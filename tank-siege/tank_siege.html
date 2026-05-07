@@ -983,8 +983,7 @@ const EXP_FRAMES = 8;
 const EXP_FRAME_W = 128;
 const EXP_FRAME_H = 128;
 const expImg = new Image();
-const _IMG_DIR = (typeof Android !== 'undefined') ? 'https://appassets.androidplatform.net/assets/' : '';
-expImg.src = _IMG_DIR + 'explosion1.png';
+expImg.src = 'explosion1.png';
 
 // Ammo config
 const AMMO_DEF = {
@@ -1096,22 +1095,24 @@ function loadLevel(idx){
   SFX.setWind(Math.abs(lv.wind||0));
   initSpecialFX();
   checkTacticalExpiry();
-  // Level 15+ rota kaybolduysa hint göster
   if(curLevel>=15 && !lv.showPath && !isTacticalActive()) setTimeout(showTacticalHint,1200);
   targetHP = targetMaxHP = lv.targetHP || MAT_HP[lv.targetMat];
-
   destructionPieces=[];
   screenShake=0;
   explosions=[];
   generateTerrain(lv.terrain);
   generateClouds();
   placeEntities();
-  // Level progression: slot açılınca mermiyi otomatik ver
   grantLevelAmmo();
   updateUI();
   cleanExpiredSlots();
   updateAmmoBar();
   updateHUD2();
+  // Terrain bake'i bir sonraki frame'e ertele — main thread bloklanmaz
+  terrainImg = null; // önce null, draw() siyah gösterir
+  requestAnimationFrame(()=>{
+    terrainImg = renderTerrainToImg();
+  });
 }
 
 function generateClouds(){
@@ -2116,8 +2117,12 @@ function drawBgMountains(){
 function drawTerrain(){
   if(terrainImg){
     ctx.drawImage(terrainImg,0,0);
+  } else if(lv) {
+    // Terrain henüz bake edilmedi — düz zemin rengi göster (tek frame)
+    const th=currentTheme||THEMES.valley;
+    ctx.fillStyle=th.terrainColors?th.terrainColors[2]:'#4a5a3a';
+    ctx.fillRect(0,H*0.5,W,H*0.5);
   }
-  // krater çizimi kaldırıldı
 }
 
 function drawTank(){
