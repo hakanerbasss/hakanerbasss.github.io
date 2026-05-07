@@ -23,6 +23,7 @@ html,body{
 /* HUD */
 #hud{
   position:fixed;top:0;left:0;right:0;height:52px;
+  background:rgba(0,0,0,0.35);
   background:linear-gradient(180deg,rgba(0,0,0,0.85),transparent);
   display:flex;align-items:center;justify-content:space-between;
   padding:0 10px;z-index:100;pointer-events:none;
@@ -153,7 +154,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   position:fixed;right:10px;bottom:76px;z-index:100;
   display:flex;flex-direction:column;gap:8px;
 }
-.ammo-btn{
+.ammo-btn{filter:drop-shadow(0 1px 2px rgba(0,0,0,0.8));
   width:44px;height:44px;border-radius:50%;
   border:2px solid rgba(255,255,255,0.2);
   background:rgba(0,0,0,0.5);cursor:pointer;
@@ -410,7 +411,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
     <span id="tank-badge-name">Basic</span>
     <span id="tank-badge-level"></span>
   </div>
-  <button onclick="showLevelMap()" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);color:white;border-radius:14px;padding:4px 10px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🗺️</button>
+  <button onclick="showLevelMap()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🗺️</button>
   <button id="btn-gallery-open" onclick="openGallery(curLevel)">⚔️ Inventory</button>
   <button onclick="openSettings()" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
 </div>
@@ -6084,7 +6085,7 @@ function openTacticalInfo(){
 
 <!-- Level Başlangıç Kartı -->
 <div id="level-start-bg" onclick="closeLevelStartCard()" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.55);"></div>
-<div id="level-start-card" style="display:none;position:fixed;left:50%;bottom:140px;transform:translateX(-50%);z-index:501;
+<div id="level-start-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:501;
   background:linear-gradient(135deg,#1a2030,#0d1520);
   border:1.5px solid rgba(255,255,255,0.12);border-radius:20px;
   padding:20px;width:280px;max-width:calc(100vw-32px);
