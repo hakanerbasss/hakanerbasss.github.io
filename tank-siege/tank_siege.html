@@ -541,7 +541,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
   <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;">💨 Calm</div>
   <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent;">🛡️</button>
-  <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.4);border-radius:8px;padding:4px 8px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;">🔥 1</button>
+  <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.4);border-radius:8px;padding:4px 8px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-top:6px;">🔥 1</button>
 </div>
 
 <div id="power-wrap">
@@ -5687,15 +5687,11 @@ function checkTacticalExpiry(){
 function updateStreakBadge(){
   const badge = document.getElementById('streak-badge');
   if(!badge) return;
-  if(loginStreak >= 0 && lastStreakDate){
-    badge.textContent = '🔥 ' + (loginStreak+1);
-    badge.style.display = 'inline-block';
-    // 7. gün altın
-    badge.style.borderColor = loginStreak>=6 ? 'rgba(255,215,0,0.6)' : 'rgba(255,140,0,0.4)';
-    badge.style.color = loginStreak>=6 ? '#FFD700' : '#FF8C00';
-  } else {
-    badge.style.display = 'none';
-  }
+  // Her zaman göster — gün 1'den itibaren
+  badge.textContent = '🔥 ' + (loginStreak+1);
+  badge.style.display = 'inline-block';
+  badge.style.borderColor = loginStreak>=6 ? 'rgba(255,215,0,0.6)' : 'rgba(255,140,0,0.4)';
+  badge.style.color = loginStreak>=6 ? '#FFD700' : '#FF8C00';
 }
 
 function openStreakCard(){
