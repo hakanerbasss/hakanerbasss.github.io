@@ -6,7 +6,7 @@
 <title>Tank Siege</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Rajdhani:wght@600;700&display=swap');
-*{margin:0;padding:0;box-sizing:border-box;}
+*{margin:0;padding:0;box-sizing:border-box;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 html,body{
   width:100%;height:100%;overflow:hidden;
   background:#1a1a2e;
@@ -4437,10 +4437,9 @@ function showThemeGate(have, need, themeIdx){
   document.getElementById('tgo-next-theme-name').textContent =
     (nextTh.emoji||'🌟') + ' ' + (nextTh.name||'Yeni Tema');
   const barFull = Math.min(have, need);
-  document.getElementById('tgo-star-bar').textContent =
-    '⭐'.repeat(barFull) + '☆'.repeat(Math.max(0, need-barFull));
+  document.getElementById('tgo-star-bar').textContent = '⭐ '+have+' / '+need;
   document.getElementById('tgo-star-text').textContent =
-    have + '/' + need + ' yıldız — ' + missing + ' yıldız eksik';
+    have + '/' + need + ' yıldız — ' + missing + ' eksik';
   // overlay'i göster
   const ov = document.getElementById('theme-gate-overlay');
   ov.style.display = 'flex';
