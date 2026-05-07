@@ -209,6 +209,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 /* ── GALERI EKRANI ─────────────────────────────── */
 #gallery-overlay{
+  will-change:opacity;
   position:fixed;inset:0;z-index:400;
   background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);
   display:flex;flex-direction:column;
@@ -362,6 +363,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   border:1px solid rgba(255,255,255,0.07);border-top:none;
 }
 .lm-card{
+  will-change:transform;
   border-radius:10px;padding:11px 10px;cursor:pointer;
   border:1.5px solid rgba(255,255,255,0.09);
   background:rgba(255,255,255,0.05);
@@ -5182,6 +5184,7 @@ const GAME_LAYERS = ['cv','hud','hud2','angle-display','wind-wrap','power-wrap',
 
 let _lmScrolling = false;
 let _lmScrollTimer = null;
+let _lmNavigating = false; // crash guard
 
 function showLevelMap(){
   const res = document.getElementById('result');
@@ -5203,15 +5206,18 @@ function showLevelMap(){
   }, 150);
 }
 
-function closeLevelMap(){
+function closeLevelMap(restoreGame=true){
   document.getElementById('level-map').style.display = 'none';
-  // Oyun katmanlarını geri getir
-  GAME_LAYERS.forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.style.display='';
-  });
-  const bw2=document.getElementById('boost-wrap');
-  if(bw2) bw2.style.display='flex';
+  if(restoreGame){
+    // Oyun ekranına dönüyoruz — game layers'ı restore et
+    GAME_LAYERS.forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.display='';
+    });
+    const bw2=document.getElementById('boost-wrap');
+    if(bw2) bw2.style.display='flex';
+  }
+  // restoreGame=false ise galeri açılıyor — reflow yok
 }
 
 function renderLevelMap(){
@@ -5308,10 +5314,14 @@ function renderLevelMap(){
       card.ontouchend = (e) => {
           card.style.transform = '';
           card.style.background = '';
-          if(!_lmScrolling){
+          if(!_lmScrolling && !_lmNavigating){
+            _lmNavigating = true;
             e.preventDefault();
-            closeLevelMap();
+            // Game layers'ı restore etme — gereksiz reflow!
+            // Sadece level map'i gizle, galeri üstüne açılır
+            document.getElementById('level-map').style.display = 'none';
             openGallery(idx);
+            setTimeout(()=>{ _lmNavigating = false; }, 1000);
           }
         };
       card.ontouchcancel = () => {
