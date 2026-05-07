@@ -4703,7 +4703,7 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 // Müzik/Rüzgar → HTML5 Audio (streaming, loop)
 // ═══════════════════════════════════════════════════════════════
 const SFX = (function(){
-  const DIR = 'sounds/';
+  const DIR = (typeof Android !== 'undefined') ? 'https://appassets.androidplatform.net/assets/sounds/' : 'sounds/';
   let sfxOn   = localStorage.getItem('ts_sfx')   !== '0';
   let musicOn = localStorage.getItem('ts_music') !== '0';
 
@@ -4938,8 +4938,15 @@ const SFX = (function(){
     },
     toggleMusic(){
       musicOn=!musicOn; localStorage.setItem('ts_music',musicOn?'1':'0');
-      if(!musicOn){ Object.values(mus).forEach(a=>{if(!a.paused)a.pause();}); }
-      else if(_cm){ mus[_cm].volume=_cm==='gallery'?0.32:0.28; mus[_cm].play().catch(()=>{}); }
+      if(!musicOn){
+        Object.values(mus).forEach(a=>{if(a&&!a.paused) a.pause();});
+      } else {
+        if(!_cm) _cm='battle';
+        const vol=_cm==='gallery'?0.32:0.28;
+        mus[_cm].volume=vol;
+        if(_ac&&_ac.state==='suspended') _ac.resume().then(()=>mus[_cm].play().catch(()=>{}));
+        else mus[_cm].play().catch(()=>{});
+      }
       updateMusicBtn(); return musicOn;
     },
 
@@ -5760,6 +5767,26 @@ function checkDailyLoginBonus(){
 function closeLoginBonus(){
   const p = document.getElementById('login-bonus-popup');
   if(p) p.style.display = 'none';
+}
+
+
+// ── Android Reklam Köprüsü ─────────────────────────────────────────────────
+// Android'den çağrılır: webView.evaluateJavascript("giveReward('tactical')", null)
+function giveReward(adType){
+  switch(adType){
+    case 'extra_ammo':   giveExtraAmmo(); break;
+    case 'extra_stars':  giveAdStars(2); break;
+    case 'puan':         givePointsFromAd(); break;
+    case 'shield':       giveAdShield && giveAdShield(); break;
+    case 'tactical':     giveTactical(); break;
+    case 'windblock':    giveAdWindblock && giveAdWindblock(); break;
+    default: showToast('Ödül alındı!');
+  }
+}
+
+// Reklam gösterilemedi — kullanıcıya bildir, ödül verme
+function adFailed(adType){
+  showToast('📵 Reklam yüklenemedi. İnternet bağlantını kontrol et.');
 }
 
 init();
