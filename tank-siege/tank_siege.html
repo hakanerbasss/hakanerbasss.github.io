@@ -5180,6 +5180,9 @@ function isThemeUnlocked(themeIdx){
 
 const GAME_LAYERS = ['cv','hud','hud2','angle-display','wind-wrap','power-wrap','ammo-bar','joystick-zone','bottom-bar'];
 
+let _lmScrolling = false;
+let _lmScrollTimer = null;
+
 function showLevelMap(){
   const res = document.getElementById('result');
   if(res) res.classList.remove('show');
@@ -5219,6 +5222,13 @@ function renderLevelMap(){
   const total = getTotalStars();
   const maxStars = LEVELS.length * 3;
   document.getElementById('lm-total-stars').textContent = '⭐ '+total+'/'+maxStars;
+  // Scroll tracker — ilk tap sorununun önüne geçer
+  const lmEl = document.getElementById('level-map');
+  lmEl.onscroll = () => {
+    _lmScrolling = true;
+    clearTimeout(_lmScrollTimer);
+    _lmScrollTimer = setTimeout(()=>{ _lmScrolling = false; }, 200);
+  };
 
   const themeOrder = ['valley','desert','snow','forest','rocky','meadow','volcano','nightcity','tropical','skyislands','cloudy','rainy','snowyweather'];
   const themeNames_map = {
@@ -5291,22 +5301,30 @@ function renderLevelMap(){
         + (!unlocked ? '<div class="lm-lock-icon">🔒</div>' : '');
 
       if(unlocked){
-        card.ontouchstart = () => {
+        card.ontouchstart = (e) => {
           card.style.transform = 'scale(0.93)';
           card.style.background = 'rgba(255,255,255,0.12)';
         };
-      card.ontouchend = card.ontouchcancel = () => {
+      card.ontouchend = (e) => {
+          card.style.transform = '';
+          card.style.background = '';
+          if(!_lmScrolling){
+            e.preventDefault();
+            closeLevelMap();
+            openGallery(idx);
+          }
+        };
+      card.ontouchcancel = () => {
           card.style.transform = '';
           card.style.background = '';
         };
-      card.onclick = () => {
-          closeLevelMap();
-          openGallery(idx);
-        };
       } else {
         card.ontouchstart = () => { card.style.transform='scale(0.96)'; };
-      card.ontouchend = card.ontouchcancel = () => { card.style.transform=''; };
-      card.onclick = () => showToast('🔒 Önce önceki leveli tamamla!');
+      card.ontouchend = (e) => {
+        card.style.transform='';
+        if(!_lmScrolling){ e.preventDefault(); showToast('🔒 Önce önceki leveli tamamla!'); }
+      };
+      card.ontouchcancel = () => { card.style.transform=''; };
       }
 
       grid.appendChild(card);
