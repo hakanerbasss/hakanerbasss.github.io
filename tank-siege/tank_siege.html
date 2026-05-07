@@ -983,7 +983,8 @@ const EXP_FRAMES = 8;
 const EXP_FRAME_W = 128;
 const EXP_FRAME_H = 128;
 const expImg = new Image();
-expImg.src = 'explosion1.png';
+const _IMG_DIR = (typeof Android !== 'undefined') ? 'https://appassets.androidplatform.net/assets/' : '';
+expImg.src = _IMG_DIR + 'explosion1.png';
 
 // Ammo config
 const AMMO_DEF = {
