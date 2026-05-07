@@ -5800,6 +5800,7 @@ function giveWindBlock(){
   if(!lv || lv.wind===0){ showToast('💨 Bu levelde rüzgar yok, hak geri eklendi!'); return; }
   windBlock={expiresAtLevel:cl+3};
   wind=0;
+  SFX.setWind(0);  // rüzgar engelleyici aktifken rüzgar sesini durdur
   localStorage.setItem('ts_wind_block',JSON.stringify(windBlock));
   updateTacticalBadge(); updateWindBlockBadge();
   renderGallery();
