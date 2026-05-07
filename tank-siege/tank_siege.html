@@ -983,7 +983,8 @@ const EXP_FRAMES = 8;
 const EXP_FRAME_W = 128;
 const EXP_FRAME_H = 128;
 const expImg = new Image();
-expImg.src = 'explosion1.png';
+const _IMG_DIR = (typeof Android !== 'undefined') ? 'https://appassets.androidplatform.net/assets/' : '';
+expImg.src = _IMG_DIR + 'explosion1.png';
 
 // Ammo config
 const AMMO_DEF = {
@@ -1021,6 +1022,16 @@ const TANK_DEF = {
   elite:    {color:'#2E3D6B',barrelColor:'#1E2D5A',w:72,h:32,barrelW:6,barrelL:44, armor:true, antenna:true, chrome:false, maxPower:33, windRes:0.70},
   titan:    {color:'#4A3728',barrelColor:'#2A1E14',w:82,h:36,barrelW:7,barrelL:52, armor:true, antenna:true, chrome:true,  maxPower:38, windRes:0.55},
 };
+
+// Tank upgrade efektif değerleri — her seviye +1.5 maxPower, -0.04 windRes
+function tankEffectivePower(tankKey){
+  const td=TANK_DEF[tankKey]||TANK_DEF.basic;
+  return td.maxPower + (tankUpgrades[tankKey]||0)*1.5;
+}
+function tankEffectiveWindRes(tankKey){
+  const td=TANK_DEF[tankKey]||TANK_DEF.basic;
+  return Math.max(0.15, td.windRes - (tankUpgrades[tankKey]||0)*0.04);
+}
 
 // ═══════════════════════════════════════
 // INIT
@@ -1816,7 +1827,7 @@ function update(){
     const steps=Math.max(3,Math.min(16,Math.ceil(speed/4)));
     for(let step=0;step<steps;step++){
       const curTd=TANK_DEF[selectedTank]||TANK_DEF.basic;
-      bullet.vx += (shieldActive?0:wind)*0.012*(curTd.windRes||1.0)/steps;
+      bullet.vx += (shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank)/steps;
       bullet.vy += GRAVITY/steps;
       bullet.x  += bullet.vx/steps;
       bullet.y  += bullet.vy/steps;
@@ -1875,7 +1886,7 @@ function update(){
     let hit = false;
     for(let s=0;s<esteps;s++){
       const curTd=TANK_DEF[selectedTank]||TANK_DEF.basic;
-      eb.vx += (shieldActive?0:wind)*0.012*(curTd.windRes||1.0)/esteps;
+      eb.vx += (shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank)/esteps;
       eb.vy += GRAVITY/esteps;
       eb.x  += eb.vx/esteps;
       eb.y  += eb.vy/esteps;
@@ -2666,7 +2677,7 @@ function drawPath(){
   const bx0 = tankX+Math.cos(-rad)*td.barrelL;
   const by0 = tankY-td.h-4+Math.sin(-rad)*td.barrelL;
   const pathTd=TANK_DEF[selectedTank]||TANK_DEF[lv.tankType]||TANK_DEF.basic;
-  const pwr = MIN_POWER + (power/100)*((pathTd.maxPower||MAX_POWER)-MIN_POWER);
+  const pwr = MIN_POWER + (power/100)*(tankEffectivePower(selectedTank||lv.tankType)-MIN_POWER);
   const darkThemes=['snow','forest','rocky'];
   const pathCol=darkThemes.includes(lv&&lv.theme?lv.theme:'valley')
     ?'rgba(255,214,10,0.80)':'rgba(40,60,200,0.85)';
@@ -2689,7 +2700,7 @@ function drawPath(){
       const steps=Math.max(3,Math.min(16,Math.ceil(speed/4)));
       let hit=false;
       for(let s=0;s<steps;s++){
-        vx+=(shieldActive?0:wind)*0.012*(pathTd.windRes||1.0)/steps;
+        vx+=(shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank||lv.tankType)/steps;
         vy+=GRAVITY/steps;
         px+=vx/steps;
         py+=vy/steps;
@@ -2742,7 +2753,7 @@ function drawPath(){
       const steps=Math.max(3,Math.min(16,Math.ceil(speed/4)));
       let hit=false;
       for(let s=0;s<steps;s++){
-        vx+=(shieldActive?0:wind)*0.012*(pathTd.windRes||1.0)/steps;
+        vx+=(shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank||lv.tankType)/steps;
         vy+=GRAVITY/steps;
         px+=vx/steps; py+=vy/steps;
         const xi=Math.floor(px);
@@ -3180,7 +3191,7 @@ function shiftWind(){
   const shift=(Math.random()-0.5)*maxWind*0.6;
   wind=Math.max(-maxWind*1.3,Math.min(maxWind*1.3,wind+shift));
   if(Math.random()<0.15) wind*=-1;
-  if(!shieldActive) SFX.setWind(Math.abs(wind));
+  if(!(shieldActive||(windBlock&&windBlock.expiresAtLevel>curLevel))) SFX.setWind(Math.abs(wind));
   updateUI();
 }
 
@@ -3191,7 +3202,7 @@ function fire(){
   const rad=angle*Math.PI/180;
   const bx=tankX+Math.cos(-rad)*td.barrelL;
   const by=tankY-td.h-4+Math.sin(-rad)*td.barrelL;
-  const tankMaxP=td.maxPower||MAX_POWER;
+  const tankMaxP=tankEffectivePower(selectedTank||lv.tankType);
   const pwr=MIN_POWER+(power/100)*(tankMaxP-MIN_POWER);
 
   if(selectedAmmo === 'triple'){
@@ -3764,7 +3775,7 @@ function openGallery(nextIdx){
 
 function closeGallery(){
   SFX.closeGallery();
-  SFX.setWind(Math.abs(wind));
+  SFX.setWind((shieldActive||(windBlock&&windBlock.expiresAtLevel>curLevel))?0:Math.abs(wind));
   document.getElementById('gallery-overlay').classList.remove('show');
   updateTacticalBadge(); updateWindBlockBadge(); // galeri kapanınca rozeti güncelle
 }
@@ -3806,7 +3817,7 @@ function restoreGameLayers(callback){
 function startLevel(){
   document.getElementById('gallery-overlay').classList.remove('show');
   SFX.closeGallery();
-  SFX.setWind(Math.abs(wind));
+  SFX.setWind((shieldActive||(windBlock&&windBlock.expiresAtLevel>curLevel))?0:Math.abs(wind));
   restoreGameLayers(()=>{
     loadLevel(pendingLevelIdx);
     updateTacticalBadge();
@@ -3874,7 +3885,7 @@ function watchAdForPoints(){
 }
 
 function givePointsFromAd(){
-  SFX.setWind(Math.abs(wind));
+  SFX.setWind((shieldActive||(windBlock&&windBlock.expiresAtLevel>curLevel))?0:Math.abs(wind));
   score+=200;
   lastAdTime=Date.now();
   dailyAdCount++;
@@ -4079,10 +4090,10 @@ function renderTankGallery(cont){
       </div>
       <span style="font-size:10px;font-weight:700;color:${col};width:36px;text-align:right;">${valStr}</span>
     </div>`;
-    const _menzilVal = (_td.maxPower-20)/22; // 20-42 arası → 0-1
-    const _ruzgarVal = 1-_td.windRes;
+    const _menzilVal = (tankEffectivePower(key)-20)/22;
+    const _ruzgarVal = 1-tankEffectiveWindRes(key);
     const _tankInfoHtml = `
-      ${_tStatRow('Menzil',_menzilVal,'#FF6B35','⚡'+_td.maxPower)}
+      ${_tStatRow('Menzil',Math.min(1,_menzilVal),'#FF6B35','⚡'+tankEffectivePower(key).toFixed(1))}
       ${_tStatRow('Rüzgar',_ruzgarVal,'#00C9B1',Math.round(_ruzgarVal*100)+'%')}
       ${_tStatRow('Bonus',Math.min(1,_tBonNow/100),'#FFD700','+'+_tBonNow+'%')}
       <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;">
