@@ -324,8 +324,10 @@ button:active{opacity:0.75;transform:scale(0.96);}
 }
 /* ── Level Map ──────────────────────────────────────────── */
 #level-map{
-  display:none;position:fixed;inset:0;z-index:9999;
+  display:block;position:fixed;inset:0;z-index:9999;
   background:#0a0f1a;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  touch-action:pan-y;will-change:transform;
+  visibility:hidden;pointer-events:none;opacity:0;
 }
 #level-map-header{
   position:sticky;top:0;z-index:10;
@@ -373,7 +375,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   transition:transform 0.1s, background 0.1s;
 }
 .lm-card:active{transform:scale(0.93);background:rgba(255,255,255,0.12)!important;}
-.lm-card{transition:transform 0.08s,background 0.08s;}
+.lm-card{transition:none;}
 .lm-card.locked{opacity:0.4;cursor:default;background:rgba(0,0,0,0.2);}
 .lm-card.current{border-color:rgba(255,215,0,0.55);background:rgba(255,215,0,0.07);}
 .lm-card.completed{border-color:rgba(0,230,118,0.25);}
@@ -3859,7 +3861,6 @@ function closeLevelStartCard(){
 }
 
 function restoreGameLayers(callback){
-  // Galeri kapat, sonraki frame'de restore et — reflow bloklamaz
   requestAnimationFrame(()=>{
     GAME_LAYERS.forEach(id=>{
       const el=document.getElementById(id);
@@ -3867,7 +3868,7 @@ function restoreGameLayers(callback){
     });
     const bw=document.getElementById('boost-wrap');
     if(bw) bw.style.display='flex';
-    if(callback) requestAnimationFrame(callback);
+    if(callback) callback();
   });
 }
 
@@ -5368,7 +5369,9 @@ function showLevelMap(){
   if(bw) bw.style.display='none';
   renderLevelMap();
   const map = document.getElementById('level-map');
-  map.style.display = 'block';
+  map.style.visibility='visible';
+  map.style.pointerEvents='auto';
+  map.style.opacity='1';
   setTimeout(()=>{
     const cur = document.getElementById('lm-card-'+curLevel);
     if(cur) cur.scrollIntoView({behavior:'smooth', block:'center'});
@@ -5376,9 +5379,11 @@ function showLevelMap(){
 }
 
 function closeLevelMap(restoreGame=true){
-  document.getElementById('level-map').style.display = 'none';
+  const _lm=document.getElementById('level-map');
+  _lm.style.visibility='hidden';
+  _lm.style.pointerEvents='none';
+  _lm.style.opacity='0';
   if(restoreGame){
-    // Oyun ekranına dönüyoruz — game layers'ı restore et
     GAME_LAYERS.forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.style.display='';
@@ -5386,7 +5391,6 @@ function closeLevelMap(restoreGame=true){
     const bw2=document.getElementById('boost-wrap');
     if(bw2) bw2.style.display='flex';
   }
-  // restoreGame=false ise galeri açılıyor — reflow yok
 }
 
 function renderLevelMap(){
@@ -5407,11 +5411,11 @@ function renderLevelMap(){
 
   const themeOrder = ['valley','desert','snow','forest','rocky','meadow','volcano','nightcity','tropical','skyislands','cloudy','rainy','snowyweather'];
   const themeNames_map = {
-    valley:'🌿 Yeşil Vadi', desert:'🏜️ Çöl', snow:'❄️ Karlı Dağlar',
-    forest:'🌲 Ormanlık', rocky:'🪨 Kayalık', meadow:'🌅 Otlak',
-    volcano:'🌋 Yanardağ', nightcity:'🌙 Gece Şehri', tropical:'🏖️ Tropikal',
-    skyislands:'☁️ Gökyüzü Adaları', cloudy:'⛅ Bulutlar Üstü',
-    rainy:'🌧️ Fırtına Cephesi', snowyweather:'🌨️ Kar Fırtınası',
+    valley:'🌿 Green Valley', desert:'🏜️ Desert', snow:'❄️ Snowy Mountains',
+    forest:'🌲 Forest', rocky:'🪨 Rocky Lands', meadow:'🌅 Meadow',
+    volcano:'🌋 Volcano', nightcity:'🌙 Night City', tropical:'🏖️ Tropical',
+    skyislands:'☁️ Sky Islands', cloudy:'⛅ Above the Clouds',
+    rainy:'🌧️ Storm Front', snowyweather:'🌨️ Snowstorm',
   };
 
 
@@ -5487,7 +5491,10 @@ function renderLevelMap(){
             _lmNavigating = true;
             e.preventDefault();
             // Level map kapat, game layers restore et, aksiyon kartı göster
-            document.getElementById('level-map').style.display = 'none';
+            const _lm2=document.getElementById('level-map');
+            _lm2.style.visibility='hidden';
+            _lm2.style.pointerEvents='none';
+            _lm2.style.opacity='0';
             restoreGameLayers(()=>{
               openLevelStartCard(idx);
               _lmNavigating = false;
