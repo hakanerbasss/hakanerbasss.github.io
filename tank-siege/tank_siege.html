@@ -6019,10 +6019,15 @@ function giveReward(adType){
     case 'extra_ammo':   giveExtraAmmo(); break;
     case 'extra_stars':  giveAdStars(2); break;
     case 'puan':         givePointsFromAd(); break;
-    case 'shield':       giveAdShield && giveAdShield(); break;
+    case 'shield':       activateShield(); break;
     case 'tactical':     giveTactical(); break;
-    case 'windblock':    giveAdWindblock && giveAdWindblock(); break;
-    default: showToast('Ödül alındı!');
+    case 'windblock':    giveWindBlock(); break;
+    default:
+      // Mühimmat: 'ammo_ap', 'ammo_piercer' vs.
+      if(adType.startsWith('ammo_')){
+        giveAdAmmo(adType.replace('ammo_','')); break;
+      }
+      showToast('Ödül alındı!');
   }
 }
 
