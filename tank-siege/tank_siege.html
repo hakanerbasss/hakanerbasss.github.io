@@ -111,6 +111,10 @@ html,body{
   -webkit-tap-highlight-color:transparent;
 }
 #btn-fire:active{transform:translateY(3px);box-shadow:0 1px 0 #b32200;}
+button:active{opacity:0.75;transform:scale(0.96);}
+.res-btn:active{transform:scale(0.96)!important;opacity:0.8;}
+.gc-btn:active{opacity:0.7;}
+.gtab:active{opacity:0.7;}
 #btn-fire:disabled{opacity:0.4;pointer-events:none;}
 
 /* Result overlay */
@@ -362,7 +366,8 @@ html,body{
   -webkit-tap-highlight-color:transparent;
   transition:transform 0.1s, background 0.1s;
 }
-.lm-card:active{transform:scale(0.95);}
+.lm-card:active{transform:scale(0.93);background:rgba(255,255,255,0.12)!important;}
+.lm-card{transition:transform 0.08s,background 0.08s;}
 .lm-card.locked{opacity:0.4;cursor:default;background:rgba(0,0,0,0.2);}
 .lm-card.current{border-color:rgba(255,215,0,0.55);background:rgba(255,215,0,0.07);}
 .lm-card.completed{border-color:rgba(0,230,118,0.25);}
@@ -4481,7 +4486,7 @@ function giveAdStars(count){
     refreshStarShopUI();
     if(gateOv&&gateOv.style.display==='flex'){
       const have=starsNow; const need=20; const barFull=Math.min(have,need);
-      document.getElementById('tgo-star-bar').textContent='⭐'.repeat(barFull)+'☆'.repeat(Math.max(0,need-barFull));
+      document.getElementById('tgo-star-bar').textContent='⭐ '+have+' / '+need;
       document.getElementById('tgo-star-text').textContent=have+'/'+need+' yıldız — '+(need-have)+' yıldız eksik';
     }
   }
@@ -4548,7 +4553,7 @@ function buyStarWithPoints(count){
   if(gateOv&&gateOv.style.display==='flex'){
     const starsNow=getThemeStars(themeIdx);
     const need=20; const have=starsNow; const barFull=Math.min(have,need);
-    document.getElementById('tgo-star-bar').textContent='⭐'.repeat(barFull)+'☆'.repeat(Math.max(0,need-barFull));
+    document.getElementById('tgo-star-bar').textContent='⭐ '+have+' / '+need;
     document.getElementById('tgo-star-text').textContent=have+'/'+need+' yıldız — '+(need-have)+' yıldız eksik';
     if(starsNow>=20){
       gateOv.style.display='none';
