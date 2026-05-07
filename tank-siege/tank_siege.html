@@ -1036,8 +1036,39 @@ function tankEffectiveWindRes(tankKey){
   return Math.max(0.15, td.windRes - (tankUpgrades[tankKey]||0)*0.04);
 }
 
-// ═══════════════════════════════════════
-// INIT
+// ── PNG TERRAIN SİSTEMİ ──────────────────────────────────────────
+const TERRAIN_PNGS = {
+  // valley teması için test PNG — level 1-10
+  // Format: 'theme_terrain': Image object
+};
+const _terrainPngCache = {};
+
+function loadTerrainPng(theme, terrainType){
+  const key = theme+'_'+terrainType;
+  if(_terrainPngCache[key]) return _terrainPngCache[key];
+  // Şimdilik sadece valley_medium için test
+  if(theme==='valley'){
+    const img = new Image();
+    const src = (typeof Android !== 'undefined')
+      ? 'https://appassets.androidplatform.net/assets/terrain_valley.png'
+      : 'test1_terrain.png';
+    img.src = src;
+    _terrainPngCache[key] = img;
+    return img;
+  }
+  return null;
+}
+
+function drawTerrainPng(){
+  if(!lv) return;
+  const img = loadTerrainPng(lv.theme, lv.terrain);
+  if(img && img.complete && img.naturalWidth){
+    // PNG'yi tüm ekrana yay — fizik terrain array'i aynı kalır
+    ctx.drawImage(img, 0, 0, W, H);
+    return true;
+  }
+  return false;
+}
 // ═══════════════════════════════════════
 function init(){
   cv = document.getElementById('cv');
@@ -1964,18 +1995,21 @@ function update(){
 }
 
 function draw(){
-  // Sky
-  drawSky();
+  // Valley teması için PNG terrain dene
+  const usePng = lv && lv.theme==='valley' && drawTerrainPng();
 
-  drawSpecialFX_BG();
-  // Clouds
-  drawClouds();
-
-  // Background mountains (parallax)
-  drawBgMountains();
-
-  // Terrain (pre-rendered + craters)
-  drawTerrain();
+  if(!usePng){
+    // Normal canvas terrain
+    drawSky();
+    drawSpecialFX_BG();
+    drawClouds();
+    drawBgMountains();
+    drawTerrain();
+  } else {
+    // PNG üzerine sadece animasyonlu elemanlar
+    drawSpecialFX_BG();
+    drawClouds();
+  }
 
   // Path preview
   if(phase==='aim' && (lv.showPath || isTacticalActive())){
@@ -3328,7 +3362,13 @@ function onTerrainHit(){
   terrainImg = renderTerrainToImg();
   // Hedef altındaki terrain değiştiyse targetY'yi güncelle
   const txi = Math.floor(targetX);
-  if(txi>=0&&txi<W) targetY = terrain[txi];
+  if(txi>=0&&txi<W){
+      targetY = terrain[txi];
+      const _txL2 = Math.max(0, txi - 18);
+      const _txR2 = Math.min(W-1, txi + 18);
+      const _sl2 = (terrain[_txR2] - terrain[_txL2]) / (_txR2 - _txL2);
+      targetAngle = Math.atan(_sl2);
+    }
 
   // Kaya parçaları, toz, çakıl
   spawnRockDebris(_bx, _by, _r, selectedAmmo);
