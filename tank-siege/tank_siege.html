@@ -7,6 +7,9 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Rajdhani:wght@600;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+button{outline:none;-webkit-appearance:none;}
+button:focus{outline:none;}
+a:focus{outline:none;}
 html,body{
   width:100%;height:100%;overflow:hidden;
   background:#1a1a2e;
@@ -5288,12 +5291,22 @@ function renderLevelMap(){
         + (!unlocked ? '<div class="lm-lock-icon">🔒</div>' : '');
 
       if(unlocked){
-        card.onclick = () => {
+        card.ontouchstart = () => {
+          card.style.transform = 'scale(0.93)';
+          card.style.background = 'rgba(255,255,255,0.12)';
+        };
+      card.ontouchend = card.ontouchcancel = () => {
+          card.style.transform = '';
+          card.style.background = '';
+        };
+      card.onclick = () => {
           closeLevelMap();
           openGallery(idx);
         };
       } else {
-        card.onclick = () => showToast('🔒 Önce önceki leveli tamamla!');
+        card.ontouchstart = () => { card.style.transform='scale(0.96)'; };
+      card.ontouchend = card.ontouchcancel = () => { card.style.transform=''; };
+      card.onclick = () => showToast('🔒 Önce önceki leveli tamamla!');
       }
 
       grid.appendChild(card);
@@ -5969,7 +5982,7 @@ function openTacticalInfo(){
     <span id="lm-total-stars" style="color:#FFD700;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;"></span>
     <button onclick="closeLevelMap()" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
       color:white;border-radius:12px;padding:6px 14px;font-size:14px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;">✕</button>
+      font-family:'Rajdhani',sans-serif;cursor:pointer;transition:transform 0.08s,opacity 0.08s;" ontouchstart="this.style.transform='scale(0.85)';this.style.opacity='0.6'" ontouchend="this.style.transform='';this.style.opacity=''">✕</button>
   </div>
   <div id="level-map-content" style="padding:8px 0 80px;"></div>
 </div>
