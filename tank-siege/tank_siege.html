@@ -1045,13 +1045,18 @@ function init(){
   document.addEventListener('contextmenu', e=>e.preventDefault(), {capture:true});
 
   checkDailyLoginBonus();
-  try{
-    loadLevel(0); // arka planda hazırla
-    setTimeout(showLevelMap, 150); // map'i göster
-  }catch(e){
-    document.getElementById('hud-level').textContent='INIT ERR:'+e.message.slice(0,40);
-    console.error('loadLevel error:',e);
-  }
+  curLevel = 0;
+  lv = LEVELS[0];
+  currentTheme = THEMES[lv.theme] || THEMES.valley;
+  // DOM tam hazır olunca çalıştır
+  setTimeout(()=>{
+    try{
+      showLevelMap();
+      loadLevel(0);
+    }catch(e){
+      console.error('init error:',e);
+    }
+  }, 50);
   requestAnimationFrame(loop);
 }
 
