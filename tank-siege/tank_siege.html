@@ -206,14 +206,12 @@ html,body{
   background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);
   display:flex;flex-direction:column;
   opacity:0;pointer-events:none;transition:opacity 0.3s;
-  overflow-y:auto;
+  overflow:hidden;
 }
 #gallery-overlay.show{opacity:1;pointer-events:all;}
 #gallery-header{
   display:flex;align-items:center;justify-content:space-between;
   padding:16px 16px 8px;flex-shrink:0;
-  position:sticky;top:0;z-index:10;
-  background:rgba(10,15,26,0.97);backdrop-filter:blur(8px);
 }
 #gallery-title{
   color:#FFD700;font-family:'Rajdhani',sans-serif;
@@ -579,7 +577,7 @@ html,body{
   </div>
 
   <!-- İçerik -->
-  <div id="gallery-content" class="gallery-grid"></div>
+  <div id="gallery-content" class="gallery-grid" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;"></div>
 
   <!-- Alt butonlar -->
   <div id="gallery-footer">
