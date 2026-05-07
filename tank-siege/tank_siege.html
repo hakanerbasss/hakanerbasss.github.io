@@ -6027,13 +6027,17 @@ function giveReward(adType){
       if(adType.startsWith('ammo_')){
         giveAdAmmo(adType.replace('ammo_','')); break;
       }
+      // Tank: 'tank_upgraded', 'tank_elite' vs.
+      if(adType.startsWith('tank_')){
+        giveAdTank(adType.replace('tank_','')); break;
+      }
       showToast('Ödül alındı!');
   }
 }
 
 // Reklam gösterilemedi — kullanıcıya bildir, ödül verme
 function adFailed(adType){
-  showToast('📵 Reklam yüklenemedi. İnternet bağlantını kontrol et.');
+  showToast('📵 Reklam şu an hazır değil, biraz bekleyip tekrar dene.');
 }
 
 init();
