@@ -541,6 +541,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
   <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;">💨 Calm</div>
   <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent;">🛡️</button>
+  <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.4);border-radius:8px;padding:4px 8px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;">🔥 1</button>
 </div>
 
 <div id="power-wrap">
@@ -1029,7 +1030,8 @@ function init(){
   ctx = cv.getContext('2d');
   updateSfxBtn();
   updateMusicBtn();
-  updateTacticalBadge(); updateWindBlockBadge();
+  updateTacticalBadge();
+  updateStreakBadge(); updateWindBlockBadge();
   resize();
   window.addEventListener('resize', resize);
 
@@ -5681,6 +5683,60 @@ function checkTacticalExpiry(){
 }
 
 
+
+function updateStreakBadge(){
+  const badge = document.getElementById('streak-badge');
+  if(!badge) return;
+  if(loginStreak >= 0 && lastStreakDate){
+    badge.textContent = '🔥 ' + (loginStreak+1);
+    badge.style.display = 'inline-block';
+    // 7. gün altın
+    badge.style.borderColor = loginStreak>=6 ? 'rgba(255,215,0,0.6)' : 'rgba(255,140,0,0.4)';
+    badge.style.color = loginStreak>=6 ? '#FFD700' : '#FF8C00';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function openStreakCard(){
+  const body = document.getElementById('streak-card-body');
+  if(!body) return;
+  const today = new Date().toDateString();
+  const isActive = lastStreakDate === today ||
+    lastStreakDate === new Date(Date.now()-86400000).toDateString();
+  const dayNum = loginStreak + 1;
+  // 7 gün çubuğu
+  let bars = '<div style="display:flex;gap:4px;margin-bottom:12px;">';
+  STREAK_STARS.forEach((s,i)=>{
+    const done = i < loginStreak;
+    const cur  = i === loginStreak;
+    bars += '<div style="flex:1;text-align:center;border-radius:6px;padding:5px 2px;'+
+      'background:'+(cur?'rgba(255,140,0,0.2)':done?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.03)')+';'+
+      'border:1px solid '+(cur?'#FF8C00':done?'rgba(255,255,255,0.12)':'rgba(255,255,255,0.06)')+';">'+
+      '<div style="font-size:12px;">'+(done||cur?'🔥':'○')+'</div>'+
+      '<div style="font-size:10px;color:'+(cur?'#FF8C00':'rgba(255,255,255,0.4)')+';">+'+s+'⭐</div>'+
+      '</div>';
+  });
+  bars += '</div>';
+
+  const warn = isActive
+    ? '<div style="color:rgba(255,255,255,0.5);font-size:11px;text-align:center;">Yarın da gir, seriyi koru!</div>'
+    : '<div style="color:#FF6B6B;font-size:11px;text-align:center;">⚠️ Bugün girmezsen seri sıfırlanır!</div>';
+
+  body.innerHTML = bars +
+    '<div style="color:rgba(255,255,255,0.6);font-size:12px;text-align:center;margin-bottom:8px;">'+
+      dayNum+'. gün — bugün +'+STREAK_STARS[loginStreak]+'⭐ kazandın'+
+    '</div>' + warn;
+
+  document.getElementById('streak-card-bg').style.display = 'block';
+  document.getElementById('streak-card').style.display = 'block';
+}
+
+function closeStreakCard(){
+  document.getElementById('streak-card-bg').style.display = 'none';
+  document.getElementById('streak-card').style.display = 'none';
+}
+
 function updateTacticalBadge(){
   const badge = document.getElementById('tactical-badge');
   if(!badge) return;
@@ -5919,6 +5975,7 @@ function checkDailyLoginBonus(){
     updateLoginPopup(loginStreak+1, starReward, starsAdded);
     const popup = document.getElementById('login-bonus-popup');
     if(popup) popup.style.display = 'flex';
+    updateStreakBadge();
   }, 300);
 }
 
@@ -6213,6 +6270,19 @@ function openTacticalInfo(){
       ▶ Savaşa Gir!
     </button>
   </div>
+</div>
+
+
+<!-- Seri Bilgi Kartı -->
+<div id="streak-card-bg" onclick="closeStreakCard()" style="display:none;position:fixed;inset:0;z-index:700;"></div>
+<div id="streak-card" style="display:none;position:fixed;right:12px;top:165px;z-index:701;
+  background:#1a2030;border:1.5px solid rgba(255,140,0,0.4);border-radius:16px;
+  padding:16px;width:230px;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <span style="color:#FF8C00;font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;">🔥 Giriş Serisi</span>
+    <button onclick="closeStreakCard()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;">✕</button>
+  </div>
+  <div id="streak-card-body"></div>
 </div>
 
 <!-- ⚙️ Ayarlar Dialog -->
