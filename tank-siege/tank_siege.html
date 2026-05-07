@@ -5702,16 +5702,18 @@ function openStreakCard(){
     lastStreakDate === new Date(Date.now()-86400000).toDateString();
   const dayNum = loginStreak + 1;
   // 7 gün çubuğu
-  let bars = '<div style="display:flex;gap:4px;margin-bottom:12px;">';
-  STREAK_STARS.forEach((s,i)=>{
-    const done = i < loginStreak;
-    const cur  = i === loginStreak;
-    bars += '<div style="flex:1;text-align:center;border-radius:6px;padding:5px 2px;'+
-      'background:'+(cur?'rgba(255,140,0,0.2)':done?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.03)')+';'+
-      'border:1px solid '+(cur?'#FF8C00':done?'rgba(255,255,255,0.12)':'rgba(255,255,255,0.06)')+';">'+
-      '<div style="font-size:12px;">'+(done||cur?'🔥':'○')+'</div>'+
-      '<div style="font-size:10px;color:'+(cur?'#FF8C00':'rgba(255,255,255,0.4)')+';">+'+s+'⭐</div>'+
-      '</div>';
+  let bars = '<div style="display:flex;gap:3px;margin-bottom:12px;">';
+  STREAK_STARS.forEach(function(s,i){
+    var done = i < loginStreak;
+    var cur  = i === loginStreak;
+    var bg   = cur ? 'rgba(255,140,0,0.2)' : (done ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)');
+    var brd  = cur ? '#FF8C00' : (done ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)');
+    var col  = cur ? '#FF8C00' : 'rgba(255,255,255,0.4)';
+    var ico  = (done || cur) ? '🔥' : '○';
+    bars += '<div style="flex:1;text-align:center;border-radius:6px;padding:4px 1px;background:' + bg + ';border:1px solid ' + brd + ';">';
+    bars += '<div style="font-size:11px">' + ico + '</div>';
+    bars += '<div style="font-size:9px;color:' + col + '">+' + s + '</div>';
+    bars += '</div>';
   });
   bars += '</div>';
 
