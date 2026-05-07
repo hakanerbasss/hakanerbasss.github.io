@@ -1726,7 +1726,17 @@ function placeEntities(){
 // ═══════════════════════════════════════
 // DRAW
 // ═══════════════════════════════════════
-function loop(){
+let _lastTime = 0;
+let _dtScale  = 1.0; // 60fps = 1.0, 30fps = 0.5 vb.
+
+function loop(ts){
+  if(_lastTime){
+    const dt = ts - _lastTime;
+    // 60fps baz: 16.67ms. Maks 2x hız (33ms den fazla gecikme varsa cap)
+    _dtScale = Math.min(dt / 16.67, 2.0);
+  }
+  _lastTime = ts;
+
   if(lv){
     try{ update(); }catch(e){
       console.error('update:',e);
