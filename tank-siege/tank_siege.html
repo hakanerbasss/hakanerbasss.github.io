@@ -591,7 +591,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
   <!-- Alt butonlar -->
   <div id="gallery-footer">
-    <button id="btn-gallery-close" onclick="GAME_LAYERS.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});const bw=document.getElementById('boost-wrap');if(bw)bw.style.display='flex';closeGallery();">✕</button>
+    <button id="btn-gallery-close" onclick="closeGallery()">✕</button>
     <button id="btn-gallery-play" onclick="startLevel()">SAVAŞA GİR! →</button>
   </div>
 </div>
@@ -3740,16 +3740,48 @@ function closeGallery(){
   updateTacticalBadge(); updateWindBlockBadge(); // galeri kapanınca rozeti güncelle
 }
 
-function startLevel(){
-  // Game layers'ı önce restore et (level map'ten geldiyse gizli olabilir)
-  GAME_LAYERS.forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.style.display='';
+
+
+function openLevelStartCard(idx){
+  pendingLevelIdx = idx;
+  const lv_data = LEVELS[idx];
+  if(!lv_data) return;
+  const th = THEMES[lv_data.theme] || Object.values(THEMES)[0];
+  document.getElementById('lsc-theme-emoji').textContent = th.emoji || '🎯';
+  document.getElementById('lsc-level-name').textContent = lv_data.id + ' — ' + lv_data.name;
+  const matNames = {wood:'🪵 Tahta',iron:'⚙️ Demir',steel:'🛡️ Çelik',concrete:'🧱 Beton'};
+  document.getElementById('lsc-level-info').textContent =
+    (matNames[lv_data.targetMat]||'') + '  •  ' + lv_data.shots + ' atış';
+  document.getElementById('level-start-bg').style.display = 'block';
+  document.getElementById('level-start-card').style.display = 'block';
+}
+
+function closeLevelStartCard(){
+  document.getElementById('level-start-bg').style.display = 'none';
+  document.getElementById('level-start-card').style.display = 'none';
+}
+
+function restoreGameLayers(callback){
+  // Galeri kapat, sonraki frame'de restore et — reflow bloklamaz
+  requestAnimationFrame(()=>{
+    GAME_LAYERS.forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.display='';
+    });
+    const bw=document.getElementById('boost-wrap');
+    if(bw) bw.style.display='flex';
+    if(callback) requestAnimationFrame(callback);
   });
-  const bw=document.getElementById('boost-wrap');
-  if(bw) bw.style.display='flex';
-  loadLevel(pendingLevelIdx);
-  closeGallery();
+}
+
+function startLevel(){
+  document.getElementById('gallery-overlay').classList.remove('show');
+  SFX.closeGallery();
+  SFX.setWind(Math.abs(wind));
+  restoreGameLayers(()=>{
+    loadLevel(pendingLevelIdx);
+    updateTacticalBadge();
+  });
 }
 
 function switchTab(tab){
@@ -5324,11 +5356,12 @@ function renderLevelMap(){
           if(!_lmScrolling && !_lmNavigating){
             _lmNavigating = true;
             e.preventDefault();
-            // Game layers'ı restore etme — gereksiz reflow!
-            // Sadece level map'i gizle, galeri üstüne açılır
+            // Level map kapat, game layers restore et, aksiyon kartı göster
             document.getElementById('level-map').style.display = 'none';
-            openGallery(idx);
-            setTimeout(()=>{ _lmNavigating = false; }, 1000);
+            restoreGameLayers(()=>{
+              openLevelStartCard(idx);
+              _lmNavigating = false;
+            });
           }
         };
       card.ontouchcancel = () => {
@@ -6046,6 +6079,38 @@ function openTacticalInfo(){
   </div>
   <div id="windblock-info-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;"></div>
   <div id="windblock-info-btn-area"></div>
+</div>
+
+
+<!-- Level Başlangıç Kartı -->
+<div id="level-start-bg" onclick="closeLevelStartCard()" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.55);"></div>
+<div id="level-start-card" style="display:none;position:fixed;left:50%;bottom:140px;transform:translateX(-50%);z-index:501;
+  background:linear-gradient(135deg,#1a2030,#0d1520);
+  border:1.5px solid rgba(255,255,255,0.12);border-radius:20px;
+  padding:20px;width:280px;max-width:calc(100vw-32px);
+  box-shadow:0 8px 40px rgba(0,0,0,0.6);">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div id="lsc-theme-emoji" style="font-size:28px;"></div>
+    <div>
+      <div id="lsc-level-name" style="color:white;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;"></div>
+      <div id="lsc-level-info" style="color:rgba(255,255,255,0.5);font-size:12px;font-family:'Rajdhani',sans-serif;margin-top:2px;"></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button onclick="closeLevelStartCard();openGallery(pendingLevelIdx);"
+      style="flex:1;padding:11px;border-radius:12px;
+      border:1.5px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.07);color:white;
+      font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">
+      ⚔️ Envanter
+    </button>
+    <button onclick="closeLevelStartCard();loadLevel(pendingLevelIdx);"
+      style="flex:2;padding:11px;border-radius:12px;border:none;
+      background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;
+      font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
+      ▶ Savaşa Gir!
+    </button>
+  </div>
 </div>
 
 <!-- ⚙️ Ayarlar Dialog -->
