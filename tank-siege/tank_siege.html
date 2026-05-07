@@ -591,7 +591,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
   <!-- Alt butonlar -->
   <div id="gallery-footer">
-    <button id="btn-gallery-close" onclick="closeGallery()">✕</button>
+    <button id="btn-gallery-close" onclick="GAME_LAYERS.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});const bw=document.getElementById('boost-wrap');if(bw)bw.style.display='flex';closeGallery();">✕</button>
     <button id="btn-gallery-play" onclick="startLevel()">SAVAŞA GİR! →</button>
   </div>
 </div>
@@ -3741,6 +3741,13 @@ function closeGallery(){
 }
 
 function startLevel(){
+  // Game layers'ı önce restore et (level map'ten geldiyse gizli olabilir)
+  GAME_LAYERS.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display='';
+  });
+  const bw=document.getElementById('boost-wrap');
+  if(bw) bw.style.display='flex';
   loadLevel(pendingLevelIdx);
   closeGallery();
 }
