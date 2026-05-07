@@ -1252,12 +1252,14 @@ function catmullRom(p0,p1,p2,p3,t){
   return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t);
 }
 
+let _terrainOC = null; // offscreen canvas — bir kez yarat, hep yeniden kullan
+
 function renderTerrainToImg(){
-  const oc=document.createElement('canvas');
-  oc.width=W; oc.height=H;
-  const octx=oc.getContext('2d');
-  drawTerrainOn(octx);
-  return oc;
+  if(!_terrainOC) _terrainOC = document.createElement('canvas');
+  _terrainOC.width = W;
+  _terrainOC.height = H;
+  drawTerrainOn(_terrainOC.getContext('2d'));
+  return _terrainOC;
 }
 
 function drawTerrainOn(c){
