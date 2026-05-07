@@ -961,7 +961,10 @@ let selectedTank = localStorage.getItem('ts_sel_tank')||'basic';
 let lastAdTime   = parseInt(localStorage.getItem('ts_last_ad')||'0');
 let dailyAdCount = parseInt(localStorage.getItem('ts_daily_ads')||'0');
 let dailyAdReset = localStorage.getItem('ts_daily_reset')||'';
-let lastLoginBonus = localStorage.getItem('ts_last_login')||'';
+let lastLoginBonus  = localStorage.getItem('ts_last_login')||'';
+let loginStreak     = parseInt(localStorage.getItem('ts_login_streak')||'0');
+let bonusStars      = parseInt(localStorage.getItem('ts_bonus_stars')||'0');
+let lastStreakDate   = localStorage.getItem('ts_streak_date')||'';
 let isDragging = false;
 let dragStartY = 0;
 let dragStartPower = 60;
@@ -4399,7 +4402,7 @@ function showResult(win,stars,sub){
 }
 
 function getTotalStars(){
-  let total = 0;
+  let total = parseInt(localStorage.getItem('ts_bonus_stars')||'0');
   for(let i=1; i<=LEVELS.length; i++){
     total += parseInt(localStorage.getItem('ts_stars_'+i)||'0');
   }
@@ -4488,6 +4491,14 @@ function showThemeGate(have, need, themeIdx){
   // overlay'i göster
   const ov = document.getElementById('theme-gate-overlay');
   ov.style.display = 'flex';
+  // Reklam butonunu güncelle
+  const today2 = new Date().toDateString();
+  const adUsed = parseInt(localStorage.getItem('ts_star_ad_'+today2)||'0');
+  const adBtn = document.getElementById('tgo-ad-btn');
+  if(adBtn){
+    if(adUsed>=3){ adBtn.disabled=true; adBtn.style.opacity='0.45'; adBtn.textContent='📺 Limit Doldu (3/3)'; }
+    else { adBtn.disabled=false; adBtn.style.opacity='1'; adBtn.textContent='📺 Reklam İzle → +2 ⭐ ('+(3-adUsed)+' hak)'; }
+  }
 }
 
 function onWatchAdForStars(){
@@ -4575,12 +4586,21 @@ function buyStarWithPoints(count){
   const cost = count===1 ? 200 : 500;
   const pts=parseInt(localStorage.getItem('ts_total_score')||'0');
   if(pts<cost){ showToast('Yeterli puan yok!'); return; }
+  // Önce kaç yıldız eklenebileceğini kontrol et
+  const themeIdx=Math.floor(curLevel/10);
+  const startId=themeIdx*10+1;
+  let canAdd=0;
+  for(let i=startId;i<startId+10;i++){
+    if(parseInt(localStorage.getItem('ts_stars_'+i)||'0')<3) canAdd++;
+  }
+  if(canAdd===0){
+    showToast('Bu temadaki tüm levellar zaten 3 yıldızlı! 🌟');
+    return; // Para düşme!
+  }
   // Puanı düş
   score = score - cost;
   localStorage.setItem('ts_total_score', score);
-  // Yıldız ekle — mevcut temada boşluk olan levellara
-  const themeIdx=Math.floor(curLevel/10);
-  const startId=themeIdx*10+1;
+  // Yıldız ekle
   let added=0;
   for(let i=startId;i<startId+10&&added<count;i++){
     const cur=parseInt(localStorage.getItem('ts_stars_'+i)||'0');
@@ -4607,6 +4627,22 @@ function buyStarWithPoints(count){
       else { loadLevel(curLevel+1); }
     }
   }
+}
+
+
+function themeGateWatchAd(){
+  const today = new Date().toDateString();
+  const key = 'ts_star_ad_'+today;
+  const used = parseInt(localStorage.getItem(key)||'0');
+  if(used >= 3){
+    showToast('Bugün yıldız reklamı limitine ulaştın! (3/3)');
+    const btn = document.getElementById('tgo-ad-btn');
+    if(btn){ btn.disabled=true; btn.style.opacity='0.45'; btn.textContent='📺 Limit Doldu (3/3)'; }
+    return;
+  }
+  try{ Android.showRewardedAd('extra_stars'); }
+  catch(e){ setTimeout(()=>giveAdStars(2), 800); }
+  localStorage.setItem(key, used+1);
 }
 
 function shopWatchAdForStars(){
@@ -5838,17 +5874,82 @@ function renderBoostGallery(cont){
   });
 }
 
+const STREAK_STARS = [1,1,2,2,3,3,5]; // 7 günlük seri ödülleri
+
 function checkDailyLoginBonus(){
   const today = new Date().toDateString();
   if(lastLoginBonus === today) return;
-  score += 50;
+
+  // Seri kontrolü — dün girdiyse devam et, atladıysa sıfırla
+  const yesterday = new Date(Date.now()-86400000).toDateString();
+  if(lastStreakDate === yesterday){
+    loginStreak = Math.min(loginStreak+1, 6); // 0-6 arası (7 gün)
+  } else if(lastStreakDate !== today){
+    loginStreak = 0; // Seri bozuldu, 1. günden başla
+  }
+
+  // Ödüller
+  const starReward = STREAK_STARS[loginStreak];
+  score += 50; // Günlük puan her zaman
+
+  // Yıldız ver — sadece mevcut temada boş levellara
+  let starsAdded = 0;
+  const themeIdx = Math.floor((curLevel||0)/10);
+  const startId  = themeIdx*10+1;
+  for(let i=startId; i<startId+10 && starsAdded<starReward; i++){
+    const cur = parseInt(localStorage.getItem('ts_stars_'+i)||'0');
+    if(cur<3){ localStorage.setItem('ts_stars_'+i, Math.min(3,cur+1)); starsAdded++; }
+  }
+  // Tema doluysa bonus yıldız havuzuna ekle (tank upgrade için kullanılır)
+  const leftover = starReward - starsAdded;
+  if(leftover > 0){
+    bonusStars += leftover;
+    localStorage.setItem('ts_bonus_stars', bonusStars);
+  }
+
+  // Kaydet
   lastLoginBonus = today;
-  localStorage.setItem('ts_last_login', today);
-  localStorage.setItem('ts_total_score', score);
+  lastStreakDate  = today;
+  localStorage.setItem('ts_last_login',    today);
+  localStorage.setItem('ts_login_streak',  loginStreak);
+  localStorage.setItem('ts_streak_date',   today);
+  localStorage.setItem('ts_total_score',   score);
+
   setTimeout(function(){
+    updateLoginPopup(loginStreak+1, starReward, starsAdded);
     const popup = document.getElementById('login-bonus-popup');
     if(popup) popup.style.display = 'flex';
   }, 300);
+}
+
+function updateLoginPopup(dayNum, starReward, starsAdded){
+  const el = document.getElementById('lbp-content');
+  if(!el) return;
+  const days = ['','2.','3.','4.','5.','6.','7.'];
+  const isMax = dayNum>=7;
+  el.innerHTML =
+    '<div style="font-size:13px;color:rgba(255,255,255,0.55);margin-bottom:10px;">'+
+      (dayNum===1 ? 'Seri başladı! Her gün gir, daha fazla kazan.' :
+       isMax ? '🔥 7. gün! Seri tamamlandı, yeniden başlıyor.' :
+       '🔥 '+dayNum+'. gün serisi! Devam et!')+
+    '</div>'+
+    '<div style="display:flex;justify-content:center;gap:4px;margin-bottom:14px;">'+
+    STREAK_STARS.map((s,i)=>{
+      const done = i<dayNum; const cur = i===dayNum-1;
+      return '<div style="width:32px;height:36px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;'+
+        'background:'+(cur?'rgba(255,215,0,0.25)':done?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.04)')+';'+
+        'border:1.5px solid '+(cur?'#FFD700':done?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.08)')+';">'+
+        '<span style="font-size:12px;">'+(done||cur?'⭐':'☆')+'</span>'+
+        '<span style="color:'+(cur?'#FFD700':'rgba(255,255,255,0.4)')+';">'+s+'</span>'+
+        '</div>';
+    }).join('')+
+    '</div>'+
+    '<div style="background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.25);border-radius:12px;padding:12px;margin-bottom:4px;">'+
+      '<div style="color:#FFD700;font-size:26px;font-weight:700;font-family:Rajdhani,sans-serif;">'+
+        '+50 🏆  +'+starsAdded+' ⭐'+
+      '</div>'+
+      '<div style="color:rgba(255,255,255,0.45);font-size:11px;margin-top:3px;">Günlük puan + gün '+dayNum+' yıldız ödülü</div>'+
+    '</div>';
 }
 function closeLoginBonus(){
   const p = document.getElementById('login-bonus-popup');
@@ -6225,17 +6326,23 @@ function openTacticalInfo(){
         font-family:'Rajdhani',sans-serif;font-weight:600;"></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <button onclick="themeGateGoMap()"
-        style="width:100%;padding:13px;border-radius:13px;border:1.5px solid rgba(255,255,255,0.2);
-        background:rgba(255,255,255,0.08);color:white;font-size:15px;font-weight:700;
+      <button id="tgo-ad-btn" onclick="themeGateWatchAd()"
+        style="width:100%;padding:13px;border-radius:13px;border:none;
+        background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;font-size:15px;font-weight:700;
         font-family:'Rajdhani',sans-serif;cursor:pointer;">
-        🗺️ Önceki Levellara Dön
+        📺 Reklam İzle → +2 ⭐
       </button>
       <button onclick="themeGateOpenShop()"
         style="width:100%;padding:13px;border-radius:13px;border:none;
         background:linear-gradient(135deg,#4CAF50,#2e7d32);color:white;font-size:15px;font-weight:700;
         font-family:'Rajdhani',sans-serif;cursor:pointer;">
-        ⭐ Yıldız Satın Al
+        ⭐ Puan ile Yıldız Al
+      </button>
+      <button onclick="themeGateGoMap()"
+        style="width:100%;padding:13px;border-radius:13px;border:1.5px solid rgba(255,255,255,0.2);
+        background:rgba(255,255,255,0.08);color:white;font-size:15px;font-weight:700;
+        font-family:'Rajdhani',sans-serif;cursor:pointer;">
+        🗺️ Önceki Levellara Dön
       </button>
     </div>
   </div>
@@ -6410,24 +6517,17 @@ function openTacticalInfo(){
   background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
   <div style="background:linear-gradient(135deg,#1a2030,#0d1520);
     border:1.5px solid rgba(255,215,0,0.4);border-radius:24px;
-    padding:28px 24px;width:260px;text-align:center;
+    padding:22px 20px;width:290px;text-align:center;
     box-shadow:0 0 40px rgba(255,215,0,0.15);">
-    <div style="font-size:48px;margin-bottom:8px;">🌅</div>
-    <div style="color:#FFD700;font-size:22px;font-weight:700;
-      font-family:'Fredoka One',sans-serif;margin-bottom:6px;">Günlük Bonus!</div>
-    <div style="color:rgba(255,255,255,0.7);font-size:14px;margin-bottom:16px;">
-      Bugün de geri döndün!
-    </div>
-    <div style="background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);
-      border-radius:14px;padding:14px;margin-bottom:20px;">
-      <div style="color:#FFD700;font-size:32px;font-weight:700;font-family:'Rajdhani',sans-serif;">+50 🏆</div>
-      <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:4px;">Günlük giriş puanı</div>
-    </div>
+    <div style="font-size:36px;margin-bottom:6px;">🌅</div>
+    <div style="color:#FFD700;font-size:20px;font-weight:700;
+      font-family:'Fredoka One',sans-serif;margin-bottom:12px;">Günlük Giriş!</div>
+    <div id="lbp-content"></div>
     <button onclick="closeLoginBonus()"
-      style="width:100%;padding:14px;border:none;border-radius:14px;
+      style="width:100%;padding:13px;border:none;border-radius:14px;
       background:linear-gradient(135deg,#FFD700,#FF8C00);
-      color:#000;font-size:16px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;">
+      color:#000;font-size:15px;font-weight:700;
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-top:12px;">
       Harika! Oynamaya Başla 🎮
     </button>
   </div>
