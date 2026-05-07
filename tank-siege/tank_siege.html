@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Tank Siege</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Rajdhani:wght@600;700&display=swap');
@@ -22,14 +22,11 @@ html,body{
 
 /* HUD */
 #hud{
-  position:fixed;top:0;left:0;right:0;
-  height:calc(52px + env(safe-area-inset-top, 0px));
-  padding-top:env(safe-area-inset-top, 0px);
+  position:fixed;top:0;left:0;right:0;height:52px;
   background:rgba(0,0,0,0.35);
   background:linear-gradient(180deg,rgba(0,0,0,0.85),transparent);
   display:flex;align-items:center;justify-content:space-between;
-  padding-left:10px;padding-right:10px;
-  z-index:100;pointer-events:none;
+  padding:0 10px;z-index:100;pointer-events:none;
 }
 #hud-level{color:#FFD700;font-size:15px;font-weight:700;letter-spacing:0.5px;pointer-events:none;}
 #hud-shots{color:white;font-size:15px;pointer-events:none;}
@@ -401,8 +398,8 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 
 <div id="hud">
-  <span id="hud-level">LEVEL 1</span>
   <span id="hud-shots">💣 3</span>
+  <span id="hud-level">LEVEL 1</span>
   <span id="hud-score">🏆 0</span>
   <span id="hud-stars" onclick="openStarShop()" style="color:#FFD700;font-size:15px;font-weight:700;pointer-events:auto;cursor:pointer;padding:4px 8px;border-radius:10px;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);">⭐ 0</span>
 </div>
