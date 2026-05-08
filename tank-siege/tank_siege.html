@@ -548,6 +548,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 <div id="boost-wrap" style="position:fixed;top:108px;left:12px;z-index:200;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:auto;">
   <button id="tactical-badge" onclick="onTacticalBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="windblock-badge" onclick="onWindBlockTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
+  <button id="sandbox-tactic-btn" onclick="onSandboxTacticTap()" style="background:rgba(0,0,0,0.75);border:2px solid rgba(255,107,53,0.5);border-radius:10px;padding:5px 10px;color:#FF6B35;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;">⚔️ Tactic</button>
 </div>
 
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
@@ -640,10 +641,13 @@ const MIN_POWER = 6;
 
 // ═══════════════════════════════════════
 // LEVELS
+// ── Sandbox Mod Detect ──────────────────────────────────────────
+const isSandbox = window.location.hash === '#sandbox';
+// ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.4';
-const APP_VERSION_DATE = '2026.05.09 00:01';
-const APP_VERSION_NOTE = 'EkonomiDengesi+PiercerHint+ReclamSayacBug+StarShopAyriKey+AmmoUpgrade';
+const APP_VERSION      = '1.0.5';
+const APP_VERSION_DATE = '2026.05.09 02:41';
+const APP_VERSION_NOTE = 'SandboxMod+HashDetect+MockReklamlar+FireGercekReklam+ExitButonu';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1111,6 +1115,8 @@ function drawTerrainPng(){
 }
 // ═══════════════════════════════════════
 function init(){
+  if(isSandbox) sbClearAndInit();
+  updateSandboxBtn();
   cv = document.getElementById('cv');
   ctx = cv.getContext('2d');
   updateSfxBtn();
@@ -3874,8 +3880,12 @@ function showShieldChoice(){
 
 function useShieldAd(){
   document.getElementById('shield-overlay').style.display='none';
+  if(isSandbox){
+    activateShield();
+  } else {
   try{ Android.showRewardedAd('shield'); }
   catch(e){ activateShield(); }
+  }
 }
 
 function useShieldPuan(){
@@ -3906,6 +3916,14 @@ function shiftWind(){
 }
 
 function fire(){
+  if(phase!=='aim'||shotsLeft<=0) return;
+  if(isSandbox){
+    document.getElementById('sandbox-fire-ad').style.display = 'flex';
+    return;
+  }
+  _doFire();
+}
+function _doFire(){
   if(phase!=='aim'||shotsLeft<=0) return;
   SFX.fire(selectedAmmo);
   const td=TANK_DEF[selectedTank]||TANK_DEF[lv.tankType]||TANK_DEF.basic;
@@ -5416,8 +5434,12 @@ function onWatchAdForStars(){
     return;
   }
   localStorage.setItem(key, used+1);
+  if(isSandbox){
+    setTimeout(()=>giveAdStars(2), 800);
+  } else {
   try{ Android.showRewardedAd('extra_stars'); }
   catch(e){ setTimeout(()=>giveAdStars(2), 800); }
+  }
 }
 
 function giveAdStars(count){
@@ -5547,8 +5569,12 @@ function themeGateWatchAd(){
     return;
   }
   localStorage.setItem(key, used+1);  // reklam başlamadan say — APK callback ile ödül
+  if(isSandbox){
+    setTimeout(()=>giveAdStars(2), 800);
+  } else {
   try{ Android.showRewardedAd('extra_stars'); }
   catch(e){ setTimeout(()=>giveAdStars(2), 800); }
+  }
 }
 
 function shopWatchAdForStars(){
@@ -6331,8 +6357,12 @@ function renderLevelMap(){
 function watchAdForExtraAmmo(){
   const btn = document.getElementById('btn-extra-ammo');
   if(btn) btn.style.display = 'none';
+  if(isSandbox){
+    setTimeout(giveExtraAmmo, 500);
+  } else {
   try{ Android.showRewardedAd('extra_ammo'); }
   catch(e){ setTimeout(giveExtraAmmo, 500); }
+  }
 }
 function giveExtraAmmo(){
   const today = new Date().toDateString();
@@ -6683,8 +6713,12 @@ function adTactical(){
   const used=parseInt(localStorage.getItem(key)||'0');
   if(used>=3){ showToast('Bugün Taktik Görüş reklam limitine ulaştın! (3/3)'); return; }
   localStorage.setItem(key, used+1);
+  if(isSandbox){
+    setTimeout(giveTactical, 500);
+  } else {
   try{ Android.showRewardedAd('tactical'); }
   catch(e){ setTimeout(giveTactical, 500); }
+  }
 }
 
 function adWindBlock(){
@@ -6694,8 +6728,12 @@ function adWindBlock(){
   const used=parseInt(localStorage.getItem(key)||'0');
   if(used>=3){ showToast('Bugün Rüzgar Engelleyici limitine ulaştın! (3/3)'); return; }
   localStorage.setItem(key, used+1);
+  if(isSandbox){
+    setTimeout(giveWindBlock, 500);
+  } else {
   try{ Android.showRewardedAd('windblock'); }
   catch(e){ setTimeout(giveWindBlock, 500); }
+  }
 }
 
 function giveWindBlock(){
@@ -6743,8 +6781,12 @@ function closeGuidedHint(){
 
 function guidedHintAd(){
   closeGuidedHint();
+  if(isSandbox){
+    setTimeout(()=>giveGuidedReward(), 1500);
+  } else {
   try{ Android.showRewardedAd('guided'); }
   catch(e){ setTimeout(()=>giveGuidedReward(), 1500); }
+  }
 }
 
 function giveGuidedReward(){
@@ -7008,6 +7050,7 @@ function giveReward(adType){
     case 'tactical':     giveTactical(); break;
     case 'windblock':    giveWindBlock(); break;
     case 'guided':       giveGuidedReward(); break;
+    case 'sandbox_fire':  _doFire(); break;
     default:
       // Mühimmat: 'ammo_ap', 'ammo_piercer' vs.
       if(adType.startsWith('ammo_')){
@@ -7024,6 +7067,74 @@ function giveReward(adType){
 // Reklam gösterilemedi — kullanıcıya bildir, ödül verme
 function adFailed(adType){
   showToast('📵 Reklam şu an hazır değil, biraz bekleyip tekrar dene.');
+}
+
+// ── Sandbox Sistemi ─────────────────────────────────────────────
+
+function sbClearAndInit(){
+  // Tüm ts_ verilerini sıfırla
+  const keys = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('ts_')) keys.push(k);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
+  // Sandbox başlangıç verileri
+  localStorage.setItem('ts_total_score', '1000000');
+  localStorage.setItem('ts_bonus_stars', '1000');
+}
+
+function updateSandboxBtn(){
+  const btn = document.getElementById('sandbox-tactic-btn');
+  if(!btn) return;
+  if(isSandbox){
+    btn.textContent = '🚪 EXIT';
+    btn.style.borderColor = 'rgba(255,50,50,0.6)';
+    btn.style.color = '#ff6b6b';
+  } else {
+    btn.textContent = '⚔️ Tactic';
+    btn.style.borderColor = 'rgba(255,107,53,0.5)';
+    btn.style.color = '#FF6B35';
+  }
+}
+
+function onSandboxTacticTap(){
+  if(isSandbox){
+    // EXIT — gerçek moda dön
+    window.location.hash = '';
+    window.location.reload();
+  } else {
+    // Tactic butonu — sandbox'a geç (kart göster)
+    document.getElementById('sandbox-entry-card').style.display = 'flex';
+  }
+}
+
+function closeSandboxCard(){
+  document.getElementById('sandbox-entry-card').style.display = 'none';
+}
+
+function sandboxAdWatched(){
+  // Gerçek reklam izlendi → sandbox aç
+  closeSandboxCard();
+  window.location.hash = '#sandbox';
+  window.location.reload();
+}
+
+function sbMockAd(callback){
+  // Sahte reklam — direkt callback
+  if(typeof callback === 'function') callback();
+  else if(typeof callback === 'string') eval(callback);
+}
+
+// fire() için sandbox reklam
+function sbFireAdWatched(){
+  document.getElementById('sandbox-fire-ad').style.display = 'none';
+  // Gerçek reklam izlet — sandbox'ta fire için gerçek reklam
+  try{
+    Android.showRewardedAd('sandbox_fire');
+  } catch(e){
+    _doFire(); // geliştirme modunda direkt
+  }
 }
 
 init();
@@ -7810,5 +7921,57 @@ function openTacticalInfo(){
     <button onclick="closeBuriedInfo()" style="background:linear-gradient(135deg,#FFD700,#FF8C00);border:none;border-radius:10px;padding:10px 28px;color:#000;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">Anladım</button>
   </div>
 </div>
+
+<!-- Sandbox Giriş Kartı (WebView 1'de gösterilir) -->
+<div id="sandbox-entry-card" style="display:none;position:fixed;inset:0;z-index:950;
+  background:rgba(0,0,0,0.82);align-items:center;justify-content:center;">
+  <div style="background:linear-gradient(135deg,#1a0800,#2a1200);border:2px solid rgba(255,107,53,0.5);
+    border-radius:22px;padding:28px 22px;width:290px;text-align:center;font-family:'Rajdhani',sans-serif;">
+    <div style="font-size:44px;margin-bottom:10px;">⚔️</div>
+    <div style="color:#FF6B35;font-size:20px;font-weight:700;margin-bottom:10px;">Talim Sahası</div>
+    <div style="color:rgba(255,255,255,0.72);font-size:13px;line-height:1.8;margin-bottom:20px;">
+      Tüm veriler sıfırlanır<br>
+      <b style="color:#FFD700;">1.000.000 🏆</b> puan başlangıç<br>
+      <b style="color:#FFD700;">1.000 ⭐</b> yıldız<br>
+      Her atış için reklam izlenir<br>
+      <span style="color:rgba(255,255,255,0.38);font-size:11px;">Hiçbir kazanım kaydedilmez</span>
+    </div>
+    <button onclick="sandboxAdWatched()" style="width:100%;padding:14px;border:none;border-radius:14px;
+      background:linear-gradient(135deg,#FF6B35,#ff3d00);color:white;font-size:15px;
+      font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;">
+      📺 Reklam İzle → Gir
+    </button>
+    <button onclick="closeSandboxCard()" style="width:100%;padding:9px;border:none;
+      background:none;color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
+      Vazgeç
+    </button>
+  </div>
+</div>
+
+<!-- Sandbox Fire Reklam -->
+<div id="sandbox-fire-ad" style="display:none;position:fixed;inset:0;z-index:950;
+  background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
+  <div style="background:#1a1a2e;border:1.5px solid rgba(255,107,53,0.4);
+    border-radius:18px;padding:22px 18px;width:270px;text-align:center;
+    font-family:'Rajdhani',sans-serif;">
+    <div style="font-size:32px;margin-bottom:8px;">🎯</div>
+    <div style="color:#FF6B35;font-size:16px;font-weight:700;margin-bottom:8px;">Talim Sahası</div>
+    <div style="color:rgba(255,255,255,0.65);font-size:12px;line-height:1.6;margin-bottom:16px;">
+      Her atış için reklam izle
+    </div>
+    <button onclick="sbFireAdWatched()" style="width:100%;padding:12px;border:none;
+      border-radius:12px;background:linear-gradient(135deg,#FF6B35,#ff3d00);
+      color:white;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;
+      cursor:pointer;margin-bottom:8px;">
+      📺 Reklam İzle → Ateşle
+    </button>
+    <button onclick="document.getElementById('sandbox-fire-ad').style.display='none'"
+      style="width:100%;padding:8px;border:none;background:none;
+      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
+      Vazgeç
+    </button>
+  </div>
+</div>
+
 </body>
 </html>
