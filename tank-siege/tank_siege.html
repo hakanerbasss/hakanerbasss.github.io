@@ -4864,9 +4864,11 @@ function renderTankGallery(cont){
     } else {
       const uLvl=tankUpgrades[key]||0;
       const totalStars=getTotalStars();
-      const upgBtn=uLvl<UPGRADE_MAX
+      // tempTank aktifken upgrade butonu gizle
+      const _isTempTank = tempTank && tempTank.type === key && tempTank.expiresAtLevel > curLevel;
+      const upgBtn = _isTempTank ? '' : (uLvl<UPGRADE_MAX
         ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FFD700,#c9a800);color:#1a1a1a;margin-top:4px;" onclick="upgradeTank('${key}')" ${totalStars<TANK_UPGRADE_COSTS[uLvl]?'disabled':''}>⬆ Sv${uLvl+1} — ${TANK_UPGRADE_COSTS[uLvl]}⭐</button>`
-        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>⭐ MAX</button>`;
+        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>⭐ MAX</button>`);
       if(isSelected){
         btnHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;">
           <button class="gc-btn btn-selected">✓ Seçili</button>
@@ -5051,9 +5053,44 @@ function giveAdAmmo(type){
 }
 
 function adTank(type){
+  if(tempTank && tempTank.expiresAtLevel > curLevel){
+    // Elinde geçici tank var — dialog göster
+    const curDef = TANK_DEF_GALLERY[tempTank.type] || TANK_DEF[tempTank.type];
+    const newDef = TANK_DEF_GALLERY[type];
+    const kalan  = tempTank.expiresAtLevel - curLevel;
+    _adTankPending = type;
+    const desc = document.getElementById('tank-replace-desc');
+    if(desc) desc.innerHTML =
+      'Elinde <b style="color:#FFD700">' + (curDef?curDef.name:tempTank.type) + '</b> var ' +
+      '(<b style="color:#FF6B35">' + kalan + ' level kaldı</b>).<br><br>' +
+      'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve ' +
+      'yerine <b style="color:#FFD700">' + newDef.name + '</b> gelir.';
+    const bg = document.getElementById('tank-replace-bg');
+    if(bg) bg.style.display = 'flex';
+    return;
+  }
   try{ Android.showRewardedAd('tank_'+type); }
   catch(e){ giveAdTank(type); }
 }
+
+function cancelTankReplace(){
+  _adTankPending = null;
+  const bg = document.getElementById('tank-replace-bg');
+  if(bg) bg.style.display = 'none';
+}
+
+function confirmTankReplace(){
+  const bg = document.getElementById('tank-replace-bg');
+  if(bg) bg.style.display = 'none';
+  if(!_adTankPending) return;
+  const type = _adTankPending;
+  _adTankPending = null;
+  tempTank = null;
+  localStorage.removeItem('ts_temp_tank');
+  try{ Android.showRewardedAd('tank_'+type); }
+  catch(e){ giveAdTank(type); }
+}
+
 function giveAdTank(type){
   const def=TANK_DEF_GALLERY[type];
   tempTank={type, expiresAtLevel:curLevel+def.tempLevels};
@@ -7515,6 +7552,19 @@ function openTacticalInfo(){
 
 
 <!-- Geçici Mühimmat Değiştirme Dialog -->
+<!-- Tank Replace Dialog -->
+<div id="tank-replace-bg" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
+  <div style="background:linear-gradient(135deg,#1a1a2e,#0a1520);border:1.5px solid rgba(255,107,53,0.4);border-radius:22px;padding:24px 20px;width:290px;text-align:center;font-family:'Rajdhani',sans-serif;">
+    <div style="font-size:36px;margin-bottom:8px;">🔄</div>
+    <div style="color:#FF6B35;font-size:17px;font-weight:700;margin-bottom:10px;">Tank Değiştir?</div>
+    <div id="tank-replace-desc" style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="cancelTankReplace()" style="flex:1;padding:11px;border:1.5px solid rgba(255,255,255,0.2);border-radius:12px;background:rgba(255,255,255,0.07);color:white;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">İptal</button>
+      <button onclick="confirmTankReplace()" style="flex:2;padding:11px;border:none;border-radius:12px;background:linear-gradient(135deg,#FF6B35,#ff3d00);color:white;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">Değiştir 📺</button>
+    </div>
+  </div>
+</div>
+
 <div id="ammo-replace-bg" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
   <div style="background:linear-gradient(135deg,#1a2030,#0d1520);
     border:1.5px solid rgba(255,165,0,0.4);border-radius:20px;
