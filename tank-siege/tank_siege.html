@@ -3952,7 +3952,7 @@ function onTerrainHit(){
   const dx  = bullet.x - targetX;
   const dy  = bullet.y - (targetY - targetH/2);
   const dist= Math.sqrt(dx*dx + dy*dy);
-  const splashRange = ad.radius * 0.25;  // sadece çok yakın düşünce hasar
+  const splashRange = (lv && lv.cave ? ad.radius * 0.85 : ad.radius * 0.5);
 
   if(dist < splashRange && targetHP > 0){
     const matRes = {wood:1.0, iron:0.6, steel:0.35, concrete:0.20};
@@ -6792,7 +6792,8 @@ function renderBoostGallery(cont){
     <div class="gc-info">
       <div class="gc-name">Taktik Görüş ${tacBadge}</div>
       <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 6px;">
-        Rota çizgisini gösterir, düşme noktasını belirler, rüzgar yönünü işaretler.
+        Rota çizgisini gösterir, düşme noktasını belirler.<br>
+        <b style="color:#00E5FF;">Rüzgar etkisi hesaba katılır</b> — rota gerçek düşüş noktasını gösterir.
         Level 15'ten sonra rota kaybolur — bu ile geri açılır.
       </div>
       ${statBar('Hassasiyet',1.0,'#00E5FF')}
