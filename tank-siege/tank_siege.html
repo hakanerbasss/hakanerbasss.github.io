@@ -4225,11 +4225,6 @@ function upgradeAmmo(type){
 }
 
 function upgradeTank(type){
-  if(tempTank && tempTank.type===type && tempTank.expiresAtLevel>curLevel){
-    showToast('⏱ Geçici tank upgrade yapılamaz!');
-    SFX.locked();
-    return;
-  }
   const curLvl = tankUpgrades[type]||0;
   if(curLvl>=UPGRADE_MAX){showToast('Maksimum seviyeye ulaşıldı!');return;}
   const cost = TANK_UPGRADE_COSTS[curLvl];
@@ -4300,38 +4295,7 @@ function giveAdAmmo(type){
   showToast(def.emoji+' '+def.name+' 1 level için aktif!');
 }
 
-let _adTankPending = null;
 function adTank(type){
-  if(tempTank && tempTank.expiresAtLevel > curLevel){
-    const curDef = TANK_DEF_GALLERY[tempTank.type];
-    const newDef = TANK_DEF_GALLERY[type];
-    const kalan = tempTank.expiresAtLevel - curLevel;
-    _adTankPending = type;
-    const desc = document.getElementById('tank-replace-desc');
-    if(desc) desc.innerHTML =
-      'Elinde <b style="color:#FFD700">' + curDef.emoji+' '+curDef.name + '</b> var ' +
-      '(<b style="color:#FF6B35">' + kalan + ' level kaldı</b>).<br><br>' +
-      '<b style="color:#00E5FF">' + newDef.emoji+' '+newDef.name + '</b> alırsan eskisi silinir.';
-    const bg = document.getElementById('tank-replace-bg');
-    if(bg){ bg.style.display='flex'; }
-    return;
-  }
-  try{ Android.showRewardedAd('tank_'+type); }
-  catch(e){ giveAdTank(type); }
-}
-function cancelTankReplace(){
-  _adTankPending = null;
-  const bg = document.getElementById('tank-replace-bg');
-  if(bg) bg.style.display='none';
-}
-function confirmTankReplace(){
-  const bg = document.getElementById('tank-replace-bg');
-  if(bg) bg.style.display='none';
-  if(!_adTankPending) return;
-  const type = _adTankPending;
-  _adTankPending = null;
-  tempTank = null;
-  localStorage.removeItem('ts_temp_tank');
   try{ Android.showRewardedAd('tank_'+type); }
   catch(e){ giveAdTank(type); }
 }
@@ -5526,13 +5490,12 @@ function renderLevelMap(){
           if(!_lmScrolling && !_lmNavigating){
             _lmNavigating = true;
             e.preventDefault();
-            // Level map kapat, game layers restore et, aksiyon kartı göster
             const _lm2=document.getElementById('level-map');
             _lm2.style.visibility='hidden';
             _lm2.style.pointerEvents='none';
             _lm2.style.opacity='0';
             restoreGameLayers(()=>{
-              openLevelStartCard(idx);
+              openGallery(idx);
               _lmNavigating = false;
             });
           }
@@ -6755,34 +6718,6 @@ function openTacticalInfo(){
         ❌ İptal
       </button>
       <button id="ammo-replace-ok" onclick="confirmAmmoReplace()"
-        style="flex:1;padding:12px;border-radius:12px;border:none;
-        background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;
-        font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
-        ✅ Devam Et
-      </button>
-    </div>
-  </div>
-</div>
-
-<div id="tank-replace-bg" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
-  <div style="background:linear-gradient(135deg,#1a2030,#0d1520);
-    border:1.5px solid rgba(255,165,0,0.4);border-radius:20px;
-    padding:24px 20px;width:280px;max-width:calc(100vw - 32px);
-    box-shadow:0 0 40px rgba(255,165,0,0.1);">
-    <div style="font-size:32px;text-align:center;margin-bottom:10px;">⚠️</div>
-    <div style="color:#FFD700;font-size:17px;font-weight:700;font-family:'Rajdhani',sans-serif;
-      text-align:center;margin-bottom:12px;">Geçici Tank Var!</div>
-    <div id="tank-replace-desc" style="color:rgba(255,255,255,0.75);font-size:14px;
-      line-height:1.6;text-align:center;margin-bottom:20px;"></div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="cancelTankReplace()"
-        style="flex:1;padding:12px;border-radius:12px;
-        border:1.5px solid rgba(255,255,255,0.2);
-        background:rgba(255,255,255,0.07);color:white;
-        font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
-        ❌ İptal
-      </button>
-      <button onclick="confirmTankReplace()"
         style="flex:1;padding:12px;border-radius:12px;border:none;
         background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;
         font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
