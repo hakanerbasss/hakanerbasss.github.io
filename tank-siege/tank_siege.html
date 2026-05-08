@@ -544,6 +544,17 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;">💨 Calm</div>
   <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent;">🛡️</button>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.4);border-radius:8px;padding:4px 8px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-top:6px;">🔥 1</button>
+
+  <!-- DEBUG PANEL -->
+  <button onclick="const p=document.getElementById('debug-panel');p.style.display=p.style.display==='none'?'flex':'none';" style="margin-top:6px;background:rgba(0,0,0,0.7);border:1px solid #ff0;border-radius:6px;padding:3px 7px;color:#ff0;font-size:11px;cursor:pointer;">🔧</button>
+  <div id="debug-panel" style="margin-top:4px;background:rgba(0,0,0,0.8);border:1px solid #ff0;border-radius:8px;padding:6px 8px;display:none;flex-direction:column;gap:4px;min-width:130px;">
+    <div style="color:#ff0;font-size:10px;font-weight:700;text-align:center;">🔧 DEBUG</div>
+    <label style="color:#fff;font-size:9px;">crackW <input id="dbg-crackW" type="number" value="2" step="0.5" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
+    <label style="color:#fff;font-size:9px;">crackD <input id="dbg-crackD" type="number" value="22" step="2" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
+    <label style="color:#fff;font-size:9px;">maxDist <input id="dbg-maxDist" type="number" value="45" step="5" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
+    <label style="color:#fff;font-size:9px;">dustSz <input id="dbg-dustSz" type="number" value="2" step="0.5" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
+    <label style="color:#fff;font-size:9px;">dustCnt <input id="dbg-dustCnt" type="number" value="14" step="1" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
+  </div>
 </div>
 
 <div id="power-wrap">
@@ -1894,7 +1905,7 @@ function update(){
             const upgLvl2 = ammoUpgrades[_curAmmo] || 0;
             const crackD2 = 30 + upgLvl2 * 12;
             bullet.undergroundMaxDist = bullet.undergroundTargetAhead
-              ? Math.min(_tdist * 0.85, 70 + upgLvl2 * 15)
+              ? Math.min(_tdist * 0.75, (parseFloat(document.getElementById('dbg-maxDist')?.value||'45')) + upgLvl2 * 8)
               : crackD2;
           }
           // Mesafe güncelle
@@ -2800,9 +2811,26 @@ function drawParticles(){
       ctx.fillStyle=p.color;
       ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
     } else if(p.type==='dust'){
-      ctx.fillStyle=p.color;
-      const r=p.size*(0.5+alpha*0.5);
-      ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();
+      // İnce sis çizgisi — fog/streak tarzı
+      const len = p.size * (2.5 + alpha);
+      const wid = p.size * 0.35;
+      const ang = p.dustAngle || 0;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(ang);
+      const dg = ctx.createLinearGradient(-len*0.5,0,len*0.5,0);
+      const ca = p.color.replace(/[\d.]+\)$/, `${(alpha*0.28).toFixed(2)})`);
+      const cm = p.color.replace(/[\d.]+\)$/, `${(alpha*0.12).toFixed(2)})`);
+      dg.addColorStop(0,'rgba(0,0,0,0)');
+      dg.addColorStop(0.2, cm);
+      dg.addColorStop(0.5, ca);
+      dg.addColorStop(0.8, cm);
+      dg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = dg;
+      ctx.beginPath();
+      ctx.ellipse(0,0,len*0.5,wid,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
     } else if(p.type==='rock'){
       ctx.save();
       ctx.translate(p.x,p.y);
@@ -3422,6 +3450,7 @@ function shiftWind(){
 
 function fire(){
   if(phase!=='aim'||shotsLeft<=0) return;
+  if(_crackOverlay){ _crackOverlay.getContext('2d').clearRect(0,0,_crackOverlay.width,_crackOverlay.height); }
   SFX.fire(selectedAmmo);
   const td=TANK_DEF[selectedTank]||TANK_DEF[lv.tankType]||TANK_DEF.basic;
   const rad=angle*Math.PI/180;
@@ -3710,7 +3739,9 @@ function spawnRockDebris(x, y, radius, ammoType){
   }
 
   // Toz bulutu — geniş, yavaş yükselen
-  const dustCount = Math.round(14 + power * 12);
+  const _dbgDC = parseFloat(document.getElementById('dbg-dustCnt')?.value||'14');
+  const _dbgDS = parseFloat(document.getElementById('dbg-dustSz')?.value||'2');
+  const dustCount = Math.round(_dbgDC + power * 8);
   for(let i = 0; i < dustCount; i++){
     const a = -Math.PI + Math.random()*Math.PI;
     const v = 0.5 + Math.random()*(2 + power*2);
@@ -3720,15 +3751,16 @@ function spawnRockDebris(x, y, radius, ammoType){
     const g = parseInt(dustCol.slice(3,5),16);
     const b = parseInt(dustCol.slice(5,7),16);
     particles.push({
-      x: x + (Math.random()-0.5)*radius*1.2,
+      x: x + (Math.random()-0.5)*radius*0.55,
       y: y,
       vx: Math.cos(a)*v,
       vy: -(0.4 + Math.random()*(1.5 + power*1.5)),
-      size: 10 + Math.random()*(20 + power*20),
-      life: 50 + Math.random()*50,
-      maxLife: 100,
-      color: 'rgba('+r+','+g+','+b+',0.55)',
+      size: _dbgDS + Math.random()*(2 + power*1.5),
+      life: 30 + Math.random()*25,
+      maxLife: 55,
+      color: 'rgba('+r+','+g+','+b+',0.7)',
       type: 'dust',
+      dustAngle: Math.random()*Math.PI,
     });
   }
 
@@ -3835,10 +3867,12 @@ function deformTerrain(cx, cy, radius, ammoType, blastX, blastY){
     const cc = _crackOverlay.getContext('2d');
 
     const upgLvl  = ammoUpgrades[ammoType] || 0;
-    const crackW  = 4  + upgLvl * 3;
-    const crackD  = 40 + upgLvl * 20;
-    const jagged  = 8  + upgLvl * 3;
-    const grayW   = crackW * 4;
+    const _dbgCW = parseFloat(document.getElementById('dbg-crackW')?.value||'2');
+    const _dbgCD = parseFloat(document.getElementById('dbg-crackD')?.value||'22');
+    const crackW  = _dbgCW + upgLvl * 1.5;
+    const crackD  = _dbgCD + upgLvl * 10;
+    const jagged  = 7  + upgLvl * 2;
+    const grayW   = crackW * 3;
     const seed    = Math.floor(cx * 7 + surfY * 3);
     const rng     = (n) => { const v=Math.sin(seed+n)*43758.5453; return v-Math.floor(v); };
 
