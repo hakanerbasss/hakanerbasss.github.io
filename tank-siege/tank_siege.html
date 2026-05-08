@@ -2161,7 +2161,7 @@ function update(){
         const _homY = bullet.enteredCave ? targetY  : _entY;
 
         // Sadece düşüşte veya içerideyse yönlen
-        if(bullet.vy > 0 || bullet.enteredCave){
+        if(bullet.vy > 1.5 || bullet.enteredCave){
           const _desiredAngle = Math.atan2(_homY - bullet.y, _homX - bullet.x);
           const _currentAngle = Math.atan2(bullet.vy, bullet.vx);
 
@@ -6935,6 +6935,7 @@ function giveReward(adType){
     case 'shield':       activateShield(); break;
     case 'tactical':     giveTactical(); break;
     case 'windblock':    giveWindBlock(); break;
+    case 'guided':       giveGuidedReward(); break;
     default:
       // Mühimmat: 'ammo_ap', 'ammo_piercer' vs.
       if(adType.startsWith('ammo_')){
