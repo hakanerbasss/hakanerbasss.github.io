@@ -641,9 +641,9 @@ const MIN_POWER = 6;
 // ═══════════════════════════════════════
 // LEVELS
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.2';
-const APP_VERSION_DATE = '2026.05.08 23:05';
-const APP_VERSION_NOTE = 'Magara+guidedBaslik+tankReplace+splash+versionSistemi+compScript';
+const APP_VERSION      = '1.0.3';
+const APP_VERSION_DATE = '2026.05.08 23:20';
+const APP_VERSION_NOTE = 'Versiyon notu acilmiyordu duzeltme denemesi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -7128,7 +7128,12 @@ function openDevMode(){
 }
 
 function showVersionNote(){
-  showToast('v'+APP_VERSION+' — '+APP_VERSION_NOTE, 4000);
+  const pop = document.getElementById('version-note-pop');
+  if(pop){
+    document.getElementById('version-note-ver').textContent  = 'v' + APP_VERSION + ' — ' + APP_VERSION_DATE;
+    document.getElementById('version-note-text').textContent = APP_VERSION_NOTE;
+    pop.style.display = 'flex';
+  }
 }
 
 function closeDevMode(){
@@ -7715,6 +7720,16 @@ function openTacticalInfo(){
       font-family:'Rajdhani',sans-serif;cursor:pointer;margin-top:12px;">
       Harika! Oynamaya Başla 🎮
     </button>
+  </div>
+</div>
+
+<!-- Version Note Popup -->
+<div id="version-note-pop" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
+  <div style="background:#1a1a2e;border:2px solid #FFD700;border-radius:16px;padding:22px 20px;max-width:280px;width:90%;text-align:center;font-family:'Rajdhani',sans-serif;" onclick="event.stopPropagation()">
+    <div style="font-size:28px;margin-bottom:8px;">📦</div>
+    <div id="version-note-ver" style="color:#FFD700;font-size:15px;font-weight:700;margin-bottom:12px;"></div>
+    <div id="version-note-text" style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.6;margin-bottom:16px;"></div>
+    <button onclick="document.getElementById('version-note-pop').style.display='none'" style="background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:8px 24px;color:#FFD700;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">Tamam</button>
   </div>
 </div>
 
