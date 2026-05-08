@@ -904,7 +904,7 @@ function makeLevels(){
       const showPath = globalId<=15;
       const pathDots = Math.max(0,40-globalId*2);
       // Terrain types cycling
-      const terrainTypes=['gentle','medium','twin','valley','fortress','high','medium','twin','valley','fortress'];
+      const terrainTypes=['gentle','medium','twin','valley','fortress','high','medium','cave_mountain','valley','fortress'];
       // HP progression — tema çarpanı ile ölçeklenir
       const hpMult = Math.pow(1.55, ti);
       const hpValues=[120,150,200,280,350,400,550,700,950,1400].map(v=>Math.round(v*hpMult));
@@ -920,6 +920,7 @@ function makeLevels(){
 
       // Son 2 level: gömülü hedef. localIdx 9 tamamen gömülü, 8 kısmen
       const buriedType = localIdx===9 ? 'full' : localIdx===8 ? 'partial' : null;
+      const caveLevel   = localIdx===7;
       lvs.push({
         id:globalId,
         name:themeNames[theme][li],
@@ -935,6 +936,7 @@ function makeLevels(){
         treeStyleIdx: Math.floor(Math.random() * 3), // her level farklı ağaç
         ammo:localIdx<3?['normal']:localIdx<6?['normal','ap']:['normal','ap','explosive'],
         buried: buriedType,  // null | 'partial' | 'full'
+        cave:   caveLevel,
       });
     }
   });
@@ -961,9 +963,11 @@ let craters = [];
 let terrain = [];     // y values for each x pixel
 let terrainImg = null;
 let _crackOverlay = null; // Bunker Buster V-çatlak overlay — terrain'den bağımsız
-let targetX, targetY, targetW=70, targetH=50;
+let targetX, targetY, targetW=45, targetH=32;
 let targetHP = 100, targetMaxHP = 100;
 let targetBuriedDepth = 0;   // piksel olarak toprağa gömülme derinliği
+// Mağara sistemi
+let caveData = null; // {mx, my, mw, mh, floorY} — null ise mağara yok
 let _buriedHpFrozen = false; // %20 eşiğinde donduruldu mu
 let _buriedAdUsed = false;   // reklam ile kilit kırıldı mı
 let _nukePulse = 0;          // ☢️ animasyon zamanı
@@ -1178,6 +1182,7 @@ function loadLevel(idx){
   _buriedHpFrozen = false;
   _buriedAdUsed   = false;
   _nukePulse      = 0;
+  caveData = null;
   const _bub = document.getElementById('buried-unlock-btn');
   if(_bub) _bub.style.display = lv.buried ? 'flex' : 'none';
   // Gömülme derinliği: partial=hedefin %55'i, full=hedefin %90'ı toprak altında
@@ -1302,6 +1307,21 @@ function generateTerrain(type){
         {x:W,       y:baseY},
       ];
       break;
+    case 'cave_mountain':
+      // Mağara seviyesi: sağda yüksek ve geniş tek dağ
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.03},
+        {x:W*0.25,  y:baseY-H*0.08},
+        {x:W*0.38,  y:baseY-H*0.10},
+        {x:W*0.50,  y:baseY-H*0.28},
+        {x:W*0.62,  y:baseY-H*0.50},
+        {x:W*0.72,  y:baseY-H*0.52},
+        {x:W*0.82,  y:baseY-H*0.48},
+        {x:W*0.92,  y:baseY-H*0.18},
+        {x:W,       y:baseY-H*0.05},
+      ];
+      break;
     default:
       points = [
         {x:0,y:baseY},{x:W*0.4,y:baseY-H*0.2},{x:W*0.6,y:baseY-H*0.2},{x:W,y:baseY}
@@ -1410,12 +1430,142 @@ function drawTerrainOn(c){
     }
   }
 
-  // Top edge highlight
+  // ── Mağara — organik kaya oyuğu, bulut gibi köşesiz ─────────────────
+  if(caveData){
+    const {mx, my, mw, mh, floorY} = caveData;
+    const seed = Math.floor(mx*3+my*7);
+    const rng  = n => { const v=Math.sin(seed+n*127.1)*43758.5; return v-Math.floor(v); };
+
+    c.save();
+
+    // ── Ana karanlık dolgu — çok yumuşak radial ─────────────────────
+    const cg = c.createRadialGradient(
+      mx - mw*0.42, my + mh*0.52, mw*0.02,
+      mx - mw*0.42, my + mh*0.52, mw*0.82
+    );
+    cg.addColorStop(0,    'rgba(4,2,1,0.99)');
+    cg.addColorStop(0.35, 'rgba(10,6,2,0.97)');
+    cg.addColorStop(0.7,  'rgba(22,14,6,0.88)');
+    cg.addColorStop(1,    'rgba(38,24,10,0.60)');
+
+    // Organik şekil: bezier eğrileriyle doğal kaya oyuğu
+    // Ağız sağda (mx,my..floorY), içi sola açılır
+    const cx = mx - mw*0.48;  // merkez X
+    const cy = my + mh*0.50;  // merkez Y
+
+    c.beginPath();
+    // Sağ ağız üst köşe
+    c.moveTo(mx, my + mh*0.08);
+    // Tavan — 3 bezier segmenti, hafif düzensiz
+    c.bezierCurveTo(
+      mx - mw*0.18, my - mh*0.06,
+      mx - mw*0.55, my - mh*0.10,
+      mx - mw*0.82, my + mh*0.10
+    );
+    // Sol iç duvar — kavisli kapanış
+    c.bezierCurveTo(
+      mx - mw*0.96, my + mh*0.22,
+      mx - mw*0.98, my + mh*0.70,
+      mx - mw*0.88, my + mh*0.88
+    );
+    // Taban — sola düzce, sağa hafif yukarı
+    c.bezierCurveTo(
+      mx - mw*0.65, my + mh*0.96,
+      mx - mw*0.30, my + mh*0.95,
+      mx, my + mh*0.88
+    );
+    // Sağ ağız alt → üst
+    c.bezierCurveTo(
+      mx + mw*0.04, my + mh*0.70,
+      mx + mw*0.04, my + mh*0.28,
+      mx, my + mh*0.08
+    );
+    c.closePath();
+    c.fillStyle = cg;
+    c.fill();
+
+    // ── Tavan kenar yumuşatma — terrain rengiyle blend ──────────────
+    const blendG = c.createRadialGradient(
+      mx - mw*0.42, my, mw*0.1,
+      mx - mw*0.42, my, mw*0.65
+    );
+    blendG.addColorStop(0,   'rgba(0,0,0,0)');
+    blendG.addColorStop(0.7, 'rgba(0,0,0,0)');
+    blendG.addColorStop(1,   'rgba(20,14,6,0.35)');
+    c.fillStyle = blendG;
+    c.fill();
+
+    // ── Sarkıtlar — organik damlalar ────────────────────────────────
+    for(let i=0; i<5; i++){
+      const t  = (i+0.5)/5;
+      const sx = mx - mw*0.85 + mw*0.70*t;
+      // Tavan Y yaklaşımı
+      const tavY = my + mh*0.05 + mh*0.12*Math.sin(t*Math.PI)*0.8;
+      const sh   = mh*(0.10 + rng(i*5)*0.12);
+      const sw   = mw*(0.022 + rng(i*5+1)*0.015);
+      c.beginPath();
+      c.moveTo(sx-sw, tavY);
+      c.bezierCurveTo(sx-sw*0.5, tavY+sh*0.5, sx+sw*0.5, tavY+sh*0.5, sx+sw, tavY);
+      c.bezierCurveTo(sx+sw*0.3, tavY+sh*0.7, sx, tavY+sh, sx-sw*0.3, tavY+sh*0.7);
+      c.closePath();
+      c.fillStyle=`rgba(${8+Math.floor(rng(i)*8)},${4+Math.floor(rng(i)*5)},${1+Math.floor(rng(i)*3)},0.95)`;
+      c.fill();
+    }
+
+    // ── Dikitler ────────────────────────────────────────────────────
+    for(let i=0; i<3; i++){
+      const t  = (i+0.6)/3;
+      const sx = mx - mw*0.80 + mw*0.55*t;
+      const sh = mh*(0.08 + rng(i*7)*0.08);
+      const sw = mw*0.018;
+      c.beginPath();
+      c.moveTo(sx-sw, floorY);
+      c.bezierCurveTo(sx-sw*0.3, floorY-sh*0.6, sx+sw*0.3, floorY-sh*0.6, sx+sw, floorY);
+      c.bezierCurveTo(sx+sw*0.2, floorY-sh*0.8, sx, floorY-sh, sx-sw*0.2, floorY-sh*0.8);
+      c.closePath();
+      c.fillStyle='rgba(18,10,4,0.90)';
+      c.fill();
+    }
+
+    // ── Ağız sağından terrain rengiyle ört — taşan siyahlığı gizle
+    const _tg = c.createLinearGradient(0, my, 0, floorY);
+    _tg.addColorStop(0, tc[0]);
+    _tg.addColorStop(0.4, tc[1]);
+    _tg.addColorStop(1, tc[2]);
+    c.fillStyle = _tg;
+    c.beginPath();
+    c.moveTo(mx, terrain[Math.min(W-1, Math.floor(mx))]);
+    for(let _x = Math.floor(mx); _x < W; _x++){
+      c.lineTo(_x, terrain[_x]);
+    }
+    c.lineTo(W, H); c.lineTo(mx, H);
+    c.closePath();
+    c.fill();
+
+    c.restore();
+  }
+
+    // Top edge highlight
   c.strokeStyle=th.edgeColor;
   c.lineWidth=2.5;
-  c.beginPath();
-  for(let x=0;x<W;x++) x===0?c.moveTo(x,terrain[x]):c.lineTo(x,terrain[x]);
-  c.stroke();
+  // Mağara ağzı aralığında çizgi atla
+  if(caveData){
+    // Mağaranın tüm genişliği boyunca atla (mx-mw ile mx arası)
+    const gapL = caveData.mx - caveData.mw - 4;
+    const gapR = caveData.mx + 4;
+    let inGap = false;
+    c.beginPath();
+    for(let x=0;x<W;x++){
+      if(x >= gapL && x <= gapR){ inGap = true; continue; }
+      if(inGap){ c.moveTo(x, terrain[x]); inGap = false; continue; }
+      x===0 ? c.moveTo(x,terrain[x]) : c.lineTo(x,terrain[x]);
+    }
+    c.stroke();
+  } else {
+    c.beginPath();
+    for(let x=0;x<W;x++) x===0?c.moveTo(x,terrain[x]):c.lineTo(x,terrain[x]);
+    c.stroke();
+  }
 
   // Texture cracks/lines
   c.strokeStyle='rgba(0,0,0,0.10)';
@@ -1541,6 +1691,12 @@ function drawDecorations(c, th){
   }
 
   positions.forEach(dx=>{
+    // Mağara alanında ağaç çizme
+    if(caveData){
+      const clearL = caveData.mx - caveData.mw - 15;
+      const clearR = caveData.mx + 15;
+      if(dx >= clearL && dx <= clearR) return;
+    }
     const xi=Math.floor(Math.max(0,Math.min(W-1,dx)));
     const dy=terrain[xi];
     if(st){
@@ -1810,7 +1966,7 @@ function placeEntities(){
   // Target on right side
   let rx = W*0.82;
   let ry = terrain[Math.floor(rx)];
-  targetW = 70; targetH = 50;
+  targetW = 45; targetH = 32;
 
   if(lv.buried){
     // Sağ taraf etek noktasını bul:
@@ -1844,6 +2000,41 @@ function placeEntities(){
       const innerY = terrain[Math.floor(targetX)];
       targetY = innerY + targetH * 1.2; // tamamen altında
     }
+
+  } else if(lv.cave){
+    // Sağ taraftaki dağda tepe (minY) ve dip (maxY) bul
+    const xL = Math.floor(W * 0.45);
+    const xR = Math.floor(W * 0.95);
+    let peakX = xL, peakY = 9999;  // tepe = en küçük Y
+    let dipY  = 0;                  // dip = en büyük Y (dağın eteği)
+    for(let xi = xL; xi <= xR; xi++){
+      if(terrain[xi] < peakY){ peakY = terrain[xi]; peakX = xi; }
+      if(terrain[xi] > dipY)   dipY  = terrain[xi];
+    }
+
+    // Mağara Y konumu: tepe ile dip arasında %75 aşağıda (dibe yakın)
+    const caveTargetY = peakY + (dipY - peakY) * 0.75;
+
+    // Ağız SAĞDA — dağın sağ eteğinde, tanka BAKMIYOR
+    // Sağdan sola tara: terrain'in caveTargetY'ye ilk indiği nokta = sağ yamaç kenarı
+    let yamacX = xR;
+    for(let xi = xR; xi >= peakX; xi--){
+      if(terrain[xi] >= caveTargetY){ yamacX = xi; break; }
+    }
+
+    // Mağara boyutu
+    const mw = targetW * 2.0;
+    const mh = targetH * 1.8;
+
+    // Ağız sağda (yamacX), içi sola (dağ içine) açılır
+    const mouthX      = yamacX;
+    const surfAtMouth = terrain[Math.min(W-1, mouthX)];
+    const my          = surfAtMouth - mh * 0.85;
+    const floorY      = my + mh;
+
+    caveData = { mx: mouthX, my, mw, mh, floorY };
+    targetX  = mouthX - mw * 0.5;
+    targetY  = floorY - targetH * 0.45;
 
   } else {
     targetX = rx; targetY = ry;
@@ -1953,7 +2144,10 @@ function update(){
       bullet.x  += bullet.vx/steps;
       bullet.y  += bullet.vy/steps;
       const bxi = Math.floor(bullet.x);
-      if(bxi>=0 && bxi<W && bullet.y >= terrain[bxi]){
+      // Mağara ağzında terrain çarpışmasını atla
+      const _inCaveGap = caveData && bullet.x >= caveData.mx - 4 && bullet.x <= caveData.mx + 4
+                         && bullet.y >= caveData.my && bullet.y <= caveData.floorY;
+      if(bxi>=0 && bxi<W && bullet.y >= terrain[bxi] && !_inCaveGap){
         const _curAmmo = bullet.ammoType || selectedAmmo;
         if((AMMO_DEF[_curAmmo]||{}).bunkerBust){
           if(!bullet.underground){
@@ -2064,7 +2258,7 @@ function update(){
         deformTerrain(eb.x, eb.y, _r, eb.ammoType||selectedAmmo);
         terrainImg = renderTerrainToImg();
         const txi2=Math.floor(targetX);
-        if(txi2>=0&&txi2<W) targetY=terrain[txi2];
+        if(txi2>=0&&txi2<W && !lv.cave && !lv.buried) targetY=terrain[txi2];
         spawnRockDebris(eb.x, eb.y, _r, eb.ammoType||selectedAmmo);
         spawnImpact(eb.x, eb.y, 'terrain');
         spawnExplosionSprite(eb.x, eb.y, 0.75);
@@ -2312,8 +2506,14 @@ function drawTerrain(){
   }
   // Crack overlay — terrain yeniden çizilse bile çatlaklar kalır
   if(_crackOverlay) ctx.drawImage(_crackOverlay, 0, 0);
+
+  // Mağara ön duvar overlay — hedef mağara içinde kalır
+  if(caveData) drawCaveForeground();
 }
 
+function drawCaveForeground(){
+  // devre dışı — çerçeve yapıyordu
+}
 function drawTank(){
   // selectedTank varsa onu kullan, yoksa lv.tankType
   const tankKey = selectedTank||lv.tankType||'basic';
@@ -3708,7 +3908,7 @@ function onTerrainHit(){
   terrainImg = renderTerrainToImg();
   // Hedef altındaki terrain değiştiyse targetY'yi güncelle
   const txi = Math.floor(targetX);
-  if(txi>=0&&txi<W){
+  if(txi>=0&&txi<W && !lv.cave && !lv.buried){
       targetY = terrain[txi];
       const _txL2 = Math.max(0, txi - 18);
       const _txR2 = Math.min(W-1, txi + 18);
