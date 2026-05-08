@@ -956,6 +956,9 @@ const UPGRADE_MAX = 5;
 const AMMO_UPGRADE_COSTS = [2000,5000,10000,20000,40000]; // seviye 1→2, 2→3, ...
 const TANK_UPGRADE_COSTS = [5,10,20,35,60];               // yıldız cinsinden
 let tempAmmo    = JSON.parse(localStorage.getItem('ts_temp_ammo')||'null');
+
+// Bunker Buster patlama animasyonu
+let _bunkerBlastAnim = null; // {x, y, tipX, tipY, startTime, duration}
 let tempTactical  = JSON.parse(localStorage.getItem('ts_temp_tactical')||'null');
 let tacticalHintShown = localStorage.getItem('ts_tactical_hint')==='1';
 let tempTank    = JSON.parse(localStorage.getItem('ts_temp_tank')||'null');
@@ -1886,11 +1889,13 @@ function update(){
             const _dot = (bullet.vx*_tdx + bullet.vy*_tdy) /
                          (Math.sqrt(bullet.vx*bullet.vx+bullet.vy*bullet.vy) * _tdist + 0.001);
             // dot > 0.3: mermi hedefe doğru gidiyor
-            bullet.undergroundTargetAhead = (_dot > 0.3 && _tdist < 200);
-            // Patlama mesafesi: hedef varsa hedefe kadar, yoksa crackD kadar
+            bullet.undergroundTargetAhead = (_dot > 0.3 && _tdist < 120);
+            // Patlama mesafesi: küçük ve sınırlı
             const upgLvl2 = ammoUpgrades[_curAmmo] || 0;
-            const crackD2 = 35 + upgLvl2 * 18;
-            bullet.undergroundMaxDist = bullet.undergroundTargetAhead ? 180 : crackD2;
+            const crackD2 = 30 + upgLvl2 * 12;
+            bullet.undergroundMaxDist = bullet.undergroundTargetAhead
+              ? Math.min(_tdist * 0.85, 70 + upgLvl2 * 15)
+              : crackD2;
           }
           // Mesafe güncelle
           const ddx = bullet.x - bullet.undergroundStartX;
@@ -2071,6 +2076,9 @@ function draw(){
 
   // Bullet
   if(bullet) drawBullet();
+
+  // Bunker blast sprite
+  drawBunkerBlast();
 
   // Particles
   drawParticles();
@@ -2593,6 +2601,121 @@ function drawTarget(){
   ctx.restore();
 }
 
+function drawBunkerBlast(){
+  if(!_bunkerBlastAnim) return;
+  const now = performance.now();
+  const elapsed = now - _bunkerBlastAnim.startTime;
+  if(elapsed > _bunkerBlastAnim.duration){ _bunkerBlastAnim = null; return; }
+
+  const t  = elapsed / _bunkerBlastAnim.duration;
+  const ex = _bunkerBlastAnim.x,  ey = _bunkerBlastAnim.y;   // giriş (toprak yüzeyi)
+  const bx = _bunkerBlastAnim.tipX, by = _bunkerBlastAnim.tipY; // patlama (toprak içi)
+
+  const dx = ex - bx, dy = ey - by;
+  const crackLen = Math.sqrt(dx*dx + dy*dy) || 35;
+
+  // Alevin çıkış yönü: patlama → giriş → DIŞARI (merminin geldiği yönün tersi)
+  const angle = Math.atan2(dy, dx); // ex,ey'den bx,by'ye ters = dışarı yön
+
+  const growT = Math.min(1, t / 0.35);
+  const fadeT = t > 0.5 ? (t - 0.5) / 0.5 : 0;
+  const alpha = 1 - fadeT;
+
+  // Boyutlar: çatlak uzunluğunun küçük bir oranı
+  const H  = Math.min(crackLen * 0.6, 38) * growT;  // alev uzunluğu
+  const W0 = Math.min(crackLen * 0.14, 8);           // taban yarı-genişliği
+
+  const seed = Math.round(ex + ey * 137);
+  const rng = n => { const v = Math.sin(seed + n * 127.1) * 43758.5453; return v - Math.floor(v); };
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(ex, ey);
+  ctx.rotate(angle); // +X artık "dışarı yön" = alevin çıktığı yön
+
+  // Alev +X ekseni boyunca, taban (0,0)'da, uç (+H, 0)'da
+  // Yan sapma ±Y ekseninde
+
+  // ── Katmanlar (dış→iç: kırmızı → turuncu → sarı) ────────────────────────
+  const layers = [
+    { wm:1.0, hm:1.0,  c0:'rgba(120,0,0,0.9)',   c1:'rgba(200,30,0,0)' },
+    { wm:0.7, hm:0.88, c0:'rgba(255,70,0,0.95)',  c1:'rgba(255,100,0,0)' },
+    { wm:0.38,hm:0.75, c0:'rgba(255,220,50,1.0)', c1:'rgba(255,255,160,0)'},
+  ];
+
+  layers.forEach(({ wm, hm, c0, c1 }) => {
+    const w = W0 * wm, h = H * hm;
+    ctx.beginPath();
+    ctx.moveTo(0, -w);
+    for(let i = 0; i <= 9; i++){
+      const s  = i / 9;
+      const px = s * h;
+      const pw = w * (1 - s * 0.92);
+      const jy = (rng(i*5 + wm*97) - 0.5) * pw * 0.6 * (1-s);
+      ctx.lineTo(px, -pw + jy);
+    }
+    ctx.lineTo(h, 0); // sivri uç
+    for(let i = 9; i >= 0; i--){
+      const s  = i / 9;
+      const px = s * h;
+      const pw = w * (1 - s * 0.92);
+      const jy = (rng(i*5 + wm*97 + 47) - 0.5) * pw * 0.6 * (1-s);
+      ctx.lineTo(px,  pw + jy);
+    }
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, h, 0);
+    g.addColorStop(0,    c0);
+    g.addColorStop(0.6,  c0.replace(/[\d.]+\)$/, '0.35)'));
+    g.addColorStop(1,    c1);
+    ctx.fillStyle = g;
+    ctx.fill();
+  });
+
+  // ── Merkez parlak çizgi ──────────────────────────────────────────────────
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(H * 0.9, 0);
+  const lg = ctx.createLinearGradient(0, 0, H, 0);
+  lg.addColorStop(0,   'rgba(255,255,230,1)');
+  lg.addColorStop(0.5, 'rgba(255,200,50,0.7)');
+  lg.addColorStop(1,   'rgba(255,80,0,0)');
+  ctx.strokeStyle = lg;
+  ctx.lineWidth   = 2 * (1 - t * 0.4);
+  ctx.stroke();
+
+  // ── Alev dilleri (uçta fan gibi açılan) ─────────────────────────────────
+  const tCount = 2 + Math.floor(growT * 3);
+  for(let i = 0; i < tCount; i++){
+    const ty = (rng(i*7+1) - 0.5) * W0 * 1.5;
+    const tl = (12 + rng(i*7+2) * 30) * growT;
+    const tw = 1.5 + rng(i*7+3) * 4;
+    ctx.beginPath();
+    ctx.moveTo(0, ty - tw);
+    ctx.quadraticCurveTo(tl*0.5, ty + (rng(i*7+4)-0.5)*5, tl, ty);
+    ctx.quadraticCurveTo(tl*0.5, ty + (rng(i*7+4)-0.5)*5, 0, ty + tw);
+    ctx.closePath();
+    const tg = ctx.createLinearGradient(0, 0, tl, 0);
+    tg.addColorStop(0,   'rgba(255,160,10,0.8)');
+    tg.addColorStop(0.6, 'rgba(255,70,0,0.4)');
+    tg.addColorStop(1,   'rgba(255,230,80,0)');
+    ctx.fillStyle = tg;
+    ctx.fill();
+  }
+
+  // ── Giriş noktası flash (ilk %25) ───────────────────────────────────────
+  if(t < 0.25){
+    const fa = (1 - t / 0.25) * 0.85;
+    const fr = W0 * 2.2;
+    const fg = ctx.createRadialGradient(0,0,0, 0,0,fr);
+    fg.addColorStop(0,   `rgba(255,255,200,${fa})`);
+    fg.addColorStop(0.5, `rgba(255,140,20,${fa*0.5})`);
+    fg.addColorStop(1,   'rgba(255,60,0,0)');
+    ctx.beginPath(); ctx.arc(0, 0, fr, 0, Math.PI*2);
+    ctx.fillStyle = fg; ctx.fill();
+  }
+
+  ctx.restore();
+}
 function drawBullet(){
   // Ana mermi
   if(bullet){
@@ -3415,6 +3538,15 @@ function onTerrainHit(){
     deformTerrain(bullet.undergroundStartX, bullet.undergroundStartY, _r, selectedAmmo, _bx, _by);
     // Patlama noktasında küçük krater
     deformTerrain(_bx, _by, _r * 0.5, 'normal');
+    // V patlama sprite animasyonu
+    _bunkerBlastAnim = {
+      x: bullet.undergroundStartX,
+      y: bullet.undergroundStartY,
+      tipX: _bx,
+      tipY: _by,
+      startTime: performance.now(),
+      duration: 700
+    };
   } else {
     deformTerrain(_bx, _by, _r, selectedAmmo);
   }
@@ -4457,17 +4589,6 @@ function giveAdTank(type){
   showToast(def.emoji+' '+def.name+' '+def.tempLevels+' level için aktif!');
 }
 
-function selectGalleryAmmo(type){
-  selectedAmmo=type;
-  localStorage.setItem('ts_sel_ammo',type);
-  renderGallery();
-}
-function selectGalleryTank(type){
-  selectedTank=type;
-  localStorage.setItem('ts_sel_tank',type);
-  renderGallery();
-}
-
 // Slot tooltip — hover
 function showSlotTip(){} // devre dışı
 
@@ -5430,12 +5551,6 @@ function updateSettingsBtns(){
   const mb=document.getElementById('set-music-btn');
   if(sb) sb.style.opacity=SFX.isEnabled()?'1':'0.4';
   if(mb) mb.style.opacity=SFX.isMusicEnabled()?'1':'0.4';
-}
-function updateSfxBtn(){
-  // artık settings içinde, no-op
-}
-function updateMusicBtn(){
-  // artık settings içinde, no-op
 }
 
 let _confirmAction=null;
