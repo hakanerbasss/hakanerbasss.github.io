@@ -5252,6 +5252,9 @@ function onWin(){
     tempGuided = null;
     localStorage.removeItem('ts_temp_guided');
   }
+  // Extra ammo butonu win'de gizle
+  const _eab = document.getElementById('btn-extra-ammo');
+  if(_eab) _eab.style.display = 'none';
   const shotsUsed = lv.shots - shotsLeft;
   let stars;
   const half=Math.ceil(lv.shots/2);
