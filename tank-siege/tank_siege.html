@@ -985,6 +985,8 @@ let tempAmmo    = JSON.parse(localStorage.getItem('ts_temp_ammo')||'null');
 // Bunker Buster patlama animasyonu
 let _bunkerBlastAnim = null; // {x, y, tipX, tipY, startTime, duration}
 let tempTactical  = JSON.parse(localStorage.getItem('ts_temp_tactical')||'null');
+let tempGuided    = JSON.parse(localStorage.getItem('ts_temp_guided')||'null');
+let guidedHintShown = localStorage.getItem('ts_guided_hint')==='1';
 let tacticalHintShown = localStorage.getItem('ts_tactical_hint')==='1';
 let tempTank    = JSON.parse(localStorage.getItem('ts_temp_tank')||'null');
 let selectedAmmo = localStorage.getItem('ts_sel_ammo')||'normal';
@@ -1178,6 +1180,7 @@ function loadLevel(idx){
   initSpecialFX();
   checkTacticalExpiry();
   if(curLevel>=15 && !lv.showPath && !isTacticalActive()) setTimeout(showTacticalHint,1200);
+  if(lv.cave && !isGuidedActive()) setTimeout(showGuidedHint, 1400);
   targetHP = targetMaxHP = lv.targetHP || MAT_HP[lv.targetMat];
   _buriedHpFrozen = false;
   _buriedAdUsed   = false;
@@ -2141,12 +2144,51 @@ function update(){
       const curTd=TANK_DEF[selectedTank]||TANK_DEF.basic;
       bullet.vx += (shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank)/steps;
       bullet.vy += GRAVITY/steps;
+
+      // ── Isıya Güdümlü Başlık — Gemini angular clamping ──
+      if(isGuidedActive() && caveData){
+        const _upgLvl  = ammoUpgrades[bullet.ammoType||selectedAmmo] || 0;
+        const _entX    = caveData.mx;
+        const _entY    = caveData.my + caveData.mh * 0.5;
+
+        // Mağara ağzına 50px → aşama 2
+        if(!bullet.enteredCave && Math.hypot(_entX - bullet.x, _entY - bullet.y) < 50){
+          bullet.enteredCave = true;
+        }
+
+        // Hedef: aşama 1 = ağız, aşama 2 = hedef
+        const _homX = bullet.enteredCave ? targetX : _entX;
+        const _homY = bullet.enteredCave ? targetY  : _entY;
+
+        // Sadece düşüşte veya içerideyse yönlen
+        if(bullet.vy > 0 || bullet.enteredCave){
+          const _desiredAngle = Math.atan2(_homY - bullet.y, _homX - bullet.x);
+          const _currentAngle = Math.atan2(bullet.vy, bullet.vx);
+
+          let _diff = _desiredAngle - _currentAngle;
+          while(_diff >  Math.PI) _diff -= Math.PI * 2;
+          while(_diff < -Math.PI) _diff += Math.PI * 2;
+
+          // Turn rate: dışarıda hafif, içeride agresif
+          const _base  = bullet.enteredCave ? 0.05 : 0.012;
+          const _max   = _base + _upgLvl * 0.008;
+          const _turn  = Math.max(-_max, Math.min(_max, _diff));
+          const _angle = _currentAngle + _turn;
+
+          // Hız sabit
+          bullet.vx = Math.cos(_angle) * speed;
+          bullet.vy = Math.sin(_angle) * speed;
+        }
+      }
+
       bullet.x  += bullet.vx/steps;
       bullet.y  += bullet.vy/steps;
       const bxi = Math.floor(bullet.x);
       // Mağara ağzında terrain çarpışmasını atla
-      const _inCaveGap = caveData && bullet.x >= caveData.mx - 4 && bullet.x <= caveData.mx + 4
-                         && bullet.y >= caveData.my && bullet.y <= caveData.floorY;
+      // enteredCave ise terrain tamamen bypass, değilse sadece ağız boşluğu
+      const _inCaveGap = (bullet.enteredCave && caveData) ||
+                         (caveData && bullet.x >= caveData.mx - 4 && bullet.x <= caveData.mx + 4
+                         && bullet.y >= caveData.my && bullet.y <= caveData.floorY);
       if(bxi>=0 && bxi<W && bullet.y >= terrain[bxi] && !_inCaveGap){
         const _curAmmo = bullet.ammoType || selectedAmmo;
         if((AMMO_DEF[_curAmmo]||{}).bunkerBust){
@@ -2194,9 +2236,11 @@ function update(){
       }
       if(bullet.x>targetX-targetW/2 && bullet.x<targetX+targetW/2 &&
          bullet.y>targetY-targetH && bullet.y<targetY+10){ onTargetHit(); break; }
-      if(bullet.x<-30 || bullet.x>W+30 || bullet.y>H+80){
+      // Cave level'da ekran sağından çıkınca daha geniş alan ver — yönelip geri dönebilir
+      const _oobLimit = (lv && lv.cave) ? W + 200 : W + 30;
+      if(bullet.x < -30 || bullet.x > _oobLimit || bullet.y > H + 80){
         bullet=null; shiftWind();
-        break; // phase geçişi aşağıda extra bullet kontrolüyle yapılıyor
+        break;
       }
     }
   }
@@ -2885,6 +2929,57 @@ function drawTarget(){
   if(lv.buried){
     drawBuriedIndicator(tx, terrain[Math.floor(tx)] || ty);
   }
+  // Cave ise hedef üzerinde ısı yayılımı
+  if(lv.cave && caveData){
+    drawCaveHeat(tx, ty);
+  }
+}
+
+function drawCaveHeat(hx, hy){
+  _nukePulse = (_nukePulse || 0) + 0.03;
+  const pulse = 0.5 + 0.5 * Math.sin(_nukePulse);
+
+  // Isı hedefin üzerinde — HP bar hizasında
+  const mouthCX = hx;
+  const mouthCY = hy - 30;
+
+  ctx.save();
+
+  // ── Dış ısı halesi — kırmızı/turuncu pulsing ────────────────────
+  const haloR = 35 + pulse * 18;
+  const haloG = ctx.createRadialGradient(mouthCX, mouthCY, 2, mouthCX, mouthCY, haloR);
+  haloG.addColorStop(0,   `rgba(255,80,0,${0.45 + pulse*0.20})`);
+  haloG.addColorStop(0.4, `rgba(255,40,0,${0.20 + pulse*0.10})`);
+  haloG.addColorStop(1,   'rgba(255,0,0,0)');
+  ctx.fillStyle = haloG;
+  ctx.beginPath();
+  ctx.ellipse(mouthCX, mouthCY, haloR * 0.6, haloR, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── İç parlak çekirdek ───────────────────────────────────────────
+  const coreR = 8 + pulse * 5;
+  const coreG = ctx.createRadialGradient(mouthCX, mouthCY, 0, mouthCX, mouthCY, coreR);
+  coreG.addColorStop(0,   `rgba(255,240,180,${0.85 + pulse*0.15})`);
+  coreG.addColorStop(0.5, `rgba(255,120,20,${0.60 + pulse*0.10})`);
+  coreG.addColorStop(1,   'rgba(255,40,0,0)');
+  ctx.fillStyle = coreG;
+  ctx.beginPath();
+  ctx.ellipse(mouthCX, mouthCY, coreR * 0.7, coreR, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── Isı dalgaları — ağızdan dışarı yayılan ince halkalar ────────
+  for(let i = 0; i < 3; i++){
+    const wt  = ((pulse + i * 0.33) % 1.0);
+    const wr  = 12 + wt * 40;
+    const wa  = (1 - wt) * 0.35;
+    ctx.strokeStyle = `rgba(255,${80 + Math.floor(wt*80)},0,${wa})`;
+    ctx.lineWidth   = 1.5 * (1 - wt);
+    ctx.beginPath();
+    ctx.ellipse(mouthCX, mouthCY, wr * 0.55, wr, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 function drawBuriedIndicator(bx, surfY){
@@ -3099,6 +3194,31 @@ function drawBullet(){
     ctx.beginPath();ctx.moveTo(8,0);ctx.lineTo(16,-3);ctx.lineTo(16,3);ctx.closePath();
     ctx.fill();
     ctx.restore();
+
+    // Isıya Güdümlü Başlık — ısı halkası efekti
+    if(isGuidedActive()){
+      _nukePulse = (_nukePulse||0) + 0.08;
+      const gp = 0.5 + 0.5*Math.sin(_nukePulse);
+      ctx.save();
+      ctx.translate(bullet.x, bullet.y);
+      // İç parlak halka
+      const hr1 = 8 + gp*4;
+      ctx.strokeStyle = `rgba(255,${120+Math.floor(gp*80)},0,${0.7+gp*0.3})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0,0,hr1,0,Math.PI*2); ctx.stroke();
+      // Dış solan halka
+      const hr2 = 14 + gp*6;
+      ctx.strokeStyle = `rgba(255,60,0,${0.35+gp*0.15})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0,0,hr2,0,Math.PI*2); ctx.stroke();
+      // Merkez ısı noktası
+      const hg = ctx.createRadialGradient(0,0,0,0,0,6);
+      hg.addColorStop(0, `rgba(255,220,100,${0.6+gp*0.3})`);
+      hg.addColorStop(1, 'rgba(255,80,0,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
   }
 
   // Extra mermiler (triple/split parçaları) — aynı görsel stilte
@@ -3808,6 +3928,7 @@ function fire(){
       ammoType:selectedAmmo,
       damageScale:1.0,
       splitDone:false,
+      startX:bx, startY:by,  // güdümlü yönelim için başlangıç
     };
     extraBullets = [];
   }
@@ -5089,6 +5210,11 @@ function onJoyUp(e){
 function onWin(){
   phase='done';
   SFX.win();
+  // Güdümlü başlık harcandı — level geçildi
+  if(tempGuided && tempGuided.usedAtLevel === curLevel){
+    tempGuided = null;
+    localStorage.removeItem('ts_temp_guided');
+  }
   const shotsUsed = lv.shots - shotsLeft;
   let stars;
   const half=Math.ceil(lv.shots/2);
@@ -5112,6 +5238,7 @@ function onWin(){
 function onFail(){
   phase='done';
   SFX.fail();
+  // Güdümlü başlık fail'de iptal olmaz — tekrar deneyebilir
   showResult(false, 0, 'Out of ammo!');
   const today = new Date().toDateString();
   const usedToday = parseInt(localStorage.getItem('ts_extra_ammo_'+today)||'0');
@@ -6546,6 +6673,37 @@ function giveTactical(){
 }
 
 // Level 15 hint kartı — tek seferlik
+function isGuidedActive(){
+  if(!lv || !lv.cave) return false;
+  // usedAtLevel set edilmişse ve henüz kullanılmamışsa aktif
+  return !!(tempGuided && tempGuided.usedAtLevel === curLevel && !tempGuided.spent);
+}
+
+function showGuidedHint(){
+  if(isGuidedActive()) return;
+  const bg = document.getElementById('guided-hint-bg');
+  if(bg) bg.style.display = 'flex';
+}
+
+function closeGuidedHint(){
+  const bg = document.getElementById('guided-hint-bg');
+  if(bg) bg.style.display = 'none';
+}
+
+function guidedHintAd(){
+  closeGuidedHint();
+  try{ Android.showRewardedAd('guided'); }
+  catch(e){ setTimeout(()=>giveGuidedReward(), 1500); }
+}
+
+function giveGuidedReward(){
+  const cl = curLevel || 0;
+  tempGuided = { usedAtLevel: cl, spent: false };
+  localStorage.setItem('ts_temp_guided', JSON.stringify(tempGuided));
+  showToast('🔥 Isıya Güdümlü Başlık aktif!');
+  updateUI();
+}
+
 function showTacticalHint(){
   if(tacticalHintShown || isTacticalActive()) return;
   tacticalHintShown = true;
@@ -6637,9 +6795,38 @@ function renderBoostGallery(cont){
     ${wbBtn}`;
   cont.appendChild(wbCard);
 
+  // ── Isıya Güdümlü Başlık ─────────────────────────────────
+  const isCaveLevel = lv && lv.cave;
+  const isGuided    = isGuidedActive();
+  let gdBadge, gdBtn;
+  if(isGuided){
+    gdBadge = '<span class="gc-badge temp-badge">✅ Bu Level Aktif</span>';
+    gdBtn   = '<span style="font-size:11px;color:#FF6B35;text-align:center;font-weight:700;">Aktif 🔥</span>';
+  } else if(!isCaveLevel){
+    gdBadge = '<span class="gc-badge locked-badge">🔒 Sadece Mağara Level</span>';
+    gdBtn   = '<span style="font-size:11px;color:#888;text-align:center;">8. levellerde<br>kullanılır</span>';
+  } else {
+    gdBadge = '<span class="gc-badge locked-badge">🔒 Aktif Değil</span>';
+    gdBtn   = '<button class="gc-btn btn-ad" onclick="closeGuidedHint();guidedHintAd()">📺 Reklam İzle<br><span style=\'font-size:10px;opacity:0.7;\'>1 level geçerli</span></button>';
+  }
+  const gdCard = document.createElement('div');
+  gdCard.className = 'gallery-card' + (isGuided ? ' owned' : '');
+  gdCard.innerHTML = `
+    <div class="gc-icon" style="font-size:36px;">🔥</div>
+    <div class="gc-info">
+      <div class="gc-name">Isıya Güdümlü Başlık ${gdBadge}</div>
+      <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 6px;">
+        Mermi mağara içindeki ısı kaynağına otomatik yönelir.
+        Sadece mağara levellarında (her temanın 8. leveli) geçerlidir.
+      </div>
+      ${statBar('Yönelim',0.95,'#FF6B35')}
+      ${statBar('Süre',0.1,'#FF6B35')}
+    </div>
+    ${gdBtn}`;
+  cont.appendChild(gdCard);
+
   // ── Yakında ───────────────────────────────────────────────
-  [{icon:'💥',name:'2x Hasar',desc:'Bir sonraki atışta çift hasar.'},
-   {icon:'🎯',name:'Güdümlü Mühimmat',desc:'Mermi hedefe kilitlenir.'}
+  [{icon:'💥',name:'2x Hasar',desc:'Bir sonraki atışta çift hasar.'}
   ].forEach(item=>{
     const c=document.createElement('div');
     c.className='gallery-card';
@@ -7386,6 +7573,44 @@ function openTacticalInfo(){
       🛡️ Güçlendirmeler'den Kalıcı Al
     </button>
     <button onclick="closeTacticalHint()"
+      style="width:100%;padding:8px;border:none;background:none;
+      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
+      Şimdi değil
+    </button>
+  </div>
+</div>
+
+<!-- Isıya Güdümlü Başlık Hint Kartı -->
+<div id="guided-hint-bg" style="display:none;position:fixed;inset:0;z-index:800;
+  background:rgba(0,0,0,0.72);align-items:center;justify-content:center;">
+  <div style="background:linear-gradient(135deg,#1a0a00,#2a1000);
+    border:1.5px solid rgba(255,100,0,0.45);border-radius:22px;
+    padding:26px 20px;width:290px;text-align:center;
+    box-shadow:0 0 40px rgba(255,80,0,0.15);">
+    <div style="font-size:44px;margin-bottom:8px;">🔥</div>
+    <div style="color:#FF6B35;font-size:18px;font-weight:700;
+      font-family:'Rajdhani',sans-serif;margin-bottom:8px;">Mağara Hedefi!</div>
+    <div style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;">
+      Hedef mağara içinde gizli.<br>
+      <b style="color:#FFB74D;">Isıya Güdümlü Başlık</b> ile<br>
+      mermin ısı kaynağına otomatik yönelir.<br>
+      <span style="color:rgba(255,255,255,0.45);font-size:11px;">Bu level için geçerli</span>
+    </div>
+    <button onclick="guidedHintAd()"
+      style="width:100%;padding:13px;border:none;border-radius:14px;
+      background:linear-gradient(135deg,#FF4500,#FF6B35);
+      color:white;font-size:15px;font-weight:700;
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;">
+      📺 Reklam İzle → 1 Level Aç
+    </button>
+    <button onclick="closeGuidedHint();switchTab('boost');openGallery(curLevel);"
+      style="width:100%;padding:10px;border-radius:14px;
+      border:1.5px solid rgba(255,100,0,0.3);
+      background:rgba(255,100,0,0.08);color:#FF6B35;
+      font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
+      ⚡ Güçlendirmeler'den Al
+    </button>
+    <button onclick="closeGuidedHint()"
       style="width:100%;padding:8px;border:none;background:none;
       color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
       Şimdi değil
