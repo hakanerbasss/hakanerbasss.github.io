@@ -943,6 +943,7 @@ let particles = [];
 let craters = [];
 let terrain = [];     // y values for each x pixel
 let terrainImg = null;
+let _crackOverlay = null; // Bunker Buster V-çatlak overlay — terrain'den bağımsız
 let targetX, targetY, targetW=70, targetH=50;
 let targetHP = 100, targetMaxHP = 100;
 let tankX, tankY;
@@ -1001,6 +1002,7 @@ const AMMO_DEF = {
   napalm:   {damage:220,radius:80,color:'#FF6D00',trailColor:'rgba(255,109,0,0.5)', explosive:true, apPen:2.2, emoji:'🔥',icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 44" width="26" height="36"><rect x="8" y="24" width="16" height="16" rx="4" fill="#FF6D00"/><rect x="10" y="19" width="12" height="7" rx="3" fill="#E65100"/><rect x="13" y="13" width="6" height="7" rx="2" fill="#BF360C"/><path d="M14 13 Q12 7 16 3 Q18 7 20 5 Q18 9 22 13Z" fill="#FFD700"/><path d="M13 13 Q10 8 14 4 Q16 8 16 3 Q19 8 22 6 Q21 10 24 13Z" fill="#FF6B35" opacity="0.6"/><rect x="8" y="30" width="16" height="2" rx="1" fill="#E65100" opacity="0.5"/><rect x="8" y="35" width="16" height="2" rx="1" fill="#E65100" opacity="0.5"/></svg>',name:'Napalm',        cost:6000, costType:'puan',  tempLevels:1},
   split:    {damage:240,radius:45,color:'#FF9800', trailColor:'rgba(255,152,0,0.6)', explosive:true, apPen:2.5, emoji:'✂️',icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 44" width="28" height="36"><path d="M18 38 Q18 22 10 10" stroke="#FF9800" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M18 38 Q18 22 18 8" stroke="#FFB74D" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M18 38 Q18 22 26 10" stroke="#FF9800" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="10" cy="8" r="4" fill="#FF6D00"/><circle cx="18" cy="6" r="4" fill="#FF9800"/><circle cx="26" cy="8" r="4" fill="#FF6D00"/><circle cx="18" cy="38" r="5" fill="#E65100"/></svg>',name:'Split',   cost:18000,costType:'puan',tempLevels:1},
   triple:   {damage:200,radius:28,color:'#29B6F6', trailColor:'rgba(41,182,246,0.6)',  explosive:false,apPen:2.8, emoji:'🔱',icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="34" height="36"><rect x="5" y="20" width="8" height="18" rx="2" fill="#0288D1"/><path d="M5 20 Q9 6 13 20Z" fill="#01579B"/><rect x="18" y="14" width="8" height="24" rx="2" fill="#29B6F6"/><path d="M18 14 Q22 2 26 14Z" fill="#0288D1"/><rect x="31" y="20" width="8" height="18" rx="2" fill="#0288D1"/><path d="M31 20 Q35 6 39 20Z" fill="#01579B"/></svg>',name:'Triple',  cost:20000,costType:'puan',tempLevels:1},
+  bunker:   {damage:320,radius:20,color:'#546E7A',trailColor:'rgba(84,110,122,0.6)',explosive:false,apPen:5.0,bunkerBust:true,emoji:'🪛',icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 48" width="18" height="40"><rect x="9" y="30" width="6" height="14" rx="1.5" fill="#37474F"/><rect x="8" y="28" width="8" height="4" rx="1" fill="#455A64"/><path d="M9 28 Q12 6 15 28Z" fill="#263238"/><path d="M10.5 28 Q12 10 13.5 28" fill="none" stroke="#546E7A" stroke-width="1" opacity="0.7"/><rect x="7" y="32" width="10" height="2" rx="1" fill="#FFD600" opacity="0.85"/><rect x="7" y="37" width="10" height="2" rx="1" fill="#FFD600" opacity="0.85"/><polygon points="8,42 10,44 14,44 16,42 15,44 9,44" fill="#37474F"/><polygon points="6,30 8,28 8,32" fill="#607D8B"/><polygon points="18,30 16,28 16,32" fill="#607D8B"/></svg>',name:'Bunker Buster',cost:15000,costType:'puan',tempLevels:1},
   nuclear:  {damage:500,radius:120,color:'#76FF03',trailColor:'rgba(118,255,3,0.5)',explosive:true, apPen:6.0, emoji:'☢️',icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 46" width="28" height="38"><circle cx="18" cy="32" r="14" fill="rgba(118,255,3,0.07)"/><rect x="11" y="28" width="14" height="14" rx="3" fill="#1B2819"/><path d="M11 28 Q18 8 25 28Z" fill="#1B5E20"/><path d="M14 28 Q18 14 22 28" fill="none" stroke="#76FF03" stroke-width="1.5" opacity="0.6"/><circle cx="18" cy="34" r="4" fill="rgba(118,255,3,0.2)"/><circle cx="18" cy="34" r="2" fill="#76FF03"/><polygon points="7,42 11,32 11,42" fill="#1B5E20"/><polygon points="29,42 25,32 25,42" fill="#1B5E20"/></svg>',name:'Nükleer',       cost:25000,costType:'puan',  tempLevels:1},
 };
 
@@ -1162,6 +1164,7 @@ function loadLevel(idx){
   updateHUD2();
   // Terrain bake'i bir sonraki frame'e ertele — main thread bloklanmaz
   terrainImg = null; // önce null, draw() siyah gösterir
+  _crackOverlay = null;
   requestAnimationFrame(()=>{
     terrainImg = renderTerrainToImg();
   });
@@ -1868,7 +1871,49 @@ function update(){
       bullet.x  += bullet.vx/steps;
       bullet.y  += bullet.vy/steps;
       const bxi = Math.floor(bullet.x);
-      if(bxi>=0 && bxi<W && bullet.y >= terrain[bxi]){ onTerrainHit(); break; }
+      if(bxi>=0 && bxi<W && bullet.y >= terrain[bxi]){
+        const _curAmmo = bullet.ammoType || selectedAmmo;
+        if((AMMO_DEF[_curAmmo]||{}).bunkerBust){
+          if(!bullet.underground){
+            bullet.underground = true;
+            bullet.undergroundStartX = bullet.x;
+            bullet.undergroundStartY = bullet.y;
+            bullet.undergroundDist   = 0;
+            // Hedef bu merminin yönünde mi? — giriş anında hesapla
+            const _tdx = targetX - bullet.x;
+            const _tdy = (targetY - targetH/2) - bullet.y;
+            const _tdist = Math.sqrt(_tdx*_tdx + _tdy*_tdy);
+            const _dot = (bullet.vx*_tdx + bullet.vy*_tdy) /
+                         (Math.sqrt(bullet.vx*bullet.vx+bullet.vy*bullet.vy) * _tdist + 0.001);
+            // dot > 0.3: mermi hedefe doğru gidiyor
+            bullet.undergroundTargetAhead = (_dot > 0.3 && _tdist < 200);
+            // Patlama mesafesi: hedef varsa hedefe kadar, yoksa crackD kadar
+            const upgLvl2 = ammoUpgrades[_curAmmo] || 0;
+            const crackD2 = 35 + upgLvl2 * 18;
+            bullet.undergroundMaxDist = bullet.undergroundTargetAhead ? 180 : crackD2;
+          }
+          // Mesafe güncelle
+          const ddx = bullet.x - bullet.undergroundStartX;
+          const ddy = bullet.y - bullet.undergroundStartY;
+          bullet.undergroundDist = Math.sqrt(ddx*ddx + ddy*ddy);
+
+          // Hedefe ulaştı mı?
+          if(bullet.undergroundTargetAhead &&
+             bullet.x>targetX-targetW/2 && bullet.x<targetX+targetW/2 &&
+             bullet.y>targetY-targetH   && bullet.y<targetY+targetH){
+            onTargetHit(); break;
+          }
+          // Max mesafeye ulaştı → patla
+          if(bullet.undergroundDist >= bullet.undergroundMaxDist){
+            onTerrainHit(); break;
+          }
+        } else {
+          onTerrainHit(); break;
+        }
+      } else if(bullet && bullet.underground){
+        // Terrain dışına çıktı → patla
+        onTerrainHit(); break;
+      }
       if(bullet.x>targetX-targetW/2 && bullet.x<targetX+targetW/2 &&
          bullet.y>targetY-targetH && bullet.y<targetY+10){ onTargetHit(); break; }
       if(bullet.x<-30 || bullet.x>W+30 || bullet.y>H+80){
@@ -2178,6 +2223,8 @@ function drawTerrain(){
     ctx.fillStyle=th.terrainColors?th.terrainColors[2]:'#4a5a3a';
     ctx.fillRect(0,H*0.5,W,H*0.5);
   }
+  // Crack overlay — terrain yeniden çizilse bile çatlaklar kalır
+  if(_crackOverlay) ctx.drawImage(_crackOverlay, 0, 0);
 }
 
 function drawTank(){
@@ -2549,6 +2596,8 @@ function drawTarget(){
 function drawBullet(){
   // Ana mermi
   if(bullet){
+    // Bunker Buster terrain içindeyse çizme
+    if(bullet.underground) return;
     const ad = AMMO_DEF[bullet.ammoType||selectedAmmo]||AMMO_DEF.normal;
     bullet.trail.forEach((t,i)=>{
       const sz=2+i*0.25;
@@ -3301,7 +3350,7 @@ function onTerrainHit(){
   SFX.terrainHit();
 
   // ── Yakın ıskalama splash hasarı ────────────────────────────────────────
-  const ad  = AMMO_DEF[selectedAmmo];
+  const ad  = AMMO_DEF[selectedAmmo] || AMMO_DEF.normal;
   const dx  = bullet.x - targetX;
   const dy  = bullet.y - (targetY - targetH/2);
   const dist= Math.sqrt(dx*dx + dy*dy);
@@ -3338,7 +3387,7 @@ function onTerrainHit(){
   const impX = Math.floor(Math.max(0,Math.min(W-1,bullet.x)));
   const cr={
     x: impX,
-    r: AMMO_DEF[selectedAmmo].radius*0.65,
+    r: (AMMO_DEF[selectedAmmo]||AMMO_DEF.normal).radius*0.65,
     // y terrain'den her frame okunacak, sabit değil
     angle: Math.random()*Math.PI*2,
     // Irregular shape points (normalized -1..1)
@@ -3358,8 +3407,17 @@ function onTerrainHit(){
 
   // Gelişmiş terrain deformasyon
   const _bx = bullet.x, _by = bullet.y;
-  const _r = AMMO_DEF[selectedAmmo].radius;
-  deformTerrain(_bx, _by, _r, selectedAmmo);
+  const _r = (AMMO_DEF[selectedAmmo]||AMMO_DEF.normal).radius;
+  const _isBunkerHit = !!(AMMO_DEF[selectedAmmo]||{}).bunkerBust;
+
+  if(_isBunkerHit && bullet.undergroundStartX != null){
+    // V-çatlak: giriş noktasından patlama noktasına kadar
+    deformTerrain(bullet.undergroundStartX, bullet.undergroundStartY, _r, selectedAmmo, _bx, _by);
+    // Patlama noktasında küçük krater
+    deformTerrain(_bx, _by, _r * 0.5, 'normal');
+  } else {
+    deformTerrain(_bx, _by, _r, selectedAmmo);
+  }
   // Re-render terrain
   terrainImg = renderTerrainToImg();
   // Hedef altındaki terrain değiştiyse targetY'yi güncelle
@@ -3563,7 +3621,7 @@ function spawnRockDebris(x, y, radius, ammoType){
 }
 
 // ── Gelişmiş terrain deformasyon ─────────────────────────────────────────────
-function deformTerrain(cx, cy, radius, ammoType){
+function deformTerrain(cx, cy, radius, ammoType, blastX, blastY){
   const ad = AMMO_DEF[ammoType] || AMMO_DEF.normal;
   const craterR = Math.min(radius * 0.55, 60);
   const oc = terrainImg;
@@ -3633,6 +3691,95 @@ function deformTerrain(cx, cy, radius, ammoType){
     const norm = Math.abs(dx) / tR;
     const d = (1 - norm * norm) * craterR * 0.3;
     terrain[x] = Math.min(H - 10, terrain[x] + d);
+  }
+
+  // ── Bunker Buster V-çatlak ───────────────────────────────────────────────
+  if((AMMO_DEF[ammoType]||{}).bunkerBust){
+    // Overlay canvas — terrain yeniden render edilse bile çatlak kalır
+    if(!_crackOverlay || _crackOverlay.width!==W || _crackOverlay.height!==H){
+      _crackOverlay = document.createElement('canvas');
+      _crackOverlay.width = W; _crackOverlay.height = H;
+    }
+    const cc = _crackOverlay.getContext('2d');
+
+    const upgLvl  = ammoUpgrades[ammoType] || 0;
+    const crackW  = 4  + upgLvl * 3;
+    const crackD  = 40 + upgLvl * 20;
+    const jagged  = 8  + upgLvl * 3;
+    const grayW   = crackW * 4;
+    const seed    = Math.floor(cx * 7 + surfY * 3);
+    const rng     = (n) => { const v=Math.sin(seed+n)*43758.5453; return v-Math.floor(v); };
+
+    const _realTipX = (blastX != null) ? blastX : cx;
+    const _realTipY = (blastY != null) ? blastY : surfY + crackD;
+
+    const leftPts=[], rightPts=[];
+    for(let i=0;i<=jagged;i++){
+      const t=i/jagged;
+      const yp=surfY + t*(_realTipY - surfY);
+      const xp=cx    + t*(_realTipX - cx);
+      const halfW=crackW*(1-t*0.88);
+      const jx=(rng(i*2)-0.5)*crackW*1.6;
+      const jy=(rng(i*2+1)-0.5)*Math.abs(_realTipY-surfY)*0.04;
+      leftPts .push({x:xp-halfW+jx, y:yp+jy});
+      rightPts.push({x:xp+halfW-jx, y:yp+jy});
+    }
+    const tipX=_realTipX+(rng(99)-0.5)*crackW*0.3;
+    const tipY=_realTipY;
+
+    // 1) Gri kenar şeritler
+    const lgGrad=cc.createLinearGradient(cx,surfY,_realTipX,tipY);
+    lgGrad.addColorStop(0,'rgba(210,210,200,0.75)');
+    lgGrad.addColorStop(0.5,'rgba(150,145,130,0.45)');
+    lgGrad.addColorStop(1,'rgba(80,75,60,0.10)');
+    cc.save(); cc.globalCompositeOperation='source-over';
+    for(const [pts,side] of [[leftPts,-1],[rightPts,1]]){
+      cc.beginPath();
+      cc.moveTo(pts[0].x+side*grayW*0.6, pts[0].y);
+      for(let i=1;i<pts.length;i++) cc.lineTo(pts[i].x+side*grayW*0.35, pts[i].y);
+      cc.lineTo(tipX,tipY);
+      for(let i=pts.length-1;i>=0;i--) cc.lineTo(pts[i].x, pts[i].y);
+      cc.closePath(); cc.fillStyle=lgGrad; cc.fill();
+    }
+    cc.restore();
+
+    // 2) Karanlık iç dolgu (siyah void)
+    cc.save(); cc.globalCompositeOperation='source-over';
+    cc.beginPath();
+    cc.moveTo(leftPts[0].x, leftPts[0].y);
+    for(let i=1;i<leftPts.length;i++) cc.lineTo(leftPts[i].x, leftPts[i].y);
+    cc.lineTo(tipX,tipY);
+    for(let i=rightPts.length-1;i>=0;i--) cc.lineTo(rightPts[i].x, rightPts[i].y);
+    cc.closePath();
+    const darkGrad=cc.createLinearGradient(cx,surfY,cx,tipY);
+    darkGrad.addColorStop(0,'rgba(0,0,0,0.95)');
+    darkGrad.addColorStop(1,'rgba(10,5,0,0.85)');
+    cc.fillStyle=darkGrad; cc.fill();
+    cc.restore();
+
+    // 3) Tırtık taş parçacıklar
+    cc.save(); cc.globalCompositeOperation='source-over';
+    for(let i=0;i<6+upgLvl*4;i++){
+      const side=rng(i+80)>0.5?1:-1;
+      const pts=side>0?rightPts:leftPts;
+      const idx2=Math.min(pts.length-1,Math.floor(rng(i+50)*(pts.length)));
+      const pr=2+rng(i+30)*(3+upgLvl*1.5);
+      cc.beginPath();
+      cc.arc(pts[idx2].x+side*rng(i+10)*grayW*0.7, pts[idx2].y+(rng(i+20)-0.5)*10, pr, 0, Math.PI*2);
+      cc.fillStyle=`rgba(${140+Math.floor(rng(i)*80)},${130+Math.floor(rng(i+1)*70)},${100+Math.floor(rng(i+2)*50)},${0.6+rng(i+3)*0.35})`;
+      cc.fill();
+    }
+    cc.restore();
+
+    // 4) Üst giriş etrafı toz/kir halo
+    cc.save(); cc.globalCompositeOperation='source-over';
+    const haloGrad=cc.createRadialGradient(cx,surfY,0,cx,surfY,grayW*2.5);
+    haloGrad.addColorStop(0,'rgba(120,100,60,0.35)');
+    haloGrad.addColorStop(1,'rgba(0,0,0,0)');
+    cc.fillStyle=haloGrad;
+    cc.save(); cc.scale(1,0.4);
+    cc.beginPath(); cc.arc(cx,surfY/0.4,grayW*2.5,0,Math.PI*2); cc.fill();
+    cc.restore(); cc.restore();
   }
 }
 
@@ -3980,6 +4127,7 @@ const AMMO_STATS={
   napalm:   {dmg:0.60,pen:0.55,alan:0.90,desc:'Geniş alan + yanma efekti'},
   split:    {dmg:0.75,pen:0.63,alan:0.80,desc:'3\'e bölünür, hem güçlü hem geniş'},
   triple:   {dmg:0.70,pen:0.70,alan:0.35,desc:'3 mermi aynı anda, yüksek hasar'},
+  bunker:   {dmg:0.85,pen:0.95,alan:0.05,desc:'Toprağı deler, gömülü hedefe ulaşır'},
   nuclear:  {dmg:1.00,pen:1.00,alan:1.00,desc:'Her şeyi yok eder'},
 };
 
@@ -4357,6 +4505,17 @@ const AMMO_INFO = {
       {label:'Hasar',val:0.5,col:'#FF6B35'},
       {label:'Zırh Delme',val:0.55,col:'#FFD700'},
       {label:'Alan',val:1.0,col:'#00C9B1'},
+    ]
+  },
+  bunker:{
+    name:'🪛 Bunker Buster',
+    desc:'Toprağı delerek içindeki hedefe ulaşır. Nuclear bölümler için şart.',
+    dmg:320, pen:5.0, radius:20,
+    effective:'Gömülü Hedef + Çelik',
+    bars:[
+      {label:'Hasar',val:0.85,col:'#FF6B35'},
+      {label:'Zırh Delme',val:0.95,col:'#FFD700'},
+      {label:'Alan',val:0.08,col:'#00C9B1'},
     ]
   },
 };
