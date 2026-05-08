@@ -49,7 +49,7 @@ html,body{
 #tank-badge-name{color:white;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;}
 #tank-badge-level{color:#FF6B35;font-size:11px;margin-left:2px;}
 #btn-gallery-open{
-  background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
+  background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);
   color:white;border-radius:14px;padding:4px 10px;
   font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;
   cursor:pointer;pointer-events:auto;
@@ -392,6 +392,15 @@ button:active{opacity:0.75;transform:scale(0.96);}
   font-family:'Rajdhani',sans-serif;font-weight:700;
 }
 
+
+@keyframes nukeSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes nukePulse {
+  0%,100% { box-shadow: 0 0 6px 2px rgba(255,210,0,0.5); }
+  50%      { box-shadow: 0 0 14px 5px rgba(255,210,0,0.9); }
+}
 </style>
 </head>
 <body>
@@ -415,7 +424,8 @@ button:active{opacity:0.75;transform:scale(0.96);}
   </div>
   <button onclick="showLevelMap()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🗺️</button>
   <button id="btn-gallery-open" onclick="openGallery(curLevel)">⚔️ Inventory</button>
-  <button onclick="openSettings()" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
+  <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
+  <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
 </div>
 
 <!-- Mermi slotları — sağ altta eski yerinde -->
@@ -542,19 +552,12 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
   <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;">💨 Calm</div>
-  <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent;">🛡️</button>
-  <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.4);border-radius:8px;padding:4px 8px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-top:6px;">🔥 1</button>
+</div>
 
-  <!-- DEBUG PANEL -->
-  <button onclick="const p=document.getElementById('debug-panel');p.style.display=p.style.display==='none'?'flex':'none';" style="margin-top:6px;background:rgba(0,0,0,0.7);border:1px solid #ff0;border-radius:6px;padding:3px 7px;color:#ff0;font-size:11px;cursor:pointer;">🔧</button>
-  <div id="debug-panel" style="margin-top:4px;background:rgba(0,0,0,0.8);border:1px solid #ff0;border-radius:8px;padding:6px 8px;display:none;flex-direction:column;gap:4px;min-width:130px;">
-    <div style="color:#ff0;font-size:10px;font-weight:700;text-align:center;">🔧 DEBUG</div>
-    <label style="color:#fff;font-size:9px;">crackW <input id="dbg-crackW" type="number" value="2" step="0.5" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
-    <label style="color:#fff;font-size:9px;">crackD <input id="dbg-crackD" type="number" value="22" step="2" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
-    <label style="color:#fff;font-size:9px;">maxDist <input id="dbg-maxDist" type="number" value="45" step="5" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
-    <label style="color:#fff;font-size:9px;">dustSz <input id="dbg-dustSz" type="number" value="2" step="0.5" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
-    <label style="color:#fff;font-size:9px;">dustCnt <input id="dbg-dustCnt" type="number" value="14" step="1" style="width:45px;font-size:9px;background:#222;color:#0ff;border:1px solid #444;border-radius:3px;padding:1px 3px;"></label>
-  </div>
+<!-- Kalkan + Bunker — sağa yaslanmış, kalkan üstte bunker altta -->
+<div id="right-action-wrap" style="position:fixed;top:148px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
+  <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🛡️</button>
+  <div id="buried-unlock-btn" onclick="showBuriedInfo()" style="display:none;width:36px;height:36px;background:rgba(0,0,0,0.7);border:1.5px solid #FFD700;border-radius:50%;cursor:pointer;pointer-events:auto;align-items:center;justify-content:center;animation:nukePulse 1.4s ease-in-out infinite;"><span style="font-size:18px;display:inline-block;animation:nukeSpin 3s linear infinite;">☢️</span></div>
 </div>
 
 <div id="power-wrap">
@@ -915,6 +918,8 @@ function makeLevels(){
       });
       const tankTypes=['basic','basic','basic','upgraded','upgraded','upgraded','elite','elite','elite','elite'];
 
+      // Son 2 level: gömülü hedef. localIdx 9 tamamen gömülü, 8 kısmen
+      const buriedType = localIdx===9 ? 'full' : localIdx===8 ? 'partial' : null;
       lvs.push({
         id:globalId,
         name:themeNames[theme][li],
@@ -929,6 +934,7 @@ function makeLevels(){
         tankType:tankTypes[localIdx],
         treeStyleIdx: Math.floor(Math.random() * 3), // her level farklı ağaç
         ammo:localIdx<3?['normal']:localIdx<6?['normal','ap']:['normal','ap','explosive'],
+        buried: buriedType,  // null | 'partial' | 'full'
       });
     }
   });
@@ -957,6 +963,10 @@ let terrainImg = null;
 let _crackOverlay = null; // Bunker Buster V-çatlak overlay — terrain'den bağımsız
 let targetX, targetY, targetW=70, targetH=50;
 let targetHP = 100, targetMaxHP = 100;
+let targetBuriedDepth = 0;   // piksel olarak toprağa gömülme derinliği
+let _buriedHpFrozen = false; // %20 eşiğinde donduruldu mu
+let _buriedAdUsed = false;   // reklam ile kilit kırıldı mı
+let _nukePulse = 0;          // ☢️ animasyon zamanı
 let tankX, tankY;
 // Sahiplik sistemi
 let ownedAmmo   = JSON.parse(localStorage.getItem('ts_owned_ammo')||'["normal"]');
@@ -1165,6 +1175,14 @@ function loadLevel(idx){
   checkTacticalExpiry();
   if(curLevel>=15 && !lv.showPath && !isTacticalActive()) setTimeout(showTacticalHint,1200);
   targetHP = targetMaxHP = lv.targetHP || MAT_HP[lv.targetMat];
+  _buriedHpFrozen = false;
+  _buriedAdUsed   = false;
+  _nukePulse      = 0;
+  const _bub = document.getElementById('buried-unlock-btn');
+  if(_bub) _bub.style.display = lv.buried ? 'flex' : 'none';
+  // Gömülme derinliği: partial=hedefin %55'i, full=hedefin %90'ı toprak altında
+  targetBuriedDepth = lv.buried==='full' ? 0.90 :
+                      lv.buried==='partial' ? 0.55 : 0;
   destructionPieces=[];
   screenShake=0;
   explosions=[];
@@ -1792,9 +1810,59 @@ function placeEntities(){
   // Target on right side
   let rx = W*0.82;
   let ry = terrain[Math.floor(rx)];
-  targetX = rx; targetY = ry;
   targetW = 70; targetH = 50;
+
+  if(lv.buried){
+    // Sağ taraf etek noktasını bul:
+    // W*0.55 ile W*0.92 arasında terrain Y değeri en BÜYÜK (ekranda en aşağı = etek) nokta
+    let etekX = Math.floor(W*0.65);
+    const xStart = Math.floor(W*0.55);
+    const xEnd   = Math.floor(W*0.92);
+    for(let xi = xStart; xi <= xEnd; xi++){
+      if(terrain[xi] > terrain[etekX]) etekX = xi;
+    }
+    const etekY = terrain[etekX];
+
+    if(lv.buried === 'partial'){
+      // 9. level: etek civarı, sadece üst ~%20'si görünür
+      targetX = etekX;
+      targetY = etekY + targetH * 0.80;
+
+    } else {
+      // 10. level: etek + tamamen içeri — her tarafı toprak altında
+      // X'i de biraz içeri it (yamacın içi)
+      // Etekten sola doğru terrain'in içine giren noktayı bul
+      let innerX = etekX;
+      for(let xi = etekX; xi >= xStart; xi--){
+        // Terrain Y'si etekten en fazla targetH*0.5 yukarıda olan ilk nokta
+        if(terrain[xi] <= etekY - targetH * 0.5){
+          innerX = xi;
+          break;
+        }
+      }
+      targetX = innerX + targetW * 0.3; // biraz sağa (terrain içi)
+      const innerY = terrain[Math.floor(targetX)];
+      targetY = innerY + targetH * 1.2; // tamamen altında
+    }
+
+  } else {
+    targetX = rx; targetY = ry;
+  }
+
 }
+// Gömülü hedef — freeze yok, normal hasar uygulanır
+function showBuriedInfo(){
+  const pop = document.getElementById('buried-info-pop');
+  if(pop) pop.style.display = 'flex';
+}
+function closeBuriedInfo(){
+  const pop = document.getElementById('buried-info-pop');
+  if(pop) pop.style.display = 'none';
+}
+function applyBuriedDamage(dmg){
+  targetHP = Math.max(0, targetHP - dmg);
+}
+
 
 // ═══════════════════════════════════════
 // DRAW
@@ -1905,7 +1973,7 @@ function update(){
             const upgLvl2 = ammoUpgrades[_curAmmo] || 0;
             const crackD2 = 30 + upgLvl2 * 12;
             bullet.undergroundMaxDist = bullet.undergroundTargetAhead
-              ? Math.min(_tdist * 0.75, (parseFloat(document.getElementById('dbg-maxDist')?.value||'45')) + upgLvl2 * 8)
+              ? Math.min(_tdist * 0.85, 70 + upgLvl2 * 15)
               : crackD2;
           }
           // Mesafe güncelle
@@ -2013,7 +2081,7 @@ function update(){
           const splash=Math.round(ad2.damage*(eb.damageScale||1)*res2*
             Math.pow(1-dist2/(ad2.radius*2.5),1.4)*0.55*ammoBonusMult2*tankBonusMult2);
           if(splash>0){
-            targetHP=Math.max(0,targetHP-splash);
+            applyBuriedDamage(splash);
             updateUI();
             if(targetHP<=0){spawnDestruction();setTimeout(()=>onWin(),2200);}
           }
@@ -2030,7 +2098,7 @@ function update(){
         const ammoBonusMult3 = 1 + 0.25*(ammoUpgrades[eb.ammoType||selectedAmmo]||0);
         const tankBonusMult3 = 1 + 0.20*(tankUpgrades[selectedTank]||0);
         const dmg3=Math.round(ad3.damage*(eb.damageScale||1)*res3*ammoBonusMult3*tankBonusMult3);
-        targetHP=Math.max(0,targetHP-dmg3);
+        applyBuriedDamage(dmg3);
         spawnImpact(eb.x,eb.y,'target');
         spawnExplosionSprite(eb.x,eb.y,0.8);
         SFX.explosion(eb.ammoType||selectedAmmo);
@@ -2438,7 +2506,9 @@ function drawTarget(){
   const tw=targetW, th=targetH;
   const pct=targetHP/targetMaxHP;
 
-  const embedDepth=targetH*0.35;
+  // Gömülü mod: terrain altındaki kısım clip ile gizlenir
+  // buried levellarda Y zaten placeEntities'de ayarlandı
+  const embedDepth = lv.buried ? targetH*0.35 : targetH*0.35;
   ctx.save();
   ctx.translate(tx, ty-th+embedDepth);
 
@@ -2578,6 +2648,7 @@ function drawTarget(){
   ctx.beginPath();ctx.roundRect(-tw/2,-32,tw*pct,7,3);ctx.fill();
   ctx.restore();
 
+
   // Flag on top — rüzgara göre dalgalanır — HP barın üstünde
   ctx.fillStyle='#888';
   ctx.fillRect(-1,-18,2,18);  // bayrak direği
@@ -2610,6 +2681,78 @@ function drawTarget(){
   // HP bar yukarıda çizildi
 
   ctx.restore();
+  // Buried ise indikatör çiz
+  if(lv.buried){
+    drawBuriedIndicator(tx, terrain[Math.floor(tx)] || ty);
+  }
+}
+
+function drawBuriedIndicator(bx, surfY){
+  _nukePulse = (_nukePulse || 0) + 0.04;
+  const pulse = 0.5 + 0.5 * Math.sin(_nukePulse);
+  const frozen = _buriedHpFrozen && !_buriedAdUsed;
+
+  // ── Işık hüzmesi — topraktan yukarı sızan ──────────────────────
+  const beamW  = 18 + pulse * 8;
+  const beamH  = 55 + pulse * 15;
+  const beamCol = frozen ? 'rgba(255,50,50,' : 'rgba(255,180,0,';
+
+  const beamGrad = ctx.createLinearGradient(bx, surfY, bx, surfY - beamH);
+  beamGrad.addColorStop(0,   beamCol + (0.55 + pulse*0.2) + ')');
+  beamGrad.addColorStop(0.5, beamCol + (0.25 + pulse*0.1) + ')');
+  beamGrad.addColorStop(1,   beamCol + '0)');
+  ctx.fillStyle = beamGrad;
+  ctx.beginPath();
+  ctx.moveTo(bx - beamW*0.5, surfY);
+  ctx.lineTo(bx - beamW*0.1, surfY - beamH);
+  ctx.lineTo(bx + beamW*0.1, surfY - beamH);
+  ctx.lineTo(bx + beamW*0.5, surfY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Yan ışık saçılımı
+  for(let s = -1; s <= 1; s += 2){
+    const sg = ctx.createLinearGradient(bx, surfY, bx + s*35, surfY - 30);
+    sg.addColorStop(0, beamCol + (0.3 + pulse*0.1) + ')');
+    sg.addColorStop(1, beamCol + '0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.moveTo(bx, surfY);
+    ctx.lineTo(bx + s*beamW*0.5, surfY);
+    ctx.lineTo(bx + s*40, surfY - 30);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── ☢️ sembolü — toprak yüzeyinin hemen üstünde ────────────────
+  const symY  = surfY - beamH * 0.55;
+  const symSz = 18 + pulse * 4;
+  ctx.save();
+  ctx.translate(bx, symY);
+  ctx.rotate(_nukePulse * 0.4); // yavaş döner
+  ctx.font       = `${Math.round(symSz)}px serif`;
+  ctx.textAlign  = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.7 + pulse * 0.3;
+  // Gölge parlaması
+  ctx.shadowColor = frozen ? '#ff2200' : '#FFD700';
+  ctx.shadowBlur  = 10 + pulse * 8;
+  ctx.fillText('☢️', 0, 0);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Frozen ise kırmızı "!" uyarı
+  if(frozen){
+    ctx.save();
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(255,80,80,${0.7+pulse*0.3})`;
+    ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 6;
+    ctx.fillText('!', bx, surfY - beamH - 10);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
 }
 
 function drawBunkerBlast(){
@@ -2811,26 +2954,9 @@ function drawParticles(){
       ctx.fillStyle=p.color;
       ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
     } else if(p.type==='dust'){
-      // İnce sis çizgisi — fog/streak tarzı
-      const len = p.size * (2.5 + alpha);
-      const wid = p.size * 0.35;
-      const ang = p.dustAngle || 0;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(ang);
-      const dg = ctx.createLinearGradient(-len*0.5,0,len*0.5,0);
-      const ca = p.color.replace(/[\d.]+\)$/, `${(alpha*0.28).toFixed(2)})`);
-      const cm = p.color.replace(/[\d.]+\)$/, `${(alpha*0.12).toFixed(2)})`);
-      dg.addColorStop(0,'rgba(0,0,0,0)');
-      dg.addColorStop(0.2, cm);
-      dg.addColorStop(0.5, ca);
-      dg.addColorStop(0.8, cm);
-      dg.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.fillStyle = dg;
-      ctx.beginPath();
-      ctx.ellipse(0,0,len*0.5,wid,0,0,Math.PI*2);
-      ctx.fill();
-      ctx.restore();
+      ctx.fillStyle=p.color;
+      const r=p.size*(0.5+alpha*0.5);
+      ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();
     } else if(p.type==='rock'){
       ctx.save();
       ctx.translate(p.x,p.y);
@@ -3450,7 +3576,6 @@ function shiftWind(){
 
 function fire(){
   if(phase!=='aim'||shotsLeft<=0) return;
-  if(_crackOverlay){ _crackOverlay.getContext('2d').clearRect(0,0,_crackOverlay.width,_crackOverlay.height); }
   SFX.fire(selectedAmmo);
   const td=TANK_DEF[selectedTank]||TANK_DEF[lv.tankType]||TANK_DEF.basic;
   const rad=angle*Math.PI/180;
@@ -3619,7 +3744,7 @@ function onTargetHit(){
   const ammoBonusMult = 1 + 0.25*(ammoUpgrades[selectedAmmo]||0);
   const tankBonusMult = 1 + 0.20*(tankUpgrades[selectedTank]||0);
   const dmg=Math.round(ad.damage*res*pen*ammoBonusMult*tankBonusMult);
-  targetHP=Math.max(0,targetHP-dmg);
+  applyBuriedDamage(dmg);
 
   spawnImpact(bullet.x,bullet.y,'target');
   spawnExplosionSprite(bullet.x,bullet.y,1.2);
@@ -3739,9 +3864,7 @@ function spawnRockDebris(x, y, radius, ammoType){
   }
 
   // Toz bulutu — geniş, yavaş yükselen
-  const _dbgDC = parseFloat(document.getElementById('dbg-dustCnt')?.value||'14');
-  const _dbgDS = parseFloat(document.getElementById('dbg-dustSz')?.value||'2');
-  const dustCount = Math.round(_dbgDC + power * 8);
+  const dustCount = Math.round(14 + power * 12);
   for(let i = 0; i < dustCount; i++){
     const a = -Math.PI + Math.random()*Math.PI;
     const v = 0.5 + Math.random()*(2 + power*2);
@@ -3751,16 +3874,15 @@ function spawnRockDebris(x, y, radius, ammoType){
     const g = parseInt(dustCol.slice(3,5),16);
     const b = parseInt(dustCol.slice(5,7),16);
     particles.push({
-      x: x + (Math.random()-0.5)*radius*0.55,
+      x: x + (Math.random()-0.5)*radius*1.2,
       y: y,
       vx: Math.cos(a)*v,
       vy: -(0.4 + Math.random()*(1.5 + power*1.5)),
-      size: _dbgDS + Math.random()*(2 + power*1.5),
-      life: 30 + Math.random()*25,
-      maxLife: 55,
-      color: 'rgba('+r+','+g+','+b+',0.7)',
+      size: 10 + Math.random()*(20 + power*20),
+      life: 50 + Math.random()*50,
+      maxLife: 100,
+      color: 'rgba('+r+','+g+','+b+',0.55)',
       type: 'dust',
-      dustAngle: Math.random()*Math.PI,
     });
   }
 
@@ -3867,12 +3989,10 @@ function deformTerrain(cx, cy, radius, ammoType, blastX, blastY){
     const cc = _crackOverlay.getContext('2d');
 
     const upgLvl  = ammoUpgrades[ammoType] || 0;
-    const _dbgCW = parseFloat(document.getElementById('dbg-crackW')?.value||'2');
-    const _dbgCD = parseFloat(document.getElementById('dbg-crackD')?.value||'22');
-    const crackW  = _dbgCW + upgLvl * 1.5;
-    const crackD  = _dbgCD + upgLvl * 10;
-    const jagged  = 7  + upgLvl * 2;
-    const grayW   = crackW * 3;
+    const crackW  = 4  + upgLvl * 3;
+    const crackD  = 40 + upgLvl * 20;
+    const jagged  = 8  + upgLvl * 3;
+    const grayW   = crackW * 4;
     const seed    = Math.floor(cx * 7 + surfY * 3);
     const rng     = (n) => { const v=Math.sin(seed+n)*43758.5453; return v-Math.floor(v); };
 
@@ -7091,6 +7211,21 @@ function openTacticalInfo(){
       font-family:'Rajdhani',sans-serif;cursor:pointer;margin-top:12px;">
       Harika! Oynamaya Başla 🎮
     </button>
+  </div>
+</div>
+
+<!-- Buried info popup -->
+<div id="buried-info-pop" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;" onclick="closeBuriedInfo()">
+  <div style="background:#1a1a2e;border:2px solid #FFD700;border-radius:16px;padding:24px 20px;max-width:280px;text-align:center;font-family:'Rajdhani',sans-serif;" onclick="event.stopPropagation()">
+    <div style="font-size:36px;margin-bottom:8px;">☢️</div>
+    <div style="color:#FFD700;font-size:18px;font-weight:700;margin-bottom:12px;">Gömülü Hedef</div>
+    <div style="color:rgba(255,255,255,0.85);font-size:13px;line-height:1.6;margin-bottom:14px;">
+      Bu hedef toprak altında gizli.<br>
+      Normal silahlar <b style="color:#FF6B35;">az hasar</b> verir.<br><br>
+      🪛 <b style="color:#80CBC4;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>
+      💥 Güçlü patlamalar terreni <b style="color:#A5D6A7;">sarsarak</b> hedefi açığa çıkarabilir.
+    </div>
+    <button onclick="closeBuriedInfo()" style="background:linear-gradient(135deg,#FFD700,#FF8C00);border:none;border-radius:10px;padding:10px 28px;color:#000;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">Anladım</button>
   </div>
 </div>
 </body>
