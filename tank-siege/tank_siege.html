@@ -645,9 +645,9 @@ const MIN_POWER = 6;
 const isSandbox = window.location.hash === '#sandbox';
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.8';
-const APP_VERSION_DATE = '2026.05.09 03:34';
-const APP_VERSION_NOTE = 'Sandbox Duzeltme yapildi';
+const APP_VERSION      = '1.0.9';
+const APP_VERSION_DATE = '2026.05.09 04:02';
+const APP_VERSION_NOTE = 'Sandbox veri sifirlama duzektme';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -3881,12 +3881,10 @@ function showShieldChoice(){
 
 function useShieldAd(){
   document.getElementById('shield-overlay').style.display='none';
-  if(isSandbox){
-    activateShield();
-  } else {
+    if(isSandbox){activateShield();}else{
+  if(isSandbox){activateShield();}else{
   try{ Android.showRewardedAd('shield'); }
-  catch(e){ activateShield(); }
-  }
+  catch(e){ activateShield(); }}}
 }
 
 function useShieldPuan(){
@@ -5060,6 +5058,7 @@ function adAmmo(type){
     if(bg) bg.style.display = 'flex';
     return;
   }
+  if(isSandbox){ giveAdAmmo(type); return; }
   try{ Android.showRewardedAd('ammo_'+type); }
   catch(e){ giveAdAmmo(type); }
 }
@@ -5078,6 +5077,7 @@ function confirmAmmoReplace(){
   _adAmmoPending = null;
   tempAmmo = null;
   localStorage.removeItem('ts_temp_ammo');
+  if(isSandbox){ giveAdAmmo(type); return; }
   try{ Android.showRewardedAd('ammo_'+type); }
   catch(e){ giveAdAmmo(type); }
 }
@@ -5108,6 +5108,7 @@ function adTank(type){
     if(bg) bg.style.display = 'flex';
     return;
   }
+  if(isSandbox){ giveAdTank(type); return; }
   try{ Android.showRewardedAd('tank_'+type); }
   catch(e){ giveAdTank(type); }
 }
@@ -5126,6 +5127,7 @@ function confirmTankReplace(){
   _adTankPending = null;
   tempTank = null;
   localStorage.removeItem('ts_temp_tank');
+  if(isSandbox){ giveAdTank(type); return; }
   try{ Android.showRewardedAd('tank_'+type); }
   catch(e){ giveAdTank(type); }
 }
@@ -5444,12 +5446,10 @@ function onWatchAdForStars(){
     return;
   }
   localStorage.setItem(key, used+1);
-  if(isSandbox){
-    setTimeout(()=>giveAdStars(2), 800);
-  } else {
+    if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
+  if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
   try{ Android.showRewardedAd('extra_stars'); }
-  catch(e){ setTimeout(()=>giveAdStars(2), 800); }
-  }
+  catch(e){ setTimeout(()=>giveAdStars(2), 800); }}}
 }
 
 function giveAdStars(count){
@@ -5587,12 +5587,10 @@ function themeGateWatchAd(){
     return;
   }
   localStorage.setItem(key, used+1);  // reklam başlamadan say — APK callback ile ödül
-  if(isSandbox){
-    setTimeout(()=>giveAdStars(2), 800);
-  } else {
+    if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
+  if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
   try{ Android.showRewardedAd('extra_stars'); }
-  catch(e){ setTimeout(()=>giveAdStars(2), 800); }
-  }
+  catch(e){ setTimeout(()=>giveAdStars(2), 800); }}}
 }
 
 function shopWatchAdForStars(){
@@ -6173,7 +6171,7 @@ function confirmReset(type){
     desc.textContent='Puan, tank, mühimmat, tüm ilerleme silinecek. Bu işlem geri alınamaz.';
     _confirmAction=()=>{
       ['ts_slots','ts_slot_custom','ts_owned_ammo','ts_temp_ammo','ts_sel_ammo',
-       'ts_owned_tanks','ts_sel_tank','ts_temp_tank','ts_total_score',
+       'ts_owned_tanks','ts_sel_tank','ts_temp_tank','ts_total_score','ts_bonus_stars',
        'ts_last_ad','ts_daily_ads','ts_daily_reset','ts_sfx','ts_music',
        'ts_tactical_owned','ts_temp_tactical','ts_tactical_hint',
        'ts_ammo_upgrades','ts_tank_upgrades','ts_wind_block'].forEach(k=>localStorage.removeItem(k));
@@ -6400,12 +6398,10 @@ function renderLevelMap(){
 function watchAdForExtraAmmo(){
   const btn = document.getElementById('btn-extra-ammo');
   if(btn) btn.style.display = 'none';
-  if(isSandbox){
-    setTimeout(giveExtraAmmo, 500);
-  } else {
+    if(isSandbox){setTimeout(giveExtraAmmo, 500);}else{
+  if(isSandbox){setTimeout(giveExtraAmmo, 500);}else{
   try{ Android.showRewardedAd('extra_ammo'); }
-  catch(e){ setTimeout(giveExtraAmmo, 500); }
-  }
+  catch(e){ setTimeout(giveExtraAmmo, 500); }}}
 }
 function giveExtraAmmo(){
   const today = new Date().toDateString();
@@ -6756,12 +6752,10 @@ function adTactical(){
   const used=parseInt(localStorage.getItem(key)||'0');
   if(used>=3){ showToast('Bugün Taktik Görüş reklam limitine ulaştın! (3/3)'); return; }
   localStorage.setItem(key, used+1);
-  if(isSandbox){
-    setTimeout(giveTactical, 500);
-  } else {
+    if(isSandbox){setTimeout(giveTactical, 500);}else{
+  if(isSandbox){setTimeout(giveTactical, 500);}else{
   try{ Android.showRewardedAd('tactical'); }
-  catch(e){ setTimeout(giveTactical, 500); }
-  }
+  catch(e){ setTimeout(giveTactical, 500); }}}
 }
 
 function adWindBlock(){
@@ -6771,12 +6765,10 @@ function adWindBlock(){
   const used=parseInt(localStorage.getItem(key)||'0');
   if(used>=3){ showToast('Bugün Rüzgar Engelleyici limitine ulaştın! (3/3)'); return; }
   localStorage.setItem(key, used+1);
-  if(isSandbox){
-    setTimeout(giveWindBlock, 500);
-  } else {
+    if(isSandbox){setTimeout(giveWindBlock, 500);}else{
+  if(isSandbox){setTimeout(giveWindBlock, 500);}else{
   try{ Android.showRewardedAd('windblock'); }
-  catch(e){ setTimeout(giveWindBlock, 500); }
-  }
+  catch(e){ setTimeout(giveWindBlock, 500); }}}
 }
 
 function giveWindBlock(){
@@ -6824,12 +6816,10 @@ function closeGuidedHint(){
 
 function guidedHintAd(){
   closeGuidedHint();
-  if(isSandbox){
-    setTimeout(()=>giveGuidedReward(), 1500);
-  } else {
+    if(isSandbox){setTimeout(()=>giveGuidedReward(), 1500);}else{
+  if(isSandbox){setTimeout(()=>giveGuidedReward(), 1500);}else{
   try{ Android.showRewardedAd('guided'); }
-  catch(e){ setTimeout(()=>giveGuidedReward(), 1500); }
-  }
+  catch(e){ setTimeout(()=>giveGuidedReward(), 1500); }}}
 }
 
 function giveGuidedReward(){
@@ -7137,8 +7127,11 @@ function sbClearAndInit(){
 }
 
 function sbInitOnLoad(){
-  // Sandbox hash ile açıldıysa init et
-  if(isSandbox) sbClearAndInit();
+  if(!isSandbox) return;
+  sbClearAndInit();
+  // Global değişkenleri sandbox değerleriyle güncelle
+  score = 1000000;
+  bonusStars = 1000;
 }
 
 function updateSandboxBtn(){
@@ -8023,7 +8016,8 @@ function openTacticalInfo(){
     <div style="font-size:32px;margin-bottom:8px;">🎯</div>
     <div style="color:#FF6B35;font-size:16px;font-weight:700;margin-bottom:8px;">Talim Sahası</div>
     <div style="color:rgba(255,255,255,0.65);font-size:12px;line-height:1.6;margin-bottom:16px;">
-      Her atış için reklam izle
+      Bu temayı test etmek için reklam izle<br>
+      <span style="color:rgba(255,255,255,0.4);font-size:11px;">Bugün bu tema için geçerli</span>
     </div>
     <button onclick="sbFireAdWatched()" style="width:100%;padding:12px;border:none;
       border-radius:12px;background:linear-gradient(135deg,#FF6B35,#ff3d00);
