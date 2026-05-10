@@ -662,9 +662,9 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.24';
-const APP_VERSION_DATE = '2026.05.10 20:15';
-const APP_VERSION_NOTE = 'Nucler yerine cluster patlaması koydum';
+const APP_VERSION      = '1.0.25';
+const APP_VERSION_DATE = '2026.05.10 21:19';
+const APP_VERSION_NOTE = 'Yeni ses skotlari eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -3923,6 +3923,7 @@ function useShieldPuan(){
 }
 
 function activateShield(){
+  SFX.shieldActivate();
   shieldActive=true;
   wind=0;
   SFX.setWind(0);  // kalkan aktifken rüzgar sesini durdur
@@ -5034,7 +5035,7 @@ function upgradeAmmo(type){
   ammoUpgrades[type]=(curLvl+1);
   lsSet('total_score', score);
   lsSet('ammo_upgrades', JSON.stringify(ammoUpgrades));
-  SFX.buy();
+  SFX.upgrade();
   updateGalleryScore();
   updateUI();
   renderGallery();
@@ -5060,7 +5061,7 @@ function upgradeTank(type){
   }
   tankUpgrades[type]=(curLvl+1);
   lsSet('tank_upgrades', JSON.stringify(tankUpgrades));
-  SFX.buy();
+  SFX.upgrade();
   renderGallery();
   showToast('🛡️ Tank Seviye '+(curLvl+1)+'→'+(curLvl+2)+'! (+20% hasar)');
 }
@@ -5411,6 +5412,7 @@ function nextLevel(){
 }
 
 function showThemeUnlock(newThemeIdx, nextLevelIdx){
+  SFX.themeUnlock();
   const themes = Object.values(THEMES);
   const newTheme = themes[newThemeIdx] || themes[0];
   const popup = document.getElementById('theme-unlock-popup');
@@ -5561,6 +5563,7 @@ function buyStarWithPoints(count){
   }
   // Puanı düş
   score = score - cost;
+  SFX.coin();
   lsSet('total_score', score);
   // Yıldız ekle
   let added=0;
@@ -5824,6 +5827,26 @@ const SFX = (function(){
     click:         'ui_click.mp3',
     buy:           'buy.mp3',
     locked:        'ui_click.mp3',
+    // Yeni slotlar — geçici atama
+    fire_split:          'fire_cluster.mp3',
+    fire_triple:         'fire_cluster.mp3',
+    fire_bunker:         'fire_nuclear.mp3',
+    exp_split:           'exp_cluster.mp3',
+    exp_triple:          'exp_cluster.mp3',
+    exp_bunker:          'exp_nuclear.mp3',
+    upgrade:             'buy.mp3',
+    coin:                'star.mp3',
+    shield_activate:     'ui_click.mp3',
+    tactical_activate:   'ui_click.mp3',
+    windblock_activate:  'ui_click.mp3',
+    guided_activate:     'ui_click.mp3',
+    extra_ammo_sound:    'ui_click.mp3',
+    terrain_hit_cave:    'terrain_hit.mp3',
+    terrain_hit_buried:  'terrain_hit.mp3',
+    hint:                'ui_click.mp3',
+    ui_open:             'ui_click.mp3',
+    ui_close:            'ui_click.mp3',
+    theme_unlock:        'win.mp3',
   };
 
   // Sessiz önbellek yüklemesi — oyun başlamadan arka planda
@@ -5985,11 +6008,12 @@ const SFX = (function(){
     },
 
     openGallery(){
-      this.click();
+      this.uiOpen();
       if(musicOn) _xfade(_cm,'gallery');
     },
 
     closeGallery(){
+      this.uiClose();
       if(musicOn) _xfade('gallery','battle');
     },
 
@@ -6012,6 +6036,51 @@ const SFX = (function(){
     click(){  if(!playBuf('click',0.45))  sTone(700,0.12,0.04,'square'); },
     buy(){    if(!playBuf('buy',0.80))    { sTone(523,0.3,0.15,'sine'); setTimeout(()=>sTone(784,0.3,0.2,'sine'),120); } },
     locked(){ if(!playBuf('locked',0.60)) { sTone(200,0.3,0.15,'square'); setTimeout(()=>sTone(150,0.2,0.2,'square'),100); } },
+
+    upgrade(){
+      if(!playBuf('upgrade',0.82))
+        { sTone(523,0.3,0.12,'sine'); setTimeout(()=>sTone(659,0.3,0.12,'sine'),80); setTimeout(()=>sTone(784,0.4,0.18,'sine'),160); }
+    },
+    coin(){
+      if(!playBuf('coin',0.72))
+        { sTone(1200,0.25,0.12,'sine'); setTimeout(()=>sTone(1500,0.25,0.15,'sine'),90); }
+    },
+    shieldActivate(){
+      if(!playBuf('shield_activate',0.75))
+        { sTone(400,0.2,0.05,'sine'); setTimeout(()=>sTone(800,0.3,0.25,'sine'),40); setTimeout(()=>sNoise(600,0.2,0.3,0.25),80); }
+    },
+    tacticalActivate(){
+      if(!playBuf('tactical_activate',0.72))
+        { sTone(900,0.25,0.08,'sine'); setTimeout(()=>sTone(1200,0.2,0.06,'sine'),100); setTimeout(()=>sTone(900,0.2,0.12,'sine'),200); }
+    },
+    windblockActivate(){
+      if(!playBuf('windblock_activate',0.72))
+        { sNoise(400,0.4,0.3,0.25,'bandpass'); setTimeout(()=>sTone(200,0.2,0.3,'sine'),100); }
+    },
+    guidedActivate(){
+      if(!playBuf('guided_activate',0.80))
+        { sTone(600,0.3,0.08,'square'); setTimeout(()=>sTone(900,0.4,0.08,'square'),100); setTimeout(()=>sTone(1200,0.4,0.15,'sine'),200); }
+    },
+    extraAmmo(){
+      if(!playBuf('extra_ammo_sound',0.75))
+        { sNoise(1400,0.3,0.06,0.05); setTimeout(()=>sNoise(1200,0.3,0.06,0.05),80); setTimeout(()=>sNoise(1000,0.3,0.06,0.05),160); }
+    },
+    themeUnlock(){
+      if(!playBuf('theme_unlock',0.95))
+        { [[523,0],[659,.1],[784,.22],[1047,.36],[1319,.52],[1568,.7]].forEach(([f,t])=>sTone(f,0.5,0.35,'sine',t)); }
+    },
+    hint(){
+      if(!playBuf('hint',0.55))
+        { sTone(880,0.2,0.08,'sine'); setTimeout(()=>sTone(1100,0.2,0.12,'sine'),100); }
+    },
+    uiOpen(){
+      if(!playBuf('ui_open',0.45))
+        { sTone(500,0.15,0.08,'sine'); setTimeout(()=>sTone(700,0.15,0.1,'sine'),60); }
+    },
+    uiClose(){
+      if(!playBuf('ui_close',0.40))
+        { sTone(700,0.12,0.08,'sine'); setTimeout(()=>sTone(500,0.12,0.1,'sine'),60); }
+    },
 
     toggleSfx(){
       sfxOn=!sfxOn; lsSet('sfx', sfxOn?'1':'0');
@@ -6255,6 +6324,7 @@ let _lmScrollTimer = null;
 let _lmNavigating = false; // crash guard
 
 function showLevelMap(){
+  SFX.uiOpen();
   const res = document.getElementById('result');
   if(res) res.classList.remove('show');
   // Oyun katmanlarını gizle
@@ -6428,6 +6498,7 @@ function watchAdForExtraAmmo(){
   catch(e){ setTimeout(giveExtraAmmo, 500); }}}
 }
 function giveExtraAmmo(){
+  SFX.extraAmmo();
   const today = new Date().toDateString();
   const key = 'extra_ammo_'+today;
   lsSet(key, parseInt(lsGet(key)||'0') + 1);
@@ -6796,6 +6867,7 @@ function adWindBlock(){
 }
 
 function giveWindBlock(){
+  SFX.windblockActivate();
   const cl=(typeof curLevel!=='undefined'&&curLevel>=0)?curLevel:0;
   if(!lv || lv.wind===0){ showToast('💨 Bu levelde rüzgar yok, hak geri eklendi!'); return; }
   windBlock={expiresAtLevel:cl+3};
@@ -6810,6 +6882,7 @@ function giveWindBlock(){
 }
 
 function giveTactical(){
+  SFX.tacticalActivate();
   const cl = (typeof curLevel !== 'undefined' && curLevel >= 0) ? curLevel : 0;
   if(lv && lv.showPath){ showToast('🎯 Rota zaten görünüyor, hak geri eklendi!'); return; }
   tempTactical = {expiresAtLevel: cl + 3};
@@ -6828,6 +6901,7 @@ function isGuidedActive(){
 }
 
 function showGuidedHint(){
+  SFX.hint();
   if(isGuidedActive()) return;
   const bg = document.getElementById('guided-hint-bg');
   if(bg) bg.style.display = 'flex';
@@ -6847,6 +6921,7 @@ function guidedHintAd(){
 }
 
 function giveGuidedReward(){
+  SFX.guidedActivate();
   const cl = curLevel || 0;
   tempGuided = { usedAtLevel: cl, spent: false };
   lsSet('temp_guided', JSON.stringify(tempGuided));
@@ -6855,6 +6930,7 @@ function giveGuidedReward(){
 }
 
 function showPiercerHint(){
+  SFX.hint();
   if(piercerHintShown) return;
   const _hasPiercer = typeof ownedAmmo !== 'undefined' && ownedAmmo.includes('piercer');
   if(_hasPiercer) return;
@@ -6875,6 +6951,7 @@ function piercerHintAd(){
 }
 
 function showTacticalHint(){
+  SFX.hint();
   if(tacticalHintShown || isTacticalActive()) return;
   tacticalHintShown = true;
   lsSet('tactical_hint', '1');
