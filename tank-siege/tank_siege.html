@@ -665,7 +665,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.64';
+const APP_VERSION      = '1.0.65';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -683,8 +683,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 22:45';
-const APP_VERSION_NOTE = 'test 2 can';
+const APP_VERSION_DATE = '2026.05.11 22:54';
+const APP_VERSION_NOTE = 'Can sistemi test 3';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1168,7 +1168,7 @@ function init(){
   updateSfxBtn();
   updateMusicBtn();
   updateTacticalBadge();
-  updateStreakBadge(); updateWindBlockBadge(); updateLivesBadge(); updateBoostBadge();
+  updateStreakBadge(); updateWindBlockBadge(); updateBoostBadge(); if(typeof updateLivesBadge==='function') updateLivesBadge();
   resize();
   window.addEventListener('resize', resize);
 
@@ -1206,15 +1206,6 @@ function resize(){
 // LEVEL LOAD
 // ═══════════════════════════════════════
 function loadLevel(idx){
-  // Can kontrolu - fonksiyon tanimli degilse atla
-  if(typeof hasLives === 'function' && !hasLives()){
-    const ms=_livesRegenMs();
-    const mins=Math.ceil(ms/60000);
-    const livesCardBg=document.getElementById('lives-card-bg');
-    if(livesCardBg) openLivesCard();
-    else showToast('❤️ Can yok! '+mins+' dakika bekle.');
-    return;
-  }
   curLevel = idx;
   lv = LEVELS[Math.min(idx, LEVELS.length-1)];
   angle = 38 + Math.random()*8;
@@ -8898,9 +8889,6 @@ function checkDevPass(){
 
 function devAddScore(){
   score+=1000000;
-  lsSet('lives_count', String(MAX_LIVES||5));
-  if(typeof updateLivesBadge==='function') updateLivesBadge();
-  showToast('❤️ Can 5e tamamlandi + 1M puan');
   lsSet('total_score', score);
   updateGalleryScore();
   updateUI();
@@ -9797,27 +9785,26 @@ function closeCloudSettings() {
   </div>
 </div>
 
-
 <script>
 var MAX_LIVES=5;
 var LIVES_REGEN_MS=20*60*1000;
 function _livesNow(){
-  var stored=parseInt(lsGet("lives_count")||String(MAX_LIVES));
+  var stored=parseInt(lsGet("lives_count")||"5");
   var lastTime=parseInt(lsGet("lives_time")||"0");
   var now=Date.now();
   if(stored>=MAX_LIVES){lsSet("lives_time",String(now));return MAX_LIVES;}
   var elapsed=now-lastTime;
-  var regenned=Math.floor(elapsed/LIVES_REGEN_MS);
-  if(regenned>0){
-    var newL=Math.min(MAX_LIVES,stored+regenned);
+  var regen=Math.floor(elapsed/LIVES_REGEN_MS);
+  if(regen>0){
+    var newL=Math.min(MAX_LIVES,stored+regen);
     lsSet("lives_count",String(newL));
-    lsSet("lives_time",String(lastTime+regenned*LIVES_REGEN_MS));
+    lsSet("lives_time",String(lastTime+regen*LIVES_REGEN_MS));
     return newL;
   }
   return stored;
 }
 function _livesRegenMs(){
-  var stored=parseInt(lsGet("lives_count")||String(MAX_LIVES));
+  var stored=parseInt(lsGet("lives_count")||"5");
   if(stored>=MAX_LIVES) return 0;
   var lastTime=parseInt(lsGet("lives_time")||String(Date.now()));
   var elapsed=Date.now()-lastTime;
@@ -9864,7 +9851,6 @@ function closeLivesCard(){
 }
 setInterval(updateLivesBadge,30000);
 </script>
-
 <div id="lives-card-bg" onclick="closeLivesCard()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
 <div id="lives-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:3px solid #FF5555;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
