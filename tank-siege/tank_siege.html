@@ -426,6 +426,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="btn-gallery-open" onclick="openGallery(curLevel)">⚔️ Inventory</button>
   <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
+  <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:14px;padding:4px 8px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit">☁️</button>
 </div>
 
 <!-- Mermi slotları — sağ altta eski yerinde -->
@@ -663,7 +664,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.46';
+const APP_VERSION      = '1.0.47';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -681,8 +682,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 13:18';
-const APP_VERSION_NOTE = 'Googke';
+const APP_VERSION_DATE = '2026.05.11 13:47';
+const APP_VERSION_NOTE = 'Google Play Games Eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -8893,6 +8894,13 @@ function openTacticalInfo(){
     🗑️ Tüm Veriyi Sıfırla
   </button>
 
+  <button onclick="openCloudSettings()"
+    style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(66,133,244,0.4);
+    background:rgba(66,133,244,0.08);color:#4285F4;font-size:14px;font-family:'Rajdhani',sans-serif;
+    font-weight:700;cursor:pointer;margin-bottom:8px;">
+    ☁️ Bulut Kayit
+  </button>
+
   <button onclick="openDevMode()"
     style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);
     background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.25);font-size:12px;font-family:'Rajdhani',sans-serif;
@@ -9421,6 +9429,14 @@ function onCloudSignIn(success) {
   if (el) {
     el.textContent = success ? 'Bulut: Bagli' : 'Bulut: Baglanamadi';
     el.style.color = success ? '#00C853' : 'rgba(255,255,255,0.4)';
+  }
+  // HUD badge guncelle
+  var btn = document.getElementById('cloud-games-btn');
+  if (btn) {
+    btn.style.display = 'block';
+    btn.style.borderColor = success ? 'rgba(66,133,244,0.7)' : 'rgba(255,255,255,0.2)';
+    btn.style.color = success ? '#4285F4' : 'rgba(255,255,255,0.35)';
+    btn.title = success ? 'Bulut Bagli' : 'Bulut Bagli Degil';
   }
 }
 
