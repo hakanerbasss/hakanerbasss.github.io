@@ -663,7 +663,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.45';
+const APP_VERSION      = '1.0.46';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -681,8 +681,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 12:25';
-const APP_VERSION_NOTE = 'Hasar etki alani buyutuldu';
+const APP_VERSION_DATE = '2026.05.11 13:18';
+const APP_VERSION_NOTE = 'Googke';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -6220,6 +6220,7 @@ function onWin(){
   if(gained>prevScore) lsSet(scoreKey, gained);
   lsSet('total_score', score);
   showResult(true, stars, '+'+gained+' pts');
+  autoCloudSave();
 }
 
 function onFail(){
@@ -9406,6 +9407,110 @@ function openTacticalInfo(){
       color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
       Vazgeç
     </button>
+  </div>
+</div>
+
+
+<script>
+// Cloud Save Sistemi
+var _cloudSignedIn = false;
+
+function onCloudSignIn(success) {
+  _cloudSignedIn = success;
+  var el = document.getElementById('cloud-status');
+  if (el) {
+    el.textContent = success ? 'Bulut: Bagli' : 'Bulut: Baglanamadi';
+    el.style.color = success ? '#00C853' : 'rgba(255,255,255,0.4)';
+  }
+}
+
+function cloudSave() {
+  if (typeof Android === 'undefined') { showToast('Bulut kayit sadece uygulamada calisir.'); return; }
+  if (!_cloudSignedIn) { showToast('Once Google Play Games girisini yap.'); return; }
+  var data = {};
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    data[k] = localStorage.getItem(k);
+  }
+  data['cur_level'] = String(typeof curLevel !== 'undefined' ? curLevel : 0);
+  try { Android.saveCloudData(JSON.stringify(data)); showToast('Kaydediliyor...'); }
+  catch(e) { showToast('Kayit hatasi: ' + e.message); }
+}
+
+function cloudLoad() {
+  if (typeof Android === 'undefined') { showToast('Bulut yukleme sadece uygulamada calisir.'); return; }
+  if (!_cloudSignedIn) { showToast('Once Google Play Games girisini yap.'); return; }
+  showToast('Yukleniyor...');
+  Android.loadCloudData();
+}
+
+function onCloudSaveResult(success, error) {
+  if (success) { showToast('Buluta kaydedildi!'); }
+  else { showToast('Kayit basarisiz: ' + (error || 'bilinmeyen hata')); }
+}
+
+function onCloudLoadResult(success, b64data, error) {
+  if (!success || !b64data) { showToast('Yukleme basarisiz: ' + (error || 'veri yok')); return; }
+  try {
+    var json = atob(b64data);
+    var data = JSON.parse(json);
+    var count = 0;
+    for (var k in data) {
+      if (k === 'cur_level') continue;
+      localStorage.setItem(k, data[k]);
+      count++;
+    }
+    showToast(count + ' kayit yuklendi! Yenileniyor...');
+    setTimeout(function() { location.reload(); }, 1500);
+  } catch(e) { showToast('Veri parse hatasi: ' + e.message); }
+}
+
+function cloudSignIn() {
+  if (typeof Android === 'undefined') { showToast('Sadece uygulamada calisir.'); return; }
+  Android.signInPlayGames();
+}
+
+function autoCloudSave() {
+  if (!_cloudSignedIn) return;
+  if (typeof Android === 'undefined') return;
+  var data = {};
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    data[k] = localStorage.getItem(k);
+  }
+  data['cur_level'] = String(typeof curLevel !== 'undefined' ? curLevel : 0);
+  try { Android.saveCloudData(JSON.stringify(data)); } catch(_) {}
+}
+
+function openCloudSettings() {
+  var d = document.getElementById('cloud-settings-bg');
+  var c = document.getElementById('cloud-settings-card');
+  if (d) d.style.display = 'block';
+  if (c) c.style.display = 'block';
+  var st = document.getElementById('cloud-signin-status');
+  if (st) st.textContent = _cloudSignedIn ? 'Giris yapildi' : 'Giris yapilmadi';
+}
+
+function closeCloudSettings() {
+  var d = document.getElementById('cloud-settings-bg');
+  var c = document.getElementById('cloud-settings-card');
+  if (d) d.style.display = 'none';
+  if (c) c.style.display = 'none';
+}
+</script>
+
+<div id="cloud-settings-bg" onclick="closeCloudSettings()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
+<div id="cloud-settings-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:2px solid #4285F4;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;">Bulut Kayit</span>
+    <button onclick="closeCloudSettings()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">X</button>
+  </div>
+  <div id="cloud-signin-status" style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:14px;text-align:center;"></div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <button onclick="cloudSignIn()" style="padding:10px;border-radius:12px;border:1px solid #4285F4;background:rgba(66,133,244,0.15);color:#4285F4;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Google Play Games Giris</button>
+    <button onclick="cloudSave()" style="padding:10px;border-radius:12px;border:1px solid #00C853;background:rgba(0,200,83,0.15);color:#00C853;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Simdi Kaydet</button>
+    <button onclick="cloudLoad()" style="padding:10px;border-radius:12px;border:1px solid #FF6B35;background:rgba(255,107,53,0.15);color:#FF6B35;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Buluttan Yukle</button>
+    <div style="font-size:11px;color:rgba(255,255,255,0.35);text-align:center;margin-top:4px;line-height:1.5;">Yukleme mevcut verinin uzerine yazar. Level tamamlandiginda otomatik kaydedilir.</div>
   </div>
 </div>
 
