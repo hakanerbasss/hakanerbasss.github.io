@@ -662,18 +662,26 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.37';
+const APP_VERSION      = '1.0.38';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
 // Bulutlar sadece x pozisyonu değişince yeniden çiziliyor (her ~3-4 frame).
 let _cloudOC      = null;  // offscreen canvas — bulutlar için
+
+// ── Statik BG cache (gökyüzü + dağlar) — tema/boyut değişince yeniden çiz ──
+let _staticBgOC      = null;
+let _staticBgCtx     = null;
+let _staticBgDirty   = true;
+let _staticBgTheme   = null;
+let _staticBgW       = 0;
+let _staticBgH       = 0;
 let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 07:08';
-const APP_VERSION_NOTE = 'Joystick Duzeltildi';
+const APP_VERSION_DATE = '2026.05.11 08:41';
+const APP_VERSION_NOTE = 'Cloud cache eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1252,6 +1260,7 @@ function loadLevel(idx){
   requestAnimationFrame(()=>{
     terrainImg = renderTerrainToImg();
   invalidateCloudCache(); // yeni level → bulut cache sıfırla
+  invalidateStaticBg();   // yeni level → gökyüzü/dağ cache sıfırla
   });
 }
 
@@ -2424,10 +2433,9 @@ function draw(){
 
   if(!usePng){
     // Normal canvas terrain
-    drawSky();
+    drawStaticBgCached();
     drawSpecialFX_BG();
     drawCloudsCached();
-    drawBgMountains();
     drawLavaBelowTerrain();
     drawTerrain();
   } else {
@@ -2506,7 +2514,19 @@ function drawSky(){
     ctx.fillStyle='#FFE566';ctx.beginPath();ctx.arc(W*0.8,H*0.1,24,0,Math.PI*2);ctx.fill();
   }
 
-  // Snow particles
+  // Fog overlay for forest (statik — cache içinde kalabilir)
+  if(th.hasFog){
+    const fg=ctx.createLinearGradient(0,H*0.5,0,H*0.75);
+    fg.addColorStop(0,'rgba(40,60,30,0)');
+    fg.addColorStop(1,'rgba(40,60,30,0.35)');
+    ctx.fillStyle=fg;ctx.fillRect(0,H*0.5,W,H*0.25);
+  }
+}
+
+// Snow particles — drawSky'dan ayrılmış, her frame hareket ediyor
+function drawSkySnowParticles(){
+  if(!currentTheme||!lv) return;
+  const th=currentTheme;
   if(th.hasSnow && !lv._snowPts){
     lv._snowPts=Array.from({length:40},()=>({x:Math.random()*W,y:Math.random()*H*0.7,s:Math.random()*2+0.5,sp:0.3+Math.random()*0.7}));
   }
@@ -2516,14 +2536,6 @@ function drawSky(){
       p.y+=p.sp; if(p.y>H*0.7){p.y=0;p.x=Math.random()*W;}
       ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);ctx.fill();
     });
-  }
-
-  // Fog overlay for forest
-  if(th.hasFog){
-    const fg=ctx.createLinearGradient(0,H*0.5,0,H*0.75);
-    fg.addColorStop(0,'rgba(40,60,30,0)');
-    fg.addColorStop(1,'rgba(40,60,30,0.35)');
-    ctx.fillStyle=fg;ctx.fillRect(0,H*0.5,W,H*0.25);
   }
 }
 
@@ -2559,6 +2571,7 @@ function drawCloudsCached(){
 }
 
 function invalidateCloudCache(){ _cloudDirty = true; _cloudLastSig = ''; }
+function invalidateStaticBg(){ _staticBgDirty = true; _staticBgTheme = null; }
 
 function drawClouds(){ drawCloudsOn(ctx); }
 
@@ -2632,6 +2645,35 @@ function drawBgMountains(){
     ctx.closePath();ctx.fill();
   }
   ctx.restore();
+}
+
+// ── Statik BG cache: gökyüzü + dağlar — tema değişince yeniden çiz ───────────
+// drawSky() içinde yıldızlar Math.random kullanıyor → ilk render'da sabit kalır
+// Bu kasma açısından önemli değil çünkü yıldızlar zaten sabit görünmeli
+function drawStaticBgCached(){
+  const th = currentTheme || THEMES.valley;
+  // Boyut veya tema değişti mi?
+  if(!_staticBgOC || _staticBgW!==W || _staticBgH!==H || _staticBgTheme!==th){
+    _staticBgOC       = document.createElement('canvas');
+    _staticBgOC.width = W; _staticBgOC.height = H;
+    _staticBgCtx      = _staticBgOC.getContext('2d');
+    _staticBgTheme    = th;
+    _staticBgW = W; _staticBgH = H;
+    _staticBgDirty = true;
+  }
+  if(_staticBgDirty){
+    // Ana ctx'i geçici olarak staticBg ctx'e yönlendir
+    const _mainCtx = ctx;
+    ctx = _staticBgCtx;
+    _staticBgCtx.clearRect(0,0,W,H);
+    drawSky();
+    drawBgMountains();
+    ctx = _mainCtx;
+    _staticBgDirty = false;
+  }
+  ctx.drawImage(_staticBgOC, 0, 0);
+  // Snow particles ve hasClouds alçak bulutlar dinamik — staticBg dışında
+  drawSkySnowParticles();
 }
 
 function drawTerrain(){
@@ -6934,14 +6976,12 @@ function drawLavaBelowTerrain(){
         ctx.lineCap='round';
         ctx.stroke();
       }
-      const grad=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*2.5);
-      grad.addColorStop(0,`rgba(255,255,180,${0.9*brightness})`);
-      grad.addColorStop(0.4,`rgba(255,${eg},0,${0.7*brightness})`);
-      grad.addColorStop(1,'rgba(180,20,0,0)');
-      ctx.fillStyle=grad;
-      ctx.beginPath();ctx.arc(e.x,e.y,e.r*2.5,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle=`rgba(255,240,200,${brightness})`;
-      ctx.beginPath();ctx.arc(e.x,e.y,e.r*0.5,0,Math.PI*2);ctx.fill();
+      // Dış hale — tek düz renk, gradient yok (performans)
+      ctx.fillStyle=`rgba(255,${eg},0,${0.35*brightness})`;
+      ctx.beginPath();ctx.arc(e.x,e.y,e.r*2.2,0,Math.PI*2);ctx.fill();
+      // İç parlak nokta
+      ctx.fillStyle=`rgba(255,245,180,${brightness})`;
+      ctx.beginPath();ctx.arc(e.x,e.y,e.r*0.7,0,Math.PI*2);ctx.fill();
     });
     ctx.restore();
   }
@@ -6988,23 +7028,11 @@ function drawSpecialFX_FG(){
 
   // ── Alçak bulutlar / Cloudy tema ─────────────────────────────
   if(th.hasClouds){
-    // Mevcut clouds sistemindeki bulutları alçak katmanda tekrar çiz
-    // Aynı drawCloudsOn() kullanılır — yüksek opasiteli, terrain seviyesine yakın
+    // Alçak bulut katmanı: clouds sistemi zaten cached olduğu için
+    // sadece ekstra globalAlpha ile tekrar çiz — swap yok, düşük maliyet
     ctx.save();
-    ctx.globalAlpha = 0.72;
-    // Alçak bulutlar: her bulutu Y ekseninde aşağı kaydır (terrain yakını)
-    const lowClouds = clouds.map(c => Object.assign({}, c, {
-      y: H * 0.52 + (c.y % (H * 0.18)), // terrain hizasına yakın bant
-      opacity: Math.min(1, (c.opacity || 0.8) * 1.1),
-    }));
-    // Geçici olarak clouds'u değiştirmeden drawCloudsOn ile çiz
-    const _savedClouds = clouds;
-    // clouds global — geçici swap
-    // drawCloudsOn zaten clouds'u okuyor, o yüzden swap yapıyoruz
-    // eslint-disable-next-line no-global-assign
-    clouds = lowClouds;
-    drawCloudsOn(ctx);
-    clouds = _savedClouds;
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(_cloudOC || document.createElement('canvas'), 0, H*0.12);
     ctx.restore();
   }
 }
