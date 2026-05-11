@@ -662,9 +662,18 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.35';
-const APP_VERSION_DATE = '2026.05.11 00:17';
-const APP_VERSION_NOTE = 'Damage ve uograde hasaari guckendirildi';
+const APP_VERSION      = '1.0.36';
+
+// ── Offscreen Cloud Cache ─────────────────────────────────────────
+// Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
+// Bulutlar sadece x pozisyonu değişince yeniden çiziliyor (her ~3-4 frame).
+let _cloudOC      = null;  // offscreen canvas — bulutlar için
+let _cloudCtx     = null;
+let _cloudDirty   = true;
+let _cloudLastSig = '';    // bulut pozisyon imzası
+// ─────────────────────────────────────────────────────────────────
+const APP_VERSION_DATE = '2026.05.11 06:52';
+const APP_VERSION_NOTE = 'fix: drawSpecialFX_FG loop baglantisi, lav havuzu, ember yagisi, hasClouds eksigi; feat: hasCrumble, offscreen bulut cache';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -851,7 +860,7 @@ const THEMES = {
     groundColor:['#3a4a3a','#1a2a1a'],
     edgeColor:'rgba(120,140,110,0.7)',
     bgMtnColor:['#6a7a80','#4a5860'],
-    hasRiver:true, hasSnow:false, hasSand:false,
+    hasRiver:true, hasSnow:false, hasSand:false, hasClouds:true,
     treeColor:'#2a5a2a', treeStyle:'pine',
     treeStyles:[
       {shape:'pine',   col:'#2a5028', col2:'#1a3018', trunk:'#3a1a06'},
@@ -1242,6 +1251,7 @@ function loadLevel(idx){
   _crackOverlay = null;
   requestAnimationFrame(()=>{
     terrainImg = renderTerrainToImg();
+  invalidateCloudCache(); // yeni level → bulut cache sıfırla
   });
 }
 
@@ -2346,6 +2356,9 @@ function update(){
         const txi2=Math.floor(targetX);
         if(txi2>=0&&txi2<W && !lv.cave && !lv.buried) targetY=terrain[txi2];
         spawnRockDebris(eb.x, eb.y, _r, eb.ammoType||selectedAmmo);
+        if(currentTheme && currentTheme.hasCrumble){
+          spawnCrumble(eb.x, eb.y, _r);
+        }
         spawnImpact(eb.x, eb.y, 'terrain');
         spawnExplosionSprite(eb.x, eb.y, 0.75);
         screenShake = Math.max(screenShake, 3 + _r*0.06);
@@ -2413,13 +2426,13 @@ function draw(){
     // Normal canvas terrain
     drawSky();
     drawSpecialFX_BG();
-    drawClouds();
+    drawCloudsCached();
     drawBgMountains();
     drawTerrain();
   } else {
     // PNG üzerine sadece animasyonlu elemanlar
     drawSpecialFX_BG();
-    drawClouds();
+    drawCloudsCached();
   }
 
   // Path preview
@@ -2441,6 +2454,9 @@ function draw(){
 
   // Particles
   drawParticles();
+
+  // Special FX foreground
+  drawSpecialFX_FG();
 
   // Aim indicator
   if(phase==='aim') drawAimIndicator();
@@ -2510,42 +2526,78 @@ function drawSky(){
   }
 }
 
-function drawClouds(){
+// ── Cloud Cache: blur filter pahalı, bulut px değişince yeniden çiz ──────────
+function drawCloudsCached(){
+  if(!clouds.length){ return; }
+
+  // Canvas boyutu değişti mi?
+  if(!_cloudOC || _cloudOC.width !== W || _cloudOC.height !== H){
+    _cloudOC  = document.createElement('canvas');
+    _cloudOC.width  = W;
+    _cloudOC.height = H;
+    _cloudCtx = _cloudOC.getContext('2d');
+    _cloudDirty = true;
+  }
+
+  // Bulut pozisyon imzası — sadece 1px'den fazla hareket ettiyse dirty
+  const sig = clouds.map(c => Math.round(c.x)).join(',');
+  if(sig !== _cloudLastSig){
+    _cloudDirty   = true;
+    _cloudLastSig = sig;
+  }
+
+  if(_cloudDirty){
+    _cloudCtx.clearRect(0, 0, W, H);
+    // drawClouds() aynen çalışsın ama _cloudCtx üzerinde
+    // → geçici olarak ctx'i değiştirmek yerine drawCloudsOn() kullan
+    drawCloudsOn(_cloudCtx);
+    _cloudDirty = false;
+  }
+
+  ctx.drawImage(_cloudOC, 0, 0);
+}
+
+function invalidateCloudCache(){ _cloudDirty = true; _cloudLastSig = ''; }
+
+function drawClouds(){ drawCloudsOn(ctx); }
+
+function drawCloudsOn(c){
   const th=currentTheme||THEMES.valley;
   const darkCol=th.cloudDark||'rgba(210,225,240,0.90)';
-  const weight=th.cloudWeight||0.45; // 0=açık hafif, 1=koyu yağmur yüklü
+  const weight=th.cloudWeight||0.45;
+  // 0=açık hafif, 1=koyu yağmur yüklü
   clouds.forEach(cl=>{
-    ctx.save();
+    c.save();
     const gx=cl.x, gy=cl.y;
     // Zemin gölgesi — ağır bulutlarda daha belirgin
-    ctx.globalAlpha=0.05+weight*0.10;
-    ctx.filter='blur(14px)';
-    ctx.fillStyle='rgba(80,100,130,1)';
-    ctx.beginPath();
-    cl.lobes.forEach(l=>ctx.ellipse(gx+l.dx,gy+l.dy+(cl.bh||30)*0.6,l.rx*0.9,l.ry*0.5,l.rot,0,Math.PI*2));
-    ctx.fill();
-    ctx.filter='none';
+    c.globalAlpha=0.05+weight*0.10;
+    c.filter='blur(14px)';
+    c.fillStyle='rgba(80,100,130,1)';
+    c.beginPath();
+    cl.lobes.forEach(l=>c.ellipse(gx+l.dx,gy+l.dy+(cl.bh||30)*0.6,l.rx*0.9,l.ry*0.5,l.rot,0,Math.PI*2));
+    c.fill();
+    c.filter='none';
     // Soft glow
-    ctx.globalAlpha=0.08+weight*0.04;
-    ctx.filter='blur(18px)';
-    ctx.fillStyle='rgba(255,255,255,0.7)';
-    ctx.beginPath();
-    cl.lobes.forEach(l=>ctx.ellipse(gx+l.dx,gy+l.dy,l.rx*1.15,l.ry*1.15,l.rot,0,Math.PI*2));
-    ctx.fill();
-    ctx.filter='none';
+    c.globalAlpha=0.08+weight*0.04;
+    c.filter='blur(18px)';
+    c.fillStyle='rgba(255,255,255,0.7)';
+    c.beginPath();
+    cl.lobes.forEach(l=>c.ellipse(gx+l.dx,gy+l.dy,l.rx*1.15,l.ry*1.15,l.rot,0,Math.PI*2));
+    c.fill();
+    c.filter='none';
     // Hacim alt katman — tema renginde, ağır bulutlarda daha koyu
-    ctx.globalAlpha=cl.opacity*(0.70+weight*0.25);
-    ctx.fillStyle=darkCol;
-    cl.lobes.forEach(l=>{ctx.beginPath();ctx.ellipse(gx+l.dx,gy+l.dy+l.ry*0.20,l.rx*0.96,l.ry*0.86,l.rot,0,Math.PI*2);ctx.fill();});
+    c.globalAlpha=cl.opacity*(0.70+weight*0.25);
+    c.fillStyle=darkCol;
+    cl.lobes.forEach(l=>{c.beginPath();c.ellipse(gx+l.dx,gy+l.dy+l.ry*0.20,l.rx*0.96,l.ry*0.86,l.rot,0,Math.PI*2);c.fill();});
     // Ana renk katmanı
-    ctx.globalAlpha=cl.opacity;
-    ctx.fillStyle=cl.color||'rgba(250,252,255,0.96)';
-    cl.lobes.forEach(l=>{ctx.beginPath();ctx.ellipse(gx+l.dx,gy+l.dy,l.rx,l.ry,l.rot,0,Math.PI*2);ctx.fill();});
+    c.globalAlpha=cl.opacity;
+    c.fillStyle=cl.color||'rgba(250,252,255,0.96)';
+    cl.lobes.forEach(l=>{c.beginPath();c.ellipse(gx+l.dx,gy+l.dy,l.rx,l.ry,l.rot,0,Math.PI*2);c.fill();});
     // Üst parlaklık — ağır bulutlarda az
-    ctx.globalAlpha=cl.opacity*(0.50-weight*0.30);
-    ctx.fillStyle='rgba(255,255,255,1)';
-    cl.lobes.slice(0,3).forEach(l=>{ctx.beginPath();ctx.ellipse(gx+l.dx-l.rx*0.1,gy+l.dy-l.ry*0.28,l.rx*0.50,l.ry*0.32,l.rot,0,Math.PI*2);ctx.fill();});
-    ctx.restore();
+    c.globalAlpha=cl.opacity*(0.50-weight*0.30);
+    c.fillStyle='rgba(255,255,255,1)';
+    cl.lobes.slice(0,3).forEach(l=>{c.beginPath();c.ellipse(gx+l.dx-l.rx*0.1,gy+l.dy-l.ry*0.28,l.rx*0.50,l.ry*0.32,l.rot,0,Math.PI*2);c.fill();});
+    c.restore();
   });
 }
 
@@ -4101,6 +4153,9 @@ function onTerrainHit(){
 
   // Kaya parçaları, toz, çakıl
   spawnRockDebris(_bx, _by, _r, selectedAmmo);
+  if(currentTheme && currentTheme.hasCrumble){
+    spawnCrumble(_bx, _by, _r);
+  }
   spawnImpact(_bx, _by, 'terrain');
   spawnExplosionSprite(_bx, _by, 0.8);
 
@@ -4519,6 +4574,120 @@ function spawnImpact(x,y,surface){
     });
   }
 }
+
+// ── Rocky Cliffs: hasCrumble efekti ──────────────────────────────────────────
+// Normal spawnRockDebris'e ek olarak çağrılır.
+// Büyük kaya blokları yüksek parabolle fırlar, terrain rengiyle eşleşir.
+// Bazıları "rolling" animasyonuyla zemine çarpar ve yuvarlanır.
+function spawnCrumble(x, y, radius){
+  const th = currentTheme || THEMES.valley;
+  const cols = th.terrainColors || ['#7a6a5a','#6a5a4a','#5a4a3a'];
+  const power = Math.min(1, radius / 80);
+
+  // ── Büyük kaya blokları (3-6 adet) — yüksek parabol ──────────────────────
+  const bigCount = 3 + Math.floor(power * 3);
+  for(let i = 0; i < bigCount; i++){
+    const angle = -Math.PI * (0.2 + Math.random() * 0.6); // yukarı-yana
+    const speed = 5 + Math.random() * (9 + power * 8);
+    const size  = 10 + Math.random() * (14 + power * 10);
+    const col   = cols[Math.floor(Math.random() * Math.min(3, cols.length))];
+
+    const sides = 4 + Math.floor(Math.random() * 3); // 4-6 kenar
+    const pts = [];
+    for(let s = 0; s < sides; s++){
+      const a = (Math.PI*2/sides)*s + (Math.random()-0.5)*0.7;
+      const r = size * (0.55 + Math.random()*0.45);
+      pts.push(Math.cos(a)*r, Math.sin(a)*r);
+    }
+
+    destructionPieces.push({
+      x: x + (Math.random()-0.5)*radius*0.5,
+      y: y,
+      vx: Math.cos(angle)*speed * (i%2===0 ? 1 : -1) * (0.6 + Math.random()*0.4),
+      vy: Math.sin(angle)*speed - 2,
+      rot: Math.random()*Math.PI*2,
+      rotV: (Math.random()-0.5)*0.25,
+      color: col,
+      pts,
+      life: 100 + Math.random()*60,
+      maxLife: 160,
+      bounced: false,
+    });
+  }
+
+  // ── Orta boy kırık kayalar (4-8 adet) — geniş açılı ─────────────────────
+  const midCount = 4 + Math.floor(power * 4);
+  for(let i = 0; i < midCount; i++){
+    const angle = -Math.PI * (0.05 + Math.random() * 0.9);
+    const speed = 3 + Math.random() * (6 + power * 6);
+    const size  = 5 + Math.random() * (9 + power * 7);
+    const col   = cols[Math.floor(Math.random() * cols.length)];
+
+    const sides = 3 + Math.floor(Math.random() * 3);
+    const pts = [];
+    for(let s = 0; s < sides; s++){
+      const a = (Math.PI*2/sides)*s + (Math.random()-0.5)*0.6;
+      const r = size * (0.5 + Math.random()*0.5);
+      pts.push(Math.cos(a)*r, Math.sin(a)*r);
+    }
+
+    destructionPieces.push({
+      x: x + (Math.random()-0.5)*radius*0.8,
+      y: y + Math.random()*5,
+      vx: Math.cos(angle)*speed,
+      vy: Math.sin(angle)*speed - 1,
+      rot: Math.random()*Math.PI*2,
+      rotV: (Math.random()-0.5)*0.4,
+      color: col,
+      pts,
+      life: 60 + Math.random()*50,
+      maxLife: 110,
+      bounced: false,
+    });
+  }
+
+  // ── Taş tozu — koyu gri, yayılan ─────────────────────────────────────────
+  const dustCount = 10 + Math.floor(power * 8);
+  for(let i = 0; i < dustCount; i++){
+    const a = Math.random() * Math.PI * 2;
+    const v = 0.8 + Math.random() * (2 + power * 2);
+    particles.push({
+      x: x + (Math.random()-0.5)*radius,
+      y: y,
+      vx: Math.cos(a)*v,
+      vy: Math.sin(a)*v - 0.5,
+      size: 6 + Math.random()*10,
+      life: 35 + Math.random()*25,
+      maxLife: 60,
+      color: 'rgba(90,75,60,0.45)',
+      type: 'dust',
+    });
+  }
+
+  // ── Çakıl serpintisi — çok sayıda küçük parçacık ─────────────────────────
+  const gravelCount = 20 + Math.floor(power * 15);
+  for(let i = 0; i < gravelCount; i++){
+    const a = -Math.PI + Math.random()*Math.PI;
+    const v = 3 + Math.random()*(6 + power*5);
+    particles.push({
+      x: x + (Math.random()-0.5)*radius*0.5,
+      y: y,
+      vx: Math.cos(a)*v,
+      vy: Math.sin(a)*v - 1.5,
+      size: 0.8 + Math.random()*2.2,
+      life: 20 + Math.random()*20,
+      maxLife: 40,
+      color: cols[Math.floor(Math.random()*cols.length)],
+      type: 'rock',
+      rot: Math.random()*Math.PI*2,
+      rotV: (Math.random()-0.5)*0.5,
+    });
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function spawnDestruction(){
   const tx=targetX, ty=targetY;
@@ -6524,11 +6693,13 @@ let rainDrops = [];
 let snowFlakes = [];
 let cityLights = [];
 let lavaPulse = 0;
+let emberDrops = [];
 
 function initSpecialFX(){
   rainDrops = [];
   snowFlakes = [];
   cityLights = [];
+  emberDrops = [];
   lavaPulse = 0;
   if(!lv || !currentTheme) return;
   const th = currentTheme;
@@ -6556,6 +6727,14 @@ function initSpecialFX(){
       blinkT:Math.random()*60,
     });
   }
+  if(th.hasLava){
+    for(let i=0;i<40;i++) emberDrops.push({
+      x:Math.random()*W, y:Math.random()*H,
+      vy:0.8+Math.random()*2.2, vx:(Math.random()-0.5)*1.2,
+      r:1.5+Math.random()*3, glow:Math.random(),
+      glowSpeed:0.04+Math.random()*0.06, trail:[],
+    });
+  }
 }
 
 function updateSpecialFX(){
@@ -6579,6 +6758,17 @@ function updateSpecialFX(){
     if(l.blink) l.blinkT--;
     if(l.blinkT<=0) l.blinkT=20+Math.random()*80;
   });
+  if(th.hasLava){
+    emberDrops.forEach(e=>{
+      e.trail.push({x:e.x,y:e.y});
+      if(e.trail.length>4) e.trail.shift();
+      e.y+=e.vy; e.x+=e.vx;
+      e.glow=(e.glow+e.glowSpeed)%1;
+      if(e.y>H+10){e.y=-10;e.x=Math.random()*W;e.trail=[];}
+      if(e.x<-10) e.x=W+10;
+      if(e.x>W+10) e.x=-10;
+    });
+  }
 }
 
 function drawSpecialFX_BG(){
@@ -6660,30 +6850,65 @@ function drawSpecialFX_FG(){
   // ── Lav akışı / Volcano ──────────────────────────────────────
   if(th.hasLava){
     const glow=Math.sin(lavaPulse)*0.3+0.7;
-    // Lav havuzu terrain dibinde
-    for(let lx=0;lx<W;lx+=2){
-      const ty=terrain[lx];
-      if(ty>H*0.6){
-        ctx.fillStyle=`rgba(${Math.floor(220+glow*35)},${Math.floor(60+glow*20)},0,0.85)`;
-        ctx.fillRect(lx,ty-2,2,H-ty+2);
-      }
-    }
-    // Turuncu sis — lav ışıması
-    const lavGrad=ctx.createLinearGradient(0,H*0.7,0,H);
-    lavGrad.addColorStop(0,`rgba(200,50,0,${0.08*glow})`);
-    lavGrad.addColorStop(1,`rgba(255,100,0,${0.18*glow})`);
+
+    // Lav havuzu — terrain polygon, terrain şeklinde dolar
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0,H);
+    for(let lx=0;lx<W;lx++) ctx.lineTo(lx,terrain[lx]);
+    ctx.lineTo(W,H);
+    ctx.closePath();
+    const lavGrad=ctx.createLinearGradient(0,H*0.4,0,H);
+    lavGrad.addColorStop(0,`rgba(255,160,0,${0.90*glow})`);
+    lavGrad.addColorStop(0.3,`rgba(${Math.floor(210+glow*45)},${Math.floor(40+glow*50)},0,0.92)`);
+    lavGrad.addColorStop(1,'rgba(140,20,0,0.98)');
     ctx.fillStyle=lavGrad;
-    ctx.fillRect(0,H*0.7,W,H*0.3);
-    // Lav parıltısı — partiküller
-    if(Math.random()<0.4){
-      const lx=Math.random()*W;
-      const ty=terrain[Math.floor(lx)]||H;
-      if(ty>H*0.55){
-        particles.push({x:lx,y:ty,vx:(Math.random()-0.5)*2,vy:-1-Math.random()*3,
-          size:2+Math.random()*4,life:25,maxLife:25,
-          color:`rgb(255,${Math.floor(80+Math.random()*80)},0)`,type:'spark',rot:0,rotV:0});
-      }
+    ctx.fill();
+    ctx.restore();
+
+    // Lav yüzeyi parlak kenar
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0,terrain[0]);
+    for(let lx=1;lx<W;lx++) ctx.lineTo(lx,terrain[lx]);
+    ctx.strokeStyle=`rgba(255,220,80,${0.55*glow})`;
+    ctx.lineWidth=2.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // Lav kabarcıkları
+    if(Math.random()<0.5){
+      const bx=Math.random()*W;
+      const by=terrain[Math.floor(bx)]||H;
+      particles.push({x:bx,y:by,vx:(Math.random()-0.5)*2,vy:-1.5-Math.random()*3,
+        size:3+Math.random()*5,life:30,maxLife:30,
+        color:`rgb(255,${Math.floor(60+Math.random()*100)},0)`,type:'spark',rot:0,rotV:0});
     }
+
+    // Ember yağışı
+    ctx.save();
+    emberDrops.forEach(e=>{
+      const brightness=0.6+Math.sin(e.glow*Math.PI*2)*0.4;
+      const eg=Math.floor(60+brightness*120);
+      if(e.trail.length>1){
+        ctx.beginPath();
+        ctx.moveTo(e.trail[0].x,e.trail[0].y);
+        e.trail.forEach(pt=>ctx.lineTo(pt.x,pt.y));
+        ctx.strokeStyle=`rgba(255,${eg},0,0.25)`;
+        ctx.lineWidth=e.r*0.8;
+        ctx.lineCap='round';
+        ctx.stroke();
+      }
+      const grad=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*2.5);
+      grad.addColorStop(0,`rgba(255,255,180,${0.9*brightness})`);
+      grad.addColorStop(0.4,`rgba(255,${eg},0,${0.7*brightness})`);
+      grad.addColorStop(1,'rgba(180,20,0,0)');
+      ctx.fillStyle=grad;
+      ctx.beginPath();ctx.arc(e.x,e.y,e.r*2.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=`rgba(255,240,200,${brightness})`;
+      ctx.beginPath();ctx.arc(e.x,e.y,e.r*0.5,0,Math.PI*2);ctx.fill();
+    });
+    ctx.restore();
   }
 
   // ── Yağmur ──────────────────────────────────────────────────
@@ -6721,22 +6946,24 @@ function drawSpecialFX_FG(){
 
   // ── Alçak bulutlar / Cloudy tema ─────────────────────────────
   if(th.hasClouds){
-    const cloudY = H*0.42;
-    const cg=ctx.createLinearGradient(0,cloudY-30,0,cloudY+40);
-    cg.addColorStop(0,'rgba(200,210,220,0)');
-    cg.addColorStop(0.4,'rgba(200,210,220,0.75)');
-    cg.addColorStop(0.7,'rgba(180,195,210,0.85)');
-    cg.addColorStop(1,'rgba(160,180,200,0)');
-    ctx.fillStyle=cg;
-    ctx.fillRect(0,cloudY-30,W,70);
-    // Hafif hareket illüzyonu
-    ctx.strokeStyle='rgba(220,225,235,0.4)';ctx.lineWidth=1;
-    for(let ci=0;ci<8;ci++){
-      const cx2=(ci*W/7+Date.now()*0.008)%W;
-      ctx.beginPath();
-      ctx.ellipse(cx2,cloudY+5,40+ci*8,10+ci*2,0,0,Math.PI*2);
-      ctx.stroke();
-    }
+    // Mevcut clouds sistemindeki bulutları alçak katmanda tekrar çiz
+    // Aynı drawCloudsOn() kullanılır — yüksek opasiteli, terrain seviyesine yakın
+    ctx.save();
+    ctx.globalAlpha = 0.72;
+    // Alçak bulutlar: her bulutu Y ekseninde aşağı kaydır (terrain yakını)
+    const lowClouds = clouds.map(c => Object.assign({}, c, {
+      y: H * 0.52 + (c.y % (H * 0.18)), // terrain hizasına yakın bant
+      opacity: Math.min(1, (c.opacity || 0.8) * 1.1),
+    }));
+    // Geçici olarak clouds'u değiştirmeden drawCloudsOn ile çiz
+    const _savedClouds = clouds;
+    // clouds global — geçici swap
+    // drawCloudsOn zaten clouds'u okuyor, o yüzden swap yapıyoruz
+    // eslint-disable-next-line no-global-assign
+    clouds = lowClouds;
+    drawCloudsOn(ctx);
+    clouds = _savedClouds;
+    ctx.restore();
   }
 }
 
