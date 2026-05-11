@@ -665,7 +665,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.63';
+const APP_VERSION      = '1.0.64';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -683,8 +683,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 22:41';
-const APP_VERSION_NOTE = 'Can sistemi ekleniyor test1';
+const APP_VERSION_DATE = '2026.05.11 22:45';
+const APP_VERSION_NOTE = 'test 2 can';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1206,10 +1206,13 @@ function resize(){
 // LEVEL LOAD
 // ═══════════════════════════════════════
 function loadLevel(idx){
-  if(!hasLives()){
+  // Can kontrolu - fonksiyon tanimli degilse atla
+  if(typeof hasLives === 'function' && !hasLives()){
     const ms=_livesRegenMs();
     const mins=Math.ceil(ms/60000);
-    showToast('❤️ Can yok! '+mins+' dakika bekle.');
+    const livesCardBg=document.getElementById('lives-card-bg');
+    if(livesCardBg) openLivesCard();
+    else showToast('❤️ Can yok! '+mins+' dakika bekle.');
     return;
   }
   curLevel = idx;
@@ -8895,6 +8898,9 @@ function checkDevPass(){
 
 function devAddScore(){
   score+=1000000;
+  lsSet('lives_count', String(MAX_LIVES||5));
+  if(typeof updateLivesBadge==='function') updateLivesBadge();
+  showToast('❤️ Can 5e tamamlandi + 1M puan');
   lsSet('total_score', score);
   updateGalleryScore();
   updateUI();
