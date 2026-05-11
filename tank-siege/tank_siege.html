@@ -664,7 +664,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.61';
+const APP_VERSION      = '1.0.62';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -682,8 +682,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 20:57';
-const APP_VERSION_NOTE = 'Hayvanmar vurulunca kaybolur baska yerden dogar ve 7 farkki hayvan eklendi.|Zurafa|Esek|Mamut|Zebra|Aslan';
+const APP_VERSION_DATE = '2026.05.11 21:59';
+const APP_VERSION_NOTE = 'Hayvan sesleri eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -6397,7 +6397,33 @@ function _drawMammoth(c, a){
   }
 }
 
+// Hayvan synth sesi - dosyası olmayan türler için
+function _animalSynthSound(type){
+  try {
+    const ac2 = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ac2.createOscillator();
+    const gain = ac2.createGain();
+    osc.connect(gain); gain.connect(ac2.destination);
+    const configs = {
+      giraffe:  {type:'sine',   freq:180, dur:0.4, vol:0.3},
+      squirrel: {type:'square', freq:800, dur:0.2, vol:0.2},
+      turtle:   {type:'sine',   freq:120, dur:0.3, vol:0.2},
+    };
+    const cfg = configs[type] || {type:'sine', freq:300, dur:0.3, vol:0.2};
+    osc.type = cfg.type;
+    osc.frequency.setValueAtTime(cfg.freq, ac2.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(cfg.freq*0.5, ac2.currentTime+cfg.dur);
+    gain.gain.setValueAtTime(cfg.vol, ac2.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac2.currentTime+cfg.dur);
+    osc.start(); osc.stop(ac2.currentTime+cfg.dur);
+  } catch(_){}
+}
+
 function _animalHitFX(an){
+  // Dosyasi olmayan turler icin synth ses
+  const synthTypes = ['giraffe','squirrel','turtle'];
+  if(synthTypes.includes(an.type)) _animalSynthSound(an.type);
+  else SFX.animalSound(an.type); // hayvan sesi
   // Hayvan tipine göre partikül rengi
   const cols = {
     bird:'rgba(180,180,160,0.9)', eagle:'rgba(60,50,40,0.9)',
@@ -7050,6 +7076,25 @@ const SFX = (function(){
     ui_open:             'ui_click.mp3',
     ui_close:            'ui_click.mp3',
     theme_unlock:        'win.mp3',
+    // Hayvan sesleri
+    animal_cow:          'cow.mp3',
+    animal_sheep:        'sheep.mp3',
+    animal_camel:        'camel.mp3',
+    animal_deer:         'deer.mp3',
+    animal_goat:         'goat.mp3',
+    animal_horse:        'horse.mp3',
+    animal_wolf:         'wolf.mp3',
+    animal_fox:          'fox.mp3',
+    animal_rabbit:       'rabbit.mp3',
+    animal_owl:          'owl.mp3',
+    animal_rooster:      'rooster.mp3',
+    animal_frog:         'frog.mp3',
+    animal_bird:         'bird.mp3',
+    animal_eagle:        'eagle.mp3',
+    animal_donkey:       'donkey.mp3',
+    animal_zebra:        'zebra.mp3',
+    animal_lion:         'lion.mp3',
+    animal_mammoth:      'mammoth.mp3',
   };
 
   // Sessiz önbellek yüklemesi — oyun başlamadan arka planda
@@ -7268,6 +7313,7 @@ const SFX = (function(){
       if(!playBuf('extra_ammo_sound',0.75))
         { sNoise(1400,0.3,0.06,0.05); setTimeout(()=>sNoise(1200,0.3,0.06,0.05),80); setTimeout(()=>sNoise(1000,0.3,0.06,0.05),160); }
     },
+    animalSound(type){ playBuf('animal_'+type, 0.7); },
     themeUnlock(){
       if(!playBuf('theme_unlock',0.95))
         { [[523,0],[659,.1],[784,.22],[1047,.36],[1319,.52],[1568,.7]].forEach(([f,t])=>sTone(f,0.5,0.35,'sine',t)); }
