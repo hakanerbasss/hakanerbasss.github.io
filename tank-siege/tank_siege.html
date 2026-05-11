@@ -426,6 +426,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="btn-gallery-open" onclick="openGallery(curLevel)">⚔️ Inventory</button>
   <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
+  <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">❤️ 5</button>
   <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
 </div>
 
@@ -664,7 +665,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.62';
+const APP_VERSION      = '1.0.63';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -682,8 +683,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 21:59';
-const APP_VERSION_NOTE = 'Hayvan sesleri eklendi';
+const APP_VERSION_DATE = '2026.05.11 22:41';
+const APP_VERSION_NOTE = 'Can sistemi ekleniyor test1';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1167,7 +1168,7 @@ function init(){
   updateSfxBtn();
   updateMusicBtn();
   updateTacticalBadge();
-  updateStreakBadge(); updateWindBlockBadge(); updateBoostBadge();
+  updateStreakBadge(); updateWindBlockBadge(); updateLivesBadge(); updateBoostBadge();
   resize();
   window.addEventListener('resize', resize);
 
@@ -1205,6 +1206,12 @@ function resize(){
 // LEVEL LOAD
 // ═══════════════════════════════════════
 function loadLevel(idx){
+  if(!hasLives()){
+    const ms=_livesRegenMs();
+    const mins=Math.ceil(ms/60000);
+    showToast('❤️ Can yok! '+mins+' dakika bekle.');
+    return;
+  }
   curLevel = idx;
   lv = LEVELS[Math.min(idx, LEVELS.length-1)];
   angle = 38 + Math.random()*8;
@@ -9782,6 +9789,88 @@ function closeCloudSettings() {
     <button id="cloud-signout-btn" onclick="cloudSignOut()" style="display:none;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">Hesap Degistir / Cikis</button>
     <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:2px;line-height:1.5;">Level tamamlandiginda otomatik kaydedilir.</div>
   </div>
+</div>
+
+
+<script>
+var MAX_LIVES=5;
+var LIVES_REGEN_MS=20*60*1000;
+function _livesNow(){
+  var stored=parseInt(lsGet("lives_count")||String(MAX_LIVES));
+  var lastTime=parseInt(lsGet("lives_time")||"0");
+  var now=Date.now();
+  if(stored>=MAX_LIVES){lsSet("lives_time",String(now));return MAX_LIVES;}
+  var elapsed=now-lastTime;
+  var regenned=Math.floor(elapsed/LIVES_REGEN_MS);
+  if(regenned>0){
+    var newL=Math.min(MAX_LIVES,stored+regenned);
+    lsSet("lives_count",String(newL));
+    lsSet("lives_time",String(lastTime+regenned*LIVES_REGEN_MS));
+    return newL;
+  }
+  return stored;
+}
+function _livesRegenMs(){
+  var stored=parseInt(lsGet("lives_count")||String(MAX_LIVES));
+  if(stored>=MAX_LIVES) return 0;
+  var lastTime=parseInt(lsGet("lives_time")||String(Date.now()));
+  var elapsed=Date.now()-lastTime;
+  return Math.max(0,LIVES_REGEN_MS-(elapsed%LIVES_REGEN_MS));
+}
+function hasLives(){return _livesNow()>0;}
+function loseLife(){
+  var cur=_livesNow();
+  if(cur<=0) return 0;
+  var newL=cur-1;
+  lsSet("lives_count",String(newL));
+  if(newL===MAX_LIVES-1) lsSet("lives_time",String(Date.now()));
+  updateLivesBadge();
+  return newL;
+}
+function updateLivesBadge(){
+  var badge=document.getElementById("lives-badge");
+  if(!badge) return;
+  var cur=_livesNow();
+  var h="";
+  for(var i=0;i<MAX_LIVES;i++) h+=i<cur?"❤️":"🤍";
+  badge.textContent=h;
+  badge.style.borderColor=cur>0?"rgba(255,80,80,0.5)":"rgba(150,150,150,0.4)";
+  badge.style.color=cur>0?"#FF5555":"rgba(200,200,200,0.5)";
+}
+function openLivesCard(){
+  var cur=_livesNow();
+  var ms=_livesRegenMs();
+  var mins=Math.ceil(ms/60000);
+  document.getElementById("lives-card-bg").style.display="block";
+  document.getElementById("lives-card").style.display="block";
+  var h="";
+  for(var i=0;i<MAX_LIVES;i++) h+=i<cur?"❤️ ":"🤍 ";
+  var el=document.getElementById("lives-card-hearts");
+  if(el) el.textContent=h.trim();
+  var st=document.getElementById("lives-card-status");
+  if(st) st.textContent=cur+" / "+MAX_LIVES+" can";
+  var ti=document.getElementById("lives-card-timer");
+  if(ti) ti.textContent=cur<MAX_LIVES?"Sonraki can: "+mins+" dakika":"Canlar dolu!";
+}
+function closeLivesCard(){
+  document.getElementById("lives-card-bg").style.display="none";
+  document.getElementById("lives-card").style.display="none";
+}
+setInterval(updateLivesBadge,30000);
+</script>
+
+<div id="lives-card-bg" onclick="closeLivesCard()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
+<div id="lives-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:3px solid #FF5555;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;">❤️ Canlar</span>
+    <button onclick="closeLivesCard()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">×</button>
+  </div>
+  <div style="text-align:center;margin-bottom:14px;">
+    <div id="lives-card-hearts" style="font-size:28px;letter-spacing:4px;margin-bottom:8px;"></div>
+    <div id="lives-card-status" style="font-size:14px;color:rgba(255,255,255,0.7);font-family:'Rajdhani',sans-serif;font-weight:700;"></div>
+    <div id="lives-card-timer" style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;"></div>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.5;">Her 20 dakikada 1 can dolar.<br>Maksimum 5 can.</div>
 </div>
 
 </body>
