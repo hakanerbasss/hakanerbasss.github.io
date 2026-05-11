@@ -682,8 +682,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 20:51';
-const APP_VERSION_NOTE = 'Namlu açısı 89 derece yapıldı.';
+const APP_VERSION_DATE = '2026.05.11 20:57';
+const APP_VERSION_NOTE = 'Hayvanmar vurulunca kaybolur baska yerden dogar ve 7 farkki hayvan eklendi.|Zurafa|Esek|Mamut|Zebra|Aslan';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -704,7 +704,7 @@ const THEMES = {
       {shape:'oak',     col:'#2a6a10', col2:'#1a4a08', trunk:'#5a3a18'},
     ],
     cloudColor:'rgba(250,252,255,0.92)', cloudDark:'rgba(210,225,240,0.88)', cloudWeight:0.45,
-    animals:['cow','rabbit','rooster'],
+    animals:['cow','rabbit','rooster','donkey'],
   },
   desert: {
     name:'Desert Sands', emoji:'🏜️',
@@ -721,7 +721,7 @@ const THEMES = {
       {shape:'dead',   col:'#6a5a30', col2:'#4a3a18', trunk:'#4a3018'},
     ],
     cloudColor:'rgba(255,235,180,0.85)', cloudDark:'rgba(220,180,120,0.80)', cloudWeight:0.30,
-    animals:['camel','fox'],
+    animals:['camel','fox','zebra'],
   },
   snow: {
     name:'Frozen Peaks', emoji:'❄️',
@@ -739,7 +739,7 @@ const THEMES = {
       {shape:'dead',   col:'#4a4a5a', col2:'#2a2a3a', trunk:'#3a3a4a'},
     ],
     cloudColor:'rgba(180,200,240,0.90)', cloudDark:'rgba(120,140,180,0.92)', cloudWeight:0.65,
-    animals:['wolf','rabbit'],
+    animals:['wolf','rabbit','mammoth'],
   },
   forest: {
     name:'Dark Forest', emoji:'🌲',
@@ -775,7 +775,7 @@ const THEMES = {
       {shape:'pine',   col:'#2a4a18', col2:'#1a2a08', trunk:'#3a1a06'},
     ],
     cloudColor:'rgba(160,150,170,0.88)', cloudDark:'rgba(100,90,120,0.92)', cloudWeight:0.60,
-    animals:['goat','eagle'],
+    animals:['goat','eagle','lion'],
     hasCrumble:true,
   },
   meadow: {
@@ -794,7 +794,7 @@ const THEMES = {
       {shape:'cherry', col:'#d06878', col2:'#a04050', trunk:'#5a3010'},
     ],
     cloudColor:'rgba(255,220,160,0.88)', cloudDark:'rgba(220,170,100,0.85)', cloudWeight:0.35,
-    animals:['horse','sheep','cow'],
+    animals:['horse','sheep','cow','giraffe','zebra','lion'],
   },
   volcano: {
     name:'Volcano', emoji:'🌋',
@@ -2175,6 +2175,25 @@ function placeEntities(){
 // ── Hayvan Sistemi ────────────────────────────────────────────────────────────
 function updateAnimals(){
   if(!animals.length) return;
+  // Respawn yonet
+  animals.forEach(a=>{
+    if(a._hit && a._respawnTimer > 0){
+      a._respawnTimer--;
+      if(a._respawnTimer <= 0){
+        // Farkli X pozisyonunda yeniden dog
+        const isBird = a.type==='bird' || a.type==='eagle';
+        a.x = W * (0.1 + Math.random() * 0.8);
+        a.y = isBird ? H*(0.10+Math.random()*0.20) : terrain[Math.floor(Math.min(a.x,W-1))];
+        a.baseY = a.y;
+        a.dir = Math.random()<0.5?1:-1;
+        a.speed = isBird?(1.0+Math.random()*0.8):(0.3+Math.random()*0.4);
+        a.moving = true;
+        a.scared = false;
+        a._hit = false;
+      }
+      return; // gizli, guncelleme yapma
+    }
+  });
   animals.forEach(a=>{
     const isBird = a.type==='bird' || a.type==='eagle';
     a.flapPhase += 0.12;
@@ -2224,8 +2243,9 @@ function drawAnimals(){
 }
 
 function drawAnimal(a){
+  if(a._hit) return; // vuruldu, gizle
   const isBird  = a.type==='bird' || a.type==='eagle';
-  const isLarge = a.type==='eagle' || a.type==='cow' || a.type==='camel';
+  const isLarge = a.type==='eagle' || a.type==='cow' || a.type==='camel' || a.type==='giraffe' || a.type==='mammoth' || a.type==='lion';
   ctx.save();
   ctx.translate(a.x, a.y);
   if(!isBird) ctx.scale(a.dir, 1); // yer hayvanları yönü
@@ -2247,6 +2267,11 @@ function drawAnimal(a){
     case 'rooster':  _drawRooster(ctx, a);       break;
     case 'frog':     _drawFrog(ctx, a);          break;
     case 'turtle':   _drawTurtle(ctx, a);        break;
+    case 'donkey':   _drawDonkey(ctx, a);         break;
+    case 'giraffe':  _drawGiraffe(ctx, a);        break;
+    case 'zebra':    _drawZebra(ctx, a);          break;
+    case 'lion':     _drawLion(ctx, a);           break;
+    case 'mammoth':  _drawMammoth(ctx, a);        break;
   }
   ctx.restore();
 }
@@ -2846,15 +2871,11 @@ function update(){
           const bdx = bullet.x - an.x;
           const bdy = bullet.y - an.y;
           if(Math.sqrt(bdx*bdx+bdy*bdy) < _animalHitRadius(an.type)){ // küçük çarpışma yarıçapı
-            an._hit = true;
             _animalHitFX(an);
-            // Kuşu korkut + ekrandan uzaklaştır
-            an.scared=true; an.scaredTimer=300;
-            an.speed=4+Math.random()*2;
-            an.dir = bdx>=0?1:-1;
-            an.moving=true;
-            // %30 ihtimalle 1 yıldız
             _birdHitReward(an.x, an.y);
+            // Kaybol, 5-8 saniye sonra farkli yerden yeniden dog
+            an._hit = true;
+            an._respawnTimer = 300 + Math.floor(Math.random() * 180); // 5-8 sn
           }
         });
       }
@@ -6246,6 +6267,136 @@ function showResult(win,stars,sub){
 }
 
 // Hayvan çarpışma yarıçapı
+// ── Esek ──────────────────────────────────────────────────────────────────────
+function _drawDonkey(c, a){
+  const walk = a.moving ? Math.sin(a.bobPhase)*2 : 0;
+  c.fillStyle='#9e9080'; c.strokeStyle='#5a4a38'; c.lineWidth=1;
+  c.beginPath(); c.roundRect(-15,-15,30,13,3); c.fill(); c.stroke();
+  c.beginPath(); c.roundRect(11,-22,13,10,2); c.fill(); c.stroke();
+  // Uzun kulaklar
+  c.strokeStyle='#9e9080'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(13,-22); c.lineTo(11,-30); c.stroke();
+  c.beginPath(); c.moveTo(19,-22); c.lineTo(21,-30); c.stroke();
+  c.strokeStyle='#5a4a38'; c.lineWidth=3; c.lineCap='round';
+  [[-10,0],[-3,0],[4,0],[10,0]].forEach(([lx],i)=>{
+    const lw=(i%2===0?1:-1)*walk;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw*0.5,8); c.stroke();
+  });
+  // Kuyruk
+  c.strokeStyle='#5a4a38'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(-15,-10); c.quadraticCurveTo(-22,-8,-20,-2); c.stroke();
+}
+
+// ── Zurafa ─────────────────────────────────────────────────────────────────────
+function _drawGiraffe(c, a){
+  const walk = a.moving ? Math.sin(a.bobPhase)*2 : 0;
+  // Uzun boyun
+  c.fillStyle='#e8c060'; c.strokeStyle='#a06020'; c.lineWidth=1;
+  c.beginPath(); c.roundRect(8,-50,8,30,2); c.fill(); c.stroke();
+  // Kafa
+  c.beginPath(); c.roundRect(10,-62,14,14,3); c.fill(); c.stroke();
+  // Boynuzlar
+  c.strokeStyle='#a06020'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(13,-62); c.lineTo(12,-68); c.stroke();
+  c.beginPath(); c.moveTo(20,-62); c.lineTo(21,-68); c.stroke();
+  // Govde
+  c.beginPath(); c.roundRect(-15,-22,34,14,3); c.fill(); c.stroke();
+  // Lekeler
+  c.fillStyle='rgba(140,80,20,0.5)';
+  [[-8,-18],[2,-15],[10,-20],[-4,-10]].forEach(([lx,ly])=>{
+    c.beginPath(); c.ellipse(lx,ly,4,3,0.3,0,Math.PI*2); c.fill();
+  });
+  // Uzun bacaklar
+  c.strokeStyle='#a06020'; c.lineWidth=3; c.lineCap='round';
+  [[-10,0],[-3,0],[8,0],[15,0]].forEach(([lx],i)=>{
+    const lw=(i%2===0?1:-1)*walk;
+    c.beginPath(); c.moveTo(lx,-8); c.lineTo(lx+lw,18); c.stroke();
+  });
+}
+
+// ── Zebra ──────────────────────────────────────────────────────────────────────
+function _drawZebra(c, a){
+  const walk = a.moving ? Math.sin(a.bobPhase)*2 : 0;
+  c.fillStyle='#f0f0f0'; c.strokeStyle='#222'; c.lineWidth=1;
+  c.beginPath(); c.roundRect(-15,-15,30,13,3); c.fill(); c.stroke();
+  // Siyah cizgiler
+  c.strokeStyle='#222'; c.lineWidth=2;
+  [-8,-3,3,9].forEach(x=>{
+    c.beginPath(); c.moveTo(x,-15); c.lineTo(x+1,-2); c.stroke();
+  });
+  // Kafa
+  c.fillStyle='#f0f0f0'; c.strokeStyle='#222'; c.lineWidth=1;
+  c.beginPath(); c.roundRect(11,-21,13,10,2); c.fill(); c.stroke();
+  c.strokeStyle='#222'; c.lineWidth=1.5;
+  [13,18].forEach(x=>{ c.beginPath(); c.moveTo(x,-21); c.lineTo(x,-27); c.stroke(); });
+  // Yele
+  c.strokeStyle='#222'; c.lineWidth=2;
+  for(let i=0;i<5;i++){ c.beginPath(); c.moveTo(-15+i*4,-15); c.lineTo(-14+i*4,-21); c.stroke(); }
+  c.strokeStyle='#444'; c.lineWidth=3; c.lineCap='round';
+  [[-10,0],[-3,0],[4,0],[10,0]].forEach(([lx],i)=>{
+    const lw=(i%2===0?1:-1)*walk;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw*0.5,8); c.stroke();
+  });
+}
+
+// ── Aslan ──────────────────────────────────────────────────────────────────────
+function _drawLion(c, a){
+  const walk = a.moving ? Math.sin(a.bobPhase)*2 : 0;
+  c.fillStyle='#d4a84b'; c.strokeStyle='#8a6020'; c.lineWidth=1;
+  c.beginPath(); c.roundRect(-15,-14,30,12,3); c.fill(); c.stroke();
+  // Yelesi olan kafa
+  c.fillStyle='#8a4010'; c.beginPath(); c.arc(17,-14,10,0,Math.PI*2); c.fill();
+  c.fillStyle='#d4a84b'; c.strokeStyle='#8a6020';
+  c.beginPath(); c.arc(18,-15,7,0,Math.PI*2); c.fill(); c.stroke();
+  // Burun
+  c.fillStyle='#c07060';
+  c.beginPath(); c.ellipse(23,-13,3,2,0,0,Math.PI*2); c.fill();
+  // Kulaklar
+  c.fillStyle='#d4a84b'; c.strokeStyle='#8a6020';
+  c.beginPath(); c.moveTo(12,-22); c.lineTo(10,-27); c.lineTo(16,-23); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(22,-22); c.lineTo(24,-27); c.lineTo(28,-23); c.fill(); c.stroke();
+  c.strokeStyle='#8a6020'; c.lineWidth=3; c.lineCap='round';
+  [[-10,0],[-4,0],[4,0],[10,0]].forEach(([lx],i)=>{
+    const lw=(i%2===0?1:-1)*walk;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw*0.5,8); c.stroke();
+  });
+  // Kuyruk
+  c.strokeStyle='#d4a84b'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(-15,-8); c.quadraticCurveTo(-24,-4,-22,2); c.stroke();
+  c.fillStyle='#8a4010'; c.beginPath(); c.arc(-22,3,3,0,Math.PI*2); c.fill();
+}
+
+// ── Mamut ──────────────────────────────────────────────────────────────────────
+function _drawMammoth(c, a){
+  const walk = a.moving ? Math.sin(a.bobPhase)*2 : 0;
+  c.fillStyle='#6a4a30'; c.strokeStyle='#3a2a18'; c.lineWidth=1;
+  c.beginPath(); c.roundRect(-18,-20,36,18,4); c.fill(); c.stroke();
+  // Kafa
+  c.beginPath(); c.roundRect(14,-26,16,14,3); c.fill(); c.stroke();
+  // Hortum
+  c.strokeStyle='#3a2a18'; c.lineWidth=3; c.lineCap='round';
+  c.beginPath(); c.moveTo(28,-14); c.quadraticCurveTo(34,-8,30,-2); c.stroke();
+  // Fildisi
+  c.strokeStyle='#f0e0a0'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(18,-12); c.quadraticCurveTo(18,-4,24,0); c.stroke();
+  c.beginPath(); c.moveTo(26,-12); c.quadraticCurveTo(28,-4,34,-2); c.stroke();
+  // Uzun tusler
+  c.strokeStyle='#6a4a30'; c.lineWidth=1.5;
+  c.beginPath(); c.moveTo(16,-26); c.lineTo(14,-34); c.stroke();
+  c.beginPath(); c.moveTo(24,-26); c.lineTo(26,-34); c.stroke();
+  // Kalin bacaklar
+  c.strokeStyle='#3a2a18'; c.lineWidth=5; c.lineCap='round';
+  [[-12,0],[-4,0],[5,0],[13,0]].forEach(([lx],i)=>{
+    const lw=(i%2===0?1:-1)*walk;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw,10); c.stroke();
+  });
+  // Kil cizgileri (tuy)
+  c.strokeStyle='#4a3020'; c.lineWidth=1;
+  for(let i=0;i<6;i++){
+    c.beginPath(); c.moveTo(-16+i*5,-20); c.lineTo(-18+i*5,-10); c.stroke();
+  }
+}
+
 function _animalHitFX(an){
   // Hayvan tipine göre partikül rengi
   const cols = {
@@ -6281,6 +6432,11 @@ function _animalHitRadius(type){
     case 'cow':      return 20;
     case 'camel':    return 22;
     case 'deer':     return 16;
+    case 'donkey':   return 18;
+    case 'giraffe':  return 22;
+    case 'zebra':    return 18;
+    case 'lion':     return 18;
+    case 'mammoth':  return 24;
     case 'goat':     return 15;
     case 'sheep':    return 15;
     case 'wolf':     return 16;
