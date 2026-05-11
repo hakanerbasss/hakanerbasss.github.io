@@ -426,7 +426,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="btn-gallery-open" onclick="openGallery(curLevel)">⚔️ Inventory</button>
   <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
-  <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:14px;padding:4px 8px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit">☁️</button>
+  <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 8px 3px 3px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;align-items:center;gap:5px;"><img id="cloud-avatar-img" src="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:18px;">☁️</span></button>
 </div>
 
 <!-- Mermi slotları — sağ altta eski yerinde -->
@@ -664,7 +664,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.50';
+const APP_VERSION      = '1.0.51';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -682,8 +682,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 15:27';
-const APP_VERSION_NOTE = 'Badge ve oyuncu adi eklendi';
+const APP_VERSION_DATE = '2026.05.11 16:02';
+const APP_VERSION_NOTE = 'Google play avatar eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -9447,6 +9447,20 @@ function _updateCloudBadge(success, name) {
   }
 }
 
+function onCloudPlayerInfo(name, avatarUrl) {
+  _cloudUserName = name;
+  var imgEl = document.getElementById('cloud-avatar-img');
+  var txtEl = document.getElementById('cloud-badge-text');
+  if (avatarUrl && imgEl) {
+    imgEl.src = avatarUrl; imgEl.style.display = 'block';
+    if (txtEl) txtEl.style.display = 'none';
+  }
+  var cardAvatar = document.getElementById('cloud-card-avatar');
+  if (cardAvatar && avatarUrl) { cardAvatar.src = avatarUrl; cardAvatar.style.display = 'block'; }
+  var nameEl = document.getElementById('cloud-signin-status');
+  if (nameEl) { nameEl.innerHTML = '<span style="color:#4285F4;font-weight:700;">' + name + '</span><br><span style="font-size:11px;color:#00C853;">Play Games bagli</span>'; }
+}
+
 function onCloudSignIn(success, name) {
   _cloudSignedIn = success;
   _cloudUserName = name || '';
@@ -9454,6 +9468,11 @@ function onCloudSignIn(success, name) {
   // popup aciksa aninda guncelle
   var card = document.getElementById('cloud-settings-card');
   if (card && card.style.display !== 'none') _refreshCloudSettingsUI();
+  // cikis yapilinca avatar temizle
+  if (!success) {
+    var ca = document.getElementById('cloud-card-avatar');
+    if (ca) { ca.src=''; ca.style.display='none'; }
+  }
 }
 
 function cloudSave() {
@@ -9519,6 +9538,11 @@ function cloudSignOut() {
   Android.signOutPlayGames();
 }
 
+function cloudSignOut() {
+  if (typeof Android === 'undefined') { showToast('Sadece uygulamada calisir.'); return; }
+  Android.signOutPlayGames();
+}
+
 function openCloudSettings() {
   document.getElementById('cloud-settings-bg').style.display = 'block';
   document.getElementById('cloud-settings-card').style.display = 'block';
@@ -9530,6 +9554,8 @@ function _refreshCloudSettingsUI() {
   var statusEl   = document.getElementById('cloud-account-status');
   var signoutBtn = document.getElementById('cloud-signout-btn');
   var signinBtn  = document.getElementById('cloud-signin-btn');
+  var cardAvatar = document.getElementById('cloud-card-avatar');
+  var imgEl      = document.getElementById('cloud-avatar-img');
   if (_cloudSignedIn) {
     if (nameEl)     { nameEl.textContent = _cloudUserName || 'Bilinmiyor'; nameEl.style.color = '#4285F4'; }
     if (statusEl)   { statusEl.textContent = 'Play Games bagli'; statusEl.style.color = '#00C853'; }
@@ -9553,6 +9579,7 @@ function closeCloudSettings() {
 
 <div id="cloud-settings-bg" onclick="closeCloudSettings()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
 <div id="cloud-settings-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:3px solid #4285F4;">
+  <div style="text-align:center;margin-bottom:10px;"><img id="cloud-card-avatar" src="" style="display:none;width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(66,133,244,0.5);"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
     <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;">☁️ Bulut Kayit</span>
     <button onclick="closeCloudSettings()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;line-height:1;">✕</button>
