@@ -664,7 +664,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.60';
+const APP_VERSION      = '1.0.61';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -682,8 +682,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 19:35';
-const APP_VERSION_NOTE = 'Bagde isim testi';
+const APP_VERSION_DATE = '2026.05.11 20:51';
+const APP_VERSION_NOTE = 'Namlu açısı 89 derece yapıldı.';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -5467,7 +5467,7 @@ function spawnDestruction(){
 // CONTROLS
 // ═══════════════════════════════════════
 function adjustAngle(delta){
-  angle = Math.max(5, Math.min(85, angle+delta));
+  angle = Math.max(5, Math.min(89, angle+delta));
   updateUI();
 }
 
@@ -6175,7 +6175,7 @@ function onJoyMove(e){
   dot.style.top=(joyStartY+Math.sin(ang2)*dist)+'px';
   // X axis -> angle: drag right=lower angle, drag left=higher
   // Map dx from -JOY_R..+JOY_R to angle 75..10
-  angle=Math.max(5,Math.min(80,45-dx*0.5));
+  angle=Math.max(5,Math.min(89,45-dx*0.5));
   // Y axis -> power: drag up=more power
   power=Math.max(10,Math.min(100,50-dy*0.7));
   updatePowerBarOnly(); // DOM'a sadece power bar yaz, tam updateUI() değil
