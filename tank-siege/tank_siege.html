@@ -664,7 +664,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.49';
+const APP_VERSION      = '1.0.50';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -682,8 +682,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 14:39';
-const APP_VERSION_NOTE = 'Google Play Games Eklendi';
+const APP_VERSION_DATE = '2026.05.11 15:27';
+const APP_VERSION_NOTE = 'Badge ve oyuncu adi eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -9424,21 +9424,36 @@ function openTacticalInfo(){
 var _cloudSignedIn = false;
 
 var _cloudUserName = '';
-function onCloudSignIn(success, name) {
-  _cloudSignedIn = success;
-  _cloudUserName = name || '';
+function _updateCloudBadge(success, name) {
   var btn = document.getElementById('cloud-games-btn');
   if (btn) {
-    if (success) {
-      btn.textContent = name ? name.split(' ')[0] : '☁️';
-      btn.style.display = 'block';
+    btn.style.display = 'block';
+    if (success && name) {
+      btn.textContent = name.split(' ')[0];
       btn.style.borderColor = 'rgba(66,133,244,0.8)';
       btn.style.color = '#4285F4';
       btn.style.background = 'rgba(66,133,244,0.15)';
+    } else if (success) {
+      btn.textContent = '☁️';
+      btn.style.borderColor = 'rgba(66,133,244,0.6)';
+      btn.style.color = '#4285F4';
+      btn.style.background = 'rgba(66,133,244,0.1)';
     } else {
-      btn.style.display = 'none';
+      btn.textContent = '☁️';
+      btn.style.borderColor = 'rgba(255,255,255,0.2)';
+      btn.style.color = 'rgba(255,255,255,0.35)';
+      btn.style.background = 'rgba(0,0,0,0.6)';
     }
   }
+}
+
+function onCloudSignIn(success, name) {
+  _cloudSignedIn = success;
+  _cloudUserName = name || '';
+  _updateCloudBadge(success, name);
+  // popup aciksa aninda guncelle
+  var card = document.getElementById('cloud-settings-card');
+  if (card && card.style.display !== 'none') _refreshCloudSettingsUI();
 }
 
 function cloudSave() {
@@ -9487,11 +9502,6 @@ function cloudSignIn() {
   Android.signInPlayGames();
 }
 
-function cloudSignOut() {
-  if (typeof Android === 'undefined') { showToast('Sadece uygulamada calisir.'); return; }
-  Android.signOutPlayGames();
-}
-
 function autoCloudSave() {
   if (!_cloudSignedIn) return;
   if (typeof Android === 'undefined') return;
@@ -9504,21 +9514,30 @@ function autoCloudSave() {
   try { Android.saveCloudData(JSON.stringify(data)); } catch(_) {}
 }
 
+function cloudSignOut() {
+  if (typeof Android === 'undefined') { showToast('Sadece uygulamada calisir.'); return; }
+  Android.signOutPlayGames();
+}
+
 function openCloudSettings() {
   document.getElementById('cloud-settings-bg').style.display = 'block';
   document.getElementById('cloud-settings-card').style.display = 'block';
-  var nameEl   = document.getElementById('cloud-account-name');
-  var statusEl = document.getElementById('cloud-account-status');
+  _refreshCloudSettingsUI();
+}
+
+function _refreshCloudSettingsUI() {
+  var nameEl     = document.getElementById('cloud-account-name');
+  var statusEl   = document.getElementById('cloud-account-status');
   var signoutBtn = document.getElementById('cloud-signout-btn');
   var signinBtn  = document.getElementById('cloud-signin-btn');
   if (_cloudSignedIn) {
-    if (nameEl)   { nameEl.textContent = _cloudUserName || 'Bilinmiyor'; nameEl.style.color = '#4285F4'; }
-    if (statusEl) { statusEl.textContent = 'Play Games bagli'; statusEl.style.color = '#00C853'; }
+    if (nameEl)     { nameEl.textContent = _cloudUserName || 'Bilinmiyor'; nameEl.style.color = '#4285F4'; }
+    if (statusEl)   { statusEl.textContent = 'Play Games bagli'; statusEl.style.color = '#00C853'; }
     if (signoutBtn) signoutBtn.style.display = 'block';
     if (signinBtn)  signinBtn.style.display  = 'none';
   } else {
-    if (nameEl)   { nameEl.textContent = 'Giris yapilmadi'; nameEl.style.color = 'rgba(255,255,255,0.4)'; }
-    if (statusEl) { statusEl.textContent = ''; }
+    if (nameEl)     { nameEl.textContent = 'Giris yapilmadi'; nameEl.style.color = 'rgba(255,255,255,0.4)'; }
+    if (statusEl)   { statusEl.textContent = ''; }
     if (signoutBtn) signoutBtn.style.display = 'none';
     if (signinBtn)  signinBtn.style.display  = 'block';
   }
