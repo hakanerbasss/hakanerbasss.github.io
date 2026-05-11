@@ -312,7 +312,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 /* Stat bars in gallery */
 .stat-row{display:flex;align-items:center;gap:6px;margin-top:4px;}
 .stat-label{color:rgba(255,255,255,0.45);font-size:11px;width:55px;flex-shrink:0;}
-.stat-bar-bg{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;}
+.stat-bar-bg{flex:1;min-width:0;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
 .stat-bar-fill{height:100%;border-radius:3px;}
 
 .gc-icon svg{display:block;margin:0 auto;overflow:visible;}
@@ -549,6 +549,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="tactical-badge" onclick="onTacticalBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="windblock-badge" onclick="onWindBlockTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="sandbox-tactic-btn" onclick="onSandboxTacticTap()" style="background:rgba(0,0,0,0.75);border:2px solid rgba(255,107,53,0.5);border-radius:10px;padding:5px 10px;color:#FF6B35;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;">⚔️ Tactic</button>
+  <button id="boost-badge" onclick="onDmgBoostBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
 </div>
 
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
@@ -662,7 +663,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.40';
+const APP_VERSION      = '1.0.41';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -680,8 +681,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 10:02';
-const APP_VERSION_NOTE = 'Hayvan spawn eklendi. Lucky shoot';
+const APP_VERSION_DATE = '2026.05.11 10:52';
+const APP_VERSION_NOTE = '2x hasar aktif edildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1034,6 +1035,14 @@ let guidedHintShown = lsGet('guided_hint')==='1';
 let tacticalHintShown = lsGet('tactical_hint')==='1';
 let piercerHintShown  = lsGet('piercer_hint')==='1';
 let tempTank    = JSON.parse(lsGet('temp_tank')||'null');
+
+// ── 2x Hasar sistemi ──────────────────────────────────────────────
+// Kalıcı upgrade: dmgBoostLevel 0-3 (0=yok, 1=x1.5, 2=x1.75, 3=x2.0)
+// Geçici: reklam izle → 3 level boyunca tam x2.0
+let dmgBoostLevel   = parseInt(lsGet('dmg_boost_level')||'0');  // kalıcı seviye
+let tempDmgBoost    = JSON.parse(lsGet('temp_dmg_boost')||'null'); // {expiresAtLevel}
+const DMG_BOOST_MULT   = [1.0, 1.5, 1.75, 2.0]; // seviye → multiplier
+const DMG_BOOST_COSTS  = [0, 8000, 20000, 45000]; // puan maliyeti
 let selectedAmmo = lsGet('sel_ammo')||'normal';
 let selectedTank = lsGet('sel_tank')||'basic';
 // Puan reklamı cooldown
@@ -1157,7 +1166,7 @@ function init(){
   updateSfxBtn();
   updateMusicBtn();
   updateTacticalBadge();
-  updateStreakBadge(); updateWindBlockBadge();
+  updateStreakBadge(); updateWindBlockBadge(); updateBoostBadge();
   resize();
   window.addEventListener('resize', resize);
 
@@ -1221,6 +1230,10 @@ function loadLevel(idx){
   if(tempTank && tempTank.expiresAtLevel<=curLevel){
     tempTank=null; lsRemove('temp_tank');
     selectedTank='basic';
+  }
+  if(tempDmgBoost && tempDmgBoost.expiresAtLevel<=curLevel){
+    tempDmgBoost=null; lsRemove('temp_dmg_boost');
+    showToast('2x Hasar geçici süresi bitti.');
   }
   currentTheme = THEMES[lv.theme] || THEMES.valley;
   SFX.setWind((windBlock && windBlock.expiresAtLevel > curLevel) ? 0 : Math.abs(lv.wind||0));
@@ -2997,7 +3010,7 @@ function update(){
           const ammoBonusMult2 = 1 + 0.25*(ammoUpgrades[eb.ammoType||selectedAmmo]||0);
           const tankBonusMult2 = 1 + 0.20*(tankUpgrades[selectedTank]||0);
           const splash=Math.round(ad2.damage*(eb.damageScale||1)*res2*
-            Math.pow(1-dist2/(ad2.radius*2.5),1.4)*0.55*ammoBonusMult2*tankBonusMult2);
+            Math.pow(1-dist2/(ad2.radius*2.5),1.4)*0.55*ammoBonusMult2*tankBonusMult2*dmgBoostMultiplier());
           if(splash>0){
             applyBuriedDamage(splash);
             updateUI();
@@ -3015,7 +3028,7 @@ function update(){
         const res3=matRes3[lv.targetMat]||1.0;
         const ammoBonusMult3 = 1 + 0.25*(ammoUpgrades[eb.ammoType||selectedAmmo]||0);
         const tankBonusMult3 = 1 + 0.20*(tankUpgrades[selectedTank]||0);
-        const dmg3=Math.round(ad3.damage*(eb.damageScale||1)*res3*ammoBonusMult3*tankBonusMult3);
+        const dmg3=Math.round(ad3.damage*(eb.damageScale||1)*res3*ammoBonusMult3*tankBonusMult3*dmgBoostMultiplier());
         applyBuriedDamage(dmg3);
         spawnImpact(eb.x,eb.y,'target');
         spawnExplosionSprite(eb.x,eb.y,0.8);
@@ -4746,7 +4759,7 @@ function onTerrainHit(){
     const splashMult = ad.explosive ? 0.80 : 0.50;  // patlayıcı daha etkili
     const ammoBonusMult = 1 + 0.25*(ammoUpgrades[selectedAmmo]||0);
     const tankBonusMult = 1 + 0.20*(tankUpgrades[selectedTank]||0);
-    const dmg  = Math.max(1, Math.round(ad.damage * res * falloff * splashMult * ammoBonusMult * tankBonusMult));
+    const dmg  = Math.max(1, Math.round(ad.damage * res * falloff * splashMult * ammoBonusMult * tankBonusMult * dmgBoostMultiplier()));
     applyBuriedDamage(dmg);
     // Küçük hasar efekti
     spawnImpact(targetX, targetY - targetH*0.5, 'target');
@@ -4862,7 +4875,7 @@ function onTargetHit(){
   const pen=ad.apPen||1.0;
   const ammoBonusMult = 1 + 0.25*(ammoUpgrades[selectedAmmo]||0);
   const tankBonusMult = 1 + 0.20*(tankUpgrades[selectedTank]||0);
-  const dmg=Math.round(ad.damage*res*pen*ammoBonusMult*tankBonusMult);
+  const dmg=Math.round(ad.damage*res*pen*ammoBonusMult*tankBonusMult*dmgBoostMultiplier());
   applyBuriedDamage(dmg);
 
   spawnImpact(bullet.x,bullet.y,'target');
@@ -5472,7 +5485,7 @@ function hasTank(type){
 }
 
 // Galeriyi aç
-function openGallery(nextIdx){
+function openGallery(nextIdx, tab){
   SFX.openGallery();
   pendingLevelIdx = nextIdx;
   // Geçici silahları kontrol et — süresi dolmuş mu?
@@ -5482,9 +5495,9 @@ function openGallery(nextIdx){
   if(tempTank && tempTank.expiresAtLevel<=curLevel){
     tempTank=null; lsRemove('temp_tank');
   }
-  galleryTab='ammo';
+  galleryTab = tab || 'ammo';
   document.querySelectorAll('.gtab').forEach((t,i)=>{
-    t.classList.toggle('active',i===0);
+    t.classList.toggle('active',(galleryTab==='ammo'&&i===0)||(galleryTab==='boost'&&i===1)||(galleryTab==='tank'&&i===2));
   });
   updateGalleryScore();
   updateAdButton();
@@ -5502,7 +5515,7 @@ function closeGallery(){
   SFX.closeGallery();
   SFX.setWind((shieldActive||(windBlock&&windBlock.expiresAtLevel>curLevel))?0:Math.abs(wind));
   document.getElementById('gallery-overlay').classList.remove('show');
-  updateTacticalBadge(); updateWindBlockBadge(); // galeri kapanınca rozeti güncelle
+  updateTacticalBadge(); updateWindBlockBadge(); // galeri kapanınca rozeti güncelle updateBoostBadge();
 }
 
 
@@ -5589,6 +5602,15 @@ function updateAdButton(){
   } else {
     btn.classList.remove('disabled');
     info.textContent=`+200 🏆 (${5-dailyAdCount} hak)`;
+  }
+}
+
+function watchAdForDmgBoost(){
+  if(typeof Android !== 'undefined' && Android.showRewardedAd){
+    Android.showRewardedAd('dmg_boost');
+  } else {
+    // Test modu
+    buyTempDmgBoost();
   }
 }
 
@@ -6178,7 +6200,9 @@ function onWin(){
   else if(shotsUsed<=half) stars=2;
   else stars=1;
   const starMult = [0, 6, 12, 20][stars] || 6;  // 1yıldız:6, 2yıldız:12, 3yıldız:20
-  const gained = Math.round(lv.id * starMult);
+  // Geç levellar için puan multiplier artışı
+  const levelBonus = lv.id > 100 ? 1.9 : lv.id > 50 ? 1.4 : 1.0;
+  const gained = Math.round(lv.id * starMult * levelBonus);
   score += gained;
   // LocalStorage'a kaydet
   const key='stars_'+lv.id;
@@ -6266,6 +6290,61 @@ function _birdHitReward(x, y){
   // Sadece efekt — yıldız yok
   const msgs = ['Lucky!', 'Nice Shot!', 'Oops!', '🐦'];
   showFloatingText(x, y-20, msgs[Math.floor(Math.random()*msgs.length)], '#ffffff');
+}
+
+// Aktif hasar çarpanı — geçici öncelikli, yoksa kalıcı
+function dmgBoostMultiplier(){
+  if(tempDmgBoost && tempDmgBoost.expiresAtLevel > curLevel) return 2.0;
+  return DMG_BOOST_MULT[dmgBoostLevel] || 1.0;
+}
+
+// 2x Hasar geçici satın al (reklam sonrası)
+function buyTempDmgBoost(){
+  tempDmgBoost = { expiresAtLevel: curLevel + 3 };
+  lsSet('temp_dmg_boost', JSON.stringify(tempDmgBoost));
+  showToast('💥 2x Hasar aktif! 3 level boyunca.');
+  updateBoostBadge();
+}
+
+// 2x Hasar kalıcı upgrade
+function buyPermDmgBoost(){
+  if(dmgBoostLevel >= 3){ showToast('Maksimum seviyede!'); return; }
+  const nextLvl = dmgBoostLevel + 1;
+  const cost = DMG_BOOST_COSTS[nextLvl];
+  if(score < cost){ SFX.locked(); showToast('Yeterli puan yok! ('+cost+' 🏆)'); return; }
+  score -= cost;
+  lsSet('total_score', score);
+  dmgBoostLevel = nextLvl;
+  lsSet('dmg_boost_level', dmgBoostLevel);
+  updateUI();
+  showToast('💥 2x Hasar Sv'+dmgBoostLevel+' aktif! (×'+DMG_BOOST_MULT[dmgBoostLevel]+')');
+  renderGallery();
+}
+
+// HUD badge güncelle — windblock-badge ile aynı stil
+function updateBoostBadge(){
+  const badge = document.getElementById('boost-badge');
+  if(!badge) return;
+  const cl = curLevel||0;
+  const isTemp = tempDmgBoost && tempDmgBoost.expiresAtLevel > cl;
+  const isPerm = dmgBoostLevel > 0;
+
+  if(isTemp){
+    const kalan = tempDmgBoost.expiresAtLevel - cl;
+    badge.textContent = '💥 '+kalan+'L';
+    badge.style.background = 'rgba(255,80,0,0.25)';
+    badge.style.border = '2px solid rgba(255,107,53,0.8)';
+    badge.style.color = '#FF6B35';
+  } else if(isPerm){
+    badge.textContent = '💥 ×'+DMG_BOOST_MULT[dmgBoostLevel];
+    badge.style.background = 'rgba(255,80,0,0.20)';
+    badge.style.border = '2px solid rgba(255,107,53,0.6)';
+    badge.style.color = '#FF8C55';
+  } else {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.style.display = 'block';
 }
 
 function addStars(n){
@@ -6630,6 +6709,7 @@ function updateUI(){
   document.getElementById('power-fill').style.height = power+'%';
   document.getElementById('power-pct').textContent   = _normPct+'%';
   _lastPowerBarH = power; _lastAngleText = '📐 '+Math.round(angle)+'°';
+  updateBoostBadge();
   const absWind=Math.abs(wind);
   const windEl=document.getElementById('wind-display');
   const shieldBtn=document.getElementById('shield-btn');
@@ -8087,20 +8167,54 @@ function renderBoostGallery(cont){
     ${gdBtn}`;
   cont.appendChild(gdCard);
 
-  // ── Yakında ───────────────────────────────────────────────
-  [{icon:'💥',name:'2x Hasar',desc:'Bir sonraki atışta çift hasar.'}
-  ].forEach(item=>{
-    const c=document.createElement('div');
-    c.className='gallery-card';
-    c.style.opacity='0.45';
-    c.innerHTML=`
-      <div class="gc-icon" style="font-size:36px;">${item.icon}</div>
-      <div class="gc-info">
-        <div class="gc-name">${item.name} <span class="gc-badge locked-badge">⏳ Yakında</span></div>
-        <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px;">${item.desc}</div>
-      </div>`;
-    cont.appendChild(c);
-  });
+  // ── 2x Hasar ─────────────────────────────────────────────
+  const _bTemp   = tempDmgBoost && tempDmgBoost.expiresAtLevel > curLevel;
+  const _bTempL  = _bTemp ? (tempDmgBoost.expiresAtLevel - curLevel) : 0;
+  const _bMult   = DMG_BOOST_MULT[dmgBoostLevel];
+  const _bNext   = dmgBoostLevel < 3 ? DMG_BOOST_MULT[dmgBoostLevel+1] : null;
+  const _bCost   = dmgBoostLevel < 3 ? DMG_BOOST_COSTS[dmgBoostLevel+1] : null;
+
+  let _bBadge, _bBtn;
+  if(_bTemp){
+    _bBadge = `<span class="gc-badge temp-badge">⏱ ${_bTempL} level kaldı (×2.0)</span>`;
+    _bBtn   = `<button class="gc-btn btn-ad" onclick="watchAdForDmgBoost()">📺 +3 level<br><span style="font-size:10px;opacity:0.7;">uzat</span></button>`;
+  } else if(dmgBoostLevel > 0){
+    _bBadge = `<span class="gc-badge owned-badge">✓ Sv${dmgBoostLevel} ×${_bMult} kalıcı</span>`;
+    _bBtn   = dmgBoostLevel < 3
+      ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''}>⬆ Sv${dmgBoostLevel+1} — ×${_bNext}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
+      : `<span style="font-size:11px;color:#FFD700;text-align:center;">✓ Maksimum<br>seviye</span>`;
+  } else {
+    _bBadge = '<span class="gc-badge locked-badge">🔒 Aktif Değil</span>';
+    _bBtn   = `<button class="gc-btn btn-ad" onclick="watchAdForDmgBoost()">📺 Reklam izle<br><span style="font-size:10px;opacity:0.7;">3 level ×2.0</span></button>`;
+  }
+
+  // Kalıcı upgrade butonu — geçici aktifken de göster (alt kısım)
+  const _bPermBtn = (!_bTemp && dmgBoostLevel < 3)
+    ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''} style="margin-top:3px;">⬆ Kalıcı Sv${dmgBoostLevel+1} — ×${_bNext}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
+    : '';
+
+  // Geçici aktifken kalıcı butonu da göster
+  const _bPermBtn2 = dmgBoostLevel < 3
+    ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''} style="margin-top:5px;width:100%;">⬆ Kalıcı Sv${dmgBoostLevel+1} — ×${_bNext}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
+    : '';
+
+  const _boostCard = document.createElement('div');
+  _boostCard.className = 'gallery-card' + (dmgBoostLevel>0||_bTemp ? ' owned' : '');
+  _boostCard.innerHTML = `
+    <div class="gc-icon" style="font-size:36px;">💥</div>
+    <div class="gc-info">
+      <div class="gc-name">Hasar Yükseltici ${_bBadge}</div>
+      <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 6px;">
+        Tüm atışlarda hasar çarpanı. Geçici: reklam → 3 level ×2.0. Kalıcı: puan ile upgrade.
+      </div>
+      ${statBar('Güç', Math.max(dmgBoostLevel/3, _bTemp?1:0), '#FF6B35')}
+      ${statBar('Süre', _bTemp ? _bTempL/3 : (dmgBoostLevel>0?1:0), '#FF6B35')}
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px;">
+        ${_bBtn}
+        ${_bPermBtn2}
+      </div>
+    </div>`;
+  cont.appendChild(_boostCard);
 }
 
 const STREAK_STARS = [1,1,2,2,3,3,5]; // 7 günlük seri ödülleri
@@ -8119,7 +8233,7 @@ function checkDailyLoginBonus(){
 
   // Ödüller
   const starReward = STREAK_STARS[loginStreak];
-  score += 50; // Günlük puan her zaman
+  score += 10; // Günlük puan (retention, ekonomiyi bozmaz)
 
   // Yıldız ver — sadece mevcut temada boş levellara
   let starsAdded = 0;
@@ -8134,6 +8248,12 @@ function checkDailyLoginBonus(){
   if(leftover > 0){
     bonusStars += leftover;
     lsSet('bonus_stars', bonusStars);
+  }
+
+  // 7 günlük seri tamamlandıysa +100 puan bonus
+  if(loginStreak === 6){ // 0-6 arası, 6 = 7. gün
+    score += 100;
+    showToast('🔥 7 günlük seri! +100 puan bonus!');
   }
 
   // Kaydet
@@ -8389,6 +8509,61 @@ function onWindBlockTap(){
   openWindBlockInfo();
 }
 
+function onDmgBoostBadgeTap(){
+  openDmgBoostInfo();
+}
+
+function openDmgBoostInfo(){
+  const cl = curLevel||0;
+  const isTemp = tempDmgBoost && tempDmgBoost.expiresAtLevel > cl;
+  const isPerm = dmgBoostLevel > 0;
+  const mult   = dmgBoostMultiplier();
+  const btnStyle = 'display:block;width:100%;padding:10px;border-radius:11px;border:none;font-family:Rajdhani,sans-serif;font-weight:700;font-size:14px;cursor:pointer;margin-top:6px;';
+
+  const body    = document.getElementById('dmgboost-info-body');
+  const btnArea = document.getElementById('dmgboost-info-btn-area');
+  const card    = document.getElementById('dmgboost-info-card');
+  if(!card) return;
+
+  card.style.borderTop = (isTemp||isPerm) ? '2px solid #FF6B35' : '2px solid rgba(255,255,255,0.15)';
+
+  if(isTemp){
+    const kalan = tempDmgBoost.expiresAtLevel - cl;
+    body.innerHTML = '<span style="font-size:22px;">💥</span><br>'
+      +'<b style="color:#FF6B35">'+kalan+' Level Kaldı (×2.0)</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">Tüm atışlarda 2 kat hasar.<br>'
+      +(isPerm?'Kalıcı: Sv'+dmgBoostLevel+' ×'+DMG_BOOST_MULT[dmgBoostLevel]+' aktif.':'Kalıcı yükseltme için güçlendirici sekmesini ziyaret et.')+'</span>';
+    btnArea.innerHTML =
+      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">📺 +3 Level Uzat</button>'
+      +'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">🛡️ Güçlendirici Sekmesi</button>';
+  } else if(isPerm){
+    body.innerHTML = '<span style="font-size:22px;">💥</span><br>'
+      +'<b style="color:#FF6B35">Sv'+dmgBoostLevel+' — ×'+DMG_BOOST_MULT[dmgBoostLevel]+' Kalıcı</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">Tüm atışlarda hasar çarpanı aktif.'
+      +(dmgBoostLevel<3?'<br>Sv'+(dmgBoostLevel+1)+' için güçlendirici sekmesine git.':'<br>Maksimum seviyedesin!')+'</span>';
+    btnArea.innerHTML =
+      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">📺 Reklam izle — 3 level ×2.0</button>'
+      +(dmgBoostLevel<3?'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">⬆ Yükselt — Güçlendirici Sekmesi</button>':'');
+  } else {
+    body.innerHTML = '<span style="font-size:22px;">💥</span><br>'
+      +'<b style="color:rgba(255,255,255,0.5)">Hasar Yükseltici</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">Tüm atışlarda hasar çarpanı.<br>'
+      +'Reklam: 3 level ×2.0 geçici.<br>Puan ile kalıcı yükseltme yapabilirsin.</span>';
+    btnArea.innerHTML =
+      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">📺 Reklam izle — 3 level ×2.0</button>'
+      +'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">🛡️ Kalıcı Satın Al</button>';
+  }
+  document.getElementById('dmgboost-info-bg').style.display='block';
+  card.style.display='block';
+}
+
+function closeDmgBoostInfo(){
+  const bg   = document.getElementById('dmgboost-info-bg');
+  const card = document.getElementById('dmgboost-info-card');
+  if(bg)   bg.style.display='none';
+  if(card) card.style.display='none';
+}
+
 function openWindBlockInfo(){
   const cl = curLevel||0;
   const isActive = windBlock && windBlock.expiresAtLevel > cl;
@@ -8606,6 +8781,19 @@ function openTacticalInfo(){
   </div>
   <div id="windblock-info-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;"></div>
   <div id="windblock-info-btn-area"></div>
+</div>
+
+<!-- Hasar Yükseltici Info Kartı -->
+<div id="dmgboost-info-bg" onclick="closeDmgBoostInfo()" style="display:none;position:fixed;inset:0;z-index:800;"></div>
+<div id="dmgboost-info-card" style="display:none;position:fixed;left:12px;top:165px;z-index:801;
+  background:#1a2030;border-radius:16px;padding:16px;width:220px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <span style="color:#fff;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;">💥 Hasar Yükseltici</span>
+    <button onclick="closeDmgBoostInfo()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;line-height:1;">✕</button>
+  </div>
+  <div id="dmgboost-info-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;"></div>
+  <div id="dmgboost-info-btn-area"></div>
 </div>
 
 
