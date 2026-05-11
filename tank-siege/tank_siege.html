@@ -34,7 +34,7 @@ html,body{
 
 /* HUD2 — sadece tank badge + galeri butonu */
 #hud2{
-  position:fixed;top:54px;left:10px;
+  position:fixed;top:54px;left:10px;right:10px;
   display:flex;align-items:center;gap:8px;
   z-index:100;pointer-events:none;
 }
@@ -424,10 +424,9 @@ button:active{opacity:0.75;transform:scale(0.96);}
   </div>
   <button onclick="showLevelMap()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🗺️</button>
   <button id="btn-gallery-open" onclick="openGallery(curLevel)">⚔️ Inventory</button>
-  <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
+  <div style="flex:1;"></div>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
-  <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">❤️ 5</button>
-  <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
+  <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
 </div>
 
 <!-- Mermi slotları — sağ altta eski yerinde -->
@@ -554,8 +553,10 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="boost-badge" onclick="onDmgBoostBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
 </div>
 
-<div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
-  <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;">💨 Calm</div>
+<div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
+  <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;pointer-events:none;">💨 Calm</div>
+  <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
+  <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;align-self:flex-end;margin-top:4px;width:auto;">❤️ 5/5</button>
 </div>
 
 <!-- Kalkan + Bunker — sağa yaslanmış, kalkan üstte bunker altta -->
@@ -665,7 +666,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.65';
+const APP_VERSION      = '1.0.66';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -683,8 +684,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.11 22:54';
-const APP_VERSION_NOTE = 'Can sistemi test 3';
+const APP_VERSION_DATE = '2026.05.11 23:40';
+const APP_VERSION_NOTE = 'Can hud ve tasarim duzenlendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -8535,6 +8536,7 @@ function giveReward(adType){
     case 'windblock':    giveWindBlock(); break;
     case 'guided':       giveGuidedReward(); break;
     case 'dmg_boost':    buyTempDmgBoost(); break;
+    case 'give_life':    giveLifeFromAd(); break;
     case 'sandbox_fire':
       if(typeof window._sbPendingTheme !== 'undefined'){
         sessionThemes.add(window._sbPendingTheme);
@@ -8887,6 +8889,11 @@ function checkDevPass(){
   }
 }
 
+function devAddLives(){
+  lsSet("lives_count","20");
+  if(typeof updateLivesBadge==="function") updateLivesBadge();
+  showToast("❤️ 20 can eklendi!");
+}
 function devAddScore(){
   score+=1000000;
   lsSet('total_score', score);
@@ -9157,6 +9164,12 @@ function openTacticalInfo(){
       background:rgba(255,215,0,0.08);color:#FFD700;font-size:13px;font-weight:700;
       font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
       🏆 +1.000.000 Puan
+    </button>
+    <button onclick="devAddLives()"
+      style="width:100%;padding:9px;border-radius:10px;border:1.5px solid rgba(255,80,80,0.3);
+      background:rgba(255,80,80,0.08);color:#FF5555;font-size:13px;font-weight:700;
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
+      ❤️ +20 Can
     </button>
     <button onclick="devUnlockAllThemes()"
       style="width:100%;padding:9px;border-radius:10px;border:1.5px solid rgba(255,107,53,0.3);
@@ -9824,9 +9837,7 @@ function updateLivesBadge(){
   var badge=document.getElementById("lives-badge");
   if(!badge) return;
   var cur=_livesNow();
-  var h="";
-  for(var i=0;i<MAX_LIVES;i++) h+=i<cur?"❤️":"🤍";
-  badge.textContent=h;
+  badge.textContent="❤️ "+cur+"/"+MAX_LIVES;
   badge.style.borderColor=cur>0?"rgba(255,80,80,0.5)":"rgba(150,150,150,0.4)";
   badge.style.color=cur>0?"#FF5555":"rgba(200,200,200,0.5)";
 }
@@ -9836,6 +9847,12 @@ function openLivesCard(){
   var mins=Math.ceil(ms/60000);
   document.getElementById("lives-card-bg").style.display="block";
   document.getElementById("lives-card").style.display="block";
+  var adBtn=document.getElementById("ad-life-btn");
+  if(adBtn){
+    var cnt=_adLifeCountToday();
+    adBtn.textContent="📺 Reklam izle → +1 Can ("+cnt+"/3)";
+    adBtn.disabled=cnt>=3; adBtn.style.opacity=cnt>=3?"0.4":"1";
+  }
   var h="";
   for(var i=0;i<MAX_LIVES;i++) h+=i<cur?"❤️ ":"🤍 ";
   var el=document.getElementById("lives-card-hearts");
@@ -9844,6 +9861,25 @@ function openLivesCard(){
   if(st) st.textContent=cur+" / "+MAX_LIVES+" can";
   var ti=document.getElementById("lives-card-timer");
   if(ti) ti.textContent=cur<MAX_LIVES?"Sonraki can: "+mins+" dakika":"Canlar dolu!";
+}
+function _adLifeCountToday(){
+  var today=new Date().toDateString();
+  if(lsGet("ad_life_date")!==today){lsSet("ad_life_date",today);lsSet("ad_life_count","0");return 0;}
+  return parseInt(lsGet("ad_life_count")||"0");
+}
+function watchAdForLife(){
+  if(_adLifeCountToday()>=3){showToast("Gunluk 3 reklam limitine ulastiniz!");return;}
+  if(typeof Android!=="undefined") Android.showRewardedAd("give_life");
+  else giveLifeFromAd();
+}
+function giveLifeFromAd(){
+  var cur=_livesNow();
+  if(cur>=MAX_LIVES){showToast("❤️ Canlar zaten dolu!");return;}
+  lsSet("lives_count",String(cur+1));
+  lsSet("ad_life_count",String(_adLifeCountToday()+1));
+  updateLivesBadge();
+  openLivesCard();
+  showToast("❤️ +1 Can kazandin!");
 }
 function closeLivesCard(){
   document.getElementById("lives-card-bg").style.display="none";
@@ -9862,7 +9898,8 @@ setInterval(updateLivesBadge,30000);
     <div id="lives-card-status" style="font-size:14px;color:rgba(255,255,255,0.7);font-family:'Rajdhani',sans-serif;font-weight:700;"></div>
     <div id="lives-card-timer" style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;"></div>
   </div>
-  <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.5;">Her 20 dakikada 1 can dolar.<br>Maksimum 5 can.</div>
+  <button id="ad-life-btn" onclick="watchAdForLife()" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.1);color:#FFD700;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px;">📺 Reklam izle → +1 Can (0/3)</button>
+  <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.5;">Her 20 dakikada 1 can dolar. Maksimum 5 can.<br>Reklam ile gunluk 3 can kazanabilirsin.</div>
 </div>
 
 </body>
