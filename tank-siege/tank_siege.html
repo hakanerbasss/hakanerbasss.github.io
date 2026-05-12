@@ -547,17 +547,19 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 <div id="angle-display">📐 45°</div>
 <div id="boost-wrap" style="position:fixed;top:108px;left:12px;z-index:200;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:auto;">
-  <button id="tactical-badge" onclick="onTacticalBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="windblock-badge" onclick="onWindBlockTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
-  <button id="sandbox-tactic-btn" onclick="onSandboxTacticTap()" style="background:rgba(0,0,0,0.75);border:2px solid rgba(255,107,53,0.5);border-radius:10px;padding:5px 10px;color:#FF6B35;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;">⚔️ Tactic</button>
+  <button id="tactical-badge" onclick="onTacticalBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="boost-badge" onclick="onDmgBoostBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
 </div>
 
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
-  <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;pointer-events:none;">💨 Calm</div>
-  <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;margin-top:6px;" title="Bulut Kayit"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
-  <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;align-self:flex-end;margin-top:6px;width:auto;">❤️ 5/5</button>
-  <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;margin-top:6px;align-self:flex-end;">🛡️</button>
+  <div style="display:flex;flex-direction:row;align-items:center;gap:5px;">
+    <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
+    <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">❤️ 5/5</button>
+    <button id="sandbox-tactic-btn" onclick="onSandboxTacticTap()" style="background:rgba(0,0,0,0.75);border:2px solid rgba(255,107,53,0.5);border-radius:10px;padding:4px 10px;color:#FF6B35;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;">⚔️ Tactic</button>
+    <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;pointer-events:none;">💨 Calm</div>
+  </div>
+  <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;align-self:flex-end;">🛡️</button>
 </div>
 
 <!-- Kalkan + Bunker — sağa yaslanmış, kalkan üstte bunker altta -->
@@ -666,7 +668,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.69';
+const APP_VERSION      = '1.0.70';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -684,8 +686,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.12 09:54';
-const APP_VERSION_NOTE = 'Background daglar oval yapildi.|Hayvanlar agacin arkasina alindi.';
+const APP_VERSION_DATE = '2026.05.12 14:05';
+const APP_VERSION_NOTE = 'Badge duzenlenedi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -8356,7 +8358,7 @@ function updateTacticalBadge(){
     badge.style.color = 'rgba(255,255,255,0.4)';
     badge.style.opacity = '1';
   }
-  badge.style.display = 'block';
+  badge.style.display = 'inline-block';
 }
 
 function adTactical(){
