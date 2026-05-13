@@ -120,6 +120,11 @@ button:active{opacity:0.75;transform:scale(0.96);}
 .gc-btn:active{opacity:0.7;}
 .gtab:active{opacity:0.7;}
 #btn-fire:disabled{opacity:0.4;pointer-events:none;}
+#btn-fire.test-mode{
+  background:linear-gradient(135deg,#00c853,#00e676);
+  box-shadow:0 4px 0 #007a2e,0 5px 20px rgba(0,230,118,0.5);
+}
+#btn-fire.test-mode:active{box-shadow:0 1px 0 #007a2e;}
 
 /* Result overlay */
 #result{
@@ -668,7 +673,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.72';
+const APP_VERSION      = '1.0.73';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -686,8 +691,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.12 15:53';
-const APP_VERSION_NOTE = 'Terrain denenesi geri alindi';
+const APP_VERSION_DATE = '2026.05.13 20:22';
+const APP_VERSION_NOTE = 'Test reklam toogle eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -9095,6 +9100,15 @@ function checkDevPass(){
   if(_vno) _vno.textContent = APP_VERSION;
   if(_vdt) _vdt.textContent = APP_VERSION_DATE;
     document.getElementById('dev-err').style.display='none';
+    // Test modu toggle durumunu Android'den oku
+    try {
+      var tm = Android.getDevTestMode();
+      document.getElementById('dev-test-toggle').checked = tm;
+      document.getElementById('dev-test-label').textContent = tm ? 'ACIK' : 'KAPALI';
+      document.getElementById('dev-test-label').style.color = tm ? '#00e676' : 'rgba(255,255,255,0.4)';
+      var fb = document.getElementById('btn-fire');
+      if(fb){ if(tm){ fb.classList.add('test-mode'); } else { fb.classList.remove('test-mode'); } }
+    } catch(e) {}
   } else {
     document.getElementById('dev-err').style.display='block';
     document.getElementById('dev-pass').value='';
@@ -9106,6 +9120,21 @@ function devAddLives(){
   if(typeof updateLivesBadge==="function") updateLivesBadge();
   showToast("❤️ 20 can eklendi!");
 }
+function devToggleTestAd(enabled){
+  try {
+    Android.setDevTestMode(enabled);
+  } catch(e) {}
+  var fb = document.getElementById('btn-fire');
+  if(fb){ if(enabled){ fb.classList.add('test-mode'); } else { fb.classList.remove('test-mode'); } }
+  var label = document.getElementById('dev-test-label');
+  var track = document.getElementById('dev-test-track');
+  var thumb = document.getElementById('dev-test-thumb');
+  if(label){ label.textContent = enabled ? 'ACIK' : 'KAPALI'; label.style.color = enabled ? '#00e676' : 'rgba(255,255,255,0.4)'; }
+  if(track){ track.style.background = enabled ? 'rgba(0,230,118,0.6)' : 'rgba(255,255,255,0.15)'; }
+  if(thumb){ thumb.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)'; }
+  if(typeof showToast === 'function') showToast(enabled ? 'Test reklamlari ACIK' : 'Test reklamlari KAPALI');
+}
+
 function devAddScore(){
   score+=1000000;
   lsSet('total_score', score);
@@ -9371,6 +9400,27 @@ function openTacticalInfo(){
       font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
       📺 Reklam Sayaçlarını Sıfırla
     </button>
+    <!-- Test Reklam Toggle -->
+    <div style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid rgba(0,230,118,0.3);
+      background:rgba(0,230,118,0.06);margin-bottom:8px;box-sizing:border-box;
+      display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="color:#00e676;font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;">
+          🧪 Test Reklamı
+        </div>
+        <div id="dev-test-label" style="color:rgba(255,255,255,0.4);font-size:10px;font-family:'Rajdhani',sans-serif;">
+          KAPALI
+        </div>
+      </div>
+      <label style="position:relative;display:inline-block;width:44px;height:24px;">
+        <input type="checkbox" id="dev-test-toggle" onchange="devToggleTestAd(this.checked)"
+          style="opacity:0;width:0;height:0;position:absolute;">
+        <span id="dev-test-track" style="position:absolute;cursor:pointer;inset:0;
+          background:rgba(255,255,255,0.15);border-radius:24px;transition:background 0.2s;"></span>
+        <span id="dev-test-thumb" style="position:absolute;content:'';height:18px;width:18px;
+          left:3px;bottom:3px;background:#fff;border-radius:50%;transition:transform 0.2s;"></span>
+      </label>
+    </div>
     <button onclick="devAddScore()"
       style="width:100%;padding:9px;border-radius:10px;border:1.5px solid rgba(255,215,0,0.3);
       background:rgba(255,215,0,0.08);color:#FFD700;font-size:13px;font-weight:700;
