@@ -673,7 +673,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.75';
+const APP_VERSION      = '1.0.76';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -691,8 +691,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.13 21:30';
-const APP_VERSION_NOTE = 'Play gamea heaap degiatirme eklendi';
+const APP_VERSION_DATE = '2026.05.14 06:40';
+const APP_VERSION_NOTE = 'Triple muhimmat erken patlama sorunu cozuldu. Artik ortadaki patlasa bile yanlardaki muhimmatlar harekete devam ediyor';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -3003,8 +3003,9 @@ function update(){
   updateAnimals();
   if(missiles.length > 0 || _missileQueue.length > 0) updateMissiles();
 
-  if(phase!=='flying') return;
-  // Ana bullet yoksa ama extra varsa devam et
+  // extraBullets (triple/split parçaları) phase'den bağımsız işlenmeli —
+  // ortadaki bullet çarptıktan sonra phase 'aim' olsa bile yan mermiler uçmaya devam eder.
+  if(phase!=='flying' && extraBullets.length===0) return;
 
   // Ana bullet fiziği
   if(bullet){
@@ -3268,9 +3269,16 @@ function update(){
   });
 
   // Tüm mermiler bitti mi?
-  if(phase==='flying' && !bullet && extraBullets.length===0){
-    if(shotsLeft<=0 && targetHP>0) setTimeout(()=>onFail(),600);
-    else { phase='aim'; document.getElementById('btn-fire').disabled=false; updateUI(); }
+  // Not: ortadaki bullet erken patlarsa phase='aim' yapılmış olabilir ama
+  // extraBullets hâlâ uçuyordu. Onlar da bitince fire button'ı aç.
+  if(!bullet && extraBullets.length===0){
+    if(phase==='flying'){
+      if(shotsLeft<=0 && targetHP>0) setTimeout(()=>onFail(),600);
+      else { phase='aim'; document.getElementById('btn-fire').disabled=false; updateUI(); }
+    } else if(phase==='aim'){
+      // Ortadaki erken pattı, phase zaten 'aim' yapıldı — sadece fire butonu aktif et
+      document.getElementById('btn-fire').disabled=false; updateUI();
+    }
   }
 }
 
@@ -3305,7 +3313,7 @@ function draw(){
   drawTarget();
 
   // Bullet
-  if(bullet) drawBullet();
+  if(bullet || extraBullets.length > 0) drawBullet();
 
   // Bunker blast sprite
   drawBunkerBlast();
@@ -4159,8 +4167,8 @@ function drawBunkerBlast(){
 function drawBullet(){
   // Ana mermi
   if(bullet){
-    // Bunker Buster terrain içindeyse çizme
-    if(bullet.underground) return;
+    // Bunker Buster terrain içindeyse çizme — ama extraBullets çizimi devam etmeli
+    if(!bullet.underground){
     const ad = AMMO_DEF[bullet.ammoType||selectedAmmo]||AMMO_DEF.normal;
     bullet.trail.forEach((t,i)=>{
       const sz=2+i*0.25;
@@ -4210,7 +4218,8 @@ function drawBullet(){
       ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fill();
       ctx.restore();
     }
-  }
+    } // end if(!bullet.underground)
+  } // end if(bullet)
 
   // Extra mermiler (triple/split parçaları) — aynı görsel stilte
   extraBullets.forEach(eb=>{
@@ -4983,7 +4992,7 @@ function _checkCounterAttackTrigger(bx, by){
 }
 
 function onTerrainHit(){
-  extraBullets = [];
+  // extraBullets temizlenmiyor — triple/split yan mermileri hâlâ uçuyor olabilir
   SFX.terrainHit();
 
   // ── Yakın ıskalama splash hasarı ────────────────────────────────────────
