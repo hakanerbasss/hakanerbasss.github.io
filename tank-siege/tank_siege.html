@@ -673,7 +673,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.78';
+const APP_VERSION      = '1.0.79';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -691,8 +691,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.14 07:19';
-const APP_VERSION_NOTE = 'reklam ayarkari eklendi';
+const APP_VERSION_DATE = '2026.05.14 21:56';
+const APP_VERSION_NOTE = 'Kar temasi duzeltildi ve tum temalarda arka plan guncellendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -736,9 +736,9 @@ const THEMES = {
     name:'Frozen Peaks', emoji:'❄️',
     sky:['#050e1f','#0d1b3e','#1a2a5e'],
     skyMid:['#0d1830','#1a2a4e','#2a3a6e'],
-    terrainColors:['#E8F4FF','#B8D0E8','#7090B0','#506070','#304050'],
-    groundColor:['#7090B0','#304050'],
-    edgeColor:'rgba(100,140,180,0.95)',
+    terrainColors:['#A0BCDA','#7898B8','#506888','#344E68','#1E3048'],
+    groundColor:['#506888','#1E3048'],
+    edgeColor:'rgba(160,200,230,0.85)',
     bgMtnColor:['#2A4060','#1A2A40'],
     hasRiver:true, hasSnow:true, hasSand:false, hasSnowFall:true,
     treeColor:'#1a4a1a', treeStyle:'pine',
@@ -1515,26 +1515,35 @@ function drawTerrainOn(c){
   c.closePath();
   c.fill();
 
-  // Snow cap overlay
+  // Snow cap overlay — sadece terrain yüzeyini kapla, taban doldurma
   if(th.hasSnow){
-    const snowLevel=H*0.52;
-    c.fillStyle='rgba(255,255,255,0.85)';
+    // Kar kaplamasi: terrain yuzeyini takip eder, sert kesim yok
+    // Yalnizca terrain ustu boyanir — snowLevel esiginin altinda kar olmaz
+    c.save();
+    // Terrain'i clip olarak kullan — sadece terrain icinde kar ciz
     c.beginPath();
-    c.moveTo(0,H);
-    for(let x=0;x<W;x++){
-      const ty2=terrain[x];
-      c.lineTo(x, ty2<snowLevel ? ty2 : snowLevel);
-    }
-    c.lineTo(W,H);
+    c.moveTo(0, H);
+    for(let x=0;x<W;x++) c.lineTo(x, terrain[x]);
+    c.lineTo(W, H);
     c.closePath();
-    c.fill();
-    // Snow edge soft
-    c.strokeStyle='rgba(255,255,255,0.5)';
+    c.clip();
+
+    // Kar gradient: tepe noktasinda opak, asagi dogru seffaf — cizgi yok
+    const snowGrad = c.createLinearGradient(0, H*0.25, 0, H*0.65);
+    snowGrad.addColorStop(0.0, 'rgba(215,232,248,0.90)');
+    snowGrad.addColorStop(0.45,'rgba(200,220,240,0.75)');
+    snowGrad.addColorStop(1.0, 'rgba(160,185,210,0.0)');
+    c.fillStyle = snowGrad;
+    c.fillRect(0, 0, W, H);
+
+    c.restore();
+
+    // Terrain ustu ince beyaz cizgi — sadece terrain kenarinda
+    c.strokeStyle='rgba(255,255,255,0.55)';
     c.lineWidth=2;
     c.beginPath();
     for(let x=0;x<W;x++){
-      const ty2=terrain[x];
-      x===0?c.moveTo(x,ty2):c.lineTo(x,ty2);
+      x===0?c.moveTo(x,terrain[x]):c.lineTo(x,terrain[x]);
     }
     c.stroke();
   }
@@ -3481,40 +3490,215 @@ function drawCloudsOn(c){
   });
 }
 
-function drawBgMountains(){
-  const th=currentTheme||THEMES.valley;
-  const mc=th.bgMtnColor;
-  ctx.save();
-  ctx.globalAlpha=0.22;
-  const mg=ctx.createLinearGradient(0,H*0.28,0,H*0.72);
-  mg.addColorStop(0,mc[0]);mg.addColorStop(1,mc[1]);
-  ctx.fillStyle=mg;
-  // Far range — yumusak tepeler
-  const mpts=[0,0.08,0.16,0.25,0.34,0.42,0.52,0.60,0.70,0.80,0.90,1.0];
+// ── Dağ profili çizici: noktalar arası catmull-rom benzeri yumuşak eğri ─────
+function _drawMtnLayer(pts, botY, fillStyle, alpha){
+  if(!pts.length) return;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle   = fillStyle;
   ctx.beginPath();
-  ctx.moveTo(0, H*0.72);
-  for(var mi=0; mi<mpts.length-1; mi++){
-    var x1=mpts[mi]*W, x2=mpts[mi+1]*W;
-    var y1=mi%2===0?H*0.72:H*(0.30+Math.sin(mi*1.3)*0.06);
-    var y2=(mi+1)%2===0?H*0.72:H*(0.30+Math.sin((mi+1)*1.3)*0.06);
-    var cpx=(x1+x2)/2;
-    var cpy=Math.min(y1,y2)-H*0.02;
-    ctx.quadraticCurveTo(cpx, cpy, x2, y2);
+  ctx.moveTo(0, botY);
+  ctx.lineTo(pts[0].x, botY);
+  for(let i=0; i<pts.length; i++){
+    const p  = pts[i];
+    const pn = pts[i+1] || {x: W, y: botY};
+    const pp = pts[i-1] || {x: 0, y: botY};
+    // Kontrol noktaları: komşu noktaya doğru 1/3 mesafe
+    const cp1x = p.x  + (pn.x - pp.x)*0.20;
+    const cp1y = p.y  + (pn.y - pp.y)*0.20;
+    const cp2x = pn.x - (pn.x - pp.x)*0.20;
+    const cp2y = pn.y - (pn.y - pp.y)*0.20;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pn.x, pn.y);
   }
-  ctx.lineTo(W,H*0.72);ctx.lineTo(0,H*0.72);
-  ctx.closePath();ctx.fill();
-  // Snow on bg mountains
+  ctx.lineTo(W, botY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ── Dağ tepesine kar/buz vurgusu ─────────────────────────────────────────────
+function _drawSnowCaps(pts, capH, alpha){
+  ctx.globalAlpha = alpha;
+  pts.forEach(p=>{
+    if(p.isPeak){
+      const rx = p.capRx || W*0.045;
+      const ry = capH;
+      const g  = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y+ry, rx*1.8);
+      g.addColorStop(0,   'rgba(230,242,255,0.95)');
+      g.addColorStop(0.5, 'rgba(200,225,245,0.60)');
+      g.addColorStop(1,   'rgba(180,210,235,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + ry*0.4, rx, ry*1.2, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  });
+}
+
+function drawBgMountains(){
+  const th = currentTheme || THEMES.valley;
+  ctx.save();
+
   if(th.hasSnow){
-    ctx.fillStyle='rgba(255,255,255,0.4)';
-    ctx.beginPath();
-    mpts.forEach((fx,i)=>{
-      const fy=i%2===0?H*0.72:H*(0.30+Math.sin(i*1.3)*0.06);
-      const snowY=fy+(i%2===0?0:-H*0.04);
-      i===0?ctx.moveTo(fx*W,snowY):ctx.lineTo(fx*W,snowY);
-    });
-    ctx.lineTo(W,H*0.45);ctx.lineTo(0,H*0.45);
-    ctx.closePath();ctx.fill();
+    // ═══════════════════════════════════════════════════════════════
+    // KAR TEMASI — 4 katmanlı paralaks dağ sistemi
+    // Katman 1: en uzak, en soluk, çok geniş yuvarlak tepeler
+    // Katman 2: orta mesafe, karışık sivri+yuvarlak
+    // Katman 3: yakın, daha koyu, geniş kütleler
+    // Katman 4: ön plan, en koyu, terrain'e yakın
+    // ═══════════════════════════════════════════════════════════════
+    const bot = H * 0.735;
+
+    // ── KATMAN 1: En uzak — geniş, soluk, yüksek tepeler ─────────
+    const L1 = [
+      {x:W*0.00, y:bot,        isPeak:false},
+      {x:W*0.07, y:H*0.52,     isPeak:true,  capRx:W*0.038},
+      {x:W*0.15, y:H*0.44,     isPeak:true,  capRx:W*0.050},
+      {x:W*0.23, y:H*0.38,     isPeak:true,  capRx:W*0.058},
+      {x:W*0.30, y:H*0.48,     isPeak:false},
+      {x:W*0.38, y:H*0.33,     isPeak:true,  capRx:W*0.065},
+      {x:W*0.46, y:H*0.41,     isPeak:false},
+      {x:W*0.54, y:H*0.35,     isPeak:true,  capRx:W*0.062},
+      {x:W*0.61, y:H*0.45,     isPeak:false},
+      {x:W*0.69, y:H*0.30,     isPeak:true,  capRx:W*0.070},
+      {x:W*0.77, y:H*0.42,     isPeak:false},
+      {x:W*0.84, y:H*0.36,     isPeak:true,  capRx:W*0.058},
+      {x:W*0.91, y:H*0.47,     isPeak:false},
+      {x:W*0.97, y:H*0.40,     isPeak:true,  capRx:W*0.045},
+      {x:W*1.00, y:bot,        isPeak:false},
+    ];
+    const gL1 = ctx.createLinearGradient(0,H*0.28,0,bot);
+    gL1.addColorStop(0, '#182438'); gL1.addColorStop(1, '#101828');
+    _drawMtnLayer(L1, bot, gL1, 0.38);
+    _drawSnowCaps(L1, H*0.028, 0.55);
+
+    // ── KATMAN 2: Orta uzak — karışık yükseklik, biraz daha koyu ─
+    const L2 = [
+      {x:W*0.00, y:bot,        isPeak:false},
+      {x:W*0.05, y:H*0.56,     isPeak:false},
+      {x:W*0.11, y:H*0.47,     isPeak:true,  capRx:W*0.042},
+      {x:W*0.18, y:H*0.55,     isPeak:false},
+      {x:W*0.25, y:H*0.42,     isPeak:true,  capRx:W*0.055},
+      {x:W*0.32, y:H*0.50,     isPeak:false},
+      {x:W*0.39, y:H*0.38,     isPeak:true,  capRx:W*0.060},
+      {x:W*0.44, y:H*0.53,     isPeak:false},
+      {x:W*0.50, y:H*0.44,     isPeak:true,  capRx:W*0.048},
+      {x:W*0.56, y:H*0.57,     isPeak:false},
+      {x:W*0.63, y:H*0.40,     isPeak:true,  capRx:W*0.055},
+      {x:W*0.70, y:H*0.55,     isPeak:false},
+      {x:W*0.76, y:H*0.46,     isPeak:true,  capRx:W*0.050},
+      {x:W*0.82, y:H*0.52,     isPeak:false},
+      {x:W*0.89, y:H*0.43,     isPeak:true,  capRx:W*0.045},
+      {x:W*0.95, y:H*0.55,     isPeak:false},
+      {x:W*1.00, y:bot,        isPeak:false},
+    ];
+    const gL2 = ctx.createLinearGradient(0,H*0.33,0,bot);
+    gL2.addColorStop(0, '#1E3050'); gL2.addColorStop(1, '#141E30');
+    _drawMtnLayer(L2, bot, gL2, 0.48);
+    _drawSnowCaps(L2, H*0.024, 0.65);
+
+    // ── KATMAN 3: Orta yakın — daha geniş kütleler, farklı ritim ─
+    const L3 = [
+      {x:W*0.00, y:bot,        isPeak:false},
+      {x:W*0.06, y:H*0.60,     isPeak:false},
+      {x:W*0.14, y:H*0.50,     isPeak:true,  capRx:W*0.038},
+      {x:W*0.20, y:H*0.63,     isPeak:false},
+      {x:W*0.28, y:H*0.52,     isPeak:true,  capRx:W*0.048},
+      {x:W*0.35, y:H*0.60,     isPeak:false},
+      {x:W*0.43, y:H*0.48,     isPeak:true,  capRx:W*0.055},
+      {x:W*0.50, y:H*0.65,     isPeak:false},
+      {x:W*0.57, y:H*0.54,     isPeak:true,  capRx:W*0.045},
+      {x:W*0.63, y:H*0.62,     isPeak:false},
+      {x:W*0.70, y:H*0.50,     isPeak:true,  capRx:W*0.052},
+      {x:W*0.77, y:H*0.64,     isPeak:false},
+      {x:W*0.84, y:H*0.55,     isPeak:true,  capRx:W*0.042},
+      {x:W*0.91, y:H*0.61,     isPeak:false},
+      {x:W*0.97, y:H*0.57,     isPeak:false},
+      {x:W*1.00, y:bot,        isPeak:false},
+    ];
+    const gL3 = ctx.createLinearGradient(0,H*0.38,0,bot);
+    gL3.addColorStop(0, '#263C58'); gL3.addColorStop(1, '#18283A');
+    _drawMtnLayer(L3, bot, gL3, 0.55);
+    _drawSnowCaps(L3, H*0.020, 0.70);
+
+    // ── KATMAN 4: En yakın ön plan — koyu, terrain'e zemin hazırlar
+    const L4 = [
+      {x:W*0.00, y:bot,        isPeak:false},
+      {x:W*0.08, y:H*0.64,     isPeak:false},
+      {x:W*0.17, y:H*0.60,     isPeak:true,  capRx:W*0.030},
+      {x:W*0.26, y:H*0.68,     isPeak:false},
+      {x:W*0.35, y:H*0.62,     isPeak:true,  capRx:W*0.035},
+      {x:W*0.44, y:H*0.70,     isPeak:false},
+      {x:W*0.53, y:H*0.63,     isPeak:true,  capRx:W*0.032},
+      {x:W*0.62, y:H*0.69,     isPeak:false},
+      {x:W*0.71, y:H*0.61,     isPeak:true,  capRx:W*0.035},
+      {x:W*0.80, y:H*0.67,     isPeak:false},
+      {x:W*0.89, y:H*0.64,     isPeak:false},
+      {x:W*1.00, y:bot,        isPeak:false},
+    ];
+    const gL4 = ctx.createLinearGradient(0,H*0.44,0,bot);
+    gL4.addColorStop(0, '#304860'); gL4.addColorStop(1, '#1C2E42');
+    _drawMtnLayer(L4, bot, gL4, 0.60);
+    _drawSnowCaps(L4, H*0.015, 0.60);
+
+    // ── Ufuk sisi: katmanlar arasi yumusak gecis ─────────────────
+    const fogG = ctx.createLinearGradient(0, H*0.55, 0, bot);
+    fogG.addColorStop(0, 'rgba(16,24,40,0)');
+    fogG.addColorStop(1, 'rgba(16,24,40,0.35)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle   = fogG;
+    ctx.fillRect(0, H*0.55, W, bot - H*0.55);
+
+  } else {
+    // ═══════════════════════════════════════════════════════════════
+    // DİĞER TEMALAR — 3 katmanlı sistem
+    // ═══════════════════════════════════════════════════════════════
+    const mc   = th.bgMtnColor;
+    const bot2 = H * 0.735;
+
+    // Tema renginden 3 ton türet: açık→orta→koyu
+    function hexToRgb(h){
+      const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
+      return [r,g,b];
+    }
+    function blendCol(a,b,t){
+      const ra=hexToRgb(a),rb=hexToRgb(b);
+      return `rgb(${Math.round(ra[0]+(rb[0]-ra[0])*t)},${Math.round(ra[1]+(rb[1]-ra[1])*t)},${Math.round(ra[2]+(rb[2]-ra[2])*t)})`;
+    }
+    const c0=mc[0], c1=mc[1];
+
+    // Katman A — en uzak, soluk
+    const LA=[
+      {x:W*0.00,y:bot2},{x:W*0.10,y:H*0.46},{x:W*0.22,y:H*0.38},
+      {x:W*0.35,y:H*0.44},{x:W*0.47,y:H*0.34},{x:W*0.58,y:H*0.42},
+      {x:W*0.70,y:H*0.36},{x:W*0.82,y:H*0.44},{x:W*0.92,y:H*0.40},
+      {x:W*1.00,y:bot2},
+    ];
+    const gA=ctx.createLinearGradient(0,H*0.28,0,bot2);
+    gA.addColorStop(0,c0); gA.addColorStop(1,c1);
+    _drawMtnLayer(LA, bot2, gA, 0.18);
+
+    // Katman B — orta
+    const LB=[
+      {x:W*0.00,y:bot2},{x:W*0.08,y:H*0.55},{x:W*0.18,y:H*0.46},
+      {x:W*0.27,y:H*0.52},{x:W*0.37,y:H*0.42},{x:W*0.47,y:H*0.50},
+      {x:W*0.56,y:H*0.44},{x:W*0.65,y:H*0.52},{x:W*0.74,y:H*0.46},
+      {x:W*0.83,y:H*0.54},{x:W*0.92,y:H*0.48},{x:W*1.00,y:bot2},
+    ];
+    const gB=ctx.createLinearGradient(0,H*0.34,0,bot2);
+    gB.addColorStop(0,blendCol(c0,c1,0.35)); gB.addColorStop(1,c1);
+    _drawMtnLayer(LB, bot2, gB, 0.24);
+
+    // Katman C — en yakın, en koyu
+    const LC=[
+      {x:W*0.00,y:bot2},{x:W*0.09,y:H*0.60},{x:W*0.19,y:H*0.54},
+      {x:W*0.30,y:H*0.60},{x:W*0.40,y:H*0.54},{x:W*0.50,y:H*0.62},
+      {x:W*0.60,y:H*0.56},{x:W*0.70,y:H*0.62},{x:W*0.80,y:H*0.56},
+      {x:W*0.90,y:H*0.62},{x:W*1.00,y:bot2},
+    ];
+    const gC=ctx.createLinearGradient(0,H*0.40,0,bot2);
+    gC.addColorStop(0,blendCol(c0,c1,0.6)); gC.addColorStop(1,c1);
+    _drawMtnLayer(LC, bot2, gC, 0.28);
   }
+
   ctx.restore();
 }
 
