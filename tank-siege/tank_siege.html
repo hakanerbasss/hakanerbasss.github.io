@@ -673,7 +673,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.80';
+const APP_VERSION      = '1.0.81';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -691,8 +691,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.16 19:24';
-const APP_VERSION_NOTE = 'Piercer sesi değişti';
+const APP_VERSION_DATE = '2026.05.17 23:37';
+const APP_VERSION_NOTE = 'Nuclear explosion patlama efekti degisikligi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1085,11 +1085,20 @@ const EXP_FRAMES = 8;
 const EXP_FRAME_W = 128;
 const EXP_FRAME_H = 128;
 const expImg = new Image();
+// Nuclear explosion sprite
+const EXP_NUC_FRAMES = 9;
+const EXP_NUC_FRAME_W = 256;
+const EXP_NUC_FRAME_H = 256;
+const expNuclearImg = new Image();
 const _IMG_DIR = (typeof Android !== 'undefined') ? 'https://appassets.androidplatform.net/assets/' : '';
 expImg.src = _IMG_DIR + 'explosion1.png';
 let _expImgReady = false;
 expImg.onload = ()=>{ _expImgReady = true; };
 expImg.onerror = ()=>{ _expImgReady = false; };
+expNuclearImg.src = _IMG_DIR + 'explosion_nuclear.png';
+let _expNuclearImgReady = false;
+expNuclearImg.onload = ()=>{ _expNuclearImgReady = true; };
+expNuclearImg.onerror = ()=>{ _expNuclearImgReady = false; };
 
 // Ammo config
 const AMMO_DEF = {
@@ -2985,7 +2994,8 @@ function update(){
       e.timer = 0;
       e.frame++;
     }
-    return e.frame < EXP_FRAMES;
+    const maxFrames = e.type==='nuclear' ? EXP_NUC_FRAMES : EXP_FRAMES;
+    return e.frame < maxFrames;
   });
 
   // Update particles - ALWAYS, regardless of phase
@@ -3268,7 +3278,8 @@ function update(){
         const dmg3=Math.round(ad3.damage*(eb.damageScale||1)*res3*ammoBonusMult3*tankBonusMult3*dmgBoostMultiplier());
         applyBuriedDamage(dmg3);
         spawnImpact(eb.x,eb.y,'target');
-        spawnExplosionSprite(eb.x,eb.y,0.8);
+        const _nucType = (eb.ammoType||selectedAmmo)==='nuclear'?'nuclear':'normal';
+        spawnExplosionSprite(eb.x,eb.y, _nucType==='nuclear'?2.0:0.8, _nucType);
         SFX.explosion(eb.ammoType||selectedAmmo);
         updateUI();
         if(targetHP<=0){spawnDestruction();setTimeout(()=>onWin(),2200);}
@@ -4538,34 +4549,30 @@ function drawParticles(){
   });
 
   // Draw sprite sheet explosions
-  if(_expImgReady){
-    explosions.forEach(e=>{
-      const alpha = e.frame < EXP_FRAMES-2 ? 1 : 1-(e.frame-(EXP_FRAMES-2))/2;
+  explosions.forEach(e=>{
+    const isNuc = e.type==='nuclear';
+    const img     = isNuc ? expNuclearImg     : expImg;
+    const ready   = isNuc ? _expNuclearImgReady : _expImgReady;
+    const fW      = isNuc ? EXP_NUC_FRAME_W  : EXP_FRAME_W;
+    const fH      = isNuc ? EXP_NUC_FRAME_H  : EXP_FRAME_H;
+    const fMax    = isNuc ? EXP_NUC_FRAMES   : EXP_FRAMES;
+    const alpha   = e.frame < fMax-2 ? 1 : 1-(e.frame-(fMax-2))/2;
+    const size    = fH * e.scale;
+    if(ready){
       ctx.globalAlpha = Math.max(0, alpha);
-      const size = EXP_FRAME_H * e.scale;
-      ctx.drawImage(
-        expImg,
-        e.frame * EXP_FRAME_W, 0,
-        EXP_FRAME_W, EXP_FRAME_H,
-        e.x - size/2, e.y - size/2,
-        size, size
-      );
-    });
-  } else {
-    // Fallback — PNG yüklenemedi, canvas ile basit patlama
-    explosions.forEach(e=>{
-      const alpha = e.frame < EXP_FRAMES-2 ? 1 : 1-(e.frame-(EXP_FRAMES-2))/2;
-      const size = EXP_FRAME_H * e.scale * (e.frame/EXP_FRAMES);
-      const g = ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,size/2);
-      g.addColorStop(0,'rgba(255,255,200,'+Math.max(0,alpha)+')');
+      ctx.drawImage(img, e.frame*fW, 0, fW, fH, e.x-size/2, e.y-size/2, size, size);
+    } else {
+      const sz2 = fH * e.scale * (e.frame/fMax);
+      const gc  = isNuc ? '118,255,3' : '255,255,200';
+      const g   = ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,sz2/2);
+      g.addColorStop(0,'rgba('+gc+','+Math.max(0,alpha)+')');
       g.addColorStop(0.3,'rgba(255,150,0,'+Math.max(0,alpha*0.8)+')');
       g.addColorStop(0.7,'rgba(200,50,0,'+Math.max(0,alpha*0.5)+')');
       g.addColorStop(1,'rgba(80,80,80,0)');
-      ctx.globalAlpha=1;
-      ctx.fillStyle=g;
-      ctx.beginPath();ctx.arc(e.x,e.y,size/2,0,Math.PI*2);ctx.fill();
-    });
-  }
+      ctx.globalAlpha=1; ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(e.x,e.y,sz2/2,0,Math.PI*2);ctx.fill();
+    }
+  });
 
   ctx.globalAlpha=1;
   if(screenShake>0) ctx.restore();
@@ -5344,7 +5351,7 @@ function onTargetHit(){
 // ═══════════════════════════════════════
 // PARTICLES
 // ═══════════════════════════════════════
-function spawnExplosionSprite(x, y, scale=1.0){
+function spawnExplosionSprite(x, y, scale=1.0, type='normal'){
   explosions.push({
     x, y,
     frame: 0,
@@ -5352,6 +5359,7 @@ function spawnExplosionSprite(x, y, scale=1.0){
     timer: 0,
     frameRate: 3, // advance frame every N game frames
     done: false,
+    type,
   });
 }
 
