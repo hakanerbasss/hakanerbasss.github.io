@@ -741,7 +741,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.94';
+const APP_VERSION      = '1.0.95';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -759,8 +759,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 12:56';
-const APP_VERSION_NOTE = 'Titan tank atis efekti degisti';
+const APP_VERSION_DATE = '2026.05.18 13:13';
+const APP_VERSION_NOTE = 'Badge reklam izleme ve yanlis artirma sorunu giderildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -8860,7 +8860,7 @@ function adWindBlock(){
 
 function giveWindBlock(){
   SFX.windblockActivate();
-  const cl=(typeof pendingLevelIdx!=='undefined'&&pendingLevelIdx>0)?pendingLevelIdx:((typeof curLevel!=='undefined'&&curLevel>=0)?curLevel:0);
+  const cl=(typeof curLevel!=='undefined'&&curLevel>=0)?curLevel:0;
   if(!lv || lv.wind===0){ showToast('💨 Bu levelde rüzgar yok, hak geri eklendi!'); return; }
   windBlock={expiresAtLevel:cl+3};
   wind=0;
@@ -8875,7 +8875,7 @@ function giveWindBlock(){
 
 function giveTactical(){
   SFX.tacticalActivate();
-  const cl = (typeof pendingLevelIdx!=='undefined'&&pendingLevelIdx>0) ? pendingLevelIdx : ((typeof curLevel!=='undefined'&&curLevel>=0)?curLevel:0);
+  const cl = (typeof curLevel!=='undefined'&&curLevel>=0) ? curLevel : 0;
   if(lv && lv.showPath){ showToast('🎯 Rota zaten görünüyor, hak geri eklendi!'); return; }
   tempTactical = {expiresAtLevel: cl + 3};
   lsSet('temp_tactical', JSON.stringify(tempTactical));
