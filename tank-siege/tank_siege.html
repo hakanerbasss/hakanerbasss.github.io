@@ -715,7 +715,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.86';
+const APP_VERSION      = '1.0.87';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -733,8 +733,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 10:07';
-const APP_VERSION_NOTE = 'Tema kartlari duzenlendi';
+const APP_VERSION_DATE = '2026.05.18 10:38';
+const APP_VERSION_NOTE = 'Tema degistirildi emoji sorunu giderildi fix 2';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -8101,11 +8101,11 @@ function renderLevelMap(){
 
   var _lmThemes = ['valley','desert','snow','forest','rocky','meadow','volcano','nightcity','tropical','skyislands','cloudy','rainy','snowyweather'];
   var _lmNames = {
-    valley:'\U0001f33f Green Valley', desert:'\U0001f3dc\ufe0f Desert', snow:'\u2744\ufe0f Snowy Mtn',
-    forest:'\U0001f332 Forest', rocky:'\U0001fab8 Rocky', meadow:'\U0001f305 Meadow',
-    volcano:'\U0001f30b Volcano', nightcity:'\U0001f319 Night City', tropical:'\U0001f3d6\ufe0f Tropical',
-    skyislands:'\u2601\ufe0f Sky Islands', cloudy:'\u26c5 Cloudy',
-    rainy:'\U0001f327\ufe0f Storm', snowyweather:'\U0001f328\ufe0f Snowstorm'
+    valley:'Green Valley', desert:'Desert', snow:'Snowy Mtn',
+    forest:'Forest', rocky:'Rocky', meadow:'Meadow',
+    volcano:'Volcano', nightcity:'Night City', tropical:'Tropical',
+    skyislands:'Sky Islands', cloudy:'Cloudy',
+    rainy:'Storm', snowyweather:'Snowstorm'
   };
   var _lmEmojis = {
     valley:'🌳', desert:'🌞', snow:'🏔', forest:'🌲',
@@ -8227,11 +8227,11 @@ function renderLevelMap(){
     _tc.id = 'lm-tcard-'+ti;
     _tc.style.background = 'linear-gradient(145deg,'+_tCol+'ee,'+_tCol+'88)';
     _tc.innerHTML =
-      '<div class="lm-tcard-emoji">'+(_lmEmojis[theme]||'\U0001f30d')+'</div>'
+      '<div class="lm-tcard-emoji">'+(_lmEmojis[theme]||'🌍')+'</div>'
       +'<div class="lm-tcard-name">'+(_lmShort[theme]||theme)+'</div>'
       +(_isUnlocked
-        ? '<div class="lm-tcard-stars">\u2b50 '+_tStars+'/30</div>'
-        : '<div class="lm-tcard-lock">\U0001f512</div>');
+        ? '<div class="lm-tcard-stars">⭐ '+_tStars+'/30</div>'
+        : '<div class="lm-tcard-lock">🔒</div>');
 
     (function(_c, _ti){
       _c.ontouchstart = function(){ _c.style.opacity='0.7'; };
