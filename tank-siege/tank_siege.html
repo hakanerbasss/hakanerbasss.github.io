@@ -715,7 +715,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.87';
+const APP_VERSION      = '1.0.88';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -733,8 +733,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 10:38';
-const APP_VERSION_NOTE = 'Tema degistirildi emoji sorunu giderildi fix 2';
+const APP_VERSION_DATE = '2026.05.18 10:45';
+const APP_VERSION_NOTE = 'muhimmat grafik yazilari duzeltildi. Gerekli, atış vs yazilar';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -4806,7 +4806,7 @@ function openTankCard(){
     _tStatRow('Menzil',menzilVal,'#FF6B35','⚡'+td.maxPower)+
     _tStatRow('Rüzgar',ruzgarVal,'#00C9B1',Math.round(ruzgarVal*100)+'%')+
     _tStatRow('Bonus',Math.min(1,tBonNow/100),'#FFD700','+'+tBonNow+'%')+
-    `<div style="margin-top:5px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;">
+    `<div style="margin-top:5px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
       ${targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${targetHPt.toLocaleString()} HP</b> karargah</div>`:''}
       <div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${dmgT.toLocaleString()}</b> (${amDef.name})${dmgTNext?` → <b style="color:#00E676">${dmgTNext.toLocaleString()}</b>`:''}</div>
       <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${shotsTColor}">${shotsT} atış</b> gerekli${shotsTNext&&shotsTNext<Number(shotsT)?` → <b style="color:#00E676">${shotsTNext}</b>`:''}</div>
@@ -5020,7 +5020,7 @@ function openSlotCard(idx){
     _sRow('Hasar',st.dmg,'#FF6B35',dmgBase)+
     _sRow('Zırh',st.pen,'#FFD700','x'+def.apPen)+
     _sRow('Alan',st.alan,'#00C9B1',def.radius+'px')+
-    `<div style="margin-top:5px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;">
+    `<div style="margin-top:5px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
       ${targetHPnow?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${targetHPnow.toLocaleString()} HP</b> karargah</div>`:''}
       <div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${dmgNow.toLocaleString()}</b>${uLvl>0?` <span style="color:rgba(255,255,255,0.3);font-size:10px;">(Sv${uLvl})</span>`:''}${dmgNext?` → <b style="color:#00E676">${dmgNext.toLocaleString()}</b> <span style="color:rgba(255,255,255,0.3);font-size:10px;">+1sv</span>`:uLvl>=UPGRADE_MAX?' <span style="color:#FFD700;font-size:10px;">MAX</span>':''}</div>
       <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${shotsColor}">${shots} atış</b> gerekli${shotsNext&&shotsNext<Number(shots)?` → <b style="color:#00E676">${shotsNext}</b>`:''}</div>
@@ -6255,7 +6255,7 @@ function renderAmmoGallery(cont){
       ${_statRow('Hasar',st.dmg,'#FF6B35', _dmgBase)}
       ${_statRow('Zırh',st.pen,'#FFD700', 'x'+def.apPen)}
       ${_statRow('Alan',st.alan,'#00C9B1', def.radius+'px')}
-      <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;">
+      <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
         ${_targetHPnow?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${_targetHPnow.toLocaleString()} HP</b> karargah</div>`:''}
         ${(status==='owned'||status==='temp')?`<div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${_dmgNow.toLocaleString()}</b>${_uLvl>0?` <span style="color:rgba(255,255,255,0.3);font-size:10px;">(Sv${_uLvl})</span>`:''}${_dmgNext?` → <b style="color:#00E676">${_dmgNext.toLocaleString()}</b>`:' <span style="color:#FFD700;font-size:10px;">MAX</span>'}</div>
         <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${_shotsColor}">${_shots} atış</b> gerekli${_shotsNext&&_shotsNext<Number(_shots)?` → <b style="color:#00E676">${_shotsNext}</b>`:''}</div>`
@@ -6344,7 +6344,7 @@ function renderTankGallery(cont){
       ${_tStatRow('Menzil',Math.min(1,_menzilVal),'#FF6B35','⚡'+tankEffectivePower(key).toFixed(1))}
       ${_tStatRow('Rüzgar',_ruzgarVal,'#00C9B1',Math.round(_ruzgarVal*100)+'%')}
       ${_tStatRow('Bonus',Math.min(1,_tBonNow/100),'#FFD700','+'+_tBonNow+'%')}
-      <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;">
+      <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
         ${_targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${_targetHPt.toLocaleString()} HP</b> karargah</div>`:''}
         ${(status==='owned'||status==='temp')?`<div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${_dmgT.toLocaleString()}</b> (${_amDef.name})${_dmgTNext?` → <b style="color:#00E676">${_dmgTNext.toLocaleString()}</b>`:''}</div>
         <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${_shotsTColor}">${_shotsT} atış</b> gerekli${_shotsTNext&&_shotsTNext<Number(_shotsT)?` → <b style="color:#00E676">${_shotsTNext}</b>`:''}</div>
