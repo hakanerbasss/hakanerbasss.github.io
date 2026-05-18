@@ -749,7 +749,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.103';
+const APP_VERSION      = '1.0.104';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -767,8 +767,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 16:38';
-const APP_VERSION_NOTE = 'Hayvanlardan inek ve koyun yurume mekanizmasi yapildi';
+const APP_VERSION_DATE = '2026.05.18 16:45';
+const APP_VERSION_NOTE = 'hayvanlari yurutme yapildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -2676,8 +2676,12 @@ function _drawCamel(c, a){
   // Uzun bacaklar
   c.strokeStyle='#a07830'; c.lineWidth=4; c.lineCap='round';
   [[-10,0],[-4,0],[4,0],[10,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk*0.7;
-    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw,14); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*6;
+    const kx=lx+sw*0.5, ky=6;
+    const ax=kx+sw*0.4, ay=14;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -2705,8 +2709,12 @@ function _drawDeer(c, a){
   // İnce bacaklar
   c.strokeStyle='#8a4820'; c.lineWidth=2.5; c.lineCap='round';
   [[-8,0],[-3,0],[3,0],[8,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk*0.6;
-    c.beginPath(); c.moveTo(lx,-6); c.lineTo(lx+lw,8); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*5;
+    const kx=lx+sw*0.5, ky=0;
+    const ax=kx+sw*0.4, ay=8;
+    c.beginPath(); c.moveTo(lx,-6); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -2771,8 +2779,12 @@ function _drawHorse(c, a){
   // Bacaklar
   c.lineWidth=4; c.strokeStyle='#4a2810';
   [[-8,0],[-3,0],[4,0],[9,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk*0.8;
-    c.beginPath(); c.moveTo(lx,-7); c.lineTo(lx+lw,10); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*6;
+    const kx=lx+sw*0.5, ky=1;
+    const ax=kx+sw*0.4, ay=10;
+    c.beginPath(); c.moveTo(lx,-7); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -2793,8 +2805,12 @@ function _drawGoat(c, a){
   // Bacaklar
   c.strokeStyle='#9a8a78'; c.lineWidth=3; c.lineCap='round';
   [[-6,0],[-2,0],[3,0],[7,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk*0.5;
-    c.beginPath(); c.moveTo(lx,-7); c.lineTo(lx+lw,7); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*4;
+    const kx=lx+sw*0.5, ky=0;
+    const ax=kx+sw*0.3, ay=7;
+    c.beginPath(); c.moveTo(lx,-7); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -2821,8 +2837,12 @@ function _drawWolf(c, a){
   // Bacaklar
   c.strokeStyle='#4a4a3a'; c.lineWidth=3.5;
   [[-7,0],[-2,0],[3,0],[8,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk*0.6;
-    c.beginPath(); c.moveTo(lx,-7); c.lineTo(lx+lw,7); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*4;
+    const kx=lx+sw*0.5, ky=0;
+    const ax=kx+sw*0.3, ay=7;
+    c.beginPath(); c.moveTo(lx,-7); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -2856,8 +2876,12 @@ function _drawFox(c, a){
   // Bacaklar
   c.strokeStyle='#8a3008'; c.lineWidth=2.5;
   [[-5,0],[-1,0],[3,0],[7,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk*0.5;
-    c.beginPath(); c.moveTo(lx,-6); c.lineTo(lx+lw,6); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*3.5;
+    const kx=lx+sw*0.5, ky=0;
+    const ax=kx+sw*0.3, ay=6;
+    c.beginPath(); c.moveTo(lx,-6); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -2921,8 +2945,12 @@ function _drawSquirrel(c, a){
   // Bacaklar
   c.strokeStyle='#7a3808'; c.lineWidth=2;
   [[-3,0],[3,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk*0.4;
-    c.beginPath(); c.moveTo(lx,-5); c.lineTo(lx+lw,4); c.stroke();
+    const phase=a.moving?a.bobPhase+i*Math.PI:0;
+    const sw=Math.sin(phase)*2.5;
+    const kx=lx+sw*0.5, ky=-1;
+    const ax=kx+sw*0.3, ay=4;
+    c.beginPath(); c.moveTo(lx,-5); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -6983,8 +7011,12 @@ function _drawDonkey(c, a){
   c.beginPath(); c.moveTo(19,-22); c.lineTo(21,-30); c.stroke();
   c.strokeStyle='#5a4a38'; c.lineWidth=3; c.lineCap='round';
   [[-10,0],[-3,0],[4,0],[10,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk;
-    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw*0.5,8); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*4;
+    const kx=lx+sw*0.5, ky=3;
+    const ax=kx+sw*0.4, ay=8;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
   // Kuyruk
   c.strokeStyle='#5a4a38'; c.lineWidth=2;
@@ -7013,8 +7045,12 @@ function _drawGiraffe(c, a){
   // Uzun bacaklar
   c.strokeStyle='#a06020'; c.lineWidth=3; c.lineCap='round';
   [[-10,0],[-3,0],[8,0],[15,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk;
-    c.beginPath(); c.moveTo(lx,-8); c.lineTo(lx+lw,18); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*7;
+    const kx=lx+sw*0.5, ky=5;
+    const ax=kx+sw*0.4, ay=18;
+    c.beginPath(); c.moveTo(lx,-8); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -7038,8 +7074,12 @@ function _drawZebra(c, a){
   for(let i=0;i<5;i++){ c.beginPath(); c.moveTo(-15+i*4,-15); c.lineTo(-14+i*4,-21); c.stroke(); }
   c.strokeStyle='#444'; c.lineWidth=3; c.lineCap='round';
   [[-10,0],[-3,0],[4,0],[10,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk;
-    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw*0.5,8); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*4;
+    const kx=lx+sw*0.5, ky=3;
+    const ax=kx+sw*0.4, ay=8;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
@@ -7061,8 +7101,12 @@ function _drawLion(c, a){
   c.beginPath(); c.moveTo(22,-22); c.lineTo(24,-27); c.lineTo(28,-23); c.fill(); c.stroke();
   c.strokeStyle='#8a6020'; c.lineWidth=3; c.lineCap='round';
   [[-10,0],[-4,0],[4,0],[10,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk;
-    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw*0.5,8); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*4;
+    const kx=lx+sw*0.5, ky=3;
+    const ax=kx+sw*0.4, ay=8;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
   // Kuyruk
   c.strokeStyle='#d4a84b'; c.lineWidth=2;
@@ -7091,8 +7135,12 @@ function _drawMammoth(c, a){
   // Kalin bacaklar
   c.strokeStyle='#3a2a18'; c.lineWidth=5; c.lineCap='round';
   [[-12,0],[-4,0],[5,0],[13,0]].forEach(([lx],i)=>{
-    const lw=(i%2===0?1:-1)*walk;
-    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+lw,10); c.stroke();
+    const phase=a.moving?a.bobPhase+i*(Math.PI/2):0;
+    const sw=Math.sin(phase)*5;
+    const kx=lx+sw*0.5, ky=4;
+    const ax=kx+sw*0.4, ay=10;
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
   // Kil cizgileri (tuy)
   c.strokeStyle='#4a3020'; c.lineWidth=1;
