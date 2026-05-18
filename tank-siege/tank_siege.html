@@ -749,7 +749,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.104';
+const APP_VERSION      = '1.0.105';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -767,8 +767,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 16:45';
-const APP_VERSION_NOTE = 'hayvanlari yurutme yapildi';
+const APP_VERSION_DATE = '2026.05.18 16:53';
+const APP_VERSION_NOTE = 'nehir duzeltildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1171,6 +1171,8 @@ const MUZZLE_FRAMES = 10;
 const MUZZLE_FRAME_W = 256;
 const MUZZLE_FRAME_H = 256;
 let _muzzleAnims = [];
+let _riverData = null;    // {pts, particles} — nehir animasyon verisi
+let _riverTime = 0;       // nehir animasyon sayaci
 let _comboCount = 0;   // arka arkaya isabet sayisi
 let _comboTimer = null; // combo sifirlanma timer
 let _muzzleFlameReady = false;
@@ -1338,6 +1340,7 @@ function loadLevel(idx){
   power = 55 + Math.random()*10;
   shotsLeft = lv.shots;
   _comboCount = 0; if(_comboTimer){ clearTimeout(_comboTimer); _comboTimer=null; }
+  _riverData = null; _riverTime = 0;
   phase = 'aim';
   bullet = null;
   particles = [];
@@ -1857,6 +1860,9 @@ function drawTerrainOn(c){
         cy2+=H*0.022;
         if(cy2>H+10) break;
       }
+
+      // Global'e kaydet — animasyon icin
+      _riverData = {pts: riverPts.map(p=>({...p})), particles:[]};
 
       // Nehir gölgesi (derinlik hissi)
       c.strokeStyle='rgba(0,60,120,0.3)';
@@ -3473,6 +3479,7 @@ function draw(){
     drawLavaBelowTerrain();
     drawAnimals();
     drawTerrain();
+    drawRiverAnim();
     if(missiles.length > 0) drawMissiles();
   } else {
     // PNG üzerine sadece animasyonlu elemanlar
@@ -5558,6 +5565,66 @@ function spawnComboText(x, y, label, count){
     + 'animation:comboAnim 0.9s ease-out forwards;';
   document.body.appendChild(el);
   setTimeout(()=>el.remove(), 900);
+}
+
+function drawRiverAnim(){
+  if(!_riverData || !_riverData.pts || _riverData.pts.length < 2) return;
+  if(!currentTheme || !currentTheme.hasRiver) return;
+  if(currentTheme.hasSnow) return; // donmus nehirde animasyon yok
+
+  _riverTime++;
+  const pts = _riverData.pts;
+
+  // Akan su dalgalari — her N frame'de yeni parcacik ekle
+  if(_riverTime % 4 === 0){
+    const idx = Math.floor(Math.random() * (pts.length - 1));
+    const p = pts[idx];
+    _riverData.particles.push({
+      x: p.x + (Math.random()-0.5)*p.w*0.6,
+      y: p.y,
+      vy: 1.2 + Math.random()*1.5,
+      vx: (Math.random()-0.5)*0.5,
+      life: 1.0,
+      size: 1.5 + Math.random()*2.5,
+      type: Math.random() < 0.3 ? 'foam' : 'wave',
+    });
+  }
+
+  // Parcaciklari guncelle ve ciz
+  _riverData.particles = _riverData.particles.filter(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.025;
+    if(p.life <= 0) return false;
+
+    const alpha = Math.min(1, p.life * 2);
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.7;
+
+    if(p.type === 'foam'){
+      // Kopuk — beyaz daire
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      // Dalga — ince yatay cizgi
+      ctx.strokeStyle = 'rgba(180,230,255,0.8)';
+      ctx.lineWidth = 1;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.size, p.y);
+      ctx.lineTo(p.x + p.size, p.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return true;
+  });
+
+  // Max parcacik siniri
+  if(_riverData.particles.length > 80){
+    _riverData.particles.splice(0, _riverData.particles.length - 80);
+  }
 }
 
 function spawnMuzzleFlash(x,y,rad){
