@@ -767,8 +767,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 16:53';
-const APP_VERSION_NOTE = 'nehir duzeltildi';
+const APP_VERSION_DATE = '2026.05.18 16:56';
+const APP_VERSION_NOTE = 'agaclar cogaldi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1924,6 +1924,13 @@ function drawDecorations(c, th){
     const x=W*(0.55+i*0.055);
     if(x>W*0.97) break;
     positions.push(x);
+  }
+  // Orta bolge — nehir kenarlari ve bos alanlar
+  for(let i=0;i<6;i++){
+    positions.push(W*(0.16+i*0.04));  // sol-orta
+  }
+  for(let i=0;i<6;i++){
+    positions.push(W*(0.38+i*0.04));  // sag-orta
   }
 
   positions.forEach(dx=>{
