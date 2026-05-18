@@ -372,7 +372,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 .lm-tcard.lm-tcard-locked{opacity:0.4;filter:grayscale(0.5);}
 .lm-tcard-emoji{font-size:30px;line-height:1;}
 .lm-tcard-name{
-  font-family:'Fredoka One',sans-serif;font-size:10px;color:#fff;
+  font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;color:#fff;
   text-align:center;padding:0 3px;line-height:1.2;
 }
 .lm-tcard-stars{font-size:9px;color:#FFD700;font-family:'Rajdhani',sans-serif;font-weight:700;}
@@ -380,7 +380,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 #lm-theme-label{
   display:flex;align-items:center;gap:8px;
   padding:8px 12px 2px;
-  font-family:'Fredoka One',sans-serif;font-size:15px;color:#fff;
+  font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:#fff;
 }
 #lm-theme-label .lm-tl-stars{
   font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif;
@@ -493,7 +493,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
     <span id="tank-badge-level"></span>
   </div>
   <button onclick="showLevelMap()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🗺️</button>
-  <button id="btn-gallery-open" onclick="openGallery(curLevel)">⚔️ Inventory</button>
+  <button id="btn-gallery-open" onclick="openGallery(curLevel)" data-i18n="inventory">⚔️ Inventory</button>
   <div style="flex:1;"></div>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
   <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
@@ -520,7 +520,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
     <button onclick="openChangeTank()" style="flex:2;
       background:linear-gradient(135deg,#FF6B35,#ff3d00);border:none;color:white;
       border-radius:10px;padding:9px;font-family:'Rajdhani',sans-serif;
-      font-size:15px;font-weight:700;cursor:pointer;">🔄 Değiştir</button>
+      font-size:15px;font-weight:700;cursor:pointer;" data-i18n="tank_card_change">🔄 Değiştir</button>
   </div>
 </div>
 
@@ -529,7 +529,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);
   flex-direction:column;overflow-y:auto;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;">
-    <span style="color:#FFD700;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;">🔄 Tank Seç</span>
+    <span style="color:#FFD700;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;" data-i18n="tank_select_title">🔄 Tank Seç</span>
     <button onclick="closeChangeTank()" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
       color:white;border-radius:12px;padding:6px 14px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✕</button>
   </div>
@@ -543,26 +543,26 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <div style="background:rgba(10,10,20,0.97);border:1.5px solid rgba(255,255,255,0.18);
     border-radius:18px;padding:20px;width:280px;max-width:calc(100vw - 32px);
     font-family:'Rajdhani',sans-serif;color:white;">
-    <div style="font-size:20px;font-weight:700;color:#FFD700;margin-bottom:6px;">🛡️ Rüzgar Kalkanı</div>
+    <div style="font-size:20px;font-weight:700;color:#FFD700;margin-bottom:6px;" data-i18n="shield_title">🛡️ Rüzgar Kalkanı</div>
     <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:12px;">
-      Bu level için rüzgar engellenir.<br>
-      Mevcut rüzgar: <span id="shield-wind-val" style="color:#FF6B35;font-weight:700;"></span>
+      <span data-i18n="shield_desc">Bu level için rüzgar engellenir.</span><br>
+      <span data-i18n="shield_current">Mevcut rüzgar:</span> <span id="shield-wind-val" style="color:#FF6B35;font-weight:700;"></span>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">
       <button onclick="useShieldAd()" style="background:linear-gradient(135deg,#FFD700,#FF8C00);
         border:none;color:#000;border-radius:12px;padding:12px;
-        font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;cursor:pointer;">
+        font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;cursor:pointer;" data-i18n="shield_ad_btn">
         📺 Reklam İzle — Ücretsiz
       </button>
       <button id="shield-puan-btn" onclick="useShieldPuan()" style="background:linear-gradient(135deg,#00C9B1,#007a6e);
         border:none;color:white;border-radius:12px;padding:12px;
         font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;cursor:pointer;">
-        200 🏆 Puan Harca
+        200 🏆 <span data-i18n="shield_pts_btn">Puan Harca</span>
       </button>
       <button onclick="document.getElementById('shield-overlay').style.display='none';"
         style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
         color:white;border-radius:12px;padding:10px;
-        font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer;">
+        font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;cursor:pointer;" data-i18n="shield_cancel">
         ✕ Vazgeç
       </button>
     </div>
@@ -587,7 +587,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
     <button id="sc-change-btn" onclick="openChangeForSlot()" style="flex:2;
       background:linear-gradient(135deg,#FF6B35,#ff3d00);border:none;color:white;
       border-radius:10px;padding:9px;font-family:'Rajdhani',sans-serif;
-      font-size:15px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">🔄 Değiştir</button>
+      font-size:15px;font-weight:700;cursor:pointer;letter-spacing:0.5px;" data-i18n="slot_card_change">🔄 Değiştir</button>
   </div>
 </div>
 
@@ -596,20 +596,20 @@ button:active{opacity:0.75;transform:scale(0.96);}
   background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);
   flex-direction:column;overflow-y:auto;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px;">
-    <span style="color:#FFD700;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;">
+    <span style="color:#FFD700;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;" data-i18n="ammo_select_title">
       🔄 Mermi Seç
     </span>
     <button onclick="closeChangeOverlay()" style="background:rgba(255,255,255,0.1);
       border:1.5px solid rgba(255,255,255,0.2);color:white;border-radius:12px;
       padding:6px 14px;font-family:'Rajdhani',sans-serif;font-size:14px;
-      font-weight:700;cursor:pointer;">✕ Kapat</button>
+      font-weight:700;cursor:pointer;" data-i18n="ammo_select_close">✕ Kapat</button>
   </div>
   <div id="change-list" style="padding:0 12px 20px;display:flex;flex-direction:column;gap:8px;"></div>
   <div style="padding:8px 12px 20px;">
     <button onclick="openGallery(curLevel);closeChangeOverlay();" style="width:100%;
       background:rgba(255,215,0,0.15);border:1.5px solid rgba(255,215,0,0.4);
       color:#FFD700;border-radius:14px;padding:12px;
-      font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;cursor:pointer;">
+      font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;cursor:pointer;" data-i18n="gallery_new_ammo">
       ⚔️ Galeri — Yeni Mermi Al
     </button>
   </div>
@@ -627,7 +627,6 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <div style="display:flex;flex-direction:row;align-items:center;gap:5px;">
     <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
     <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">❤️ 5/5</button>
-    <button id="sandbox-tactic-btn" onclick="onSandboxTacticTap()" style="background:rgba(0,0,0,0.75);border:2px solid rgba(255,107,53,0.5);border-radius:10px;padding:4px 10px;color:#FF6B35;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;">⚔️ Tactic</button>
     <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;pointer-events:none;">💨 Calm</div>
   </div>
 
@@ -656,8 +655,8 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <div id="joystick-dot"></div>
 </div>
 <div id="bottom-bar">
-  <span id="ctrl-hint">&#9664; DRAG TO AIM</span>
-  <button id="btn-fire" onclick="fire()">FIRE!</button>
+  <span id="ctrl-hint" data-i18n="drag_to_aim">&#9664; DRAG TO AIM</span>
+  <button id="btn-fire" onclick="fire()" data-i18n="fire">FIRE!</button>
   <span style="width:100px"></span>
 </div>
 
@@ -666,20 +665,20 @@ button:active{opacity:0.75;transform:scale(0.96);}
 <!-- GALERI EKRANI -->
 <div id="gallery-overlay">
   <div id="gallery-header">
-    <span id="gallery-title">⚔️ CEPHANE GALERİSİ</span>
+    <span id="gallery-title" data-i18n="gallery_title">⚔️ CEPHANE GALERİSİ</span>
     <span id="gallery-score-badge">🏆 <span id="gallery-score-num">0</span></span>
   </div>
 
   <!-- Puan reklam butonu -->
   <div id="ad-puan-btn" onclick="watchAdForPoints()">
-    <div class="ad-left">📺 Reklam İzle → Puan Kazan</div>
+    <div class="ad-left" data-i18n="ad_watch_pts">📺 Reklam İzle → Puan Kazan</div>
     <div class="ad-right" id="ad-puan-info">+200 🏆</div>
   </div>
 
   <!-- Sekmeler -->
   <div id="gallery-tabs">
-    <button class="gtab active" onclick="switchTab('ammo')">💣 Mühimmat</button>
-    <button class="gtab" onclick="switchTab('boost')">🛡️ Güçlendirmeler</button>
+    <button class="gtab active" onclick="switchTab('ammo')" data-i18n="tab_ammo">💣 Mühimmat</button>
+    <button class="gtab" onclick="switchTab('boost')" data-i18n="tab_boost">🛡️ Güçlendirmeler</button>
     <button class="gtab" onclick="switchTab('tank')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 32" width="20" height="10" style="vertical-align:middle;margin-right:3px"><rect x="2" y="20" width="60" height="10" rx="5" fill="currentColor" opacity="0.5"/><rect x="5" y="13" width="54" height="9" rx="2" fill="currentColor"/><polygon points="5,13 16,8 50,8 59,13" fill="currentColor" opacity="0.85"/><ellipse cx="26" cy="9" rx="11" ry="6" fill="currentColor" opacity="0.75"/><rect x="26" y="7" width="28" height="4" rx="2" fill="currentColor" opacity="0.55"/></svg> Tank</button>
   </div>
 
@@ -689,7 +688,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <!-- Alt butonlar -->
   <div id="gallery-footer">
     <button id="btn-gallery-close" onclick="closeGallery()">✕</button>
-    <button id="btn-gallery-play" onclick="startLevel()">SAVAŞA GİR! →</button>
+    <button id="btn-gallery-play" onclick="startLevel()" data-i18n="battle">SAVAŞA GİR! →</button>
   </div>
 </div>
 <div id="gc-dialog-bg" onclick="closeGcDialog()"></div>
@@ -699,7 +698,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <div id="gc-dialog-desc"></div>
   <div id="gc-dialog-cost" style="display:none"></div>
   <button class="gc-dialog-btn confirm-buy" id="gc-dialog-confirm" onclick="gcDialogConfirm()"></button>
-  <button class="gc-dialog-btn confirm-cancel" onclick="closeGcDialog()">Vazgec</button>
+  <button class="gc-dialog-btn confirm-cancel" onclick="closeGcDialog()" data-i18n="dlg_cancel">Vazgec</button>
 </div>
 <div id="result">
   <div id="res-title"></div>
@@ -708,11 +707,11 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
     <button class="res-btn" id="btn-next" onclick="nextLevel()">NEXT LEVEL →</button>
     <button class="res-btn" id="btn-extra-ammo" onclick="watchAdForExtraAmmo()"
-      style="display:none;background:linear-gradient(135deg,#FF6B35,#FF3D00);">
+      style="display:none;background:linear-gradient(135deg,#FF6B35,#FF3D00);" data-i18n="extra_ammo_btn">
       📺 Reklam İzle → +3 Atış
     </button>
     <button class="res-btn sec" onclick="retryLevel()">RETRY</button>
-    <button class="res-btn sec" onclick="showLevelMap()" style="margin-top:4px;">🗺️ Haritaya Dön</button>
+    <button class="res-btn sec" onclick="showLevelMap()" style="margin-top:4px;" data-i18n="back_map">🗺️ Haritaya Dön</button>
   </div>
 </div>
 
@@ -749,7 +748,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.105';
+const APP_VERSION      = '1.0.106';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -767,8 +766,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 16:56';
-const APP_VERSION_NOTE = 'agaclar cogaldi';
+const APP_VERSION_DATE = '2026.05.19 01:37';
+const APP_VERSION_NOTE = 'Tr - En dedtegi ekleme part 1';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1115,7 +1114,7 @@ let ammoUpgrades = JSON.parse(lsGet('ammo_upgrades')||'{}'); // {nuclear:2, ap:1
 let tankUpgrades = JSON.parse(lsGet('tank_upgrades')||'{}'); // {titan:3, ...}
 const UPGRADE_MAX = 8;
 const AMMO_UPGRADE_COSTS = [2000,5000,10000,20000,40000,50000,80000,120000]; // seviye 1→2...
-const TANK_UPGRADE_COSTS = [5,10,20,35,60,80,110,150];               // yıldız cinsinden
+const TANK_UPGRADE_COSTS = [3000,8000,15000,30000,60000,80000,120000,180000];     // puan cinsinden (yıldızdan dönüştürüldü)
 let tempAmmo    = JSON.parse(lsGet('temp_ammo')||'null');
 
 // Bunker Buster patlama animasyonu
@@ -1367,7 +1366,7 @@ function loadLevel(idx){
   }
   if(tempDmgBoost && tempDmgBoost.expiresAtLevel<=curLevel){
     tempDmgBoost=null; lsRemove('temp_dmg_boost');
-    showToast('2x Hasar geçici süresi bitti.');
+    showToast(t('toast_2x_expired'));
   }
   currentTheme = THEMES[lv.theme] || THEMES.valley;
   SFX.setWind((windBlock && windBlock.expiresAtLevel > curLevel) ? 0 : Math.abs(lv.wind||0));
@@ -1401,7 +1400,7 @@ function loadLevel(idx){
   const _lltxt = document.getElementById('level-loading-txt');
   if(_ll){
     _ll.style.display='flex';
-    if(_lltxt) _lltxt.textContent = (currentTheme&&currentTheme.emoji?currentTheme.emoji+' ':'') + (lv.name||'Hazırlanıyor...');
+    if(_lltxt) _lltxt.textContent = (currentTheme&&currentTheme.emoji?currentTheme.emoji+' ':'') + (tLevel(lv.name)||'Hazırlanıyor...');
   }
 
   // Frame 1: En ağır iş — terrain + bulut üret
@@ -2434,7 +2433,7 @@ function updateMissiles(){
       spawnImpact(m.x, m.y, 'target');
       if(typeof loseLife === 'function'){
         var rem = loseLife();
-        showToast('❤️ Fuze isabeti! ' + rem + ' can kaldi');
+        showToast(tFmt('toast_fuze_hit', {n: rem}));
         if(rem <= 0) setTimeout(function(){ onFail(); }, 800);
       }
       return false;
@@ -3316,7 +3315,7 @@ function update(){
         bullet = null;
         if(typeof loseLife === 'function'){
           const rem = loseLife();
-          showToast('💥 Kendi tankini vurdun! ' + rem + ' can kaldi');
+          showToast(tFmt('toast_self_hit', {n: rem}));
           if(rem <= 0) setTimeout(function(){ onFail(); }, 800);
         }
         break;
@@ -4897,10 +4896,10 @@ function drawAimIndicator(){
 // TANK KART SİSTEMİ
 // ═══════════════════════════════════════
 const TANK_STATS={
-  basic:   {menzil:0.30,guc:0.30,zirh:0.20,desc:'Başlangıç tankı, kısa menzil'},
-  upgraded:{menzil:0.55,guc:0.55,zirh:0.50,desc:'Dengeli, ekstra zırh plakaları'},
-  elite:   {menzil:0.80,guc:0.80,zirh:0.75,desc:'Uzun menzil, anten, güçlü'},
-  titan:   {menzil:1.00,guc:1.00,zirh:1.00,desc:'Maksimum güç, krom kaplama'},
+  basic:   {menzil:0.30,guc:0.30,zirh:0.20,get desc(){return t('tank_desc_basic');}},
+  upgraded:{menzil:0.55,guc:0.55,zirh:0.50,get desc(){return t('tank_desc_upgraded');}},
+  elite:   {menzil:0.80,guc:0.80,zirh:0.75,get desc(){return t('tank_desc_elite');}},
+  titan:   {menzil:1.00,guc:1.00,zirh:1.00,get desc(){return t('tank_desc_titan');}},
 };
 
 function statBarHTML(label,val,col){
@@ -4943,21 +4942,21 @@ function openTankCard(){
     <span style="font-size:10px;font-weight:700;color:${col};width:36px;text-align:right;">${valStr}</span>
   </div>`;
   document.getElementById('tc-name').innerHTML=gDef.icon+'&nbsp;'+gDef.name
-    +(tULvl>0?` <span style="font-size:11px;color:#FFD700;font-weight:700;">Sv${tULvl}</span>`:'');
+    +(tULvl>0?` <span style="font-size:11px;color:#FFD700;font-weight:700;">${t('lvl_short')}${tULvl}</span>`:'');
   document.getElementById('tc-desc').textContent=st.desc;
   document.getElementById('tc-bars').innerHTML=
-    _tStatRow('Menzil',menzilVal,'#FF6B35','⚡'+td.maxPower)+
-    _tStatRow('Rüzgar',ruzgarVal,'#00C9B1',Math.round(ruzgarVal*100)+'%')+
-    _tStatRow('Bonus',Math.min(1,tBonNow/100),'#FFD700','+'+tBonNow+'%')+
+    _tStatRow(t('stat_menzil'),menzilVal,'#FF6B35','⚡'+td.maxPower)+
+    _tStatRow(t('stat_ruzgar'),ruzgarVal,'#00C9B1',Math.round(ruzgarVal*100)+'%')+
+    _tStatRow(t('stat_bonus'),Math.min(1,tBonNow/100),'#FFD700','+'+tBonNow+'%')+
     `<div style="margin-top:5px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
-      ${targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${targetHPt.toLocaleString()} HP</b> karargah</div>`:''}
+      ${targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${targetHPt.toLocaleString()} HP</b> ${t('hq')}</div>`:''}
       <div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${dmgT.toLocaleString()}</b> (${amDef.name})${dmgTNext?` → <b style="color:#00E676">${dmgTNext.toLocaleString()}</b>`:''}</div>
-      <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${shotsTColor}">${shotsT} atış</b> gerekli${shotsTNext&&shotsTNext<Number(shotsT)?` → <b style="color:#00E676">${shotsTNext}</b>`:''}</div>
+      <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${shotsTColor}">${shotsT} ${t('shots_needed')}${shotsTNext&&shotsTNext<Number(shotsT)?` → <b style="color:#00E676">${shotsTNext}</b>`:''}</div>
       ${tBonNext!==null?`<div style="color:rgba(255,255,255,0.35);font-size:10px;">Upgrade: +${tBonNow}% → +${tBonNext}% (galeri)</div>`:''}
     </div>`;
   const tcTemp=document.getElementById('tc-temp');
   if(tempTank&&tempTank.type===type&&tempTank.expiresAtLevel>curLevel){
-    tcTemp.textContent='⏱ '+(tempTank.expiresAtLevel-curLevel)+' level kaldı (geçici)';
+    tcTemp.textContent='⏱ '+tFmt('levels_left_temp', {n: (tempTank.expiresAtLevel-curLevel)});
   } else { tcTemp.textContent=''; }
   document.getElementById('tank-card').style.display='block';
   document.getElementById('tank-card-bg').style.display='block';
@@ -5050,12 +5049,12 @@ function grantLevelAmmo(){
   if(id>=4 && !ownedAmmo.includes('ap')){
     ownedAmmo.push('ap');
     lsSet('owned_ammo', JSON.stringify(ownedAmmo));
-    showToast('🔩 AP Mühimmat kazandın!');
+    showToast(t('toast_ap_won'));
   }
   if(id>=7 && !ownedAmmo.includes('explosive')){
     ownedAmmo.push('explosive');
     lsSet('owned_ammo', JSON.stringify(ownedAmmo));
-    showToast('💥 Patlayıcı Mühimmat kazandın!');
+    showToast(t('toast_exp_won'));
   }
 }
 
@@ -5117,7 +5116,7 @@ function updateSlotUI(){
 function onSlotTap(idx){
   const openCount=getOpenSlotCount();
   if(idx>=openCount){
-    showToast('Level '+(idx===1?4:7)+'de açılır 🔒');
+    showToast(tFmt('toast_unlock_at', {n: (idx===1?4:7)}));
     return;
   }
   // Farklı açık slota bas → aktif yap
@@ -5157,20 +5156,20 @@ function openSlotCard(idx){
     <span style="font-size:10px;font-weight:700;color:${col};width:32px;text-align:right;">${valStr}</span>
   </div>`;
   document.getElementById('sc-name').innerHTML=def.icon+'&nbsp;'+def.name
-    +(uLvl>0?` <span style="font-size:11px;color:#FF6B35;font-weight:700;">Sv${uLvl}</span>`:'');
+    +(uLvl>0?` <span style="font-size:11px;color:#FF6B35;font-weight:700;">${t('lvl_short')}${uLvl}</span>`:'');
   document.getElementById('sc-desc').textContent=st.desc;
   document.getElementById('sc-bars').innerHTML=
-    _sRow('Hasar',st.dmg,'#FF6B35',dmgBase)+
-    _sRow('Zırh',st.pen,'#FFD700','x'+def.apPen)+
-    _sRow('Alan',st.alan,'#00C9B1',def.radius+'px')+
+    _sRow(t('stat_dmg'),st.dmg,'#FF6B35',dmgBase)+
+    _sRow(t('stat_armor'),st.pen,'#FFD700','x'+def.apPen)+
+    _sRow(t('stat_area'),st.alan,'#00C9B1',def.radius+'px')+
     `<div style="margin-top:5px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
-      ${targetHPnow?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${targetHPnow.toLocaleString()} HP</b> karargah</div>`:''}
-      <div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${dmgNow.toLocaleString()}</b>${uLvl>0?` <span style="color:rgba(255,255,255,0.3);font-size:10px;">(Sv${uLvl})</span>`:''}${dmgNext?` → <b style="color:#00E676">${dmgNext.toLocaleString()}</b> <span style="color:rgba(255,255,255,0.3);font-size:10px;">+1sv</span>`:uLvl>=UPGRADE_MAX?' <span style="color:#FFD700;font-size:10px;">MAX</span>':''}</div>
-      <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${shotsColor}">${shots} atış</b> gerekli${shotsNext&&shotsNext<Number(shots)?` → <b style="color:#00E676">${shotsNext}</b>`:''}</div>
+      ${targetHPnow?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${targetHPnow.toLocaleString()} HP</b> ${t('hq')}</div>`:''}
+      <div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${dmgNow.toLocaleString()}</b>${uLvl>0?` <span style="color:rgba(255,255,255,0.3);font-size:10px;">(${t('lvl_short')}${uLvl})</span>`:''}${dmgNext?` → <b style="color:#00E676">${dmgNext.toLocaleString()}</b> <span style="color:rgba(255,255,255,0.3);font-size:10px;">${t('lvl_short_plus1')}</span>`:uLvl>=UPGRADE_MAX?' <span style="color:#FFD700;font-size:10px;">MAX</span>':''}</div>
+      <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${shotsColor}">${shots} ${t('shots_needed')}${shotsNext&&shotsNext<Number(shots)?` → <b style="color:#00E676">${shotsNext}</b>`:''}</div>
     </div>`;
   const scTemp=document.getElementById('sc-temp');
   scTemp.textContent=(tempAmmo&&tempAmmo.type===type&&tempAmmo.expiresAtLevel>curLevel)
-    ?'⏱ '+(tempAmmo.expiresAtLevel-curLevel)+' level kaldı (geçici)':'';
+    ?'⏱ '+tFmt('levels_left_temp', {n: (tempAmmo.expiresAtLevel-curLevel)}):'';
   document.getElementById('slot-card').style.display='block';
   document.getElementById('slot-card-bg').style.display='block';
 }
@@ -5250,7 +5249,7 @@ function getRecommended(){
 }
 
 function onShieldTap(){
-  if(shieldActive){ showToast('Kalkan zaten aktif!'); return; }
+  if(shieldActive){ showToast(t('toast_shield_already')); return; }
   showShieldChoice();
 }
 
@@ -5272,7 +5271,7 @@ function useShieldAd(){
 
 function useShieldPuan(){
   document.getElementById('shield-overlay').style.display='none';
-  if(score<200){ showToast('Yeterli puan yok!'); return; }
+  if(score<200){ showToast(t('not_enough_pts')); return; }
   score-=200;
   lsSet('total_score', score);
   activateShield();
@@ -5283,7 +5282,7 @@ function activateShield(){
   shieldActive=true;
   wind=0;
   SFX.setWind(0);  // kalkan aktifken rüzgar sesini durdur
-  showToast('🛡️ Kalkan aktif! Rüzgar engellendi.');
+  showToast(t('toast_shield_on'));
   updateUI();
 }
 
@@ -5374,7 +5373,7 @@ function _checkCounterAttackTrigger(bx, by){
   if(_missileBlocked) return;
   // Yakın ıskalama — her zaman tetikle
   spawnCounterAttack();
-  showToast('⚠️ Karsi atak!');
+  showToast(t('toast_counter'));
 }
 
 function onTerrainHit(){
@@ -5404,7 +5403,7 @@ function onTerrainHit(){
     _checkCounterAttackTrigger(bullet.x, bullet.y);
     // Küçük hasar efekti
     spawnImpact(targetX, targetY - targetH*0.5, 'target');
-    showToast('💥 Yakın ıskalama! -' + dmg + ' HP');
+    showToast(tFmt('toast_near_miss', {n: dmg}));
     updateUI();
     if(targetHP <= 0){
       spawnDestruction();
@@ -6236,7 +6235,7 @@ function openGallery(nextIdx, tab){
   // Tavsiye göster
   const rec=getRecommended();
   if(rec && rec.type!=='normal'){
-    showToast('💡 '+rec.reason);
+    showToast(tFmt('toast_tip', {msg: rec.reason}));
   }
   SFX.setWind(0);
   document.getElementById('gallery-overlay').classList.add('show');
@@ -6332,18 +6331,18 @@ function updateAdButton(){
     setTimeout(updateAdButton, 30000);
   } else {
     btn.classList.remove('disabled');
-    info.textContent=`+200 🏆 (${5-dailyAdCount} hak)`;
+    info.textContent=`+200 🏆 (${5-dailyAdCount} ${t('hak')})`;
   }
 }
 
 function watchAdForDmgBoost(){
   showGcDialog({
     icon: '💥',
-    title: '2x Hasar - Gecici',
-    desc: 'Reklam izleyerek 3 level boyunca tum mermilerin hasari 2 katina cikar.',
+    title: t('dlg_dmg_temp_title'),
+    desc: t('dlg_dmg_temp_desc'),
     cost: '',
     btnClass: 'confirm-ad',
-    btnText: 'Reklami Izle',
+    btnText: t('dlg_watch_ad'),
     action: function(){
       if(typeof Android !== 'undefined' && Android.showRewardedAd){
         Android.showRewardedAd('dmg_boost');
@@ -6357,9 +6356,9 @@ function watchAdForDmgBoost(){
 function watchAdForPoints(){
   const today=new Date().toDateString();
   if(dailyAdReset!==today){dailyAdCount=0;dailyAdReset=today;}
-  if(dailyAdCount>=5){showToast('Günlük reklam limitine ulaştın!');return;}
+  if(dailyAdCount>=5){showToast(t('toast_ad_limit'));return;}
   const now=Date.now();
-  if(now-lastAdTime<2*60*60*1000){showToast('2 saatte bir izleyebilirsin!');return;}
+  if(now-lastAdTime<2*60*60*1000){showToast(t('toast_ad_cooldown'));return;}
   SFX.setWind(0);
   // Reklam göster
   try{
@@ -6380,7 +6379,7 @@ function givePointsFromAd(){
   lsSet('daily_ads', dailyAdCount);
   updateGalleryScore();
   updateAdButton();
-  showToast('+200 puan kazandın! 🏆');
+  showToast(t('toast_pts_won'));
 }
 
 // ── Galeri render ────────────────────────────────────────────────
@@ -6430,9 +6429,9 @@ function renderAmmoGallery(cont){
     card.className='gallery-card'+(status==='owned'||status==='temp'?' owned':'')+(inSlots.length>0?' selected-card':'')+(status==='temp'?' temp-card':'');
 
     let badge='';
-    if(status==='owned') badge='<span class="gc-badge owned-badge">✅ Sahipsin</span>';
-    else if(status==='temp') badge=`<span class="gc-badge temp-badge">⏱ ${tempAmmo.expiresAtLevel-curLevel} level kaldı</span>`;
-    else badge='<span class="gc-badge locked-badge">🔒 Kilitli</span>';
+    if(status==='owned') badge='<span class="gc-badge owned-badge">'+t('owned_badge')+'</span>';
+    else if(status==='temp') badge=`<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left',{n:(tempAmmo.expiresAtLevel-curLevel)})}</span>`;
+    else badge='<span class="gc-badge locked-badge">🔒 '+t('locked')+'</span>';
 
     let btnHtml='';
     if(status==='locked'){
@@ -6455,14 +6454,14 @@ function renderAmmoGallery(cont){
       }).join('');
       const uLvl=ammoUpgrades[key]||0;
       const upgBtn=status==='owned'?(uLvl<UPGRADE_MAX
-        ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FF6B35,#c94d1a);margin-top:4px;" onclick="upgradeAmmo('${key}')">⬆ Sv${uLvl+1} — ${AMMO_UPGRADE_COSTS[uLvl]}🏆</button>`
-        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>⭐ MAX</button>`):'';
+        ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FF6B35,#c94d1a);margin-top:4px;" onclick="upgradeAmmo('${key}')">⬆ ${t('lvl_short')}${uLvl+1} — ${AMMO_UPGRADE_COSTS[uLvl].toLocaleString()}🏆</button>`
+        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>🏆 MAX</button>`):'';
       btnHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;">${slotBadges}${upgBtn}</div>`;
     } else {
       const uLvl=ammoUpgrades[key]||0;
       const upgBtn=status==='owned'?(uLvl<UPGRADE_MAX
-        ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FF6B35,#c94d1a);margin-top:4px;" onclick="upgradeAmmo('${key}')">⬆ Sv${uLvl+1} — ${AMMO_UPGRADE_COSTS[uLvl]}🏆</button>`
-        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>⭐ MAX</button>`):'';
+        ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FF6B35,#c94d1a);margin-top:4px;" onclick="upgradeAmmo('${key}')">⬆ ${t('lvl_short')}${uLvl+1} — ${AMMO_UPGRADE_COSTS[uLvl].toLocaleString()}🏆</button>`
+        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>🏆 MAX</button>`):'';
       btnHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;">
         <button class="gc-btn btn-select" onclick="selectGalleryAmmo('${key}')">Seç</button>
         ${upgBtn}
@@ -6493,20 +6492,20 @@ function renderAmmoGallery(cont){
       <span style="font-size:10px;font-weight:700;color:${col};width:32px;text-align:right;">${val2}</span>
     </div>`;
     const _dmgInfoHtml = `
-      ${_statRow('Hasar',st.dmg,'#FF6B35', _dmgBase)}
-      ${_statRow('Zırh',st.pen,'#FFD700', 'x'+def.apPen)}
-      ${_statRow('Alan',st.alan,'#00C9B1', def.radius+'px')}
+      ${_statRow(t('stat_dmg'),st.dmg,'#FF6B35', _dmgBase)}
+      ${_statRow(t('stat_armor'),st.pen,'#FFD700', 'x'+def.apPen)}
+      ${_statRow(t('stat_area'),st.alan,'#00C9B1', def.radius+'px')}
       <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
-        ${_targetHPnow?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${_targetHPnow.toLocaleString()} HP</b> karargah</div>`:''}
-        ${(status==='owned'||status==='temp')?`<div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${_dmgNow.toLocaleString()}</b>${_uLvl>0?` <span style="color:rgba(255,255,255,0.3);font-size:10px;">(Sv${_uLvl})</span>`:''}${_dmgNext?` → <b style="color:#00E676">${_dmgNext.toLocaleString()}</b>`:' <span style="color:#FFD700;font-size:10px;">MAX</span>'}</div>
-        <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${_shotsColor}">${_shots} atış</b> gerekli${_shotsNext&&_shotsNext<Number(_shots)?` → <b style="color:#00E676">${_shotsNext}</b>`:''}</div>`
-        :`<div style="color:rgba(255,255,255,0.35);font-size:10px;">Temel hasar: ${_dmgBase}</div>`}
+        ${_targetHPnow?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${_targetHPnow.toLocaleString()} HP</b> ${t('hq')}</div>`:''}
+        ${(status==='owned'||status==='temp')?`<div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${_dmgNow.toLocaleString()}</b>${_uLvl>0?` <span style="color:rgba(255,255,255,0.3);font-size:10px;">(${t('lvl_short')}${_uLvl})</span>`:''}${_dmgNext?` → <b style="color:#00E676">${_dmgNext.toLocaleString()}</b>`:' <span style="color:#FFD700;font-size:10px;">MAX</span>'}</div>
+        <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${_shotsColor}">${_shots} ${t('shots_needed')}${_shotsNext&&_shotsNext<Number(_shots)?` → <b style="color:#00E676">${_shotsNext}</b>`:''}</div>`
+        :`<div style="color:rgba(255,255,255,0.35);font-size:10px;">${t('base_dmg')}: ${_dmgBase}</div>`}
       </div>`;
     card.innerHTML=`
       <div class="gc-icon">${def.icon}</div>
       <div class="gc-info">
-        <div class="gc-name">${def.name} ${badge}</div>
-        <div class="gc-desc">${st.desc}</div>
+        <div class="gc-name">${t('ammo_'+key)||def.name} ${badge}</div>
+        <div class="gc-desc">${t('desc_'+key)||st.desc}</div>
         ${_dmgInfoHtml}
       </div>
       ${btnHtml}`;
@@ -6523,9 +6522,9 @@ function renderTankGallery(cont){
     card.className='gallery-card'+(status==='owned'||status==='temp'?' owned':'')+(isSelected?' selected-card':'')+(status==='temp'?' temp-card':'');
 
     let badge='';
-    if(status==='owned') badge='<span class="gc-badge owned-badge">✅ Sahipsin</span>';
-    else if(status==='temp') badge=`<span class="gc-badge temp-badge">⏱ ${tempTank.expiresAtLevel-curLevel} level kaldı</span>`;
-    else badge='<span class="gc-badge locked-badge">🔒 Kilitli</span>';
+    if(status==='owned') badge='<span class="gc-badge owned-badge">'+t('owned_badge')+'</span>';
+    else if(status==='temp') badge=`<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left',{n:(tempTank.expiresAtLevel-curLevel)})}</span>`;
+    else badge='<span class="gc-badge locked-badge">🔒 '+t('locked')+'</span>';
 
     let btnHtml='';
     if(status==='locked'){
@@ -6537,15 +6536,14 @@ function renderTankGallery(cont){
       </div>`;
     } else {
       const uLvl=tankUpgrades[key]||0;
-      const totalStars=getTotalStars();
       // tempTank aktifken upgrade butonu gizle
       const _isTempTank = tempTank && tempTank.type === key && tempTank.expiresAtLevel > curLevel;
       const upgBtn = _isTempTank ? '' : (uLvl<UPGRADE_MAX
-        ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FFD700,#c9a800);color:#1a1a1a;margin-top:4px;" onclick="upgradeTank('${key}')" ${totalStars<TANK_UPGRADE_COSTS[uLvl]?'disabled':''}>⬆ Sv${uLvl+1} — ${TANK_UPGRADE_COSTS[uLvl]}⭐</button>`
-        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>⭐ MAX</button>`);
+        ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FFD700,#c9a800);color:#1a1a1a;margin-top:4px;" onclick="upgradeTank('${key}')" ${score<TANK_UPGRADE_COSTS[uLvl]?'disabled':''}>⬆ ${t('lvl_short')}${uLvl+1} — ${TANK_UPGRADE_COSTS[uLvl].toLocaleString()} 🏆</button>`
+        :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>🏆 MAX</button>`);
       if(isSelected){
         btnHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;">
-          <button class="gc-btn btn-selected">✓ Seçili</button>
+          <button class="gc-btn btn-selected">✓ ${t('stat_selected')}</button>
           ${upgBtn}
         </div>`;
       } else {
@@ -6582,21 +6580,21 @@ function renderTankGallery(cont){
     const _menzilVal = (tankEffectivePower(key)-20)/22;
     const _ruzgarVal = 1-tankEffectiveWindRes(key);
     const _tankInfoHtml = `
-      ${_tStatRow('Menzil',Math.min(1,_menzilVal),'#FF6B35','⚡'+tankEffectivePower(key).toFixed(1))}
-      ${_tStatRow('Rüzgar',_ruzgarVal,'#00C9B1',Math.round(_ruzgarVal*100)+'%')}
-      ${_tStatRow('Bonus',Math.min(1,_tBonNow/100),'#FFD700','+'+_tBonNow+'%')}
+      ${_tStatRow(t('stat_menzil'),Math.min(1,_menzilVal),'#FF6B35','⚡'+tankEffectivePower(key).toFixed(1))}
+      ${_tStatRow(t('stat_ruzgar'),_ruzgarVal,'#00C9B1',Math.round(_ruzgarVal*100)+'%')}
+      ${_tStatRow(t('stat_bonus'),Math.min(1,_tBonNow/100),'#FFD700','+'+_tBonNow+'%')}
       <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
-        ${_targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${_targetHPt.toLocaleString()} HP</b> karargah</div>`:''}
+        ${_targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${_targetHPt.toLocaleString()} HP</b> ${t('hq')}</div>`:''}
         ${(status==='owned'||status==='temp')?`<div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${_dmgT.toLocaleString()}</b> (${_amDef.name})${_dmgTNext?` → <b style="color:#00E676">${_dmgTNext.toLocaleString()}</b>`:''}</div>
-        <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${_shotsTColor}">${_shotsT} atış</b> gerekli${_shotsTNext&&_shotsTNext<Number(_shotsT)?` → <b style="color:#00E676">${_shotsTNext}</b>`:''}</div>
-        ${_tBonNext!==null?`<div style="color:rgba(255,255,255,0.4);font-size:10px;">Upgrade: +${_tBonNow}% → +${_tBonNext}% hasar bonusu</div>`:''}`:
-        `<div style="color:rgba(255,255,255,0.35);font-size:10px;">Menzil ${_td.maxPower} | Rüzgar direnci ${Math.round(_ruzgarVal*100)}%</div>`}
+        <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${_shotsTColor}">${_shotsT} ${t('shots_needed')}${_shotsTNext&&_shotsTNext<Number(_shotsT)?` → <b style="color:#00E676">${_shotsTNext}</b>`:''}</div>
+        ${_tBonNext!==null?`<div style="color:rgba(255,255,255,0.4);font-size:10px;">Upgrade: +${_tBonNow}% → +${_tBonNext}% ${t('upg_dmg_bonus')}</div>`:''}`:
+        `<div style="color:rgba(255,255,255,0.35);font-size:10px;">${t('stat_range')} ${_td.maxPower} | ${t('stat_windres')} ${Math.round(_ruzgarVal*100)}%</div>`}
       </div>`;
     card.innerHTML=`
       <div class="gc-icon">${def.icon}</div>
       <div class="gc-info">
-        <div class="gc-name">${def.name} ${badge}</div>
-        <div class="gc-desc">${st.desc}</div>
+        <div class="gc-name">${t('tank_'+key)||def.name} ${badge}</div>
+        <div class="gc-desc">${t('tank_desc_'+key)||st.desc}</div>
         ${_tankInfoHtml}
       </div>
       ${btnHtml}`;
@@ -6642,15 +6640,15 @@ function gcDialogConfirm(){
 
 function buyAmmo(type){
   const def=AMMO_DEF[type];
-  if(score<def.cost){SFX.locked();showToast('Yeterli puan yok!');return;}
+  if(score<def.cost){SFX.locked();showToast(t('not_enough_pts'));return;}
   showGcDialog({
     icon: def.emoji||'💣',
-    title: def.name+' Satin Al',
+    title: def.name+' '+t('dlg_buy'),
     desc: (AMMO_STATS[type]||{desc:''}).desc,
-    cost: def.cost+'  puan harcanacak',
+    cost: tFmt('dlg_pts_will_spend', {n: def.cost}),
     costLabel: '',
     btnClass: 'confirm-buy',
-    btnText: 'Onayla - Satin Al',
+    btnText: t('dlg_confirm')+' - '+t('dlg_buy'),
     action: function(){
       score-=def.cost;
       if(!ownedAmmo.includes(type)) ownedAmmo.push(type);
@@ -6659,22 +6657,22 @@ function buyAmmo(type){
       lsSet('owned_ammo', JSON.stringify(ownedAmmo));
       lsSet('sel_ammo', selectedAmmo);
       SFX.buy(); updateGalleryScore(); updateUI(); renderGallery();
-      showToast(def.emoji+' '+def.name+' satin alindi!');
+      showToast(def.emoji+' '+tFmt('toast_purchased', {name: def.name}));
     }
   });
 }
 
 function buyTank(type){
   const def=TANK_DEF_GALLERY[type];
-  if(score<def.cost){SFX.locked();showToast('Yeterli puan yok!');return;}
+  if(score<def.cost){SFX.locked();showToast(t('not_enough_pts'));return;}
   showGcDialog({
     icon: def.emoji||'🚗',
-    title: def.name+' Satin Al',
+    title: def.name+' '+t('dlg_buy'),
     desc: (TANK_STATS[type]||{desc:''}).desc,
-    cost: def.cost+' puan harcanacak',
+    cost: tFmt('dlg_pts_will_spend', {n: def.cost}),
     costLabel: '',
     btnClass: 'confirm-buy',
-    btnText: 'Onayla - Satin Al',
+    btnText: t('dlg_confirm')+' - '+t('dlg_buy'),
     action: function(){
       score-=def.cost;
       if(!ownedTanks.includes(type)) ownedTanks.push(type);
@@ -6683,7 +6681,7 @@ function buyTank(type){
       lsSet('owned_tanks', JSON.stringify(ownedTanks));
       lsSet('sel_tank', selectedTank);
       SFX.buy(); updateGalleryScore(); updateUI(); renderGallery();
-      showToast(def.emoji+' '+def.name+' satin alindi!');
+      showToast(def.emoji+' '+tFmt('toast_purchased', {name: def.name}));
     }
   });
 }
@@ -6691,54 +6689,50 @@ function buyTank(type){
 // ── Upgrade fonksiyonları ─────────────────────────────────────────
 function upgradeAmmo(type){
   const curLvl = ammoUpgrades[type]||0;
-  if(curLvl>=UPGRADE_MAX){showToast('Maksimum seviyeye ulasildi!');return;}
+  if(curLvl>=UPGRADE_MAX){showToast(t('toast_max_level'));return;}
   const cost = AMMO_UPGRADE_COSTS[curLvl];
-  if(score<cost){SFX.locked();showToast('Yeterli puan yok! ('+cost+')');return;}
+  if(score<cost){SFX.locked();showToast(t('not_enough_pts')+' ('+cost+')');return;}
   const def=AMMO_DEF[type];
   showGcDialog({
     icon: def.emoji||'💣',
-    title: def.name+' Yukselt',
-    desc: 'Seviye '+(curLvl+1)+' → '+(curLvl+2)+'. Hasar %25 artar.',
-    cost: cost+' puan harcanacak',
+    title: def.name+' '+t('dlg_upgrade'),
+    desc: t('upg_level')+' '+(curLvl+1)+' → '+(curLvl+2)+'. '+t('upg_dmg25'),
+    cost: tFmt('dlg_pts_will_spend', {n: cost}),
     costLabel: '',
     btnClass: 'confirm-upg',
-    btnText: 'Yukselt',
+    btnText: t('dlg_upgrade'),
     action: function(){
       score-=cost;
       ammoUpgrades[type]=(curLvl+1);
       lsSet('total_score', score);
       lsSet('ammo_upgrades', JSON.stringify(ammoUpgrades));
       SFX.upgrade(); updateGalleryScore(); updateUI(); renderGallery();
-      showToast(def.emoji+' '+def.name+' Sv'+(curLvl+2)+'! (+25% hasar)');
+      showToast(def.emoji+' '+def.name+' '+t('toast_upg_ammo').replace('{n}',curLvl+2));
     }
   });
 }
 
 function upgradeTank(type){
   const curLvl = tankUpgrades[type]||0;
-  if(curLvl>=UPGRADE_MAX){showToast('Maksimum seviyeye ulasildi!');return;}
+  if(curLvl>=UPGRADE_MAX){showToast(t('toast_max_level'));return;}
   const cost = TANK_UPGRADE_COSTS[curLvl];
-  const totalStars = getTotalStars();
-  if(totalStars<cost){SFX.locked();showToast('Yeterli yildiz yok! ('+cost+')');return;}
+  if(score<cost){SFX.locked();showToast(t('not_enough_pts')+' ('+cost+')');return;}
   const def = TANK_DEF_GALLERY[type]||{};
   showGcDialog({
     icon: def.emoji||'🚗',
-    title: (def.name||type)+' Yukselt',
-    desc: 'Seviye '+(curLvl+1)+' → '+(curLvl+2)+'. Hasar bonusu %20 artar.',
-    cost: cost+' yildiz harcanacak',
+    title: (def.name||type)+' '+t('dlg_upgrade'),
+    desc: t('upg_level')+' '+(curLvl+1)+' → '+(curLvl+2)+'. '+t('upg_dmg20'),
+    cost: tFmt('dlg_pts_will_spend', {n: cost}),
     costLabel: '',
     btnClass: 'confirm-upg',
-    btnText: 'Yukselt',
+    btnText: t('dlg_upgrade'),
     action: function(){
-      let toSpend=cost;
-      for(let i=1;i<=LEVELS.length&&toSpend>0;i++){
-        const cur=parseInt(lsGet('stars_'+i)||'0');
-        if(cur>0){const take=Math.min(cur,toSpend);lsSet('stars_'+i,cur-take);toSpend-=take;}
-      }
+      score -= cost;
+      lsSet('total_score', score);
       tankUpgrades[type]=(curLvl+1);
       lsSet('tank_upgrades', JSON.stringify(tankUpgrades));
-      SFX.upgrade(); renderGallery();
-      showToast('Tank Sv'+(curLvl+2)+'! (+20% hasar)');
+      SFX.upgrade(); updateGalleryScore(); updateUI(); renderGallery();
+      showToast(t('toast_upg_tank').replace('{n}',curLvl+2));
     }
   });
 }
@@ -6751,10 +6745,11 @@ function adAmmo(type){
     _adAmmoPending = type;
     const desc = document.getElementById('ammo-replace-desc');
     if(desc) desc.innerHTML =
-      'Elinde <b style="color:#FFD700">' + curDef.name + '</b> var ' +
-      '(<b style="color:#FF6B35">' + kalan + ' level kaldı</b>).<br><br>' +
-      'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve ' +
-      'yerine <b style="color:#FFD700">' + newDef.name + '</b> gelir.';
+      t('swap_has')+' <b style="color:#FFD700">'+curDef.name+'</b>'+(t('swap_var')?' '+t('swap_var'):'')+' ' +
+      '(<b style="color:#FF6B35">' + kalan + ' '+t('swap_left')+'</b>).<br><br>'
+      +(_curLang==='tr'
+        ? 'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve yerine <b style="color:#FFD700">'+newDef.name+'</b> gelir.'
+        : 'Continuing will reset this and replace with <b style="color:#FFD700">'+newDef.name+'</b>.');
     const bg = document.getElementById('ammo-replace-bg');
     if(bg) bg.style.display = 'flex';
     return;
@@ -6762,11 +6757,11 @@ function adAmmo(type){
   const _def = AMMO_DEF[type];
   showGcDialog({
     icon: _def.emoji||'💣',
-    title: _def.name+' Dene',
-    desc: 'Reklam izleyerek '+(_def.tempLevels||1)+' level boyunca kullanabilirsin.',
+    title: _def.name+' '+t('dlg_try_title'),
+    desc: t('dlg_ad_use').replace('{n}', (_def.tempLevels||1)),
     cost: '',
     btnClass: 'confirm-ad',
-    btnText: 'Reklami Izle',
+    btnText: t('dlg_watch_ad'),
     action: function(){
       if(isSandbox){ giveAdAmmo(type); return; }
       try{ Android.showRewardedAd('ammo_'+type); }
@@ -6801,7 +6796,7 @@ function giveAdAmmo(type){
   lsSet('temp_ammo', JSON.stringify(tempAmmo));
   lsSet('sel_ammo', selectedAmmo);
   renderGallery();
-  showToast(def.emoji+' '+def.name+' 1 level için aktif!');
+  showToast(def.emoji+' '+def.name+' '+t('toast_active').replace('{n}',1));
 }
 
 function adTank(type){
@@ -6813,10 +6808,11 @@ function adTank(type){
     _adTankPending = type;
     const desc = document.getElementById('tank-replace-desc');
     if(desc) desc.innerHTML =
-      'Elinde <b style="color:#FFD700">' + (curDef?curDef.name:tempTank.type) + '</b> var ' +
-      '(<b style="color:#FF6B35">' + kalan + ' level kaldı</b>).<br><br>' +
-      'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve ' +
-      'yerine <b style="color:#FFD700">' + newDef.name + '</b> gelir.';
+      (_curLang==='tr'?'Elinde ':'You have ')+' <b style="color:#FFD700">'+(curDef?curDef.name:tempTank.type)+'</b>'+(_curLang==='tr'?' var ':' ') +
+      '(<b style="color:#FF6B35">' + kalan + ' '+t('swap_left')+'</b>).<br><br>'
+      +(_curLang==='tr'
+        ? 'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve yerine <b style="color:#FFD700">'+newDef.name+'</b> gelir.'
+        : 'Continuing will reset this and replace with <b style="color:#FFD700">'+newDef.name+'</b>.');
     const bg = document.getElementById('tank-replace-bg');
     if(bg) bg.style.display = 'flex';
     return;
@@ -6824,11 +6820,11 @@ function adTank(type){
   const _tdef = TANK_DEF_GALLERY[type]||{};
   showGcDialog({
     icon: _tdef.emoji||'🚗',
-    title: (_tdef.name||type)+' Dene',
-    desc: 'Reklam izleyerek '+(_tdef.tempLevels||1)+' level boyunca kullanabilirsin.',
+    title: (_tdef.name||type)+' '+t('dlg_try_title'),
+    desc: t('dlg_ad_use').replace('{n}', (_tdef.tempLevels||1)),
     cost: '',
     btnClass: 'confirm-ad',
-    btnText: 'Reklami Izle',
+    btnText: t('dlg_watch_ad'),
     action: function(){
       if(isSandbox){ giveAdTank(type); return; }
       try{ Android.showRewardedAd('tank_'+type); }
@@ -6864,7 +6860,7 @@ function giveAdTank(type){
   lsSet('temp_tank', JSON.stringify(tempTank));
   lsSet('sel_tank', selectedTank);
   renderGallery();
-  showToast(def.emoji+' '+def.name+' '+def.tempLevels+' level için aktif!');
+  showToast(def.emoji+' '+def.name+' '+t('toast_active').replace('{n}',def.tempLevels));
 }
 
 // Slot tooltip — hover
@@ -6925,7 +6921,7 @@ function hideAmmoTip(){}
 
 function selectAmmo(type){
   const status=hasAmmo(type);
-  if(status==='locked'){showToast('🔒 Kilitli — Galeriden al!');return;}
+  if(status==='locked'){showToast(t('locked_gallery'));return;}
   // Aktif slota yerleştir
   slots[activeSlotIdx]=type;
   saveSlots();
@@ -7320,32 +7316,32 @@ function buyTempDmgBoost(){
   const _baseLevel3 = (typeof pendingLevelIdx!=='undefined'&&pendingLevelIdx>0) ? pendingLevelIdx : (curLevel||0);
   tempDmgBoost = { expiresAtLevel: _baseLevel3 + 3 };
   lsSet('temp_dmg_boost', JSON.stringify(tempDmgBoost));
-  showToast('💥 2x Hasar aktif! 3 level boyunca.');
+  showToast(t('toast_2x_active'));
   updateBoostBadge();
   if(galleryTab === 'boost') renderGallery();
 }
 
 // 2x Hasar kalıcı upgrade
 function buyPermDmgBoost(){
-  if(dmgBoostLevel >= 3){ showToast('Maksimum seviyede!'); return; }
+  if(dmgBoostLevel >= 3){ showToast(t('toast_max_level_short')); return; }
   const nextLvl = dmgBoostLevel + 1;
   const cost = DMG_BOOST_COSTS[nextLvl];
-  if(score < cost){ SFX.locked(); showToast('Yeterli puan yok! ('+cost+')'); return; }
+  if(score < cost){ SFX.locked(); showToast(t('not_enough_pts')+' ('+cost+')'); return; }
   showGcDialog({
     icon: '💥',
-    title: '2x Hasar Sv'+nextLvl,
-    desc: 'Kalici hasar artisi. Tum mermiler x'+DMG_BOOST_MULT[nextLvl]+' hasar yapar.',
-    cost: cost+' puan harcanacak',
+    title: tFmt('dlg_dmg_perm_title', {lv: nextLvl}),
+    desc: tFmt('dlg_dmg_perm_desc', {mult: DMG_BOOST_MULT[nextLvl]}),
+    cost: tFmt('dlg_pts_will_spend', {n: cost}),
     costLabel: '',
     btnClass: 'confirm-buy',
-    btnText: 'Satin Al',
+    btnText: t('dlg_buy'),
     action: function(){
       score -= cost;
       lsSet('total_score', score);
       dmgBoostLevel = nextLvl;
       lsSet('dmg_boost_level', dmgBoostLevel);
       updateUI(); renderGallery();
-      showToast('Hasar Sv'+dmgBoostLevel+' aktif! (x'+DMG_BOOST_MULT[dmgBoostLevel]+')');
+      showToast(tFmt('toast_dmg_active', {lv: dmgBoostLevel, mult: DMG_BOOST_MULT[dmgBoostLevel]}));
     }
   });
 }
@@ -7488,7 +7484,7 @@ function onWatchAdForStars(){
   const key = 'star_ad_'+today;  // shop'a özel key
   const used = parseInt(lsGet(key)||'0');
   if(used >= 3){
-    showToast('Bugün yıldız reklamı limitine ulaştın! (3/3)');
+    showToast(t('toast_star_ad_limit'));
     return;
   }
   lsSet(key, used+1);
@@ -7510,7 +7506,7 @@ function giveAdStars(count){
       added++;
     }
   }
-  showToast('+'+(added)+' yıldız kazandın!');
+  showToast(tFmt('toast_stars_won', {n: added}));
   updateUI();
   const starsNow=getThemeStars(themeIdx);
   const gateOv=document.getElementById('theme-gate-overlay');
@@ -7569,7 +7565,7 @@ function refreshStarShopUI(){
 function buyStarWithPoints(count){
   const cost = count===1 ? 200 : 500;
   const pts=parseInt(lsGet('total_score')||'0');
-  if(pts<cost){ showToast('Yeterli puan yok!'); return; }
+  if(pts<cost){ showToast(t('not_enough_pts')); return; }
   // Önce kaç yıldız eklenebileceğini kontrol et
   const themeIdx=Math.floor(curLevel/10);
   const startId=themeIdx*10+1;
@@ -7578,7 +7574,7 @@ function buyStarWithPoints(count){
     if(parseInt(lsGet('stars_'+i)||'0')<3) canAdd++;
   }
   if(canAdd===0){
-    showToast('Bu temadaki tüm levellar zaten 3 yıldızlı! 🌟');
+    showToast(t('toast_theme_full'));
     return; // Para düşme!
   }
   // Puanı düş
@@ -7594,7 +7590,7 @@ function buyStarWithPoints(count){
       added++;
     }
   }
-  showToast('+'+added+' yıldız kazandın! (-'+cost+' puan)');
+  showToast(tFmt('toast_stars_bought', {n: added, cost: cost}));
   updateUI();
   refreshStarShopUI();
   // Gate overlay güncelle — kapalı olsa bile 20 yıldıza ulaşınca geç
@@ -7617,7 +7613,7 @@ function buyStarWithPoints(count){
       else { loadLevel(curLevel+1); }
     } else {
       // Son level değil ama 20 yıldıza ulaşıldı — sadece toast
-      showToast('🎉 Tema yıldızı tamamlandı! Sonraki tema hazır.');
+      showToast(t('toast_theme_star_done'));
     }
   }
 }
@@ -7628,7 +7624,7 @@ function themeGateWatchAd(){
   const key = 'tgate_ad_'+today;  // themeGate'e özel key
   const used = parseInt(lsGet(key)||'0');
   if(used >= 3){
-    showToast('Bugün tema geçiş reklamı limitine ulaştın! (3/3)');
+    showToast(t('toast_theme_ad_limit'));
     const btn = document.getElementById('tgo-ad-btn');
     if(btn){ btn.disabled=true; btn.style.opacity='0.45'; btn.textContent='📺 Limit Doldu (3/3)'; }
     return;
@@ -7726,7 +7722,7 @@ function updatePowerBarOnly(){
 
 function updateUI(){
   const th2=currentTheme||THEMES.valley;
-  document.getElementById('hud-level').textContent=th2.emoji+' '+lv.id+' — '+lv.name;
+  document.getElementById('hud-level').textContent=th2.emoji+' '+lv.id+' — '+tLevel(lv.name);
   document.getElementById('hud-shots').textContent='💣 '+shotsLeft;
   document.getElementById('hud-score').textContent='🏆 '+score;
   document.getElementById('hud-stars').textContent='⭐ '+getTotalStars();
@@ -7882,6 +7878,812 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
   window.addEventListener('pagehide', scheduleIfNeeded);
   window.addEventListener('beforeunload', scheduleIfNeeded);
 })();
+
+// Dil uygula
+setTimeout(applyLang, 100);
+
+// ── Dil sistemi ──────────────────────────────────────────────────
+const LANG = {
+  tr: {
+    fire:           'ATES!',
+    inventory:      '⚔️ Envanter',
+    battle:         'SAVASA GIR! →',
+    map:            '🗺️ Harita',
+    close:          'Kapat',
+    settings:       '⚙️ Ayarlar',
+    sfx:            '🔊 Efektler',
+    music:          '🎵 Muzik',
+    sound_label:    'SES',
+    data_label:     'VERİ',
+    lang_label:     'DİL',
+    reset_slots:    '🔧 Slotlari Sifirla',
+    reset_all:      '🗑️ Tum Veriyi Sifirla',
+    cloud:          '☁️ Bulut Kayit',
+    dev_mode:       '⚙️ Gelistirici Modu',
+    detail:         'detay icin dokun',
+    next_level:     'NEXT LEVEL →',
+    retry:          'RETRY',
+    back_map:       '🗺️ Haritaya Don',
+    not_enough:     'Yeterli puan yok!',
+    not_enough_star:'Yeterli yildiz yok!',
+    bought:         'satin alindi!',
+    upgraded:       'yukseltildi!',
+    select:         'Sec',
+    buy:            'Satin Al',
+    ad_watch:       'Reklam Izle',
+    confirm:        'Onayla',
+    cancel:         'Vazgec',
+    locked:         'Kilitli',
+    theme_valley:    'Yeşil Vadi',
+    theme_desert:    'Çöl',
+    theme_snow:      'Karlı Dağlar',
+    theme_forest:    'Orman',
+    theme_rocky:     'Kayalık',
+    theme_meadow:    'Çayır',
+    theme_volcano:   'Yanardağ',
+    theme_nightcity: 'Gece Şehri',
+    theme_tropical:  'Tropik',
+    theme_skyislands:'Gökyüzü Adaları',
+    theme_cloudy:    'Bulutlu',
+    theme_rainy:     'Fırtına',
+    theme_snowyweather:'Kar Fırtınası',
+    'Training Ground':'Eğitim Alanı', 'Hill Country':'Tepe Ülkesi', 'Twin Peaks':'İkiz Tepeler',
+    'Foggy Valley':'Sisli Vadi', 'Iron Fortress':'Demir Kale', 'Canyon Run':'Kanyon Koşusu',
+    'River Crossing':'Nehir Geçişi', 'Green Hell':'Yeşil Cehennem', 'Valley Storm':'Vadi Fırtınası', 'Final Valley':'Son Vadi',
+    'Sand Dunes':'Kum Tepeleri', 'Mirage':'Serap', 'Scorched Earth':'Yanmış Toprak',
+    'Camel Pass':'Deve Geçidi', 'Desert Fort':'Çöl Kalesi', 'Oasis Siege':'Vaha Kuşatması',
+    'Sandstorm':'Kum Fırtınası', 'Dune Climber':'Kum Tırmanıcısı', 'Pyramid Rush':'Piramit Hücumu', 'Desert King':'Çöl Kralı',
+    'Frozen Pass':'Donmuş Geçit', 'Blizzard':'Tipi', 'Ice Fort':'Buz Kalesi',
+    'Avalanche':'Çığ', 'White Out':'Beyaz Fırtına', 'Frozen River':'Donmuş Nehir',
+    'Snow Blind':'Kar Körlüğü', 'Arctic Base':'Arktik Üs', 'Polar Storm':'Kutup Fırtınası', 'Ice King':'Buz Kralı',
+    'Dark Woods':'Karanlık Orman', 'Fog of War':'Savaş Sisi', 'Forest Fort':'Orman Kalesi',
+    'Night Hunt':'Gece Avı', 'Deep Forest':'Derin Orman', 'Misty Ridge':'Sisli Sırt',
+    'Jungle Base':'Orman Üssü', 'Shadow War':'Gölge Savaşı', 'Forest King':'Orman Kralı', 'Final Forest':'Son Orman',
+    'Rock Slide':'Kaya Çığı', 'Cliff Edge':'Uçurum Kenarı', 'Stone Fort':'Taş Kale',
+    'Eagle Nest':'Kartal Yuvası', 'Rocky Road':'Kayalık Yol', 'Crumble Zone':'Çöküş Bölgesi',
+    'Fault Line':'Fay Hattı', 'Stone King':'Taş Kral', 'Rock Siege':'Kaya Kuşatması', 'Final Rocky':'Son Kayalık',
+    'Sunny Field':'Güneşli Tarla', 'Golden Hill':'Altın Tepe', 'Meadow Fort':'Çayır Kalesi',
+    'Sunset Run':'Gün Batımı Koşusu', 'Pasture War':'Otlak Savaşı', 'Rolling Hills':'Dalgalı Tepeler',
+    'Windmill':'Yel Değirmeni', 'Farm Siege':'Çiftlik Kuşatması', 'Golden King':'Altın Kral', 'Final Meadow':'Son Çayır',
+    'Lava Flow':'Lav Akışı', 'Ash Cloud':'Kül Bulutu', 'Magma Ridge':'Magma Sırtı',
+    'Fire Storm':'Ateş Fırtınası', 'Eruption':'Patlama', 'Crater War':'Krater Savaşı',
+    'Burning Siege':'Yanık Kuşatma', 'Inferno':'Cehennem', 'Lava King':'Lav Kralı', 'Final Volcano':'Son Yanardağ',
+    'Neon Alley':'Neon Sokağı', 'City Lights':'Şehir Işıkları', 'Dark District':'Karanlık Semt',
+    'Rooftop War':'Çatı Savaşı', 'Night Siege':'Gece Kuşatması', 'Midnight Run':'Gece Yarısı Koşusu',
+    'City Under Fire':'Alev Alan Şehir', 'Blackout':'Karartma', 'Neon King':'Neon Kral', 'Final City':'Son Şehir',
+    'Palm Beach':'Palmiye Sahili', 'Coral Reef':'Mercan Resifi', 'Island Siege':'Ada Kuşatması',
+    'Tidal Wave':'Gelgit Dalgası', 'Jungle War':'Orman Savaşı', 'Paradise Lost':'Kayıp Cennet',
+    'Ocean Fort':'Okyanus Kalesi', 'Storm Island':'Fırtına Adası', 'Tropical King':'Tropik Kral', 'Final Island':'Son Ada',
+    'Cloud Step':'Bulut Adımı', 'Island Hop':'Ada Atlaması', 'Sky Fort':'Gökyüzü Kalesi',
+    'Wind War':'Rüzgar Savaşı', 'High Siege':'Yüksek Kuşatma', 'Above All':'Hepsinin Üstünde',
+    'Storm Cloud':'Fırtına Bulutu', 'Sky Siege':'Gökyüzü Kuşatması', 'Island King':'Ada Kralı', 'Final Sky':'Son Gökyüzü',
+    'Foggy Start':'Sisli Başlangıç', 'Low Cloud':'Alçak Bulut', 'Tree Top':'Ağaç Tepesi',
+    'Cloud Cover':'Bulut Örtüsü', 'Mist War':'Sis Savaşı', 'Grey Siege':'Gri Kuşatma',
+    'Storm Prep':'Fırtına Hazırlığı', 'Cloud Fort':'Bulut Kalesi', 'Grey King':'Gri Kral', 'Final Cloud':'Son Bulut',
+    'First Drop':'İlk Damla', 'Downpour':'Sağanak', 'Mud Run':'Çamur Koşusu',
+    'Rain Siege':'Yağmur Kuşatması', 'Storm Fort':'Fırtına Kalesi', 'Flash Flood':'Ani Sel',
+    'Rain King':'Yağmur Kralı', 'Thunder War':'Gök Gürültüsü Savaşı', 'Deluge':'Tufan', 'Final Storm':'Son Fırtına',
+    'First Snow':'İlk Kar', 'Blizzard Run':'Tipi Koşusu', 'White Out':'Beyaz Fırtına',
+    'Snow Siege':'Kar Kuşatması', 'Ice Storm':'Buz Fırtınası', 'Freeze War':'Don Savaşı',
+    'Snow Fort':'Kar Kalesi', 'Arctic Wind':'Arktik Rüzgar', 'Snow King':'Kar Kralı', 'Final Snow':'Son Kar',
+    stars_needed:   'yıldız daha gerekli',
+    mat_wood:   '🚪 Tahta',
+    mat_iron:   '⚙️ Demir',
+    mat_steel:  '🛡️ Çelik',
+    mat_concrete:'🧱 Beton',
+    locked_gallery: '🔒 Kilitli — Galeriden al!',
+    owned:          'Sahipsin',
+    map_title:      '🗺️ Level Haritasi',
+    swap_title_tank: 'Tank Degistir?',
+    swap_title_ammo: 'Silah Degistir?',
+    swap_iptal:      'Iptal',
+    swap_switch:     'Degistir',
+    swap_has:     'Elinde',
+    swap_var:     'var',
+    swap_left:    'level kaldi',
+    swap_cont:    'Devam edersen bu hakkin',
+    swap_reset:   'sifirlanir',
+    swap_replace: 've yerine',
+    swap_comes:   'gelir.',
+    tab_ammo:       '💣 Mühimmat',
+    tab_boost:      '🛡️ Güçlendirmeler',
+    tab_tank:       'Tank',
+    gallery_title:  '⚔️ CEPHANE GALERİSİ',
+    ad_watch_pts:   '📺 Reklam İzle → Puan Kazan',
+    stat_dmg:       'Hasar',
+    ammo_normal:'Normal', ammo_ap:'Zırh Delici', ammo_explosive:'Patlayici',
+    ammo_cluster:'Kume Bombasi', ammo_piercer:'Delici', ammo_napalm:'Napalm',
+    ammo_split:'Bolucii', ammo_triple:'Uclu', ammo_bunker:'Signak Kirici', ammo_nuclear:'Nukleer',
+    desc_normal:'Tahta karargahi 1 atista yok eder',
+    desc_ap:'Zirhi deler. Demir ve celik icin sart',
+    desc_explosive:'Genis alan hasari, orta zirh',
+    desc_cluster:'3 parcaya bolunur, genis etki',
+    desc_piercer:'Celigi deler, yuksek tek hasar',
+    desc_napalm:'Genis alan + yanma efekti',
+    desc_split:'3e bolunur, hem guclu hem genis',
+    desc_triple:'3 mermi ayni anda, yuksek hasar',
+    desc_bunker:'Topragi deler, gomulu hedefe ulasir',
+    desc_nuclear:'Her seyi yok eder',
+    stat_armor:     'Zırh',
+    stat_area:      'Alan',
+    shots_needed:   'atış gerekli',
+    not_enough_pts: 'Yeterli puan yok!',
+    dlg_buy:        'Satin Al',
+    dlg_watch_ad:   'Reklami Izle',
+    dlg_confirm:    'Onayla',
+    dlg_cancel:     'Vazgec',
+    dlg_upgrade:    'Yukselt',
+    dlg_pts_cost:   'puan harcanacak',
+    dlg_star_cost:  'yildiz harcanacak',
+    dlg_try:        'level dene',
+    dlg_try_title: 'Dene',
+    tank_basic:    'Basic',
+    tank_upgraded: 'Upgraded',
+    tank_elite:    'Elite',
+    tank_titan:    'Titan',
+    stat_menzil:   'Menzil',
+    stat_ruzgar:   'Ruzgar',
+    stat_bonus:    'Bonus',
+    stat_selected: 'Secili',
+    stat_range:    'Menzil',
+    upg_dmg_bonus: 'hasar bonusu',
+    upg_level:     'Seviye',
+    upg_dmg25:     'Hasar %25 artar.',
+    toast_upg_ammo: 'Sv{n}! (+25% hasar)',
+    toast_active:   '{n} level icin aktif!',
+    toast_upg_tank: 'Tank Sv{n}! (+20% hasar)',
+    upg_dmg20:     'Hasar bonusu %20 artar.',
+    stat_windres:  'Ruzgar direnci',
+    tank_desc_basic:   'Baslangic tanki, kisa menzil',
+    tank_desc_upgraded:'Dengeli, ekstra zirh plakalari',
+    tank_desc_elite:   'Uzun menzil, anten, guclu',
+    tank_desc_titan:   'Maksimum guc, krom kaplama',
+    dlg_ad_use:     'Reklam izleyerek {n} level boyunca kullanabilirsin.',
+    not_enough_star:'Yeterli yıldız yok!',
+    hq:             'karargah',
+    shot:           'atış',
+    base_dmg:       'Temel hasar',
+    level_left:     'level kaldı',
+    hak:            'hak',
+    owned_badge:    '✅ Sahipsin',
+    locked_badge:   '🔒 Kilitli',
+    select_btn:     'Seç',
+    upgrade_btn:    'Yükselt',
+    free_btn:       'Üretsiz',
+    cancel:         'Vazgeç',
+    confirm:        'Onayla',
+    ad_watch:       '📺 Reklamı İzle',
+    tank_card_change:   '🔄 Değiştir',
+    tank_select_title:  '🔄 Tank Seç',
+    shield_title:       '🛡️ Rüzgar Kalkanı',
+    shield_desc:        'Bu level için rüzgar engellenir.',
+    shield_current:     'Mevcut rüzgar:',
+    shield_ad_btn:      '📺 Reklam İzle — Ücretsiz',
+    shield_pts_btn:     'Puan Harca',
+    shield_cancel:      '✕ Vazgeç',
+    slot_card_change:   '🔄 Değiştir',
+    ammo_select_title:  '🔄 Mermi Seç',
+    ammo_select_close:  '✕ Kapat',
+    gallery_new_ammo:   '⚔️ Galeri — Yeni Mermi Al',
+    extra_ammo_btn:     '📺 Reklam İzle → +3 Atış',
+    drag_to_aim:        '◀ NİŞAN AL',
+    loading:            'Hazırlanıyor...',
+    tactical_title:     '🎯 Taktik Görüş',
+    windblock_title:    '💨 Rüzgar Engelleyici',
+    dmgboost_title:     '💥 Hasar Yükseltici',
+    lsc_inventory:      '⚔️ Envanter',
+    lsc_battle:         '▶ Savaşa Gir!',
+    streak_title:       '🔥 Giriş Serisi',
+    confirm_cancel:     'İptal',
+    confirm_reset:      'Sıfırla',
+    tgo_completed:      'TEMA TAMAMLANDI!',
+    tgo_ad_btn:         '📺 Reklam İzle → +2 ⭐',
+    tgo_buy_star:       '⭐ Puan ile Yıldız Al',
+    tgo_back_map:       '🗺️ Önceki Levellara Dön',
+    ss_title:           'YILDIZ MAĞAZASI',
+    ss_pts_for_star:    '🏆 PUAN İLE YILDIZ',
+    ss_buy_1star:       'puan',
+    ss_to_star:         '→',
+    ss_ad_label:        '📺 REKLAM İZLE',
+    ss_ad_btn:          'Reklam İzle → +2 ⭐',
+    ss_close:           'Kapat',
+    theme_unlocked:     'YENİ TEMA AÇILDI!',
+    theme_go:           '🚀 Yeni Temaya Geç!',
+    ammo_replace_warn:  'Geçici Mühimmat Var!',
+    ammo_replace_cancel:'❌ İptal',
+    ammo_replace_ok:    '✅ Devam Et',
+    piercer_title:      'Zırhlı Hedef!',
+    piercer_body:        'Bu hedef <b style="color:#FFD700;">çelik zırhlı</b> — normal mühimmat yetersiz kalır.<br><br>⚡ <b style="color:#CE93D8;">Piercer</b> ile zırhı del, tek atışta büyük hasar ver.<br><span style="color:rgba(255,255,255,0.45);font-size:11px;">1 level geçerli</span>',
+    piercer_ad_btn:     '📺 Reklam İzle → Piercer Al',
+    piercer_buy_btn:    '🛒 Satın Al',
+    piercer_skip:       'Şimdi değil',
+    tactical_hint_title:'Rota Kayboldu!',
+    tactical_hint_body:  'Level 15 sonrasında rota çizgisi kapanır.<br><br>🎯 <b style="color:#00E5FF;">Taktik Görüş</b> ile rotayı, düşme noktasını ve rüzgar yönünü tekrar görebilirsin.',
+    tactical_ad_btn:    '📺 Reklam İzle → 3 Level Aç',
+    tactical_perm_btn:  '🛡️ Güçlendirmeler\'den Kalıcı Al',
+    guided_title:       'Mağara Hedefi!',
+    guided_body:         'Hedef mağara içinde gizli.<br><br>🎯 <b style="color:#FF6B35;">Isıya Güdümlü Başlık</b> ile mermin ısı kaynağına otomatik yönelir.<br><span style="color:rgba(255,255,255,0.45);font-size:11px;">Bu level için geçerli</span>',
+    guided_ad_btn:      '📺 Reklam İzle → 1 Level Aç',
+    guided_perm_btn:    '⚡ Güçlendirmeler\'den Al',
+    login_bonus_title:  'Günlük Giriş!',
+    login_bonus_btn:    'Harika! Oynamaya Başla 🎮',
+    version_ok:         'Tamam',
+    buried_title:       'Gömülü Hedef',
+    buried_body:        'Bu hedef toprak altında gizli.<br><br>Normal silahlar <b style="color:#FFB74D;">az hasar</b> verir.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>💥 Güçlü patlamalar terreni <b style="color:#FFD700;">sarsarak</b> hedefi açığa çıkarabilir.',
+    buried_ok:          'Anladım',
+    cloud_title:        '☁️ Bulut Kayıt',
+    cloud_signin:       'Google Play Games Giriş',
+    cloud_save_now:     'Şimdi Kaydet',
+    cloud_load:         'Buluttan Yükle',
+    cloud_signout:      'Hesap Değiştir / Çıkış',
+    cloud_hint_title:   'Hesap değiştirmek için:',
+    cloud_hint_body:    '1. <b style="color:rgba(255,255,255,0.75);">Ayarlar</b> uygulamasını aç<br>2. <b style="color:rgba(255,255,255,0.75);">Google</b> bölümüne gir<br>3. <b style="color:rgba(255,255,255,0.75);">Google Hizmetleri</b> veya <b style="color:rgba(255,255,255,0.75);">Tüm Hizmetler</b> sekmesini seç<br>4. <b style="color:rgba(255,255,255,0.75);">Play Games</b> üzerine dokun<br>5. <b style="color:rgba(255,255,255,0.75);">Oturum Açılan Hesap</b> yazısına dokun<br>6. İstediğin hesabı seç veya <b style="color:rgba(255,255,255,0.75);">Tüm Oyunlardan Çıkış Yap</b> seçeneğini kullan<br>7. Oyuna geri dön ve <b style="color:rgba(255,255,255,0.75);">Giriş Yap</b> tuşuna bas',
+    cloud_auto_save:    'Level tamamlandığında otomatik kaydedilir.',
+    lives_title:        '❤️ Canlar',
+    lives_count_suffix: 'can',
+    lives_next:         'Sonraki can:',
+    lives_minutes:      'dakika',
+    lives_full:         'Canlar dolu!',
+    lives_info:         'Her 20 dakikada 1 can dolar. Maksimum 5 can.',
+    lives_ad_info:      'Reklam ile günlük 3 can kazanabilirsin.',
+    toast_2x_expired:   '2x Hasar geçici süresi bitti.',
+    toast_self_hit:     '💥 Kendi tankını vurdun! {n} can kaldı',
+    toast_ap_won:       '🔩 AP Mühimmat kazandın!',
+    toast_exp_won:      '💥 Patlayıcı Mühimmat kazandın!',
+    toast_unlock_at:    'Level {n}\'de açılır 🔒',
+    toast_shield_on:    '🛡️ Kalkan aktif! Rüzgar engellendi.',
+    toast_near_miss:    '💥 Yakın ıskalama! -{n} HP',
+    toast_tip:          '💡 {msg}',
+    toast_ad_limit:     'Günlük reklam limitine ulaştın!',
+    toast_pts_won:      '+200 puan kazandın! 🏆',
+    toast_2x_active:    '💥 2x Hasar aktif! 3 level boyunca.',
+    toast_star_ad_limit:'Bugün yıldız reklamı limitine ulaştın! (3/3)',
+    toast_stars_won:    '+{n} yıldız kazandın!',
+    toast_theme_full:   'Bu temadaki tüm levellar zaten 3 yıldızlı! 🌟',
+    toast_stars_bought: '+{n} yıldız kazandın! (-{cost} puan)',
+    toast_theme_star_done:'🎉 Tema yıldızı tamamlandı! Sonraki tema hazır.',
+    toast_theme_ad_limit:'Bugün tema geçiş reklamı limitine ulaştın! (3/3)',
+    toast_3_ammo_won:   '💣 +3 atış kazandın!',
+    toast_tactic_after15:'🎯 Level 15\'ten sonra kullanılır!',
+    toast_tac_ad_limit: 'Bugün Taktik Görüş reklam limitine ulaştın! (3/3)',
+    toast_no_wind:      '💨 Bu levelde rüzgar yok!',
+    toast_wb_ad_limit:  'Bugün Rüzgar Engelleyici limitine ulaştın! (3/3)',
+    toast_no_wind_refund:'💨 Bu levelde rüzgar yok, hak geri eklendi!',
+    toast_wb_on:        '💨 Rüzgar Engelleyici 3 level için aktif!',
+    toast_route_visible:'🎯 Rota zaten görünüyor, hak geri eklendi!',
+    toast_tac_on:       '🎯 Taktik Görüş 3 level için aktif!',
+    toast_guided_on:    '🔥 Isıya Güdümlü Başlık aktif!',
+    toast_streak_7:     '🔥 7 günlük seri! +100 puan bonus!',
+    toast_reward_got:   'Ödül alındı!',
+    toast_ad_not_ready: '📵 Reklam şu an hazır değil, biraz bekleyip tekrar dene.',
+    toast_lives_full:   '❤️ Canlar zaten dolu!',
+    toast_life_won:     '❤️ +1 Can kazandın! Devam ediliyor...',
+    toast_cloud_app_only:'Bulut kayıt sadece uygulamada çalışır.',
+    toast_cloud_load_app_only:'Bulut yükleme sadece uygulamada çalışır.',
+    toast_cloud_signin_first:'Önce Google Play Games girişini yap.',
+    toast_cloud_saving: 'Kaydediliyor...',
+    toast_cloud_save_err:'Kayıt hatası: {msg}',
+    toast_cloud_loading:'Yükleniyor...',
+    toast_cloud_saved:  'Buluta kaydedildi!',
+    toast_cloud_save_fail:'Kayıt başarısız: {msg}',
+    toast_cloud_load_fail:'Yükleme başarısız: {msg}',
+    toast_cloud_loaded: '{n} kayıt yüklendi! Yenileniyor...',
+    toast_cloud_parse_err:'Veri parse hatası: {msg}',
+    err_unknown:        'bilinmeyen hata',
+    err_no_data:        'veri yok',
+    toast_fuze_hit:     '❤️ Fuze isabeti! {n} can kaldı',
+    toast_shield_already:'Kalkan zaten aktif!',
+    toast_counter:      '⚠️ Karşı atak!',
+    toast_ad_cooldown:  '2 saatte bir izleyebilirsin!',
+    toast_max_level:    'Maksimum seviyeye ulaşıldı!',
+    toast_not_enough_stars:'Yeterli yıldız yok! ({n})',
+    toast_max_level_short:'Maksimum seviyede!',
+    toast_dmg_active:   'Hasar Sv{lv} aktif! (x{mult})',
+    toast_app_only:     'Sadece uygulamada çalışır.',
+    toast_daily_3_ad:   'Günlük 3 reklam limitine ulaştınız!',
+    ad_life_btn:        '📺 Reklam izle → +1 Can ({n}/3)',
+    lives_count_label:  '{n} / {max} can',
+    lives_full_status:  '❤️ Canlar dolu!',
+    lives_next_in:      'Sonraki can: {min} dakika',
+    // ── Güçlendirmeler sekmesi ──
+    boost_tac_name:        'Taktik Görüş',
+    boost_wb_name:         'Rüzgar Engelleyici',
+    boost_gd_name:         'Isıya Güdümlü Başlık',
+    boost_dmg_name:        'Hasar Yükseltici',
+    boost_tac_desc:        'Rota çizgisini gösterir, düşme noktasını belirler.<br><b style="color:#00E5FF;">Rüzgar etkisi hesaba katılır</b> — rota gerçek düşüş noktasını gösterir. Level 15\'ten sonra rota kaybolur — bu ile geri açılır.',
+    boost_wb_desc:         'Rüzgar etkisini 3 level boyunca tamamen sıfırlar.',
+    boost_gd_desc:         'Mermi mağara içindeki ısı kaynağına otomatik yönelir. Sadece mağara levellarında (her temanın 8. leveli) geçerlidir.',
+    boost_dmg_desc:        'Tüm atışlarda hasar çarpanı. Geçici: reklam → 3 level ×2.0. Kalıcı: puan ile upgrade.',
+    boost_stat_accuracy:   'Hassasiyet',
+    boost_stat_wind_read:  'Rüzgar Okuma',
+    boost_stat_effect:     'Etki',
+    boost_stat_duration:   'Süre',
+    boost_stat_homing:     'Yönelim',
+    boost_stat_power:      'Güç',
+    boost_badge_levels_left:'⏱ {n} level kaldı',
+    boost_badge_levels_left_2x:'⏱ {n} level kaldı (×2.0)',
+    boost_badge_active_lv:'✓ Sv{lv} ×{mult} kalıcı',
+    boost_badge_locked:   '🔒 Aktif Değil',
+    boost_badge_active_lvl:'✅ Bu Level Aktif',
+    boost_badge_lvl15:    '🔒 Level 15\'te aktif',
+    boost_badge_no_wind:  '🔒 Rüzgar Yok',
+    boost_badge_cave_only:'🔒 Sadece Mağara Level',
+    boost_btn_ad_3lvl:    '📺 +3 level',
+    boost_btn_ad_extend:  'uzat',
+    boost_btn_ad_rights:  '{n} hak',
+    boost_btn_ad_rights_full:'{n}/3 hak',
+    boost_btn_ad_3lvl_watch:'📺 3 level izle',
+    boost_btn_ad_only:    '📺 Reklam İzle',
+    boost_btn_ad_only_lower:'📺 Reklam izle',
+    boost_btn_1lvl_valid: '1 level geçerli',
+    boost_btn_3lvl_x2:    '3 level ×2.0',
+    boost_btn_upgrade:    '⬆ Sv{lv} — ×{mult}',
+    boost_btn_upgrade_perm:'⬆ Kalıcı Sv{lv} — ×{mult}',
+    boost_active_status:  'Aktif 🔥',
+    boost_max_level_label:'✓ Maksimum<br>seviye',
+    boost_daily_full:     'Günlük limit<br>doldu (0/3)',
+    boost_limit_full:     'Limit doldu<br>(0/3)',
+    boost_no_wind_here:   'Bu levelde<br>rüzgar yok',
+    boost_after_lvl15:    'Level 15\'ten<br>sonra kullanılır',
+    boost_cave_only_info: '8. levellerde<br>kullanılır',
+    // 2x Hasar dialog & info popup
+    dlg_dmg_temp_title:    '2x Hasar - Geçici',
+    dlg_dmg_temp_desc:     'Reklam izleyerek 3 level boyunca tüm mermilerin hasarı 2 katına çıkar.',
+    dlg_dmg_perm_title:    '2x Hasar Sv{lv}',
+    dlg_dmg_perm_desc:     'Kalıcı hasar artışı. Tüm mermiler x{mult} hasar yapar.',
+    dlg_pts_will_spend:    '{n} puan harcanacak',
+    levels_left_temp:      '{n} level kaldı (geçici)',
+    dmg_info_levels_left:  '{n} Level Kaldı (×2.0)',
+    dmg_info_all_shots_x2: 'Tüm atışlarda 2 kat hasar.',
+    dmg_info_perm_active:  'Kalıcı: Sv{lv} ×{mult} aktif.',
+    dmg_info_perm_hint:    'Kalıcı yükseltme için güçlendirici sekmesini ziyaret et.',
+    dmg_info_perm_title:   'Sv{lv} — ×{mult} Kalıcı',
+    dmg_info_perm_desc:    'Tüm atışlarda hasar çarpanı aktif.',
+    dmg_info_next_hint:    'Sv{lv} için güçlendirici sekmesine git.',
+    dmg_info_max:          'Maksimum seviyedesin!',
+    dmg_info_empty_title:  'Hasar Yükseltici',
+    dmg_info_empty_desc:   'Tüm atışlarda hasar çarpanı.<br>Reklam: 3 level ×2.0 geçici.<br>Puan ile kalıcı yükseltme yapabilirsin.',
+    dmg_btn_extend_3lvl:   '📺 +3 Level Uzat',
+    dmg_btn_boost_tab:     '🛡️ Güçlendirici Sekmesi',
+    dmg_btn_ad_3lvl_x2:    '📺 Reklam izle — 3 level ×2.0',
+    dmg_btn_upgrade_tab:   '⬆ Yükselt — Güçlendirici Sekmesi',
+    dmg_btn_buy_perm:      '🛡️ Kalıcı Satın Al',
+    // Taktik info popup
+    tac_info_active_title: 'Aktif: {n} Level Kaldı',
+    tac_info_active_desc:  'Rota, düşme noktası ve rüzgar yönü görünür.<br>Günlük {n}/3 reklam hakkın kaldı.',
+    tac_info_inactive_title:'Taktik Görüş',
+    tac_info_inactive_desc:'Level 15 sonrası rota kaybolur.<br>Reklam izleyerek 3 level aktif edebilirsin.<br>Günlük 3 hak — bugün {n} hakkın kaldı.',
+    tac_btn_extend:        '📺 +3 Level Uzat ({n} hak)',
+    tac_btn_watch:         '📺 Reklam İzle — 3 Level ({n}/3 hak)',
+    tac_btn_limit_full:    'Bugünkü reklam limitin doldu.<br>Yarın tekrar 3 hakkın olacak.',
+    toast_purchased:       '{name} satın alındı!',
+    wb_info_active_title:  '{n} Level Kaldı',
+    wb_info_active_desc:   'Rüzgar tamamen devre dışı.<br>Günlük {n}/3 hakkın kaldı.',
+    wb_info_inactive_title:'Rüzgar Engelleyici',
+    wb_info_inactive_desc: 'Rüzgarı 3 level boyunca tamamen sıfırlar.<br>Günlük 3 hak — bugün {n} hakkın kaldı.',
+    lvl_short:             'Sv',
+    lvl_short_plus1:       '+1sv',
+  },
+  en: {
+    fire:           'FIRE!',
+    inventory:      '⚔️ Inventory',
+    battle:         'GO TO BATTLE! →',
+    map:            '🗺️ Map',
+    close:          'Close',
+    settings:       '⚙️ Settings',
+    sfx:            '🔊 Effects',
+    music:          '🎵 Music',
+    sound_label:    'SOUND',
+    data_label:     'DATA',
+    lang_label:     'LANGUAGE',
+    reset_slots:    '🔧 Reset Slots',
+    reset_all:      '🗑️ Reset All Data',
+    cloud:          '☁️ Cloud Save',
+    dev_mode:       '⚙️ Developer Mode',
+    detail:         'tap for details',
+    next_level:     'NEXT LEVEL →',
+    retry:          'RETRY',
+    back_map:       '🗺️ Back to Map',
+    not_enough:     'Not enough points!',
+    not_enough_star:'Not enough stars!',
+    bought:         'purchased!',
+    upgraded:       'upgraded!',
+    select:         'Select',
+    buy:            'Buy',
+    ad_watch:       'Watch Ad',
+    confirm:        'Confirm',
+    cancel:         'Cancel',
+    locked:         'Locked',
+    theme_valley:    'Green Valley',
+    theme_desert:    'Desert',
+    theme_snow:      'Snowy Mountains',
+    theme_forest:    'Forest',
+    theme_rocky:     'Rocky Lands',
+    theme_meadow:    'Meadow',
+    theme_volcano:   'Volcano',
+    theme_nightcity: 'Night City',
+    theme_tropical:  'Tropical',
+    theme_skyislands:'Sky Islands',
+    theme_cloudy:    'Cloudy',
+    theme_rainy:     'Storm Front',
+    theme_snowyweather:'Snowstorm',
+    'Training Ground':'Training Ground', 'Hill Country':'Hill Country', 'Twin Peaks':'Twin Peaks',
+    'Foggy Valley':'Foggy Valley', 'Iron Fortress':'Iron Fortress', 'Canyon Run':'Canyon Run',
+    'River Crossing':'River Crossing', 'Green Hell':'Green Hell', 'Valley Storm':'Valley Storm', 'Final Valley':'Final Valley',
+    'Sand Dunes':'Sand Dunes', 'Mirage':'Mirage', 'Scorched Earth':'Scorched Earth',
+    'Camel Pass':'Camel Pass', 'Desert Fort':'Desert Fort', 'Oasis Siege':'Oasis Siege',
+    'Sandstorm':'Sandstorm', 'Dune Climber':'Dune Climber', 'Pyramid Rush':'Pyramid Rush', 'Desert King':'Desert King',
+    'Frozen Pass':'Frozen Pass', 'Blizzard':'Blizzard', 'Ice Fort':'Ice Fort',
+    'Avalanche':'Avalanche', 'White Out':'White Out', 'Frozen River':'Frozen River',
+    'Snow Blind':'Snow Blind', 'Arctic Base':'Arctic Base', 'Polar Storm':'Polar Storm', 'Ice King':'Ice King',
+    'Dark Woods':'Dark Woods', 'Fog of War':'Fog of War', 'Forest Fort':'Forest Fort',
+    'Night Hunt':'Night Hunt', 'Deep Forest':'Deep Forest', 'Misty Ridge':'Misty Ridge',
+    'Jungle Base':'Jungle Base', 'Shadow War':'Shadow War', 'Forest King':'Forest King', 'Final Forest':'Final Forest',
+    'Rock Slide':'Rock Slide', 'Cliff Edge':'Cliff Edge', 'Stone Fort':'Stone Fort',
+    'Eagle Nest':'Eagle Nest', 'Rocky Road':'Rocky Road', 'Crumble Zone':'Crumble Zone',
+    'Fault Line':'Fault Line', 'Stone King':'Stone King', 'Rock Siege':'Rock Siege', 'Final Rocky':'Final Rocky',
+    'Sunny Field':'Sunny Field', 'Golden Hill':'Golden Hill', 'Meadow Fort':'Meadow Fort',
+    'Sunset Run':'Sunset Run', 'Pasture War':'Pasture War', 'Rolling Hills':'Rolling Hills',
+    'Windmill':'Windmill', 'Farm Siege':'Farm Siege', 'Golden King':'Golden King', 'Final Meadow':'Final Meadow',
+    'Lava Flow':'Lava Flow', 'Ash Cloud':'Ash Cloud', 'Magma Ridge':'Magma Ridge',
+    'Fire Storm':'Fire Storm', 'Eruption':'Eruption', 'Crater War':'Crater War',
+    'Burning Siege':'Burning Siege', 'Inferno':'Inferno', 'Lava King':'Lava King', 'Final Volcano':'Final Volcano',
+    'Neon Alley':'Neon Alley', 'City Lights':'City Lights', 'Dark District':'Dark District',
+    'Rooftop War':'Rooftop War', 'Night Siege':'Night Siege', 'Midnight Run':'Midnight Run',
+    'City Under Fire':'City Under Fire', 'Blackout':'Blackout', 'Neon King':'Neon King', 'Final City':'Final City',
+    'Palm Beach':'Palm Beach', 'Coral Reef':'Coral Reef', 'Island Siege':'Island Siege',
+    'Tidal Wave':'Tidal Wave', 'Jungle War':'Jungle War', 'Paradise Lost':'Paradise Lost',
+    'Ocean Fort':'Ocean Fort', 'Storm Island':'Storm Island', 'Tropical King':'Tropical King', 'Final Island':'Final Island',
+    'Cloud Step':'Cloud Step', 'Island Hop':'Island Hop', 'Sky Fort':'Sky Fort',
+    'Wind War':'Wind War', 'High Siege':'High Siege', 'Above All':'Above All',
+    'Storm Cloud':'Storm Cloud', 'Sky Siege':'Sky Siege', 'Island King':'Island King', 'Final Sky':'Final Sky',
+    'Foggy Start':'Foggy Start', 'Low Cloud':'Low Cloud', 'Tree Top':'Tree Top',
+    'Cloud Cover':'Cloud Cover', 'Mist War':'Mist War', 'Grey Siege':'Grey Siege',
+    'Storm Prep':'Storm Prep', 'Cloud Fort':'Cloud Fort', 'Grey King':'Grey King', 'Final Cloud':'Final Cloud',
+    'First Drop':'First Drop', 'Downpour':'Downpour', 'Mud Run':'Mud Run',
+    'Rain Siege':'Rain Siege', 'Storm Fort':'Storm Fort', 'Flash Flood':'Flash Flood',
+    'Rain King':'Rain King', 'Thunder War':'Thunder War', 'Deluge':'Deluge', 'Final Storm':'Final Storm',
+    'First Snow':'First Snow', 'Blizzard Run':'Blizzard Run', 'White Out':'White Out',
+    'Snow Siege':'Snow Siege', 'Ice Storm':'Ice Storm', 'Freeze War':'Freeze War',
+    'Snow Fort':'Snow Fort', 'Arctic Wind':'Arctic Wind', 'Snow King':'Snow King', 'Final Snow':'Final Snow',
+    stars_needed:   'more stars needed',
+    mat_wood:   '🚪 Wood',
+    mat_iron:   '⚙️ Iron',
+    mat_steel:  '🛡️ Steel',
+    mat_concrete:'🧱 Concrete',
+    locked_gallery: '🔒 Locked — Get from Gallery!',
+    owned:          'Owned',
+    map_title:      '🗺️ Level Map',
+    swap_title_tank: 'Switch Tank?',
+    swap_title_ammo: 'Switch Ammo?',
+    swap_iptal:      'Cancel',
+    swap_switch:     'Switch',
+    swap_has:     'You have',
+    swap_var:     '',
+    swap_left:    'levels left',
+    swap_cont:    'Continuing will reset this',
+    swap_reset:   '',
+    swap_replace: 'and replace with',
+    swap_comes:   '',
+    tab_ammo:       '💣 Ammo',
+    tab_boost:      '🛡️ Boosts',
+    tab_tank:       'Tank',
+    gallery_title:  '⚔️ ARSENAL GALLERY',
+    ad_watch_pts:   '📺 Watch Ad → Earn Points',
+    stat_dmg:       'Damage',
+    ammo_normal:'Normal', ammo_ap:'Armor Piercing', ammo_explosive:'Explosive',
+    ammo_cluster:'Cluster Bomb', ammo_piercer:'Piercer', ammo_napalm:'Napalm',
+    ammo_split:'Split', ammo_triple:'Triple', ammo_bunker:'Bunker Buster', ammo_nuclear:'Nuclear',
+    desc_normal:'Destroys wooden HQ in 1 shot',
+    desc_ap:'Pierces armor. Essential for iron & steel',
+    desc_explosive:'Wide area damage, medium armor',
+    desc_cluster:'Splits into 3 parts, wide effect',
+    desc_piercer:'Pierces steel, high single damage',
+    desc_napalm:'Wide area + burn effect',
+    desc_split:'Splits into 3, powerful and wide',
+    desc_triple:'3 shells at once, high damage',
+    desc_bunker:'Drills underground, reaches buried targets',
+    desc_nuclear:'Destroys everything',
+    stat_armor:     'Armor',
+    stat_area:      'Area',
+    shots_needed:   'shots needed',
+    not_enough_pts: 'Not enough points!',
+    dlg_buy:        'Buy',
+    dlg_watch_ad:   'Watch Ad',
+    dlg_confirm:    'Confirm',
+    dlg_cancel:     'Cancel',
+    dlg_upgrade:    'Upgrade',
+    dlg_pts_cost:   'points will be spent',
+    dlg_star_cost:  'stars will be spent',
+    dlg_try:        'level trial',
+    dlg_try_title: 'Trial',
+    tank_basic:    'Basic',
+    tank_upgraded: 'Upgraded',
+    tank_elite:    'Elite',
+    tank_titan:    'Titan',
+    stat_menzil:   'Range',
+    stat_ruzgar:   'Wind',
+    stat_bonus:    'Bonus',
+    stat_selected: 'Selected',
+    stat_range:    'Range',
+    upg_dmg_bonus: 'damage bonus',
+    upg_level:     'Level',
+    upg_dmg25:     'Damage increases by 25%%.',
+    toast_upg_ammo: 'Lv{n}! (+25% damage)',
+    toast_active:   'active for {n} levels!',
+    toast_upg_tank: 'Tank Lv{n}! (+20% damage)',
+    upg_dmg20:     'Damage bonus increases by 20%%.',
+    stat_windres:  'Wind resistance',
+    tank_desc_basic:   'Starter tank, short range',
+    tank_desc_upgraded:'Balanced, extra armor plates',
+    tank_desc_elite:   'Long range, antenna, powerful',
+    tank_desc_titan:   'Maximum power, chrome plating',
+    dlg_ad_use:     'Watch an ad to use for {n} levels.',
+    not_enough_star:'Not enough stars!',
+    hq:             'headquarters',
+    shot:           'shot',
+    base_dmg:       'Base damage',
+    level_left:     'levels left',
+    hak:            'uses',
+    owned_badge:    '✅ Owned',
+    locked_badge:   '🔒 Locked',
+    select_btn:     'Select',
+    upgrade_btn:    'Upgrade',
+    free_btn:       'Free',
+    cancel:         'Cancel',
+    confirm:        'Confirm',
+    ad_watch:       '📺 Watch Ad',
+    tank_card_change:   '🔄 Switch',
+    tank_select_title:  '🔄 Select Tank',
+    shield_title:       '🛡️ Wind Shield',
+    shield_desc:        'Wind is blocked for this level.',
+    shield_current:     'Current wind:',
+    shield_ad_btn:      '📺 Watch Ad — Free',
+    shield_pts_btn:     'Spend Points',
+    shield_cancel:      '✕ Cancel',
+    slot_card_change:   '🔄 Switch',
+    ammo_select_title:  '🔄 Select Ammo',
+    ammo_select_close:  '✕ Close',
+    gallery_new_ammo:   '⚔️ Gallery — Get New Ammo',
+    extra_ammo_btn:     '📺 Watch Ad → +3 Shots',
+    drag_to_aim:        '◀ DRAG TO AIM',
+    loading:            'Loading...',
+    tactical_title:     '🎯 Tactical View',
+    windblock_title:    '💨 Wind Blocker',
+    dmgboost_title:     '💥 Damage Booster',
+    lsc_inventory:      '⚔️ Inventory',
+    lsc_battle:         '▶ Go to Battle!',
+    streak_title:       '🔥 Login Streak',
+    confirm_cancel:     'Cancel',
+    confirm_reset:      'Reset',
+    tgo_completed:      'THEME COMPLETED!',
+    tgo_ad_btn:         '📺 Watch Ad → +2 ⭐',
+    tgo_buy_star:       '⭐ Buy Star with Points',
+    tgo_back_map:       '🗺️ Back to Previous Levels',
+    ss_title:           'STAR SHOP',
+    ss_pts_for_star:    '🏆 POINTS FOR STARS',
+    ss_buy_1star:       'points',
+    ss_to_star:         '→',
+    ss_ad_label:        '📺 WATCH AD',
+    ss_ad_btn:          'Watch Ad → +2 ⭐',
+    ss_close:           'Close',
+    theme_unlocked:     'NEW THEME UNLOCKED!',
+    theme_go:           '🚀 Go to New Theme!',
+    ammo_replace_warn:  'Temporary Ammo Active!',
+    ammo_replace_cancel:'❌ Cancel',
+    ammo_replace_ok:    '✅ Continue',
+    piercer_title:      'Armored Target!',
+    piercer_body:        'This target is <b style="color:#FFD700;">steel armored</b> — normal ammo is insufficient.<br><br>⚡ <b style="color:#CE93D8;">Piercer</b> pierces the armor with one shot for massive damage.<br><span style="color:rgba(255,255,255,0.45);font-size:11px;">valid for 1 level</span>',
+    piercer_ad_btn:     '📺 Watch Ad → Get Piercer',
+    piercer_buy_btn:    '🛒 Buy',
+    piercer_skip:       'Not now',
+    tactical_hint_title:'Route Lost!',
+    tactical_hint_body:  'After level 15 the route line disappears.<br><br>🎯 <b style="color:#00E5FF;">Tactical View</b> shows the route, landing point and wind direction again.',
+    tactical_ad_btn:    '📺 Watch Ad → Unlock 3 Levels',
+    tactical_perm_btn:  '🛡️ Buy Permanent from Boosts',
+    guided_title:       'Cave Target!',
+    guided_body:         'Target is hidden in a cave.<br><br>🎯 <b style="color:#FF6B35;">Heat-Seeking Warhead</b> — your shell auto-tracks the heat source.<br><span style="color:rgba(255,255,255,0.45);font-size:11px;">Valid for this level</span>',
+    guided_ad_btn:      '📺 Watch Ad → Unlock 1 Level',
+    guided_perm_btn:    '⚡ Get from Boosts',
+    login_bonus_title:  'Daily Login!',
+    login_bonus_btn:    'Awesome! Start Playing 🎮',
+    version_ok:         'OK',
+    buried_title:       'Buried Target',
+    buried_body:        'This target is buried underground.<br><br>Normal weapons deal <b style="color:#FFB74D;">low damage</b>.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> drills through the ground for full damage.<br><br>💥 Strong explosions can <b style="color:#FFD700;">shake the terrain</b> and expose the target.',
+    buried_ok:          'Got it',
+    cloud_title:        '☁️ Cloud Save',
+    cloud_signin:       'Sign in with Google Play Games',
+    cloud_save_now:     'Save Now',
+    cloud_load:         'Load from Cloud',
+    cloud_signout:      'Switch Account / Sign Out',
+    cloud_hint_title:   'To switch accounts:',
+    cloud_hint_body:    '1. Open the <b style="color:rgba(255,255,255,0.75);">Settings</b> app<br>2. Go to <b style="color:rgba(255,255,255,0.75);">Google</b><br>3. Choose <b style="color:rgba(255,255,255,0.75);">Google Services</b> or <b style="color:rgba(255,255,255,0.75);">All Services</b><br>4. Tap on <b style="color:rgba(255,255,255,0.75);">Play Games</b><br>5. Tap <b style="color:rgba(255,255,255,0.75);">Signed-in Account</b><br>6. Pick the desired account or use <b style="color:rgba(255,255,255,0.75);">Sign Out of All Games</b><br>7. Return to the game and press <b style="color:rgba(255,255,255,0.75);">Sign In</b>',
+    cloud_auto_save:    'Auto-saved when a level is completed.',
+    lives_title:        '❤️ Lives',
+    lives_count_suffix: 'lives',
+    lives_next:         'Next life:',
+    lives_minutes:      'minutes',
+    lives_full:         'Lives are full!',
+    lives_info:         '1 life regenerates every 20 minutes. Max 5 lives.',
+    lives_ad_info:      'You can earn 3 lives per day from ads.',
+    toast_2x_expired:   '2x Damage boost expired.',
+    toast_self_hit:     '💥 You hit your own tank! {n} HP left',
+    toast_ap_won:       '🔩 AP Ammo earned!',
+    toast_exp_won:      '💥 Explosive Ammo earned!',
+    toast_unlock_at:    'Unlocks at level {n} 🔒',
+    toast_shield_on:    '🛡️ Shield active! Wind blocked.',
+    toast_near_miss:    '💥 Near miss! -{n} HP',
+    toast_tip:          '💡 {msg}',
+    toast_ad_limit:     'Daily ad limit reached!',
+    toast_pts_won:      '+200 points earned! 🏆',
+    toast_2x_active:    '💥 2x Damage active for 3 levels.',
+    toast_star_ad_limit:'Daily star ad limit reached today! (3/3)',
+    toast_stars_won:    '+{n} stars earned!',
+    toast_theme_full:   'All levels in this theme already have 3 stars! 🌟',
+    toast_stars_bought: '+{n} stars earned! (-{cost} points)',
+    toast_theme_star_done:'🎉 Theme stars complete! Next theme is ready.',
+    toast_theme_ad_limit:'Daily theme transition ad limit reached! (3/3)',
+    toast_3_ammo_won:   '💣 +3 shots earned!',
+    toast_tactic_after15:'🎯 Available after level 15!',
+    toast_tac_ad_limit: 'Daily Tactical View ad limit reached! (3/3)',
+    toast_no_wind:      '💨 No wind on this level!',
+    toast_wb_ad_limit:  'Daily Wind Blocker limit reached! (3/3)',
+    toast_no_wind_refund:'💨 No wind on this level — use refunded!',
+    toast_wb_on:        '💨 Wind Blocker active for 3 levels!',
+    toast_route_visible:'🎯 Route already visible — use refunded!',
+    toast_tac_on:       '🎯 Tactical View active for 3 levels!',
+    toast_guided_on:    '🔥 Heat-Seeking Warhead active!',
+    toast_streak_7:     '🔥 7-day streak! +100 point bonus!',
+    toast_reward_got:   'Reward claimed!',
+    toast_ad_not_ready: '📵 Ad is not ready right now — wait a moment and try again.',
+    toast_lives_full:   '❤️ Lives are already full!',
+    toast_life_won:     '❤️ +1 Life earned! Continuing...',
+    toast_cloud_app_only:'Cloud save only works in the app.',
+    toast_cloud_load_app_only:'Cloud load only works in the app.',
+    toast_cloud_signin_first:'Sign in with Google Play Games first.',
+    toast_cloud_saving: 'Saving...',
+    toast_cloud_save_err:'Save error: {msg}',
+    toast_cloud_loading:'Loading...',
+    toast_cloud_saved:  'Saved to cloud!',
+    toast_cloud_save_fail:'Save failed: {msg}',
+    toast_cloud_load_fail:'Load failed: {msg}',
+    toast_cloud_loaded: '{n} records loaded! Refreshing...',
+    toast_cloud_parse_err:'Data parse error: {msg}',
+    err_unknown:        'unknown error',
+    err_no_data:        'no data',
+    toast_fuze_hit:     '❤️ Fuze hit! {n} HP left',
+    toast_shield_already:'Shield already active!',
+    toast_counter:      '⚠️ Counter attack!',
+    toast_ad_cooldown:  'You can watch one every 2 hours!',
+    toast_max_level:    'Reached the maximum level!',
+    toast_not_enough_stars:'Not enough stars! ({n})',
+    toast_max_level_short:'Already at max level!',
+    toast_dmg_active:   'Damage Lv{lv} active! (x{mult})',
+    toast_app_only:     'Only works in the app.',
+    toast_daily_3_ad:   'Daily limit of 3 ads reached!',
+    ad_life_btn:        '📺 Watch ad → +1 Life ({n}/3)',
+    lives_count_label:  '{n} / {max} lives',
+    lives_full_status:  '❤️ Lives are full!',
+    lives_next_in:      'Next life: {min} minutes',
+    // ── Boost gallery ──
+    boost_tac_name:        'Tactical View',
+    boost_wb_name:         'Wind Blocker',
+    boost_gd_name:         'Heat-Seeking Warhead',
+    boost_dmg_name:        'Damage Booster',
+    boost_tac_desc:        'Shows the route line and predicts the landing point.<br><b style="color:#00E5FF;">Wind is factored in</b> — the route shows the real impact point. After level 15 the route disappears — this brings it back.',
+    boost_wb_desc:         'Cancels wind effect entirely for 3 levels.',
+    boost_gd_desc:         'Your shell auto-tracks the heat source inside the cave. Valid only on cave levels (the 8th level of each theme).',
+    boost_dmg_desc:        'Damage multiplier on every shot. Temporary: ad → 3 levels ×2.0. Permanent: upgrade with points.',
+    boost_stat_accuracy:   'Accuracy',
+    boost_stat_wind_read:  'Wind Reading',
+    boost_stat_effect:     'Effect',
+    boost_stat_duration:   'Duration',
+    boost_stat_homing:     'Homing',
+    boost_stat_power:      'Power',
+    boost_badge_levels_left:'⏱ {n} levels left',
+    boost_badge_levels_left_2x:'⏱ {n} levels left (×2.0)',
+    boost_badge_active_lv:'✓ Lv{lv} ×{mult} permanent',
+    boost_badge_locked:   '🔒 Not Active',
+    boost_badge_active_lvl:'✅ Active This Level',
+    boost_badge_lvl15:    '🔒 Active from Level 15',
+    boost_badge_no_wind:  '🔒 No Wind',
+    boost_badge_cave_only:'🔒 Cave Levels Only',
+    boost_btn_ad_3lvl:    '📺 +3 levels',
+    boost_btn_ad_extend:  'extend',
+    boost_btn_ad_rights:  '{n} left',
+    boost_btn_ad_rights_full:'{n}/3 left',
+    boost_btn_ad_3lvl_watch:'📺 Watch — 3 levels',
+    boost_btn_ad_only:    '📺 Watch Ad',
+    boost_btn_ad_only_lower:'📺 Watch ad',
+    boost_btn_1lvl_valid: 'valid for 1 level',
+    boost_btn_3lvl_x2:    '3 levels ×2.0',
+    boost_btn_upgrade:    '⬆ Lv{lv} — ×{mult}',
+    boost_btn_upgrade_perm:'⬆ Permanent Lv{lv} — ×{mult}',
+    boost_active_status:  'Active 🔥',
+    boost_max_level_label:'✓ Maximum<br>level',
+    boost_daily_full:     'Daily limit<br>full (0/3)',
+    boost_limit_full:     'Limit full<br>(0/3)',
+    boost_no_wind_here:   'No wind on<br>this level',
+    boost_after_lvl15:    'Available after<br>level 15',
+    boost_cave_only_info: 'Used on the<br>8th level',
+    // 2x Damage dialog & info popup
+    dlg_dmg_temp_title:    '2x Damage - Temporary',
+    dlg_dmg_temp_desc:     'Watch an ad and all shots deal 2x damage for 3 levels.',
+    dlg_dmg_perm_title:    '2x Damage Lv{lv}',
+    dlg_dmg_perm_desc:     'Permanent damage boost. All shells deal x{mult} damage.',
+    dlg_pts_will_spend:    '{n} points will be spent',
+    levels_left_temp:      '{n} levels left (temporary)',
+    dmg_info_levels_left:  '{n} Levels Left (×2.0)',
+    dmg_info_all_shots_x2: 'Every shot deals 2x damage.',
+    dmg_info_perm_active:  'Permanent: Lv{lv} ×{mult} active.',
+    dmg_info_perm_hint:    'Visit the boost tab to upgrade permanently.',
+    dmg_info_perm_title:   'Lv{lv} — ×{mult} Permanent',
+    dmg_info_perm_desc:    'Damage multiplier is active on every shot.',
+    dmg_info_next_hint:    'Go to the boost tab for Lv{lv}.',
+    dmg_info_max:          'You are at max level!',
+    dmg_info_empty_title:  'Damage Booster',
+    dmg_info_empty_desc:   'Damage multiplier on every shot.<br>Ad: 3 levels ×2.0 temporary.<br>Upgrade permanently with points.',
+    dmg_btn_extend_3lvl:   '📺 +3 Levels Extend',
+    dmg_btn_boost_tab:     '🛡️ Boost Tab',
+    dmg_btn_ad_3lvl_x2:    '📺 Watch ad — 3 levels ×2.0',
+    dmg_btn_upgrade_tab:   '⬆ Upgrade — Boost Tab',
+    dmg_btn_buy_perm:      '🛡️ Buy Permanent',
+    // Tactical info popup
+    tac_info_active_title: 'Active: {n} Levels Left',
+    tac_info_active_desc:  'Route, landing point and wind direction are visible.<br>Daily ads remaining: {n}/3.',
+    tac_info_inactive_title:'Tactical View',
+    tac_info_inactive_desc:'After level 15 the route disappears.<br>Watch an ad to activate it for 3 levels.<br>Daily limit 3 — {n} left today.',
+    tac_btn_extend:        '📺 +3 Levels Extend ({n} left)',
+    tac_btn_watch:         '📺 Watch Ad — 3 Levels ({n}/3 left)',
+    tac_btn_limit_full:    'Daily ad limit reached.<br>You\'ll have 3 again tomorrow.',
+    toast_purchased:       '{name} purchased!',
+    wb_info_active_title:  '{n} Levels Left',
+    wb_info_active_desc:   'Wind is completely disabled.<br>Daily {n}/3 left.',
+    wb_info_inactive_title:'Wind Blocker',
+    wb_info_inactive_desc: 'Cancels wind effect entirely for 3 levels.<br>Daily limit 3 — {n} left today.',
+    lvl_short:             'Lv',
+    lvl_short_plus1:       '+1lv',
+  },
+};
+
+let _curLang = localStorage.getItem('lang') || 'tr';
+
+function t(key){ return (LANG[_curLang]||LANG.tr)[key] || LANG.tr[key] || key; }
+
+function tFmt(key, vars){
+  let s = t(key);
+  if(vars && typeof s === 'string'){
+    for(const k in vars){ s = s.split('{'+k+'}').join(vars[k]); }
+  }
+  return s;
+}
+
+function tLevel(name){ return t(name); }
+
+function applyLang(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{
+    const key = el.getAttribute('data-i18n-html');
+    el.innerHTML = t(key);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
+    const key = el.getAttribute('data-i18n-placeholder');
+    el.setAttribute('placeholder', t(key));
+  });
+  // RTL kontrol (arapca vs)
+  document.body.dir = (_curLang==='ar') ? 'rtl' : 'ltr';
+}
+
+function setLang(lang){
+  _curLang = lang;
+  localStorage.setItem('lang', lang);
+  applyLang();
+  // Galeri aciksa yenile
+  if(document.getElementById('gallery-overlay')?.classList.contains('show')) renderGallery();
+}
 
 // SFX → AudioBuffer (fetch+decode, ~0ms latency)
 // Müzik/Rüzgar → HTML5 Audio (streaming, loop)
@@ -8360,6 +9162,12 @@ function closeTargetInfo(){
 
 // ── Ayarlar ──────────────────────────────────────────────────────────────────
 function openSettings(){
+  // Aktif dil butonunu vurgula
+  ['tr','en'].forEach(l=>{
+    const b=document.getElementById('lang-btn-'+l);
+    if(b) b.style.borderColor = l===_curLang?'#FFD700':'rgba(255,255,255,0.15)';
+    if(b) b.style.color = l===_curLang?'#FFD700':'white';
+  });
   const _svn=document.getElementById('settings-version-no'); if(_svn) _svn.textContent=APP_VERSION;
   const _svd=document.getElementById('settings-version-date'); if(_svd) _svd.textContent=APP_VERSION_DATE;
   updateSettingsBtns();
@@ -8421,7 +9229,7 @@ function closeConfirm(){
 // ═══════════════════════════════════════════════════════════
 // LEVEL MAP
 // ═══════════════════════════════════════════════════════════
-const MAT_BADGE = {wood:'🪵 Tahta', iron:'⚙️ Demir', steel:'🛡️ Çelik', concrete:'🧱 Beton'};
+const MAT_BADGE = {get wood(){return t('mat_wood');}, get iron(){return t('mat_iron');}, get steel(){return t('mat_steel');}, get concrete(){return t('mat_concrete');}};
 const THEME_COLORS = {
   valley:'#2d5a1e', desert:'#7a4a10', snow:'#1a2a5e',
   forest:'#1a3a1a', rocky:'#3a2a4a', meadow:'#5a3a10',
@@ -8512,11 +9320,11 @@ function renderLevelMap(){
 
   var _lmThemes = ['valley','desert','snow','forest','rocky','meadow','volcano','nightcity','tropical','skyislands','cloudy','rainy','snowyweather'];
   var _lmNames = {
-    valley:'Green Valley', desert:'Desert', snow:'Snowy Mtn',
-    forest:'Forest', rocky:'Rocky', meadow:'Meadow',
-    volcano:'Volcano', nightcity:'Night City', tropical:'Tropical',
-    skyislands:'Sky Islands', cloudy:'Cloudy',
-    rainy:'Storm', snowyweather:'Snowstorm'
+    valley:t('theme_valley'), desert:t('theme_desert'), snow:t('theme_snow'),
+    forest:t('theme_forest'), rocky:t('theme_rocky'), meadow:t('theme_meadow'),
+    volcano:t('theme_volcano'), nightcity:t('theme_nightcity'), tropical:t('theme_tropical'),
+    skyislands:t('theme_skyislands'), cloudy:t('theme_cloudy'),
+    rainy:t('theme_rainy'), snowyweather:t('theme_snowyweather')
   };
   var _lmEmojis = {
     valley:'🌳', desert:'🌞', snow:'🏔', forest:'🌲',
@@ -8525,10 +9333,10 @@ function renderLevelMap(){
     rainy:'⚡', snowyweather:'🌨'
   };
   var _lmShort = {
-    valley:'Green Valley', desert:'Desert', snow:'Snowy Mtn', forest:'Forest',
-    rocky:'Rocky', meadow:'Meadow', volcano:'Volcano', nightcity:'Night City',
-    tropical:'Tropical', skyislands:'Sky Islands', cloudy:'Cloudy',
-    rainy:'Storm', snowyweather:'Snowstorm'
+    valley:t('theme_valley'), desert:t('theme_desert'), snow:t('theme_snow'), forest:t('theme_forest'),
+    rocky:t('theme_rocky'), meadow:t('theme_meadow'), volcano:t('theme_volcano'), nightcity:t('theme_nightcity'),
+    tropical:t('theme_tropical'), skyislands:t('theme_skyislands'), cloudy:t('theme_cloudy'),
+    rainy:t('theme_rainy'), snowyweather:t('theme_snowyweather')
   };
 
   var _activeTi = Math.floor(curLevel / 10);
@@ -8573,7 +9381,7 @@ function renderLevelMap(){
       var _msg = document.createElement('div');
       var _need = ti > 0 ? (20 - getThemeStars(ti-1)) : 20;
       _msg.style.cssText = 'text-align:center;padding:40px 20px;color:rgba(255,255,255,0.4);font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;';
-      _msg.textContent = '\U0001f512 '+_need+' yildiz daha gerekli';
+      _msg.textContent = '\U0001f512 '+_need+' '+t('stars_needed');
       _lmCont.appendChild(_msg);
       return;
     }
@@ -8595,7 +9403,7 @@ function renderLevelMap(){
       for(var _s=0;_s<3;_s++) _sh += _s<_st?'\u2b50':'\u2606';
       _card.innerHTML =
         '<div class="lm-card-num">'+_lvd.id+'</div>'
-        +'<div class="lm-card-name">'+_lvd.name+'</div>'
+        +'<div class="lm-card-name">'+tLevel(_lvd.name)+'</div>'
         +'<div class="lm-card-footer">'
         +'<span class="lm-card-stars">'+_sh+'</span>'
         +'<span class="lm-card-mat">'+(MAT_BADGE[_lvd.targetMat]||'')+'</span>'
@@ -8689,7 +9497,7 @@ function giveExtraAmmo(){
   const btnFire = document.getElementById('btn-fire');
   if(btnFire) btnFire.disabled = false;
   updateUI();
-  showToast('💣 +3 atış kazandın!');
+  showToast(t('toast_3_ammo_won'));
   SFX.buy();
 }
 
@@ -9077,11 +9885,11 @@ function updateTacticalBadge(){
 }
 
 function adTactical(){
-  if(lv && lv.showPath){ showToast('🎯 Level 15\'ten sonra kullanılır!'); return; }
+  if(lv && lv.showPath){ showToast(t('toast_tactic_after15')); return; }
   const today=new Date().toDateString();
   const key='tac_ad_'+today;
   const used=parseInt(lsGet(key)||'0');
-  if(used>=3){ showToast('Bugün Taktik Görüş reklam limitine ulaştın! (3/3)'); return; }
+  if(used>=3){ showToast(t('toast_tac_ad_limit')); return; }
   lsSet(key, used+1);
     if(isSandbox){setTimeout(giveTactical, 500);}else{
   if(isSandbox){setTimeout(giveTactical, 500);}else{
@@ -9090,11 +9898,11 @@ function adTactical(){
 }
 
 function adWindBlock(){
-  if(!lv || lv.wind===0){ showToast('💨 Bu levelde rüzgar yok!'); return; }
+  if(!lv || lv.wind===0){ showToast(t('toast_no_wind')); return; }
   const today=new Date().toDateString();
   const key='wb_ad_'+today;
   const used=parseInt(lsGet(key)||'0');
-  if(used>=3){ showToast('Bugün Rüzgar Engelleyici limitine ulaştın! (3/3)'); return; }
+  if(used>=3){ showToast(t('toast_wb_ad_limit')); return; }
   lsSet(key, used+1);
     if(isSandbox){setTimeout(giveWindBlock, 500);}else{
   if(isSandbox){setTimeout(giveWindBlock, 500);}else{
@@ -9105,7 +9913,7 @@ function adWindBlock(){
 function giveWindBlock(){
   SFX.windblockActivate();
   const cl=(typeof curLevel!=='undefined'&&curLevel>=0)?curLevel:0;
-  if(!lv || lv.wind===0){ showToast('💨 Bu levelde rüzgar yok, hak geri eklendi!'); return; }
+  if(!lv || lv.wind===0){ showToast(t('toast_no_wind_refund')); return; }
   windBlock={expiresAtLevel:cl+3};
   wind=0;
   SFX.setWind(0);  // rüzgar engelleyici aktifken rüzgar sesini durdur
@@ -9114,19 +9922,19 @@ function giveWindBlock(){
   renderGallery();
   SFX.buy();
   updateUI();
-  showToast('💨 Rüzgar Engelleyici 3 level için aktif!');
+  showToast(t('toast_wb_on'));
 }
 
 function giveTactical(){
   SFX.tacticalActivate();
   const cl = (typeof curLevel!=='undefined'&&curLevel>=0) ? curLevel : 0;
-  if(lv && lv.showPath){ showToast('🎯 Rota zaten görünüyor, hak geri eklendi!'); return; }
+  if(lv && lv.showPath){ showToast(t('toast_route_visible')); return; }
   tempTactical = {expiresAtLevel: cl + 3};
   lsSet('temp_tactical', JSON.stringify(tempTactical));
   updateTacticalBadge(); updateWindBlockBadge();
   if(galleryTab === 'boost') renderGallery(); // galeri açıksa yenile
   SFX.buy();
-  showToast('🎯 Taktik Görüş 3 level için aktif!');
+  showToast(t('toast_tac_on'));
 }
 
 // Level 15 hint kartı — tek seferlik
@@ -9161,7 +9969,7 @@ function giveGuidedReward(){
   const cl = curLevel || 0;
   tempGuided = { usedAtLevel: cl, spent: false };
   lsSet('temp_guided', JSON.stringify(tempGuided));
-  showToast('🔥 Isıya Güdümlü Başlık aktif!');
+  showToast(t('toast_guided_on'));
   updateUI();
 }
 
@@ -9214,33 +10022,31 @@ function renderBoostGallery(cont){
   let tacBadge, tacBtn;
   if(isTemp){
     const kalan = tempTactical.expiresAtLevel - curLevel;
-    tacBadge=`<span class="gc-badge temp-badge">⏱ ${kalan} level kaldı</span>`;
+    tacBadge=`<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left',{n:kalan})}</span>`;
     tacBtn=tacAdLeft>0
-      ?`<button class="gc-btn btn-ad" onclick="adTactical()">📺 +3 level<br><span style="font-size:10px;opacity:0.7;">${tacAdLeft} hak</span></button>`
-      :`<span style="font-size:11px;color:#888;text-align:center;">Günlük limit<br>doldu (0/3)</span>`;
+      ?`<button class="gc-btn btn-ad" onclick="adTactical()">${t('boost_btn_ad_3lvl')}<br><span style="font-size:10px;opacity:0.7;">${tFmt('boost_btn_ad_rights',{n:tacAdLeft})}</span></button>`
+      :`<span style="font-size:11px;color:#888;text-align:center;">${t('boost_daily_full')}</span>`;
   } else if(!tacAvail){
     // Level 15 öncesi — almak anlamsız
-    tacBadge='<span class="gc-badge locked-badge">🔒 Level 15\'te aktif</span>';
-    tacBtn=`<span style="font-size:11px;color:#888;text-align:center;">Level 15\'ten<br>sonra kullanılır</span>`;
+    tacBadge=`<span class="gc-badge locked-badge">${t('boost_badge_lvl15')}</span>`;
+    tacBtn=`<span style="font-size:11px;color:#888;text-align:center;">${t('boost_after_lvl15')}</span>`;
   } else {
-    tacBadge='<span class="gc-badge locked-badge">🔒 Aktif Değil</span>';
+    tacBadge=`<span class="gc-badge locked-badge">${t('boost_badge_locked')}</span>`;
     tacBtn=tacAdLeft>0
-      ?`<button class="gc-btn btn-ad" onclick="adTactical()">📺 3 level izle<br><span style="font-size:10px;opacity:0.7;">${tacAdLeft}/3 hak</span></button>`
-      :`<span style="font-size:11px;color:#888;text-align:center;">Günlük limit<br>doldu (0/3)</span>`;
+      ?`<button class="gc-btn btn-ad" onclick="adTactical()">${t('boost_btn_ad_3lvl_watch')}<br><span style="font-size:10px;opacity:0.7;">${tFmt('boost_btn_ad_rights_full',{n:tacAdLeft})}</span></button>`
+      :`<span style="font-size:11px;color:#888;text-align:center;">${t('boost_daily_full')}</span>`;
   }
   const tacCard = document.createElement('div');
   tacCard.className='gallery-card'+(isTemp?' owned':'');
   tacCard.innerHTML=`
     <div class="gc-icon" style="font-size:36px;">🎯</div>
     <div class="gc-info">
-      <div class="gc-name">Taktik Görüş ${tacBadge}</div>
+      <div class="gc-name">${t('boost_tac_name')} ${tacBadge}</div>
       <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 6px;">
-        Rota çizgisini gösterir, düşme noktasını belirler.<br>
-        <b style="color:#00E5FF;">Rüzgar etkisi hesaba katılır</b> — rota gerçek düşüş noktasını gösterir.
-        Level 15'ten sonra rota kaybolur — bu ile geri açılır.
+        ${t('boost_tac_desc')}
       </div>
-      ${statBar('Hassasiyet',1.0,'#00E5FF')}
-      ${statBar('Rüzgar Okuma',0.85,'#00E5FF')}
+      ${statBar(t('boost_stat_accuracy'),1.0,'#00E5FF')}
+      ${statBar(t('boost_stat_wind_read'),0.85,'#00E5FF')}
     </div>
     ${tacBtn}`;
   cont.appendChild(tacCard);
@@ -9251,30 +10057,30 @@ function renderBoostGallery(cont){
   const wbHasWind = lv && lv.wind > 0; // rüzgarsız levelde işe yaramaz
   let wbBadge, wbBtn;
   if(wbActive){
-    wbBadge=`<span class="gc-badge temp-badge">⏱ ${windBlock.expiresAtLevel-curLevel} level kaldı</span>`;
+    wbBadge=`<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left',{n:(windBlock.expiresAtLevel-curLevel)})}</span>`;
     wbBtn=wbAdLeft>0
-      ?`<button class="gc-btn btn-ad" onclick="adWindBlock()">📺 +3 level<br><span style="font-size:10px;opacity:0.7;">${wbAdLeft} hak</span></button>`
-      :`<span style="font-size:11px;color:#888;text-align:center;">Limit doldu<br>(0/3)</span>`;
+      ?`<button class="gc-btn btn-ad" onclick="adWindBlock()">${t('boost_btn_ad_3lvl')}<br><span style="font-size:10px;opacity:0.7;">${tFmt('boost_btn_ad_rights',{n:wbAdLeft})}</span></button>`
+      :`<span style="font-size:11px;color:#888;text-align:center;">${t('boost_limit_full')}</span>`;
   } else if(!wbHasWind){
-    wbBadge='<span class="gc-badge locked-badge">🔒 Rüzgar Yok</span>';
-    wbBtn=`<span style="font-size:11px;color:#888;text-align:center;">Bu levelde<br>rüzgar yok</span>`;
+    wbBadge=`<span class="gc-badge locked-badge">${t('boost_badge_no_wind')}</span>`;
+    wbBtn=`<span style="font-size:11px;color:#888;text-align:center;">${t('boost_no_wind_here')}</span>`;
   } else {
-    wbBadge='<span class="gc-badge locked-badge">🔒 Aktif Değil</span>';
+    wbBadge=`<span class="gc-badge locked-badge">${t('boost_badge_locked')}</span>`;
     wbBtn=wbAdLeft>0
-      ?`<button class="gc-btn btn-ad" onclick="adWindBlock()">📺 3 level izle<br><span style="font-size:10px;opacity:0.7;">${wbAdLeft}/3 hak</span></button>`
-      :`<span style="font-size:11px;color:#888;text-align:center;">Limit doldu<br>(0/3)</span>`;
+      ?`<button class="gc-btn btn-ad" onclick="adWindBlock()">${t('boost_btn_ad_3lvl_watch')}<br><span style="font-size:10px;opacity:0.7;">${tFmt('boost_btn_ad_rights_full',{n:wbAdLeft})}</span></button>`
+      :`<span style="font-size:11px;color:#888;text-align:center;">${t('boost_limit_full')}</span>`;
   }
   const wbCard = document.createElement('div');
   wbCard.className='gallery-card'+(wbActive?' owned':'');
   wbCard.innerHTML=`
     <div class="gc-icon" style="font-size:36px;">💨</div>
     <div class="gc-info">
-      <div class="gc-name">Rüzgar Engelleyici ${wbBadge}</div>
+      <div class="gc-name">${t('boost_wb_name')} ${wbBadge}</div>
       <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 6px;">
-        Rüzgar etkisini 3 level boyunca tamamen sıfırlar.
+        ${t('boost_wb_desc')}
       </div>
-      ${statBar('Etki',1.0,'#00C9B1')}
-      ${statBar('Süre',0.3,'#00C9B1')}
+      ${statBar(t('boost_stat_effect'),1.0,'#00C9B1')}
+      ${statBar(t('boost_stat_duration'),0.3,'#00C9B1')}
     </div>
     ${wbBtn}`;
   cont.appendChild(wbCard);
@@ -9284,27 +10090,26 @@ function renderBoostGallery(cont){
   const isGuided    = isGuidedActive();
   let gdBadge, gdBtn;
   if(isGuided){
-    gdBadge = '<span class="gc-badge temp-badge">✅ Bu Level Aktif</span>';
-    gdBtn   = '<span style="font-size:11px;color:#FF6B35;text-align:center;font-weight:700;">Aktif 🔥</span>';
+    gdBadge = `<span class="gc-badge temp-badge">${t('boost_badge_active_lvl')}</span>`;
+    gdBtn   = `<span style="font-size:11px;color:#FF6B35;text-align:center;font-weight:700;">${t('boost_active_status')}</span>`;
   } else if(!isCaveLevel){
-    gdBadge = '<span class="gc-badge locked-badge">🔒 Sadece Mağara Level</span>';
-    gdBtn   = '<span style="font-size:11px;color:#888;text-align:center;">8. levellerde<br>kullanılır</span>';
+    gdBadge = `<span class="gc-badge locked-badge">${t('boost_badge_cave_only')}</span>`;
+    gdBtn   = `<span style="font-size:11px;color:#888;text-align:center;">${t('boost_cave_only_info')}</span>`;
   } else {
-    gdBadge = '<span class="gc-badge locked-badge">🔒 Aktif Değil</span>';
-    gdBtn   = '<button class="gc-btn btn-ad" onclick="closeGuidedHint();guidedHintAd()">📺 Reklam İzle<br><span style=\'font-size:10px;opacity:0.7;\'>1 level geçerli</span></button>';
+    gdBadge = `<span class="gc-badge locked-badge">${t('boost_badge_locked')}</span>`;
+    gdBtn   = `<button class="gc-btn btn-ad" onclick="closeGuidedHint();guidedHintAd()">${t('boost_btn_ad_only')}<br><span style='font-size:10px;opacity:0.7;'>${t('boost_btn_1lvl_valid')}</span></button>`;
   }
   const gdCard = document.createElement('div');
   gdCard.className = 'gallery-card' + (isGuided ? ' owned' : '');
   gdCard.innerHTML = `
     <div class="gc-icon" style="font-size:36px;">🔥</div>
     <div class="gc-info">
-      <div class="gc-name">Isıya Güdümlü Başlık ${gdBadge}</div>
+      <div class="gc-name">${t('boost_gd_name')} ${gdBadge}</div>
       <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 6px;">
-        Mermi mağara içindeki ısı kaynağına otomatik yönelir.
-        Sadece mağara levellarında (her temanın 8. leveli) geçerlidir.
+        ${t('boost_gd_desc')}
       </div>
-      ${statBar('Yönelim',0.95,'#FF6B35')}
-      ${statBar('Süre',0.1,'#FF6B35')}
+      ${statBar(t('boost_stat_homing'),0.95,'#FF6B35')}
+      ${statBar(t('boost_stat_duration'),0.1,'#FF6B35')}
     </div>
     ${gdBtn}`;
   cont.appendChild(gdCard);
@@ -9319,26 +10124,26 @@ function renderBoostGallery(cont){
 
   let _bBadge, _bBtn;
   if(_bTemp){
-    _bBadge = `<span class="gc-badge temp-badge">⏱ ${_bTempL} level kaldı (×2.0)</span>`;
-    _bBtn   = `<button class="gc-btn btn-ad" onclick="watchAdForDmgBoost()">📺 +3 level<br><span style="font-size:10px;opacity:0.7;">uzat</span></button>`;
+    _bBadge = `<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left_2x',{n:_bTempL})}</span>`;
+    _bBtn   = `<button class="gc-btn btn-ad" onclick="watchAdForDmgBoost()">${t('boost_btn_ad_3lvl')}<br><span style="font-size:10px;opacity:0.7;">${t('boost_btn_ad_extend')}</span></button>`;
   } else if(dmgBoostLevel > 0){
-    _bBadge = `<span class="gc-badge owned-badge">✓ Sv${dmgBoostLevel} ×${_bMult} kalıcı</span>`;
+    _bBadge = `<span class="gc-badge owned-badge">${tFmt('boost_badge_active_lv',{lv:dmgBoostLevel,mult:_bMult})}</span>`;
     _bBtn   = dmgBoostLevel < 3
-      ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''}>⬆ Sv${dmgBoostLevel+1} — ×${_bNext}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
-      : `<span style="font-size:11px;color:#FFD700;text-align:center;">✓ Maksimum<br>seviye</span>`;
+      ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''}>${tFmt('boost_btn_upgrade',{lv:dmgBoostLevel+1,mult:_bNext})}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
+      : `<span style="font-size:11px;color:#FFD700;text-align:center;">${t('boost_max_level_label')}</span>`;
   } else {
-    _bBadge = '<span class="gc-badge locked-badge">🔒 Aktif Değil</span>';
-    _bBtn   = `<button class="gc-btn btn-ad" onclick="watchAdForDmgBoost()">📺 Reklam izle<br><span style="font-size:10px;opacity:0.7;">3 level ×2.0</span></button>`;
+    _bBadge = `<span class="gc-badge locked-badge">${t('boost_badge_locked')}</span>`;
+    _bBtn   = `<button class="gc-btn btn-ad" onclick="watchAdForDmgBoost()">${t('boost_btn_ad_only_lower')}<br><span style="font-size:10px;opacity:0.7;">${t('boost_btn_3lvl_x2')}</span></button>`;
   }
 
   // Kalıcı upgrade butonu — geçici aktifken de göster (alt kısım)
   const _bPermBtn = (!_bTemp && dmgBoostLevel < 3)
-    ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''} style="margin-top:3px;">⬆ Kalıcı Sv${dmgBoostLevel+1} — ×${_bNext}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
+    ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''} style="margin-top:3px;">${tFmt('boost_btn_upgrade_perm',{lv:dmgBoostLevel+1,mult:_bNext})}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
     : '';
 
   // Geçici aktifken kalıcı butonu da göster
   const _bPermBtn2 = dmgBoostLevel < 3
-    ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''} style="margin-top:5px;width:100%;">⬆ Kalıcı Sv${dmgBoostLevel+1} — ×${_bNext}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
+    ? `<button class="gc-btn" onclick="buyPermDmgBoost()" ${score<_bCost?'disabled':''} style="margin-top:5px;width:100%;">${tFmt('boost_btn_upgrade_perm',{lv:dmgBoostLevel+1,mult:_bNext})}<br><span style="font-size:10px;opacity:0.7;">${_bCost.toLocaleString()} 🏆</span></button>`
     : '';
 
   const _boostCard = document.createElement('div');
@@ -9346,12 +10151,12 @@ function renderBoostGallery(cont){
   _boostCard.innerHTML = `
     <div class="gc-icon" style="font-size:36px;">💥</div>
     <div class="gc-info">
-      <div class="gc-name">Hasar Yükseltici ${_bBadge}</div>
+      <div class="gc-name">${t('boost_dmg_name')} ${_bBadge}</div>
       <div class="gc-desc" style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 6px;">
-        Tüm atışlarda hasar çarpanı. Geçici: reklam → 3 level ×2.0. Kalıcı: puan ile upgrade.
+        ${t('boost_dmg_desc')}
       </div>
-      ${statBar('Güç', Math.max(dmgBoostLevel/3, _bTemp?1:0), '#FF6B35')}
-      ${statBar('Süre', _bTemp ? _bTempL/3 : (dmgBoostLevel>0?1:0), '#FF6B35')}
+      ${statBar(t('boost_stat_power'), Math.max(dmgBoostLevel/3, _bTemp?1:0), '#FF6B35')}
+      ${statBar(t('boost_stat_duration'), _bTemp ? _bTempL/3 : (dmgBoostLevel>0?1:0), '#FF6B35')}
       <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px;">
         ${_bBtn}
         ${_bPermBtn2}
@@ -9396,7 +10201,7 @@ function checkDailyLoginBonus(){
   // 7 günlük seri tamamlandıysa +100 puan bonus
   if(loginStreak === 6){ // 0-6 arası, 6 = 7. gün
     score += 100;
-    showToast('🔥 7 günlük seri! +100 puan bonus!');
+    showToast(t('toast_streak_7'));
   }
 
   // Kaydet
@@ -9481,13 +10286,13 @@ function giveReward(adType){
       if(adType.startsWith('tank_')){
         giveAdTank(adType.replace('tank_','')); break;
       }
-      showToast('Ödül alındı!');
+      showToast(t('toast_reward_got'));
   }
 }
 
 // Reklam gösterilemedi — kullanıcıya bildir, ödül verme
 function adFailed(adType){
-  showToast('📵 Reklam şu an hazır değil, biraz bekleyip tekrar dene.');
+  showToast(t('toast_ad_not_ready'));
 }
 
 // ── Sandbox Sistemi ─────────────────────────────────────────────
@@ -9675,28 +10480,27 @@ function openDmgBoostInfo(){
   if(isTemp){
     const kalan = tempDmgBoost.expiresAtLevel - cl;
     body.innerHTML = '<span style="font-size:22px;">💥</span><br>'
-      +'<b style="color:#FF6B35">'+kalan+' Level Kaldı (×2.0)</b><br><br>'
-      +'<span style="color:rgba(255,255,255,0.65)">Tüm atışlarda 2 kat hasar.<br>'
-      +(isPerm?'Kalıcı: Sv'+dmgBoostLevel+' ×'+DMG_BOOST_MULT[dmgBoostLevel]+' aktif.':'Kalıcı yükseltme için güçlendirici sekmesini ziyaret et.')+'</span>';
+      +'<b style="color:#FF6B35">'+tFmt('dmg_info_levels_left', {n: kalan})+'</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">'+t('dmg_info_all_shots_x2')+'<br>'
+      +(isPerm?tFmt('dmg_info_perm_active', {lv: dmgBoostLevel, mult: DMG_BOOST_MULT[dmgBoostLevel]}):t('dmg_info_perm_hint'))+'</span>';
     btnArea.innerHTML =
-      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">📺 +3 Level Uzat</button>'
-      +'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">🛡️ Güçlendirici Sekmesi</button>';
+      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">'+t('dmg_btn_extend_3lvl')+'</button>'
+      +'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">'+t('dmg_btn_boost_tab')+'</button>';
   } else if(isPerm){
     body.innerHTML = '<span style="font-size:22px;">💥</span><br>'
-      +'<b style="color:#FF6B35">Sv'+dmgBoostLevel+' — ×'+DMG_BOOST_MULT[dmgBoostLevel]+' Kalıcı</b><br><br>'
-      +'<span style="color:rgba(255,255,255,0.65)">Tüm atışlarda hasar çarpanı aktif.'
-      +(dmgBoostLevel<3?'<br>Sv'+(dmgBoostLevel+1)+' için güçlendirici sekmesine git.':'<br>Maksimum seviyedesin!')+'</span>';
+      +'<b style="color:#FF6B35">'+tFmt('dmg_info_perm_title', {lv: dmgBoostLevel, mult: DMG_BOOST_MULT[dmgBoostLevel]})+'</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">'+t('dmg_info_perm_desc')
+      +(dmgBoostLevel<3?'<br>'+tFmt('dmg_info_next_hint', {lv: (dmgBoostLevel+1)}):'<br>'+t('dmg_info_max'))+'</span>';
     btnArea.innerHTML =
-      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">📺 Reklam izle — 3 level ×2.0</button>'
-      +(dmgBoostLevel<3?'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">⬆ Yükselt — Güçlendirici Sekmesi</button>':'');
+      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">'+t('dmg_btn_ad_3lvl_x2')+'</button>'
+      +(dmgBoostLevel<3?'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">'+t('dmg_btn_upgrade_tab')+'</button>':'');
   } else {
     body.innerHTML = '<span style="font-size:22px;">💥</span><br>'
-      +'<b style="color:rgba(255,255,255,0.5)">Hasar Yükseltici</b><br><br>'
-      +'<span style="color:rgba(255,255,255,0.65)">Tüm atışlarda hasar çarpanı.<br>'
-      +'Reklam: 3 level ×2.0 geçici.<br>Puan ile kalıcı yükseltme yapabilirsin.</span>';
+      +'<b style="color:rgba(255,255,255,0.5)">'+t('dmg_info_empty_title')+'</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">'+t('dmg_info_empty_desc')+'</span>';
     btnArea.innerHTML =
-      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">📺 Reklam izle — 3 level ×2.0</button>'
-      +'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">🛡️ Kalıcı Satın Al</button>';
+      '<button onclick="closeDmgBoostInfo();watchAdForDmgBoost()" style="'+btnStyle+'background:rgba(255,107,53,0.2);border:1px solid #FF6B35;color:#FF6B35;">'+t('dmg_btn_ad_3lvl_x2')+'</button>'
+      +'<button onclick="closeDmgBoostInfo();openGallery(curLevel,\'boost\')" style="'+btnStyle+'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);">'+t('dmg_btn_buy_perm')+'</button>';
   }
   document.getElementById('dmgboost-info-bg').style.display='block';
   card.style.display='block';
@@ -9724,20 +10528,18 @@ function openWindBlockInfo(){
   if(isActive){
     const kalan = windBlock.expiresAtLevel - cl;
     body.innerHTML = '<span style="font-size:22px;">💨</span><br>'
-      +'<b style="color:#00C9B1">'+kalan+' Level Kaldı</b><br><br>'
-      +'<span style="color:rgba(255,255,255,0.65)">Rüzgar tamamen devre dışı.<br>'
-      +'Günlük '+adLeft+'/3 hakkın kaldı.</span>';
+      +'<b style="color:#00C9B1">'+tFmt('wb_info_active_title', {n: kalan})+'</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">'+tFmt('wb_info_active_desc', {n: adLeft})+'</span>';
     btnArea.innerHTML = adLeft>0
-      ?'<button onclick="closeWindBlockInfo();adWindBlock()" style="'+btnStyle+'background:rgba(0,200,177,0.2);border:1px solid #00C9B1;color:#00C9B1;">📺 +3 Level Uzat ('+adLeft+' hak)</button>'
-      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">Bugünkü reklam limitin doldu.<br>Yarın tekrar 3 hakkın olacak.</div>';
+      ?'<button onclick="closeWindBlockInfo();adWindBlock()" style="'+btnStyle+'background:rgba(0,200,177,0.2);border:1px solid #00C9B1;color:#00C9B1;">'+tFmt('tac_btn_extend', {n: adLeft})+'</button>'
+      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">'+t('tac_btn_limit_full')+'</div>';
   } else {
     body.innerHTML = '<span style="font-size:22px;">💨</span><br>'
-      +'<b style="color:rgba(255,255,255,0.5)">Rüzgar Engelleyici</b><br><br>'
-      +'<span style="color:rgba(255,255,255,0.65)">Rüzgarı 3 level boyunca tamamen sıfırlar.<br>'
-      +'Günlük 3 hak — bugün '+adLeft+' hakkın kaldı.</span>';
+      +'<b style="color:rgba(255,255,255,0.5)">'+t('wb_info_inactive_title')+'</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">'+tFmt('wb_info_inactive_desc', {n: adLeft})+'</span>';
     btnArea.innerHTML = adLeft>0
-      ?'<button onclick="closeWindBlockInfo();adWindBlock()" style="'+btnStyle+'background:rgba(0,200,177,0.2);border:1px solid #00C9B1;color:#00C9B1;">📺 Reklam İzle — 3 Level ('+adLeft+'/3 hak)</button>'
-      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">Bugünkü reklam limitin doldu.<br>Yarın tekrar 3 hakkın olacak.</div>';
+      ?'<button onclick="closeWindBlockInfo();adWindBlock()" style="'+btnStyle+'background:rgba(0,200,177,0.2);border:1px solid #00C9B1;color:#00C9B1;">'+tFmt('tac_btn_watch', {n: adLeft})+'</button>'
+      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">'+t('tac_btn_limit_full')+'</div>';
   }
   document.getElementById('windblock-info-bg').style.display='block';
   card.style.display='block';
@@ -9877,21 +10679,18 @@ function openTacticalInfo(){
   if(isActive){
     const kalan = tempTactical.expiresAtLevel - cl;
     body.innerHTML = '<span style="font-size:22px;">🎯</span><br>'
-      +'<b style="color:#00E5FF">'+kalan+' Level Kaldı</b><br><br>'
-      +'<span style="color:rgba(255,255,255,0.65)">Rota, düşme noktası ve rüzgar yönü görünür.<br>'
-      +'Günlük '+adLeft+'/3 reklam hakkın kaldı.</span>';
+      +'<b style="color:#00E5FF">'+tFmt('tac_info_active_title', {n: kalan})+'</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">'+tFmt('tac_info_active_desc', {n: adLeft})+'</span>';
     btnArea.innerHTML = adLeft>0
-      ?'<button onclick="closeTacticalInfo();adTactical()" style="'+btnStyle+'background:rgba(0,150,200,0.2);border:1px solid #00E5FF;color:#00E5FF;">📺 +3 Level Uzat ('+adLeft+' hak)</button>'
-      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">Bugünkü reklam limitin doldu.<br>Yarın tekrar 3 hakkın olacak.</div>';
+      ?'<button onclick="closeTacticalInfo();adTactical()" style="'+btnStyle+'background:rgba(0,150,200,0.2);border:1px solid #00E5FF;color:#00E5FF;">'+tFmt('tac_btn_extend', {n: adLeft})+'</button>'
+      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">'+t('tac_btn_limit_full')+'</div>';
   } else {
     body.innerHTML = '<span style="font-size:22px;">🎯</span><br>'
-      +'<b style="color:rgba(255,255,255,0.5)">Taktik Görüş</b><br><br>'
-      +'<span style="color:rgba(255,255,255,0.65)">Level 15 sonrası rota kaybolur.<br>'
-      +'Reklam izleyerek 3 level aktif edebilirsin.<br>'
-      +'Günlük 3 hak — bugün '+adLeft+' hakkın kaldı.</span>';
+      +'<b style="color:rgba(255,255,255,0.5)">'+t('tac_info_inactive_title')+'</b><br><br>'
+      +'<span style="color:rgba(255,255,255,0.65)">'+tFmt('tac_info_inactive_desc', {n: adLeft})+'</span>';
     btnArea.innerHTML = adLeft>0
-      ?'<button onclick="closeTacticalInfo();adTactical()" style="'+btnStyle+'background:rgba(0,150,200,0.2);border:1px solid #00E5FF;color:#00E5FF;">📺 Reklam İzle — 3 Level ('+adLeft+'/3 hak)</button>'
-      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">Bugünkü reklam limitin doldu.<br>Yarın tekrar 3 hakkın olacak.</div>';
+      ?'<button onclick="closeTacticalInfo();adTactical()" style="'+btnStyle+'background:rgba(0,150,200,0.2);border:1px solid #00E5FF;color:#00E5FF;">'+tFmt('tac_btn_watch', {n: adLeft})+'</button>'
+      :'<div style="text-align:center;color:#888;font-size:13px;padding:8px;">'+t('tac_btn_limit_full')+'</div>';
   }
   document.getElementById('tactical-info-bg').style.display='block';
   card.style.display='block';
@@ -9908,7 +10707,7 @@ function openTacticalInfo(){
     border-top:4px solid #FFE566;border-radius:50%;
     animation:lvlSpin 0.7s linear infinite;"></div>
   <div id="level-loading-txt" style="color:rgba(255,255,255,0.7);
-    font-family:'Rajdhani',sans-serif;font-size:15px;margin-top:14px;letter-spacing:1px;">
+    font-family:'Rajdhani',sans-serif;font-size:15px;margin-top:14px;letter-spacing:1px;" data-i18n="loading">
     Hazırlanıyor...
   </div>
 </div>
@@ -9918,7 +10717,7 @@ function openTacticalInfo(){
 
 <div id="level-map">
   <div id="level-map-header">
-    <h1>🗺️ Level Haritası</h1>
+    <h1 data-i18n="map_title">🗺️ Level Haritası</h1>
     <span id="lm-total-stars" style="color:#FFD700;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;"></span>
     <button onclick="closeLevelMap()" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
       color:white;border-radius:12px;padding:6px 14px;font-size:14px;font-weight:700;
@@ -9934,7 +10733,7 @@ function openTacticalInfo(){
   background:#1a2030;border-radius:16px;padding:16px;width:220px;
   box-shadow:0 8px 32px rgba(0,0,0,0.6);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-    <span style="color:#fff;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;">🎯 Taktik Görüş</span>
+    <span style="color:#fff;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="tactical_title">🎯 Taktik Görüş</span>
     <button onclick="closeTacticalInfo()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;line-height:1;">✕</button>
   </div>
   <div id="tactical-info-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;"></div>
@@ -9946,7 +10745,7 @@ function openTacticalInfo(){
   background:#1a2030;border-radius:16px;padding:16px;width:220px;
   box-shadow:0 8px 32px rgba(0,0,0,0.6);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-    <span style="color:#fff;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;">💨 Rüzgar Engelleyici</span>
+    <span style="color:#fff;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="windblock_title">💨 Rüzgar Engelleyici</span>
     <button onclick="closeWindBlockInfo()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;line-height:1;">✕</button>
   </div>
   <div id="windblock-info-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;"></div>
@@ -9959,7 +10758,7 @@ function openTacticalInfo(){
   background:#1a2030;border-radius:16px;padding:16px;width:220px;
   box-shadow:0 8px 32px rgba(0,0,0,0.6);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-    <span style="color:#fff;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;">💥 Hasar Yükseltici</span>
+    <span style="color:#fff;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="dmgboost_title">💥 Hasar Yükseltici</span>
     <button onclick="closeDmgBoostInfo()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;line-height:1;">✕</button>
   </div>
   <div id="dmgboost-info-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;"></div>
@@ -9986,13 +10785,13 @@ function openTacticalInfo(){
       style="flex:1;padding:11px;border-radius:12px;
       border:1.5px solid rgba(255,255,255,0.2);
       background:rgba(255,255,255,0.07);color:white;
-      font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">
+      font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="lsc_inventory">
       ⚔️ Envanter
     </button>
     <button onclick="closeLevelStartCard();loadLevel(pendingLevelIdx);"
       style="flex:2;padding:11px;border-radius:12px;border:none;
       background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;
-      font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
+      font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;" data-i18n="lsc_battle">
       ▶ Savaşa Gir!
     </button>
   </div>
@@ -10005,7 +10804,7 @@ function openTacticalInfo(){
   background:#1a2030;border:1.5px solid rgba(255,140,0,0.4);border-radius:16px;
   padding:16px;width:230px;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <span style="color:#FF8C00;font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;">🔥 Giriş Serisi</span>
+    <span style="color:#FF8C00;font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="streak_title">🔥 Giriş Serisi</span>
     <button onclick="closeStreakCard()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;">✕</button>
   </div>
   <div id="streak-card-body"></div>
@@ -10017,53 +10816,66 @@ function openTacticalInfo(){
   z-index:501;background:#1a2030;border:1.5px solid rgba(255,255,255,0.12);border-radius:20px;
   padding:22px 20px;width:290px;max-width:calc(100vw - 32px);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-    <span style="color:#FFD700;font-size:18px;font-weight:700;font-family:'Rajdhani',sans-serif;">⚙️ Ayarlar</span>
+    <span style="color:#FFD700;font-size:18px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="settings">⚙️ Ayarlar</span>
     <button onclick="closeSettings()" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;line-height:1;">✕</button>
   </div>
 
   <!-- Ses -->
-  <div style="color:#8b949e;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">SES</div>
+  <div style="color:#8b949e;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;" data-i18n="sound_label">SES</div>
   <div style="display:flex;gap:10px;margin-bottom:18px;">
     <button id="set-sfx-btn" onclick="SFX.toggleSfx();updateSettingsBtns();"
       style="flex:1;padding:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.15);
       background:rgba(255,255,255,0.07);color:white;font-size:14px;font-family:'Rajdhani',sans-serif;
-      font-weight:700;cursor:pointer;">🔊 Efektler</button>
+      font-weight:700;cursor:pointer;" data-i18n="sfx">🔊 Efektler</button>
     <button id="set-music-btn" onclick="SFX.toggleMusic();updateSettingsBtns();"
       style="flex:1;padding:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.15);
       background:rgba(255,255,255,0.07);color:white;font-size:14px;font-family:'Rajdhani',sans-serif;
-      font-weight:700;cursor:pointer;">🎵 Müzik</button>
+      font-weight:700;cursor:pointer;" data-i18n="music">🎵 Müzik</button>
   </div>
 
   <!-- Veri -->
-  <div style="color:#8b949e;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">VERİ</div>
+  <div style="color:#8b949e;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;" data-i18n="data_label">VERİ</div>
 
   <button onclick="confirmReset('slots')"
     style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(255,165,0,0.4);
     background:rgba(255,165,0,0.08);color:#FFD700;font-size:14px;font-family:'Rajdhani',sans-serif;
     font-weight:700;cursor:pointer;margin-bottom:8px;">
-    🔧 Slotları Sıfırla
+    <span data-i18n="reset_slots">🔧 Slotları Sıfırla</span>
   </button>
 
   <button onclick="confirmReset('all')"
     style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(220,50,50,0.4);
     background:rgba(220,50,50,0.08);color:#ff6b6b;font-size:14px;font-family:'Rajdhani',sans-serif;
     font-weight:700;cursor:pointer;margin-bottom:8px;">
-    🗑️ Tüm Veriyi Sıfırla
+    <span data-i18n="reset_all">🗑️ Tüm Veriyi Sıfırla</span>
   </button>
 
   <button onclick="openCloudSettings()"
     style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(66,133,244,0.4);
     background:rgba(66,133,244,0.08);color:#4285F4;font-size:14px;font-family:'Rajdhani',sans-serif;
     font-weight:700;cursor:pointer;margin-bottom:8px;">
-    ☁️ Bulut Kayit
+    <span data-i18n="cloud">☁️ Bulut Kayit</span>
   </button>
 
   <button onclick="openDevMode()"
     style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);
     background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.25);font-size:12px;font-family:'Rajdhani',sans-serif;
     font-weight:700;cursor:pointer;margin-top:4px;">
-    ⚙️ Geliştirici Modu
+    <span data-i18n="dev_mode">⚙️ Geliştirici Modu</span>
   </button>
+
+  <!-- Dil secici -->
+  <div style="color:#8b949e;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;" data-i18n="lang_label">DIL</div>
+  <div style="display:flex;gap:8px;margin-bottom:18px;">
+    <button onclick="setLang('tr')" id="lang-btn-tr"
+      style="flex:1;padding:8px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);
+      background:rgba(255,255,255,0.07);color:white;font-size:13px;font-family:'Rajdhani',sans-serif;
+      font-weight:700;cursor:pointer;">TR 🇹🇷</button>
+    <button onclick="setLang('en')" id="lang-btn-en"
+      style="flex:1;padding:8px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);
+      background:rgba(255,255,255,0.07);color:white;font-size:13px;font-family:'Rajdhani',sans-serif;
+      font-weight:700;cursor:pointer;">EN 🇺🇸</button>
+  </div>
 
   <!-- Versiyon -->
   <div onclick="showVersionNote()"
@@ -10073,7 +10885,7 @@ function openTacticalInfo(){
       v<span id="settings-version-no"></span>
     </div>
     <div style="color:rgba(255,255,255,0.4);font-size:10px;margin-top:2px;" id="settings-version-date"></div>
-    <div style="color:rgba(255,215,0,0.4);font-size:9px;margin-top:2px;">detay için dokun</div>
+    <div style="color:rgba(255,215,0,0.4);font-size:9px;margin-top:2px;" data-i18n="detail">detay için dokun</div>
   </div>
 </div>
 
@@ -10084,7 +10896,7 @@ function openTacticalInfo(){
   box-shadow:0 8px 32px rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.1);">
   <div style="text-align:center;margin-bottom:16px;">
     <div style="font-size:20px;">🔐</div>
-    <div style="color:#fff;font-weight:700;font-size:15px;font-family:'Rajdhani',sans-serif;margin-top:4px;">Geliştirici Modu</div>
+    <div style="color:#fff;font-weight:700;font-size:15px;font-family:'Rajdhani',sans-serif;margin-top:4px;" data-i18n="dev_mode">Geliştirici Modu</div>
   </div>
   <div id="dev-login" style="">
     <input id="dev-pass" type="password" placeholder="Şifre"
@@ -10178,8 +10990,8 @@ function openTacticalInfo(){
   <div id="confirm-title" style="color:white;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;margin-bottom:8px;"></div>
   <div id="confirm-desc"  style="color:#8b949e;font-size:13px;margin-bottom:20px;"></div>
   <div style="display:flex;gap:10px;">
-    <button onclick="closeConfirm()" style="flex:1;padding:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:white;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">İptal</button>
-    <button id="confirm-ok-btn" style="flex:1;padding:10px;border-radius:12px;border:none;background:#c0392b;color:white;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Sıfırla</button>
+    <button onclick="closeConfirm()" style="flex:1;padding:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:white;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="confirm_cancel">İptal</button>
+    <button id="confirm-ok-btn" style="flex:1;padding:10px;border-radius:12px;border:none;background:#c0392b;color:white;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="confirm_reset">Sıfırla</button>
   </div>
 </div>
 
@@ -10218,7 +11030,7 @@ function openTacticalInfo(){
     box-shadow:0 0 60px rgba(255,100,50,0.2);">
     <div style="font-size:48px;margin-bottom:8px;">🔒</div>
     <div style="color:#FF6B35;font-size:13px;font-weight:700;letter-spacing:2px;
-      text-transform:uppercase;margin-bottom:6px;font-family:'Rajdhani',sans-serif;">
+      text-transform:uppercase;margin-bottom:6px;font-family:'Rajdhani',sans-serif;" data-i18n="tgo_completed">
       TEMA TAMAMLANDI!
     </div>
     <div id="tgo-next-theme-name" style="color:white;font-size:22px;font-weight:700;
@@ -10233,19 +11045,19 @@ function openTacticalInfo(){
       <button id="tgo-ad-btn" onclick="themeGateWatchAd()"
         style="width:100%;padding:13px;border-radius:13px;border:none;
         background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;font-size:15px;font-weight:700;
-        font-family:'Rajdhani',sans-serif;cursor:pointer;">
+        font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="tgo_ad_btn">
         📺 Reklam İzle → +2 ⭐
       </button>
       <button onclick="themeGateOpenShop()"
         style="width:100%;padding:13px;border-radius:13px;border:none;
         background:linear-gradient(135deg,#4CAF50,#2e7d32);color:white;font-size:15px;font-weight:700;
-        font-family:'Rajdhani',sans-serif;cursor:pointer;">
+        font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="tgo_buy_star">
         ⭐ Puan ile Yıldız Al
       </button>
       <button onclick="themeGateGoMap()"
         style="width:100%;padding:13px;border-radius:13px;border:1.5px solid rgba(255,255,255,0.2);
         background:rgba(255,255,255,0.08);color:white;font-size:15px;font-weight:700;
-        font-family:'Rajdhani',sans-serif;cursor:pointer;">
+        font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="tgo_back_map">
         🗺️ Önceki Levellara Dön
       </button>
     </div>
@@ -10261,7 +11073,7 @@ function openTacticalInfo(){
     box-shadow:0 0 60px rgba(255,215,0,0.15);">
     <div style="font-size:42px;margin-bottom:6px;">⭐</div>
     <div style="color:#FFD700;font-size:13px;font-weight:700;letter-spacing:2px;
-      text-transform:uppercase;margin-bottom:4px;font-family:'Rajdhani',sans-serif;">
+      text-transform:uppercase;margin-bottom:4px;font-family:'Rajdhani',sans-serif;" data-i18n="ss_title">
       YILDIZ MAĞAZASI
     </div>
     <div id="ss-current-stars" style="color:rgba(255,255,255,0.6);font-size:13px;
@@ -10271,7 +11083,7 @@ function openTacticalInfo(){
     <div style="background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);
       border-radius:14px;padding:14px;margin-bottom:12px;">
       <div style="color:#00E5FF;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;
-        margin-bottom:4px;">🏆 PUAN İLE YıLDıZ</div>
+        margin-bottom:4px;" data-i18n="ss_pts_for_star">🏆 PUAN İLE YıLDıZ</div>
       <div id="ss-score-info" style="color:rgba(255,255,255,0.6);font-size:12px;
         font-family:'Rajdhani',sans-serif;margin-bottom:10px;"></div>
       <div style="display:flex;gap:8px;justify-content:center;">
@@ -10279,13 +11091,13 @@ function openTacticalInfo(){
           style="flex:1;padding:10px 6px;border-radius:11px;border:none;
           background:linear-gradient(135deg,#00E5FF,#0080aa);color:#000;font-size:13px;
           font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">
-          200 puan<br>→ 1 ⭐
+          200 <span data-i18n="ss_buy_1star">puan</span><br><span data-i18n="ss_to_star">→</span> 1 ⭐
         </button>
         <button id="ss-btn-3star" onclick="buyStarWithPoints(3)"
           style="flex:1;padding:10px 6px;border-radius:11px;border:none;
           background:linear-gradient(135deg,#00E5FF,#0080aa);color:#000;font-size:13px;
           font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">
-          500 puan<br>→ 3 ⭐
+          500 <span data-i18n="ss_buy_1star">puan</span><br><span data-i18n="ss_to_star">→</span> 3 ⭐
         </button>
       </div>
     </div>
@@ -10294,11 +11106,11 @@ function openTacticalInfo(){
     <div style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);
       border-radius:14px;padding:14px;margin-bottom:16px;">
       <div style="color:#FFD700;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;
-        margin-bottom:10px;">📺 REKLAM İZLE</div>
+        margin-bottom:10px;" data-i18n="ss_ad_label">📺 REKLAM İZLE</div>
       <button id="ss-btn-ad" onclick="shopWatchAdForStars()"
         style="width:100%;padding:11px;border-radius:11px;border:none;
         background:linear-gradient(135deg,#FFD700,#FF8C00);color:#000;font-size:14px;
-        font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">
+        font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="ss_ad_btn">
         Reklam İzle → +2 ⭐
       </button>
       <div id="ss-ad-limit" style="color:rgba(255,255,255,0.45);font-size:11px;
@@ -10309,7 +11121,7 @@ function openTacticalInfo(){
       style="width:100%;padding:11px;border-radius:13px;
       border:1.5px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.07);
       color:rgba(255,255,255,0.7);font-size:14px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;">
+      font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="ss_close">
       Kapat
     </button>
   </div>
@@ -10323,7 +11135,7 @@ function openTacticalInfo(){
     box-shadow:0 0 60px rgba(255,215,0,0.2),0 0 120px rgba(255,215,0,0.05);">
     <div id="theme-unlock-emoji" style="font-size:56px;margin-bottom:8px;"></div>
     <div style="color:#FFD700;font-size:13px;font-weight:700;letter-spacing:2px;
-      text-transform:uppercase;margin-bottom:6px;font-family:'Rajdhani',sans-serif;">
+      text-transform:uppercase;margin-bottom:6px;font-family:'Rajdhani',sans-serif;" data-i18n="theme_unlocked">
       YENİ TEMA AÇILDI!
     </div>
     <div id="theme-unlock-name" style="color:white;font-size:24px;font-weight:700;
@@ -10342,7 +11154,7 @@ function openTacticalInfo(){
       style="width:100%;padding:14px;border:none;border-radius:14px;
       background:linear-gradient(135deg,#FFD700,#FF8C00);
       color:#000;font-size:16px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;">
+      font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="theme_go">
       🚀 Yeni Temaya Geç!
     </button>
   </div>
@@ -10354,11 +11166,11 @@ function openTacticalInfo(){
 <div id="tank-replace-bg" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
   <div style="background:linear-gradient(135deg,#1a1a2e,#0a1520);border:1.5px solid rgba(255,107,53,0.4);border-radius:22px;padding:24px 20px;width:290px;text-align:center;font-family:'Rajdhani',sans-serif;">
     <div style="font-size:36px;margin-bottom:8px;">🔄</div>
-    <div style="color:#FF6B35;font-size:17px;font-weight:700;margin-bottom:10px;">Tank Değiştir?</div>
+    <div style="color:#FF6B35;font-size:17px;font-weight:700;margin-bottom:10px;" data-i18n="swap_title_tank">Tank Değiştir?</div>
     <div id="tank-replace-desc" style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;"></div>
     <div style="display:flex;gap:10px;">
-      <button onclick="cancelTankReplace()" style="flex:1;padding:11px;border:1.5px solid rgba(255,255,255,0.2);border-radius:12px;background:rgba(255,255,255,0.07);color:white;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">İptal</button>
-      <button onclick="confirmTankReplace()" style="flex:2;padding:11px;border:none;border-radius:12px;background:linear-gradient(135deg,#FF6B35,#ff3d00);color:white;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">Değiştir 📺</button>
+      <button onclick="cancelTankReplace()" style="flex:1;padding:11px;border:1.5px solid rgba(255,255,255,0.2);border-radius:12px;background:rgba(255,255,255,0.07);color:white;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="swap_iptal">İptal</button>
+      <button onclick="confirmTankReplace()" style="flex:2;padding:11px;border:none;border-radius:12px;background:linear-gradient(135deg,#FF6B35,#ff3d00);color:white;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;"><span data-i18n="swap_switch">Değiştir</span> 📺</button>
     </div>
   </div>
 </div>
@@ -10370,7 +11182,7 @@ function openTacticalInfo(){
     box-shadow:0 0 40px rgba(255,165,0,0.1);">
     <div style="font-size:32px;text-align:center;margin-bottom:10px;">⚠️</div>
     <div style="color:#FFD700;font-size:17px;font-weight:700;font-family:'Rajdhani',sans-serif;
-      text-align:center;margin-bottom:12px;">Geçici Mühimmat Var!</div>
+      text-align:center;margin-bottom:12px;" data-i18n="ammo_replace_warn">Geçici Mühimmat Var!</div>
     <div id="ammo-replace-desc" style="color:rgba(255,255,255,0.75);font-size:14px;
       line-height:1.6;text-align:center;margin-bottom:20px;"></div>
     <div style="display:flex;gap:10px;">
@@ -10378,13 +11190,13 @@ function openTacticalInfo(){
         style="flex:1;padding:12px;border-radius:12px;
         border:1.5px solid rgba(255,255,255,0.2);
         background:rgba(255,255,255,0.07);color:white;
-        font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
+        font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;" data-i18n="ammo_replace_cancel">
         ❌ İptal
       </button>
       <button id="ammo-replace-ok" onclick="confirmAmmoReplace()"
         style="flex:1;padding:12px;border-radius:12px;border:none;
         background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;
-        font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
+        font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;cursor:pointer;" data-i18n="ammo_replace_ok">
         ✅ Devam Et
       </button>
     </div>
@@ -10401,8 +11213,8 @@ function openTacticalInfo(){
     box-shadow:0 0 40px rgba(224,64,251,0.12);">
     <div style="font-size:44px;margin-bottom:8px;">⚡</div>
     <div style="color:#E040FB;font-size:18px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;margin-bottom:8px;">Zırhlı Hedef!</div>
-    <div style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;">
+      font-family:'Rajdhani',sans-serif;margin-bottom:8px;" data-i18n="piercer_title">Zırhlı Hedef!</div>
+    <div style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;" data-i18n-html="piercer_body">
       Bu hedef <b style="color:#FFD700;">çelik zırhlı</b> — normal mühimmat yetersiz kalır.<br><br>
       ⚡ <b style="color:#CE93D8;">Piercer</b> ile zırhı del, tek atışta büyük hasar ver.<br>
       <span style="color:rgba(255,255,255,0.45);font-size:11px;">1 level geçerli</span>
@@ -10411,7 +11223,7 @@ function openTacticalInfo(){
       style="width:100%;padding:13px;border:none;border-radius:14px;
       background:linear-gradient(135deg,#7B1FA2,#E040FB);
       color:white;font-size:15px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;">
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;" data-i18n="piercer_ad_btn">
       📺 Reklam İzle → Piercer Al
     </button>
     <button onclick="closePiercerHint();switchTab('ammo');openGallery(curLevel);"
@@ -10419,11 +11231,11 @@ function openTacticalInfo(){
       border:1.5px solid rgba(224,64,251,0.3);
       background:rgba(224,64,251,0.08);color:#E040FB;
       font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
-      🛒 Satın Al (4.000 🏆)
+      <span data-i18n="piercer_buy_btn">🛒 Satın Al</span> (4.000 🏆)
     </button>
     <button onclick="closePiercerHint()"
       style="width:100%;padding:8px;border:none;background:none;
-      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
+      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;" data-i18n="piercer_skip">
       Şimdi değil
     </button>
   </div>
@@ -10438,8 +11250,8 @@ function openTacticalInfo(){
     box-shadow:0 0 40px rgba(0,229,255,0.1);">
     <div style="font-size:44px;margin-bottom:8px;">🎯</div>
     <div style="color:#00E5FF;font-size:18px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;margin-bottom:8px;">Rota Kayboldu!</div>
-    <div style="color:rgba(255,255,255,0.7);font-size:13px;line-height:1.6;margin-bottom:18px;">
+      font-family:'Rajdhani',sans-serif;margin-bottom:8px;" data-i18n="tactical_hint_title">Rota Kayboldu!</div>
+    <div style="color:rgba(255,255,255,0.7);font-size:13px;line-height:1.6;margin-bottom:18px;" data-i18n-html="tactical_hint_body">
       Level 15 sonrasında rota çizgisi kapanır.<br>
       <b style="color:white;">Taktik Görüş</b> ile rotayı, düşme noktasını<br>
       ve rüzgar yönünü tekrar görebilirsin.
@@ -10448,19 +11260,19 @@ function openTacticalInfo(){
       style="width:100%;padding:13px;border:none;border-radius:14px;
       background:linear-gradient(135deg,#0088CC,#00AAFF);
       color:white;font-size:15px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;">
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;" data-i18n="tactical_ad_btn">
       📺 Reklam İzle → 3 Level Aç
     </button>
     <button onclick="closeTacticalHint();switchTab('boost');openGallery(curLevel);"
       style="width:100%;padding:10px;border-radius:14px;
       border:1.5px solid rgba(0,229,255,0.25);
       background:rgba(0,229,255,0.07);color:#00E5FF;
-      font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
+      font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;" data-i18n="tactical_perm_btn">
       🛡️ Güçlendirmeler'den Kalıcı Al
     </button>
     <button onclick="closeTacticalHint()"
       style="width:100%;padding:8px;border:none;background:none;
-      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
+      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;" data-i18n="piercer_skip">
       Şimdi değil
     </button>
   </div>
@@ -10475,8 +11287,8 @@ function openTacticalInfo(){
     box-shadow:0 0 40px rgba(255,80,0,0.15);">
     <div style="font-size:44px;margin-bottom:8px;">🔥</div>
     <div style="color:#FF6B35;font-size:18px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;margin-bottom:8px;">Mağara Hedefi!</div>
-    <div style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;">
+      font-family:'Rajdhani',sans-serif;margin-bottom:8px;" data-i18n="guided_title">Mağara Hedefi!</div>
+    <div style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;" data-i18n-html="guided_body">
       Hedef mağara içinde gizli.<br>
       <b style="color:#FFB74D;">Isıya Güdümlü Başlık</b> ile<br>
       mermin ısı kaynağına otomatik yönelir.<br>
@@ -10486,19 +11298,19 @@ function openTacticalInfo(){
       style="width:100%;padding:13px;border:none;border-radius:14px;
       background:linear-gradient(135deg,#FF4500,#FF6B35);
       color:white;font-size:15px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;">
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;" data-i18n="guided_ad_btn">
       📺 Reklam İzle → 1 Level Aç
     </button>
     <button onclick="closeGuidedHint();switchTab('boost');openGallery(curLevel);"
       style="width:100%;padding:10px;border-radius:14px;
       border:1.5px solid rgba(255,100,0,0.3);
       background:rgba(255,100,0,0.08);color:#FF6B35;
-      font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
+      font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;" data-i18n="guided_perm_btn">
       ⚡ Güçlendirmeler'den Al
     </button>
     <button onclick="closeGuidedHint()"
       style="width:100%;padding:8px;border:none;background:none;
-      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;">
+      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;" data-i18n="piercer_skip">
       Şimdi değil
     </button>
   </div>
@@ -10513,13 +11325,13 @@ function openTacticalInfo(){
     box-shadow:0 0 40px rgba(255,215,0,0.15);">
     <div style="font-size:36px;margin-bottom:6px;">🌅</div>
     <div style="color:#FFD700;font-size:20px;font-weight:700;
-      font-family:'Fredoka One',sans-serif;margin-bottom:12px;">Günlük Giriş!</div>
+      font-family:'Fredoka One',sans-serif;margin-bottom:12px;" data-i18n="login_bonus_title">Günlük Giriş!</div>
     <div id="lbp-content"></div>
     <button onclick="closeLoginBonus()"
       style="width:100%;padding:13px;border:none;border-radius:14px;
       background:linear-gradient(135deg,#FFD700,#FF8C00);
       color:#000;font-size:15px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-top:12px;">
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-top:12px;" data-i18n="login_bonus_btn">
       Harika! Oynamaya Başla 🎮
     </button>
   </div>
@@ -10531,7 +11343,7 @@ function openTacticalInfo(){
     <div style="font-size:28px;margin-bottom:8px;">📦</div>
     <div id="version-note-ver" style="color:#FFD700;font-size:15px;font-weight:700;margin-bottom:12px;"></div>
     <div id="version-note-text" style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.6;margin-bottom:16px;"></div>
-    <button onclick="document.getElementById('version-note-pop').style.display='none'" style="background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:8px 24px;color:#FFD700;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">Tamam</button>
+    <button onclick="document.getElementById('version-note-pop').style.display='none'" style="background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:8px 24px;color:#FFD700;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="version_ok">Tamam</button>
   </div>
 </div>
 
@@ -10539,14 +11351,14 @@ function openTacticalInfo(){
 <div id="buried-info-pop" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;" onclick="closeBuriedInfo()">
   <div style="background:#1a1a2e;border:2px solid #FFD700;border-radius:16px;padding:24px 20px;max-width:280px;text-align:center;font-family:'Rajdhani',sans-serif;" onclick="event.stopPropagation()">
     <div style="font-size:36px;margin-bottom:8px;">☢️</div>
-    <div style="color:#FFD700;font-size:18px;font-weight:700;margin-bottom:12px;">Gömülü Hedef</div>
-    <div style="color:rgba(255,255,255,0.85);font-size:13px;line-height:1.6;margin-bottom:14px;">
+    <div style="color:#FFD700;font-size:18px;font-weight:700;margin-bottom:12px;" data-i18n="buried_title">Gömülü Hedef</div>
+    <div style="color:rgba(255,255,255,0.85);font-size:13px;line-height:1.6;margin-bottom:14px;" data-i18n-html="buried_body">
       Bu hedef toprak altında gizli.<br>
       Normal silahlar <b style="color:#FF6B35;">az hasar</b> verir.<br><br>
       🪛 <b style="color:#80CBC4;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>
       💥 Güçlü patlamalar terreni <b style="color:#A5D6A7;">sarsarak</b> hedefi açığa çıkarabilir.
     </div>
-    <button onclick="closeBuriedInfo()" style="background:linear-gradient(135deg,#FFD700,#FF8C00);border:none;border-radius:10px;padding:10px 28px;color:#000;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">Anladım</button>
+    <button onclick="closeBuriedInfo()" style="background:linear-gradient(135deg,#FFD700,#FF8C00);border:none;border-radius:10px;padding:10px 28px;color:#000;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="buried_ok">Anladım</button>
   </div>
 </div>
 
@@ -10653,32 +11465,32 @@ function onCloudSignIn(success, name) {
 }
 
 function cloudSave() {
-  if (typeof Android === 'undefined') { showToast('Bulut kayit sadece uygulamada calisir.'); return; }
-  if (!_cloudSignedIn) { showToast('Once Google Play Games girisini yap.'); return; }
+  if (typeof Android === 'undefined') { showToast(t('toast_cloud_app_only')); return; }
+  if (!_cloudSignedIn) { showToast(t('toast_cloud_signin_first')); return; }
   var data = {};
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
     data[k] = localStorage.getItem(k);
   }
   data['cur_level'] = String(typeof curLevel !== 'undefined' ? curLevel : 0);
-  try { Android.saveCloudData(JSON.stringify(data)); showToast('Kaydediliyor...'); }
-  catch(e) { showToast('Kayit hatasi: ' + e.message); }
+  try { Android.saveCloudData(JSON.stringify(data)); showToast(t('toast_cloud_saving')); }
+  catch(e) { showToast(tFmt('toast_cloud_save_err', {msg: e.message})); }
 }
 
 function cloudLoad() {
-  if (typeof Android === 'undefined') { showToast('Bulut yukleme sadece uygulamada calisir.'); return; }
-  if (!_cloudSignedIn) { showToast('Once Google Play Games girisini yap.'); return; }
-  showToast('Yukleniyor...');
+  if (typeof Android === 'undefined') { showToast(t('toast_cloud_load_app_only')); return; }
+  if (!_cloudSignedIn) { showToast(t('toast_cloud_signin_first')); return; }
+  showToast(t('toast_cloud_loading'));
   Android.loadCloudData();
 }
 
 function onCloudSaveResult(success, error) {
-  if (success) { showToast('Buluta kaydedildi!'); }
-  else { showToast('Kayit basarisiz: ' + (error || 'bilinmeyen hata')); }
+  if (success) { showToast(t('toast_cloud_saved')); }
+  else { showToast(tFmt('toast_cloud_save_fail', {msg: (error || t('err_unknown'))})); }
 }
 
 function onCloudLoadResult(success, b64data, error) {
-  if (!success || !b64data) { showToast('Yukleme basarisiz: ' + (error || 'veri yok')); return; }
+  if (!success || !b64data) { showToast(tFmt('toast_cloud_load_fail', {msg: (error || t('err_no_data'))})); return; }
   try {
     var json = atob(b64data);
     var data = JSON.parse(json);
@@ -10691,13 +11503,13 @@ function onCloudLoadResult(success, b64data, error) {
     // Test reklam modu geliştirici ayarı — bulutla senkronize edilmez.
     // Yükleme sonrası Android native'i kapat ki hesap karışmasın.
     try { Android.setDevTestMode(false); } catch(_) {}
-    showToast(count + ' kayit yuklendi! Yenileniyor...');
+    showToast(tFmt('toast_cloud_loaded', {n: count}));
     setTimeout(function() { location.reload(); }, 1500);
-  } catch(e) { showToast('Veri parse hatasi: ' + e.message); }
+  } catch(e) { showToast(tFmt('toast_cloud_parse_err', {msg: e.message})); }
 }
 
 function cloudSignIn() {
-  if (typeof Android === 'undefined') { showToast('Sadece uygulamada calisir.'); return; }
+  if (typeof Android === 'undefined') { showToast(t('toast_app_only')); return; }
   Android.signInPlayGames();
 }
 
@@ -10714,7 +11526,7 @@ function autoCloudSave() {
 }
 
 function cloudSignOut() {
-  if (typeof Android === 'undefined') { showToast('Sadece uygulamada calisir.'); return; }
+  if (typeof Android === 'undefined') { showToast(t('toast_app_only')); return; }
   Android.signOutPlayGames();
   // Hesap degistirme rehberini goster
   var hint = document.getElementById('cloud-account-hint');
@@ -10758,7 +11570,7 @@ function closeCloudSettings() {
 <div id="cloud-settings-bg" onclick="closeCloudSettings()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
 <div id="cloud-settings-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:3px solid #4285F4;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;">☁️ Bulut Kayit</span>
+    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="cloud_title">☁️ Bulut Kayıt</span>
     <button onclick="closeCloudSettings()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;line-height:1;">✕</button>
   </div>
   <div style="background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.2);border-radius:12px;padding:12px;margin-bottom:14px;text-align:center;">
@@ -10766,23 +11578,23 @@ function closeCloudSettings() {
     <div id="cloud-account-status" style="font-size:11px;margin-top:3px;"></div>
   </div>
   <div style="display:flex;flex-direction:column;gap:8px;">
-    <button id="cloud-signin-btn" onclick="cloudSignIn()" style="padding:10px;border-radius:12px;border:1px solid #4285F4;background:rgba(66,133,244,0.15);color:#4285F4;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Google Play Games Giris</button>
-    <button onclick="cloudSave()" style="padding:10px;border-radius:12px;border:1px solid #00C853;background:rgba(0,200,83,0.15);color:#00C853;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Simdi Kaydet</button>
-    <button onclick="cloudLoad()" style="padding:10px;border-radius:12px;border:1px solid #FF6B35;background:rgba(255,107,53,0.15);color:#FF6B35;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Buluttan Yukle</button>
-    <button id="cloud-signout-btn" onclick="cloudSignOut()" style="display:none;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">Hesap Degistir / Cikis</button>
+    <button id="cloud-signin-btn" onclick="cloudSignIn()" style="padding:10px;border-radius:12px;border:1px solid #4285F4;background:rgba(66,133,244,0.15);color:#4285F4;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="cloud_signin">Google Play Games Giriş</button>
+    <button onclick="cloudSave()" style="padding:10px;border-radius:12px;border:1px solid #00C853;background:rgba(0,200,83,0.15);color:#00C853;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="cloud_save_now">Şimdi Kaydet</button>
+    <button onclick="cloudLoad()" style="padding:10px;border-radius:12px;border:1px solid #FF6B35;background:rgba(255,107,53,0.15);color:#FF6B35;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="cloud_load">Buluttan Yükle</button>
+    <button id="cloud-signout-btn" onclick="cloudSignOut()" style="display:none;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;" data-i18n="cloud_signout">Hesap Değiştir / Çıkış</button>
     <div id="cloud-account-hint" style="display:none;margin-top:6px;padding:10px 12px;border-radius:10px;background:rgba(255,193,7,0.07);border:1px solid rgba(255,193,7,0.2);">
-      <div style="color:#FFD54F;font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif;margin-bottom:5px;">Hesap degistirmek icin:</div>
-      <div style="color:rgba(255,255,255,0.55);font-size:10px;line-height:1.6;">
-        1. <b style="color:rgba(255,255,255,0.75);">Ayarlar</b> uygulamasini ac<br>
-        2. <b style="color:rgba(255,255,255,0.75);">Google</b> bolumune gir<br>
-        3. <b style="color:rgba(255,255,255,0.75);">Google Hizmetleri</b> veya <b style="color:rgba(255,255,255,0.75);">Tum Hizmetler</b> sekmesini sec<br>
-        4. <b style="color:rgba(255,255,255,0.75);">Play Games</b> uzerine dokun<br>
-        5. <b style="color:rgba(255,255,255,0.75);">Oturum Acilan Hesap</b> yazisina dokun<br>
-        6. Istedigin hesabi sec veya <b style="color:rgba(255,255,255,0.75);">Tum Oyunlardan Cikis Yap</b> secenegini kullan<br>
-        7. Oyuna geri don ve <b style="color:rgba(255,255,255,0.75);">Giris Yap</b> tusuna bas
+      <div style="color:#FFD54F;font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif;margin-bottom:5px;" data-i18n="cloud_hint_title">Hesap değiştirmek için:</div>
+      <div style="color:rgba(255,255,255,0.55);font-size:10px;line-height:1.6;" data-i18n-html="cloud_hint_body">
+        1. <b style="color:rgba(255,255,255,0.75);">Ayarlar</b> uygulamasını aç<br>
+        2. <b style="color:rgba(255,255,255,0.75);">Google</b> bölümüne gir<br>
+        3. <b style="color:rgba(255,255,255,0.75);">Google Hizmetleri</b> veya <b style="color:rgba(255,255,255,0.75);">Tüm Hizmetler</b> sekmesini seç<br>
+        4. <b style="color:rgba(255,255,255,0.75);">Play Games</b> üzerine dokun<br>
+        5. <b style="color:rgba(255,255,255,0.75);">Oturum Açılan Hesap</b> yazısına dokun<br>
+        6. İstediğin hesabı seç veya <b style="color:rgba(255,255,255,0.75);">Tüm Oyunlardan Çıkış Yap</b> seçeneğini kullan<br>
+        7. Oyuna geri dön ve <b style="color:rgba(255,255,255,0.75);">Giriş Yap</b> tuşuna bas
       </div>
     </div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:2px;line-height:1.5;">Level tamamlandiginda otomatik kaydedilir.</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:2px;line-height:1.5;" data-i18n="cloud_auto_save">Level tamamlandığında otomatik kaydedilir.</div>
   </div>
 </div>
 
@@ -10841,7 +11653,7 @@ function openLivesCard(){
   var adBtn=document.getElementById("ad-life-btn");
   if(adBtn){
     var cnt=_adLifeCountToday();
-    adBtn.textContent="📺 Reklam izle → +1 Can ("+cnt+"/3)";
+    adBtn.textContent=tFmt('ad_life_btn', {n: cnt});
     adBtn.disabled=cnt>=3; adBtn.style.opacity=cnt>=3?"0.4":"1";
   }
   var h="";
@@ -10849,9 +11661,9 @@ function openLivesCard(){
   var el=document.getElementById("lives-card-hearts");
   if(el) el.textContent=h.trim();
   var st=document.getElementById("lives-card-status");
-  if(st) st.textContent=cur+" / "+MAX_LIVES+" can";
+  if(st) st.textContent=tFmt('lives_count_label', {n: cur, max: MAX_LIVES});
   var ti=document.getElementById("lives-card-timer");
-  if(ti) ti.textContent=cur<MAX_LIVES?"Sonraki can: "+mins+" dakika":"Canlar dolu!";
+  if(ti) ti.textContent=cur<MAX_LIVES?tFmt('lives_next_in', {min: mins}):t('lives_full_status');
 }
 function _adLifeCountToday(){
   var today=new Date().toDateString();
@@ -10859,18 +11671,18 @@ function _adLifeCountToday(){
   return parseInt(lsGet("ad_life_count")||"0");
 }
 function watchAdForLife(){
-  if(_adLifeCountToday()>=3){showToast("Gunluk 3 reklam limitine ulastiniz!");return;}
+  if(_adLifeCountToday()>=3){showToast(t('toast_daily_3_ad'));return;}
   if(typeof Android!=="undefined") Android.showRewardedAd("give_life");
   else giveLifeFromAd();
 }
 function giveLifeFromAd(){
   var cur=_livesNow();
-  if(cur>=MAX_LIVES){showToast("❤️ Canlar zaten dolu!");return;}
+  if(cur>=MAX_LIVES){showToast(t('toast_lives_full'));return;}
   lsSet("lives_count",String(cur+1));
   lsSet("ad_life_count",String(_adLifeCountToday()+1));
   updateLivesBadge();
   closeLivesCard();
-  showToast("❤️ +1 Can kazandin! Devam ediliyor...");
+  showToast(t('toast_life_won'));
   // Can geldi, level yukle
   if(typeof pendingLevelIdx !== "undefined") loadLevel(pendingLevelIdx);
 }
@@ -10883,7 +11695,7 @@ setInterval(updateLivesBadge,30000);
 <div id="lives-card-bg" onclick="closeLivesCard()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
 <div id="lives-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:3px solid #FF5555;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;">❤️ Canlar</span>
+    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="lives_title">❤️ Canlar</span>
     <button onclick="closeLivesCard()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">×</button>
   </div>
   <div style="text-align:center;margin-bottom:14px;">
@@ -10892,7 +11704,7 @@ setInterval(updateLivesBadge,30000);
     <div id="lives-card-timer" style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;"></div>
   </div>
   <button id="ad-life-btn" onclick="watchAdForLife()" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.1);color:#FFD700;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px;">📺 Reklam izle → +1 Can (0/3)</button>
-  <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.5;">Her 20 dakikada 1 can dolar. Maksimum 5 can.<br>Reklam ile gunluk 3 can kazanabilirsin.</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.5;"><span data-i18n="lives_info">Her 20 dakikada 1 can dolar. Maksimum 5 can.</span><br><span data-i18n="lives_ad_info">Reklam ile günlük 3 can kazanabilirsin.</span></div>
 </div>
 
 </body>
