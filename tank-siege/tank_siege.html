@@ -749,7 +749,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.102';
+const APP_VERSION      = '1.0.103';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -767,8 +767,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 16:15';
-const APP_VERSION_NOTE = 'combo bonus ekranda yaziyor';
+const APP_VERSION_DATE = '2026.05.18 16:38';
+const APP_VERSION_NOTE = 'Hayvanlardan inek ve koyun yurume mekanizmasi yapildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -2542,8 +2542,8 @@ function updateAnimals(){
         // Yer hayvanı: terrain'e yapış
         const tx = Math.floor(Math.min(Math.max(a.x, 0), W-1));
         const ty = terrain[tx];
-        a.y = ty;
-        a.baseY = ty;
+        a.y = ty - 6;
+        a.baseY = ty - 6;
       }
     }
   });
@@ -2560,7 +2560,14 @@ function drawAnimal(a){
   const isLarge = a.type==='eagle' || a.type==='cow' || a.type==='camel' || a.type==='giraffe' || a.type==='mammoth' || a.type==='lion';
   ctx.save();
   ctx.translate(a.x, a.y);
-  if(!isBird) ctx.scale(a.dir, 1); // yer hayvanları yönü
+  if(!isBird){
+    // Terrain egimini hesapla
+    const _xi = Math.floor(Math.max(2, Math.min(W-3, a.x)));
+    const _slope = terrain[_xi+2] - terrain[_xi-2];
+    const _angle = Math.atan2(_slope, 4);
+    ctx.rotate(_angle);
+    ctx.scale(a.dir, 1); // yer hayvanları yönü
+  }
 
   switch(a.type){
     case 'cow':   _drawCow(ctx, a);    break;
@@ -2604,11 +2611,17 @@ function _drawCow(c, a){
   c.strokeStyle='#c8a060'; c.lineWidth=1.5;
   c.beginPath(); c.moveTo(14,-20); c.lineTo(12,-25); c.stroke();
   c.beginPath(); c.moveTo(20,-20); c.lineTo(22,-25); c.stroke();
-  // Bacaklar (4 tane)
+  // Bacaklar — kalca+diz+ayak
   c.strokeStyle='#8a6a40'; c.lineWidth=3; c.lineCap='round';
   [[-10,0],[-4,0],[4,0],[10,0]].forEach(([lx],i)=>{
-    const legWalk = (i%2===0?1:-1) * walk;
-    c.beginPath(); c.moveTo(lx,-2); c.lineTo(lx+legWalk*0.5, 8); c.stroke();
+    const phase = a.moving ? a.bobPhase + i*Math.PI/2 : 0;
+    const sw = Math.sin(phase) * 5; // sallanma
+    const kx = lx + sw*0.5;         // diz x
+    const ky = -2 + 5;              // diz y
+    const ax = kx + sw*0.3;         // ayak x
+    const ay = ky + 5;              // ayak y
+    c.beginPath(); c.moveTo(lx,-2); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
   // Leke
   c.fillStyle='rgba(80,60,40,0.35)';
@@ -2631,11 +2644,15 @@ function _drawSheep(c, a){
   c.fillStyle='#e8d8c0';
   c.beginPath(); c.ellipse(8,-18,2,3,0.5,0,Math.PI*2); c.fill();
   c.beginPath(); c.ellipse(13,-18,2,3,-0.5,0,Math.PI*2); c.fill();
-  // Bacaklar
+  // Bacaklar — kalca+diz+ayak
   c.strokeStyle='#8a7a6a'; c.lineWidth=2.5; c.lineCap='round';
   [[-6,0],[-2,0],[3,0],[7,0]].forEach(([lx],i)=>{
-    const lw = (i%2===0?1:-1)*walk*0.4;
-    c.beginPath(); c.moveTo(lx,-4); c.lineTo(lx+lw,4); c.stroke();
+    const phase = a.moving ? a.bobPhase + i*Math.PI/2 : 0;
+    const sw = Math.sin(phase)*4;
+    const kx = lx+sw*0.4; const ky=-4+4;
+    const ax = kx+sw*0.3; const ay=ky+4;
+    c.beginPath(); c.moveTo(lx,-4); c.lineTo(kx,ky); c.stroke();
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(ax,ay); c.stroke();
   });
 }
 
