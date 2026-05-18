@@ -749,7 +749,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.101';
+const APP_VERSION      = '1.0.102';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -767,8 +767,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 16:09';
-const APP_VERSION_NOTE = 'Combo eklendi isabet → x1.25 COMBO! (sarı)';
+const APP_VERSION_DATE = '2026.05.18 16:15';
+const APP_VERSION_NOTE = 'combo bonus ekranda yaziyor';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -6922,7 +6922,13 @@ function onWin(){
   const prevScore=parseInt(lsGet(scoreKey)||'0');
   if(gained>prevScore) lsSet(scoreKey, gained);
   lsSet('total_score', score);
-  showResult(true, stars, '+'+gained+' pts');
+  const comboLabel = comboBonus>=2.0?' 🔥x2.0 COMBO!':comboBonus>=1.5?' 🔥x1.5 COMBO!':comboBonus>1.0?' 🔥x1.25 COMBO!':'';
+  const baseGained = Math.round(lv.id * starMult * levelBonus);
+  const bonusGained = gained - baseGained;
+  const subText = bonusGained > 0
+    ? '+'+baseGained+' pts  +'+bonusGained+' COMBO BONUS'+comboLabel
+    : '+'+gained+' pts';
+  showResult(true, stars, subText);
   autoCloudSave();
 }
 
