@@ -448,6 +448,23 @@ button:active{opacity:0.75;transform:scale(0.96);}
   0%,100% { box-shadow: 0 0 6px 2px rgba(255,210,0,0.5); }
   50%      { box-shadow: 0 0 14px 5px rgba(255,210,0,0.9); }
 }
+/* Onay dialog */
+#gc-dialog-bg{display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.7);}
+#gc-dialog{
+  display:none;position:fixed;left:50%;bottom:0;transform:translateX(-50%);
+  width:100%;max-width:480px;z-index:601;
+  background:#1a2235;border-radius:22px 22px 0 0;
+  padding:20px 20px 36px;
+}
+#gc-dialog-icon{text-align:center;font-size:44px;margin-bottom:8px;}
+#gc-dialog-title{text-align:center;font-family:'Fredoka One',sans-serif;font-size:20px;color:#fff;margin-bottom:6px;}
+#gc-dialog-desc{text-align:center;font-family:'Rajdhani',sans-serif;font-size:14px;color:rgba(255,255,255,0.65);line-height:1.5;margin-bottom:16px;}
+#gc-dialog-cost{text-align:center;background:rgba(255,215,0,0.1);border:1.5px solid rgba(255,215,0,0.3);border-radius:12px;padding:10px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:#FFD700;}
+.gc-dialog-btn{width:100%;padding:14px;border:none;border-radius:14px;font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-bottom:8px;display:block;}
+.gc-dialog-btn.confirm-buy{background:linear-gradient(135deg,#FF6B35,#ff3d00);color:#fff;}
+.gc-dialog-btn.confirm-ad{background:linear-gradient(135deg,#FFD700,#FF8C00);color:#000;}
+.gc-dialog-btn.confirm-upg{background:linear-gradient(135deg,#00C9B1,#007a6e);color:#fff;}
+.gc-dialog-btn.confirm-cancel{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.55);}
 </style>
 </head>
 <body>
@@ -667,6 +684,15 @@ button:active{opacity:0.75;transform:scale(0.96);}
     <button id="btn-gallery-play" onclick="startLevel()">SAVAŞA GİR! →</button>
   </div>
 </div>
+<div id="gc-dialog-bg" onclick="closeGcDialog()"></div>
+<div id="gc-dialog">
+  <div id="gc-dialog-icon"></div>
+  <div id="gc-dialog-title"></div>
+  <div id="gc-dialog-desc"></div>
+  <div id="gc-dialog-cost" style="display:none"></div>
+  <button class="gc-dialog-btn confirm-buy" id="gc-dialog-confirm" onclick="gcDialogConfirm()"></button>
+  <button class="gc-dialog-btn confirm-cancel" onclick="closeGcDialog()">Vazgec</button>
+</div>
 <div id="result">
   <div id="res-title"></div>
   <div id="res-stars"></div>
@@ -715,7 +741,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.88';
+const APP_VERSION      = '1.0.89';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -733,8 +759,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 10:45';
-const APP_VERSION_NOTE = 'muhimmat grafik yazilari duzeltildi. Gerekli, atış vs yazilar';
+const APP_VERSION_DATE = '2026.05.18 11:10';
+const APP_VERSION_NOTE = 'Galeri onay butonu eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -6105,12 +6131,21 @@ function updateAdButton(){
 }
 
 function watchAdForDmgBoost(){
-  if(typeof Android !== 'undefined' && Android.showRewardedAd){
-    Android.showRewardedAd('dmg_boost');
-  } else {
-    // Test modu
-    buyTempDmgBoost();
-  }
+  showGcDialog({
+    icon: '💥',
+    title: '2x Hasar - Gecici',
+    desc: 'Reklam izleyerek 3 level boyunca tum mermilerin hasari 2 katina cikar.',
+    cost: '',
+    btnClass: 'confirm-ad',
+    btnText: 'Reklami Izle',
+    action: function(){
+      if(typeof Android !== 'undefined' && Android.showRewardedAd){
+        Android.showRewardedAd('dmg_boost');
+      } else {
+        buyTempDmgBoost();
+      }
+    }
+  });
 }
 
 function watchAdForPoints(){
@@ -6364,79 +6399,143 @@ function renderTankGallery(cont){
 }
 
 // ── Satın alma ───────────────────────────────────────────────────
+// ── Onay dialog sistemi ──────────────────────────────────────────
+var _gcDialogAction = null;
+
+function showGcDialog(opts){
+  // opts: {icon, title, desc, cost, costLabel, btnClass, btnText, action}
+  document.getElementById('gc-dialog-icon').textContent = opts.icon||'';
+  document.getElementById('gc-dialog-title').textContent = opts.title||'';
+  document.getElementById('gc-dialog-desc').textContent = opts.desc||'';
+  var costEl = document.getElementById('gc-dialog-cost');
+  if(opts.cost){
+    costEl.style.display='block';
+    costEl.textContent = opts.cost+' '+(opts.costLabel||'');
+  } else {
+    costEl.style.display='none';
+  }
+  var btn = document.getElementById('gc-dialog-confirm');
+  btn.textContent = opts.btnText||'Onayla';
+  btn.className = 'gc-dialog-btn '+(opts.btnClass||'confirm-buy');
+  _gcDialogAction = opts.action;
+  document.getElementById('gc-dialog-bg').style.display='block';
+  document.getElementById('gc-dialog').style.display='block';
+}
+
+function closeGcDialog(){
+  document.getElementById('gc-dialog-bg').style.display='none';
+  document.getElementById('gc-dialog').style.display='none';
+  _gcDialogAction = null;
+}
+
+function gcDialogConfirm(){
+  const _action = _gcDialogAction;
+  closeGcDialog();
+  if(typeof _action === 'function') _action();
+}
+
 function buyAmmo(type){
   const def=AMMO_DEF[type];
   if(score<def.cost){SFX.locked();showToast('Yeterli puan yok!');return;}
-  score-=def.cost;
-  if(!ownedAmmo.includes(type)) ownedAmmo.push(type);
-  selectedAmmo=type;
-  lsSet('total_score', score);
-  lsSet('owned_ammo', JSON.stringify(ownedAmmo));
-  lsSet('sel_ammo', selectedAmmo);
-  SFX.buy();
-  updateGalleryScore();
-  updateUI();
-  renderGallery();
-  showToast(def.emoji+' '+def.name+' satın alındı!');
+  showGcDialog({
+    icon: def.emoji||'💣',
+    title: def.name+' Satin Al',
+    desc: (AMMO_STATS[type]||{desc:''}).desc,
+    cost: def.cost+'  puan harcanacak',
+    costLabel: '',
+    btnClass: 'confirm-buy',
+    btnText: 'Onayla - Satin Al',
+    action: function(){
+      score-=def.cost;
+      if(!ownedAmmo.includes(type)) ownedAmmo.push(type);
+      selectedAmmo=type;
+      lsSet('total_score', score);
+      lsSet('owned_ammo', JSON.stringify(ownedAmmo));
+      lsSet('sel_ammo', selectedAmmo);
+      SFX.buy(); updateGalleryScore(); updateUI(); renderGallery();
+      showToast(def.emoji+' '+def.name+' satin alindi!');
+    }
+  });
 }
 
 function buyTank(type){
   const def=TANK_DEF_GALLERY[type];
   if(score<def.cost){SFX.locked();showToast('Yeterli puan yok!');return;}
-  score-=def.cost;
-  if(!ownedTanks.includes(type)) ownedTanks.push(type);
-  selectedTank=type;
-  lsSet('total_score', score);
-  lsSet('owned_tanks', JSON.stringify(ownedTanks));
-  lsSet('sel_tank', selectedTank);
-  SFX.buy();
-  updateGalleryScore();
-  updateUI();
-  renderGallery();
-  showToast(def.emoji+' '+def.name+' satın alındı!');
+  showGcDialog({
+    icon: def.emoji||'🚗',
+    title: def.name+' Satin Al',
+    desc: (TANK_STATS[type]||{desc:''}).desc,
+    cost: def.cost+' puan harcanacak',
+    costLabel: '',
+    btnClass: 'confirm-buy',
+    btnText: 'Onayla - Satin Al',
+    action: function(){
+      score-=def.cost;
+      if(!ownedTanks.includes(type)) ownedTanks.push(type);
+      selectedTank=type;
+      lsSet('total_score', score);
+      lsSet('owned_tanks', JSON.stringify(ownedTanks));
+      lsSet('sel_tank', selectedTank);
+      SFX.buy(); updateGalleryScore(); updateUI(); renderGallery();
+      showToast(def.emoji+' '+def.name+' satin alindi!');
+    }
+  });
 }
 
 // ── Upgrade fonksiyonları ─────────────────────────────────────────
 function upgradeAmmo(type){
   const curLvl = ammoUpgrades[type]||0;
-  if(curLvl>=UPGRADE_MAX){showToast('Maksimum seviyeye ulaşıldı!');return;}
+  if(curLvl>=UPGRADE_MAX){showToast('Maksimum seviyeye ulasildi!');return;}
   const cost = AMMO_UPGRADE_COSTS[curLvl];
-  if(score<cost){SFX.locked();showToast('Yeterli puan yok! ('+cost+'🏆)');return;}
-  score-=cost;
-  ammoUpgrades[type]=(curLvl+1);
-  lsSet('total_score', score);
-  lsSet('ammo_upgrades', JSON.stringify(ammoUpgrades));
-  SFX.upgrade();
-  updateGalleryScore();
-  updateUI();
-  renderGallery();
+  if(score<cost){SFX.locked();showToast('Yeterli puan yok! ('+cost+')');return;}
   const def=AMMO_DEF[type];
-  showToast(def.emoji+' '+def.name+' Seviye '+(curLvl+1)+'→'+(curLvl+2)+'! (+25% hasar)');
+  showGcDialog({
+    icon: def.emoji||'💣',
+    title: def.name+' Yukselt',
+    desc: 'Seviye '+(curLvl+1)+' → '+(curLvl+2)+'. Hasar %25 artar.',
+    cost: cost+' puan harcanacak',
+    costLabel: '',
+    btnClass: 'confirm-upg',
+    btnText: 'Yukselt',
+    action: function(){
+      score-=cost;
+      ammoUpgrades[type]=(curLvl+1);
+      lsSet('total_score', score);
+      lsSet('ammo_upgrades', JSON.stringify(ammoUpgrades));
+      SFX.upgrade(); updateGalleryScore(); updateUI(); renderGallery();
+      showToast(def.emoji+' '+def.name+' Sv'+(curLvl+2)+'! (+25% hasar)');
+    }
+  });
 }
 
 function upgradeTank(type){
   const curLvl = tankUpgrades[type]||0;
-  if(curLvl>=UPGRADE_MAX){showToast('Maksimum seviyeye ulaşıldı!');return;}
+  if(curLvl>=UPGRADE_MAX){showToast('Maksimum seviyeye ulasildi!');return;}
   const cost = TANK_UPGRADE_COSTS[curLvl];
   const totalStars = getTotalStars();
-  if(totalStars<cost){SFX.locked();showToast('Yeterli yıldız yok! ('+cost+'⭐)');return;}
-  // Yıldız harcama: düşük level yıldızlarından sil
-  let toSpend=cost;
-  for(let i=1;i<=LEVELS.length&&toSpend>0;i++){
-    const cur=parseInt(lsGet('stars_'+i)||'0');
-    if(cur>0){
-      const take=Math.min(cur,toSpend);
-      lsSet('stars_'+i, cur-take);
-      toSpend-=take;
+  if(totalStars<cost){SFX.locked();showToast('Yeterli yildiz yok! ('+cost+')');return;}
+  const def = TANK_DEF_GALLERY[type]||{};
+  showGcDialog({
+    icon: def.emoji||'🚗',
+    title: (def.name||type)+' Yukselt',
+    desc: 'Seviye '+(curLvl+1)+' → '+(curLvl+2)+'. Hasar bonusu %20 artar.',
+    cost: cost+' yildiz harcanacak',
+    costLabel: '',
+    btnClass: 'confirm-upg',
+    btnText: 'Yukselt',
+    action: function(){
+      let toSpend=cost;
+      for(let i=1;i<=LEVELS.length&&toSpend>0;i++){
+        const cur=parseInt(lsGet('stars_'+i)||'0');
+        if(cur>0){const take=Math.min(cur,toSpend);lsSet('stars_'+i,cur-take);toSpend-=take;}
+      }
+      tankUpgrades[type]=(curLvl+1);
+      lsSet('tank_upgrades', JSON.stringify(tankUpgrades));
+      SFX.upgrade(); renderGallery();
+      showToast('Tank Sv'+(curLvl+2)+'! (+20% hasar)');
     }
-  }
-  tankUpgrades[type]=(curLvl+1);
-  lsSet('tank_upgrades', JSON.stringify(tankUpgrades));
-  SFX.upgrade();
-  renderGallery();
-  showToast('🛡️ Tank Seviye '+(curLvl+1)+'→'+(curLvl+2)+'! (+20% hasar)');
+  });
 }
-
 function adAmmo(type){
   if(tempAmmo && tempAmmo.expiresAtLevel > curLevel){
     // Elinde geçici mühimmat var — dialog göster
@@ -6454,9 +6553,20 @@ function adAmmo(type){
     if(bg) bg.style.display = 'flex';
     return;
   }
-  if(isSandbox){ giveAdAmmo(type); return; }
-  try{ Android.showRewardedAd('ammo_'+type); }
-  catch(e){ giveAdAmmo(type); }
+  const _def = AMMO_DEF[type];
+  showGcDialog({
+    icon: _def.emoji||'💣',
+    title: _def.name+' Dene',
+    desc: 'Reklam izleyerek '+(_def.tempLevels||1)+' level boyunca kullanabilirsin.',
+    cost: '',
+    btnClass: 'confirm-ad',
+    btnText: 'Reklami Izle',
+    action: function(){
+      if(isSandbox){ giveAdAmmo(type); return; }
+      try{ Android.showRewardedAd('ammo_'+type); }
+      catch(e){ giveAdAmmo(type); }
+    }
+  });
 }
 
 function cancelAmmoReplace(){
@@ -6505,9 +6615,20 @@ function adTank(type){
     if(bg) bg.style.display = 'flex';
     return;
   }
-  if(isSandbox){ giveAdTank(type); return; }
-  try{ Android.showRewardedAd('tank_'+type); }
-  catch(e){ giveAdTank(type); }
+  const _tdef = TANK_DEF_GALLERY[type]||{};
+  showGcDialog({
+    icon: _tdef.emoji||'🚗',
+    title: (_tdef.name||type)+' Dene',
+    desc: 'Reklam izleyerek '+(_tdef.tempLevels||1)+' level boyunca kullanabilirsin.',
+    cost: '',
+    btnClass: 'confirm-ad',
+    btnText: 'Reklami Izle',
+    action: function(){
+      if(isSandbox){ giveAdTank(type); return; }
+      try{ Android.showRewardedAd('tank_'+type); }
+      catch(e){ giveAdTank(type); }
+    }
+  });
 }
 
 function cancelTankReplace(){
@@ -6976,14 +7097,24 @@ function buyPermDmgBoost(){
   if(dmgBoostLevel >= 3){ showToast('Maksimum seviyede!'); return; }
   const nextLvl = dmgBoostLevel + 1;
   const cost = DMG_BOOST_COSTS[nextLvl];
-  if(score < cost){ SFX.locked(); showToast('Yeterli puan yok! ('+cost+' 🏆)'); return; }
-  score -= cost;
-  lsSet('total_score', score);
-  dmgBoostLevel = nextLvl;
-  lsSet('dmg_boost_level', dmgBoostLevel);
-  updateUI();
-  showToast('💥 2x Hasar Sv'+dmgBoostLevel+' aktif! (×'+DMG_BOOST_MULT[dmgBoostLevel]+')');
-  renderGallery();
+  if(score < cost){ SFX.locked(); showToast('Yeterli puan yok! ('+cost+')'); return; }
+  showGcDialog({
+    icon: '💥',
+    title: '2x Hasar Sv'+nextLvl,
+    desc: 'Kalici hasar artisi. Tum mermiler x'+DMG_BOOST_MULT[nextLvl]+' hasar yapar.',
+    cost: cost+' puan harcanacak',
+    costLabel: '',
+    btnClass: 'confirm-buy',
+    btnText: 'Satin Al',
+    action: function(){
+      score -= cost;
+      lsSet('total_score', score);
+      dmgBoostLevel = nextLvl;
+      lsSet('dmg_boost_level', dmgBoostLevel);
+      updateUI(); renderGallery();
+      showToast('Hasar Sv'+dmgBoostLevel+' aktif! (x'+DMG_BOOST_MULT[dmgBoostLevel]+')');
+    }
+  });
 }
 
 // HUD badge güncelle — windblock-badge ile aynı stil
