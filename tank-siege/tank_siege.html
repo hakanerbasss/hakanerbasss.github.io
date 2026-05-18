@@ -741,7 +741,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.95';
+const APP_VERSION      = '1.0.96';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -759,8 +759,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 13:13';
-const APP_VERSION_NOTE = 'Badge reklam izleme ve yanlis artirma sorunu giderildi';
+const APP_VERSION_DATE = '2026.05.18 13:56';
+const APP_VERSION_NOTE = 'Tank kendini vurursa can eksilir';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -3237,6 +3237,21 @@ function update(){
       }
       if(bullet.x>targetX-targetW/2 && bullet.x<targetX+targetW/2 &&
          bullet.y>targetY-targetH && bullet.y<targetY+10){ onTargetHit(); break; }
+      // Kendi tankina carpma kontrolu
+      const _td2 = TANK_DEF[selectedTank]||TANK_DEF.basic;
+      if(bullet.x>tankX-_td2.w/2 && bullet.x<tankX+_td2.w/2 &&
+         bullet.y>tankY-_td2.h-4 && bullet.y<tankY+4){
+        spawnExplosionSprite(bullet.x, bullet.y, 0.8);
+        SFX.explosion(selectedAmmo);
+        spawnImpact(bullet.x, bullet.y, 'target');
+        bullet = null;
+        if(typeof loseLife === 'function'){
+          const rem = loseLife();
+          showToast('💥 Kendi tankini vurdun! ' + rem + ' can kaldi');
+          if(rem <= 0) setTimeout(function(){ onFail(); }, 800);
+        }
+        break;
+      }
       // Cave level'da ekran sağından çıkınca daha geniş alan ver — yönelip geri dönebilir
       const _oobLimit = (lv && lv.cave) ? W + 200 : W + 30;
       if(bullet.x < -30 || bullet.x > _oobLimit || bullet.y > H + 80){
