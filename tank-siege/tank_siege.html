@@ -743,7 +743,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.99';
+const APP_VERSION      = '1.0.100';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -761,8 +761,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 14:55';
-const APP_VERSION_NOTE = 'her level ennaz 3 atış yapildi';
+const APP_VERSION_DATE = '2026.05.18 16:00';
+const APP_VERSION_NOTE = 'tema sesi eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -7831,6 +7831,7 @@ const SFX = (function(){
   }
   mus.wind    = mkAudio('wind_loop.mp3',    0,    true);
   mus.battle  = mkAudio('battle_music.mp3', 0.28, true);
+  mus.map     = mkAudio('Warbattle.mp3',     0.0,  true);
   mus.gallery = mkAudio('gallery_music.mp3',0.32, true);
   window._sfxMus = mus;   // visibilitychange için
 
@@ -7896,12 +7897,12 @@ const SFX = (function(){
   function _xfade(from, to, ms=1200){
     const fa = from ? mus[from] : null;
     const ta = to   ? mus[to]   : null;
-    const tv = to==='gallery' ? 0.32 : 0.28;
+    const tv = to==='gallery' ? 0.32 : to==='map' ? 0.35 : 0.28;
     if(ta && musicOn){ ta.volume=0; ta.play().catch(()=>{}); }
     const steps=Math.ceil(ms/40); let s=0;
     const tid=setInterval(()=>{
       s++; const p=s/steps;
-      if(fa && !fa.paused) fa.volume=Math.max(0,(1-p)*(fa===mus.battle?0.28:0.32));
+      if(fa && !fa.paused) fa.volume=Math.max(0,(1-p)*(fa===mus.battle?0.28:fa===mus.map?0.35:0.32));
       if(ta && musicOn)    ta.volume=Math.min(tv, p*tv);
       if(s>=steps){
         clearInterval(tid);
@@ -7945,6 +7946,16 @@ const SFX = (function(){
       _xfade(_cm,'battle');
     },
 
+    openMap(){
+      if(!musicOn||_cm==='map') return;
+      _xfade(_cm,'map');
+    },
+
+    closeMap(){
+      if(!musicOn) return;
+      _xfade('map','battle');
+    },
+
     openGallery(){
       this.uiOpen();
       if(musicOn) _xfade(_cm,'gallery');
@@ -7952,7 +7963,7 @@ const SFX = (function(){
 
     closeGallery(){
       this.uiClose();
-      if(musicOn) _xfade('gallery','battle');
+      if(musicOn) _xfade('gallery', _cm==='map' ? 'map' : 'battle');
     },
 
     win(){
@@ -8266,6 +8277,7 @@ let _lmNavigating = false; // crash guard
 
 function showLevelMap(){
   SFX.uiOpen();
+  SFX.openMap();
   const res = document.getElementById('result');
   if(res) res.classList.remove('show');
   // Oyun katmanlarını gizle
@@ -8288,6 +8300,7 @@ function showLevelMap(){
 }
 
 function closeLevelMap(restoreGame=true){
+  SFX.closeMap();
   const _lm=document.getElementById('level-map');
   _lm.style.visibility='hidden';
   _lm.style.pointerEvents='none';
