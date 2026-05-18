@@ -345,6 +345,48 @@ button:active{opacity:0.75;transform:scale(0.96);}
   font-size:20px;margin:0;letter-spacing:0.5px;
 }
 .lm-theme-section{margin:0 10px 6px;}
+
+/* ── Tema karti horizontal scroll ── */
+#lm-theme-scroll{
+  display:flex;gap:10px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scroll-snap-type:x mandatory;
+  padding:12px 12px 6px;
+  scrollbar-width:none;
+}
+#lm-theme-scroll::-webkit-scrollbar{display:none;}
+.lm-tcard{
+  flex:0 0 100px;height:100px;
+  border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  scroll-snap-align:start;
+  cursor:pointer;position:relative;overflow:hidden;
+  border:2px solid rgba(255,255,255,0.1);
+  -webkit-tap-highlight-color:transparent;
+}
+.lm-tcard.lm-tcard-active{
+  border-color:#FFD700;
+  box-shadow:0 0 12px rgba(255,215,0,0.4);
+  transform:scale(1.05);
+}
+.lm-tcard.lm-tcard-locked{opacity:0.4;filter:grayscale(0.5);}
+.lm-tcard-emoji{font-size:30px;line-height:1;}
+.lm-tcard-name{
+  font-family:'Fredoka One',sans-serif;font-size:10px;color:#fff;
+  text-align:center;padding:0 3px;line-height:1.2;
+}
+.lm-tcard-stars{font-size:9px;color:#FFD700;font-family:'Rajdhani',sans-serif;font-weight:700;}
+.lm-tcard-lock{position:absolute;top:3px;right:5px;font-size:11px;}
+#lm-theme-label{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px 2px;
+  font-family:'Fredoka One',sans-serif;font-size:15px;color:#fff;
+}
+#lm-theme-label .lm-tl-stars{
+  font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif;
+  padding:2px 7px;border-radius:20px;
+  background:rgba(255,215,0,0.15);color:#FFD700;
+}
 .lm-theme-header{
   display:flex;align-items:center;gap:8px;
   padding:12px;margin-top:8px;
@@ -673,7 +715,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.85';
+const APP_VERSION      = '1.0.86';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -691,8 +733,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.18 09:42';
-const APP_VERSION_NOTE = 'Hedef carpisma alani buyutuldu';
+const APP_VERSION_DATE = '2026.05.18 10:07';
+const APP_VERSION_NOTE = 'Tema kartlari duzenlendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -8048,7 +8090,7 @@ function renderLevelMap(){
 
   var _lmTotal = getTotalStars();
   var _lmMax   = LEVELS.length * 3;
-  document.getElementById('lm-total-stars').textContent = '⭐ '+_lmTotal+'/'+_lmMax;
+  document.getElementById('lm-total-stars').textContent = '\u2b50 '+_lmTotal+'/'+_lmMax;
 
   var _lmEl = document.getElementById('level-map');
   _lmEl.onscroll = function(){
@@ -8058,82 +8100,88 @@ function renderLevelMap(){
   };
 
   var _lmThemes = ['valley','desert','snow','forest','rocky','meadow','volcano','nightcity','tropical','skyislands','cloudy','rainy','snowyweather'];
-  var _lmNames  = {
-    valley:'🌿 Green Valley', desert:'🏜️ Desert', snow:'❄️ Snowy Mountains',
-    forest:'🌲 Forest', rocky:'🪨 Rocky Lands', meadow:'🌅 Meadow',
-    volcano:'🌋 Volcano', nightcity:'🌙 Night City', tropical:'🏖️ Tropical',
-    skyislands:'☁️ Sky Islands', cloudy:'⛅ Above the Clouds',
-    rainy:'🌧️ Storm Front', snowyweather:'🌨️ Snowstorm'
+  var _lmNames = {
+    valley:'\U0001f33f Green Valley', desert:'\U0001f3dc\ufe0f Desert', snow:'\u2744\ufe0f Snowy Mtn',
+    forest:'\U0001f332 Forest', rocky:'\U0001fab8 Rocky', meadow:'\U0001f305 Meadow',
+    volcano:'\U0001f30b Volcano', nightcity:'\U0001f319 Night City', tropical:'\U0001f3d6\ufe0f Tropical',
+    skyislands:'\u2601\ufe0f Sky Islands', cloudy:'\u26c5 Cloudy',
+    rainy:'\U0001f327\ufe0f Storm', snowyweather:'\U0001f328\ufe0f Snowstorm'
+  };
+  var _lmEmojis = {
+    valley:'🌳', desert:'🌞', snow:'🏔', forest:'🌲',
+    rocky:'🗻', meadow:'🌴', volcano:'🌋', nightcity:'🌙',
+    tropical:'🌊', skyislands:'💫', cloudy:'⛅',
+    rainy:'⚡', snowyweather:'🌨'
+  };
+  var _lmShort = {
+    valley:'Green Valley', desert:'Desert', snow:'Snowy Mtn', forest:'Forest',
+    rocky:'Rocky', meadow:'Meadow', volcano:'Volcano', nightcity:'Night City',
+    tropical:'Tropical', skyislands:'Sky Islands', cloudy:'Cloudy',
+    rainy:'Storm', snowyweather:'Snowstorm'
   };
 
   var _activeTi = Math.floor(curLevel / 10);
+  var _selTi = _activeTi;
 
-  _lmThemes.forEach(function(theme, ti){
+  // ── Horizontal tema scroll ──
+  var _existing = document.getElementById('lm-theme-scroll');
+  if(_existing) _existing.parentNode.removeChild(_existing);
+  var _existLbl = document.getElementById('lm-theme-label');
+  if(_existLbl) _existLbl.parentNode.removeChild(_existLbl);
+
+  var _scrollEl = document.createElement('div');
+  _scrollEl.id = 'lm-theme-scroll';
+
+  var _labelEl = document.createElement('div');
+  _labelEl.id = 'lm-theme-label';
+
+  // level-map-content'in onune ekle
+  var _lmContent = document.getElementById('level-map-content');
+  _lmContent.parentNode.insertBefore(_scrollEl, _lmContent);
+  _lmContent.parentNode.insertBefore(_labelEl, _lmContent);
+
+  function _updateLabel(ti){
+    var theme = _lmThemes[ti];
+    var _tStars = getThemeStars(ti);
     var _isUnlocked = isThemeUnlocked(ti);
-    var _tStars     = getThemeStars(ti);
-    var _tCol       = THEME_COLORS[theme] || '#222';
-    var _tActive    = (ti === _activeTi);
+    _labelEl.innerHTML =
+      '<span>'+(_lmEmojis[theme]||'')+'</span>'
+      +'<span style="flex:1">'+(_lmNames[theme]||theme)+'</span>'
+      +(_isUnlocked
+        ? '<span class="lm-tl-stars">\u2b50 '+_tStars+'/30</span>'
+        : '<span style="font-size:11px;color:#ff7070;font-family:Rajdhani,sans-serif;font-weight:700;">\U0001f512 Kilitli</span>');
+  }
 
-    var _sec = document.createElement('div');
-    _sec.className = 'lm-theme-section';
-
-    var _hdr = document.createElement('div');
-    _hdr.className = 'lm-theme-header';
-    _hdr.style.background = 'linear-gradient(135deg,'+_tCol+'cc,'+_tCol+'66)';
-    _hdr.style.cursor = _isUnlocked ? 'pointer' : 'default';
-
-    var _chev = _isUnlocked ? (_tActive ? ' ▲' : ' ▼') : '';
-    _hdr.innerHTML = '<span class="lm-theme-title">'+_lmNames[theme]+'</span>'
-      + (_isUnlocked
-        ? '<span class="lm-theme-stars">⭐ '+_tStars+'/30'+_chev+'</span>'
-        : '<span class="lm-theme-locked-badge">🔒 '+(ti===0?'20 ⭐ gerekli':getThemeStars(ti-1)+'/20 ⭐')+'</span>');
-    _sec.appendChild(_hdr);
+  function _renderGrid(ti){
+    var theme = _lmThemes[ti];
+    var _isUnlocked = isThemeUnlocked(ti);
+    _lmCont.innerHTML = '';
+    _updateLabel(ti);
 
     if(!_isUnlocked){
-      var _gBar = document.createElement('div');
-      _gBar.className = 'lm-theme-gate-bar';
-      _gBar.textContent = (ti>0?'Önceki temadan ':'')+(20-getThemeStars(ti-1))+' yıldız daha gerekli';
-      _sec.appendChild(_gBar);
-      _lmCont.appendChild(_sec);
+      var _msg = document.createElement('div');
+      var _need = ti > 0 ? (20 - getThemeStars(ti-1)) : 20;
+      _msg.style.cssText = 'text-align:center;padding:40px 20px;color:rgba(255,255,255,0.4);font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;';
+      _msg.textContent = '\U0001f512 '+_need+' yildiz daha gerekli';
+      _lmCont.appendChild(_msg);
       return;
     }
 
     var _grid = document.createElement('div');
     _grid.className = 'lm-levels-grid';
-    _grid.style.display = _tActive ? '' : 'none';
-
-    (function(_g, _h){ // closure
-      _h.onclick = function(){
-        var _wasOpen = _g.style.display !== 'none';
-        // hepsini kapat
-        document.querySelectorAll('.lm-levels-grid').forEach(function(g){ g.style.display='none'; });
-        document.querySelectorAll('.lm-theme-stars').forEach(function(s){
-          s.textContent = s.textContent.replace(' ▲',' ▼');
-        });
-        if(!_wasOpen){
-          _g.style.display = '';
-          var _sp = _h.querySelector('.lm-theme-stars');
-          if(_sp) _sp.textContent = _sp.textContent.replace(' ▼',' ▲');
-          setTimeout(function(){ _g.scrollIntoView({behavior:'smooth',block:'start'}); }, 50);
-        }
-      };
-    })(_grid, _hdr);
 
     for(var _li=0; _li<10; _li++){
-      var _idx  = ti*10+_li;
-      var _lvd  = LEVELS[_idx];
+      var _idx = ti*10+_li;
+      var _lvd = LEVELS[_idx];
       if(!_lvd) continue;
-
       var _ulk  = isLevelUnlocked(_idx);
       var _st   = parseInt(lsGet('stars_'+_lvd.id)||'0');
       var _isCur= (_idx===curLevel);
-
       var _card = document.createElement('div');
       _card.className = 'lm-card'+(_ulk?(_st>0?' completed':''):' locked')+(_isCur?' current':'');
       _card.id = 'lm-card-'+_idx;
-
       var _sh='';
-      for(var _s=0;_s<3;_s++) _sh += _s<_st?'⭐':'☆';
+      for(var _s=0;_s<3;_s++) _sh += _s<_st?'\u2b50':'\u2606';
       _card.innerHTML =
         '<div class="lm-card-num">'+_lvd.id+'</div>'
         +'<div class="lm-card-name">'+_lvd.name+'</div>'
@@ -8141,8 +8189,7 @@ function renderLevelMap(){
         +'<span class="lm-card-stars">'+_sh+'</span>'
         +'<span class="lm-card-mat">'+(MAT_BADGE[_lvd.targetMat]||'')+'</span>'
         +'</div>'
-        +(!_ulk?'<div class="lm-lock-icon">🔒</div>':'');
-
+        +(!_ulk?'<div class="lm-lock-icon">\U0001f512</div>':'');
       if(_ulk){
         (function(_c,_i){
           _c.ontouchstart=function(){ _c.style.transform='scale(0.93)'; _c.style.background='rgba(255,255,255,0.12)'; };
@@ -8165,9 +8212,50 @@ function renderLevelMap(){
       }
       _grid.appendChild(_card);
     }
-    _sec.appendChild(_grid);
-    _lmCont.appendChild(_sec);
+    _lmCont.appendChild(_grid);
+  }
+
+  // Tema kartlarini olustur
+  _lmThemes.forEach(function(theme, ti){
+    var _isUnlocked = isThemeUnlocked(ti);
+    var _tStars     = getThemeStars(ti);
+    var _tCol       = THEME_COLORS[theme] || '#222';
+    var _tActive    = (ti === _activeTi);
+
+    var _tc = document.createElement('div');
+    _tc.className = 'lm-tcard'+(_tActive?' lm-tcard-active':'')+(!_isUnlocked?' lm-tcard-locked':'');
+    _tc.id = 'lm-tcard-'+ti;
+    _tc.style.background = 'linear-gradient(145deg,'+_tCol+'ee,'+_tCol+'88)';
+    _tc.innerHTML =
+      '<div class="lm-tcard-emoji">'+(_lmEmojis[theme]||'\U0001f30d')+'</div>'
+      +'<div class="lm-tcard-name">'+(_lmShort[theme]||theme)+'</div>'
+      +(_isUnlocked
+        ? '<div class="lm-tcard-stars">\u2b50 '+_tStars+'/30</div>'
+        : '<div class="lm-tcard-lock">\U0001f512</div>');
+
+    (function(_c, _ti){
+      _c.ontouchstart = function(){ _c.style.opacity='0.7'; };
+      _c.ontouchend = function(){
+        _c.style.opacity='';
+        if(!_isUnlocked) return;
+        document.querySelectorAll('.lm-tcard').forEach(function(x){ x.classList.remove('lm-tcard-active'); });
+        _c.classList.add('lm-tcard-active');
+        _renderGrid(_ti);
+        document.getElementById('level-map').scrollTop = 0;
+      };
+      _c.ontouchcancel = function(){ _c.style.opacity=''; };
+    })(_tc, ti);
+
+    _scrollEl.appendChild(_tc);
   });
+
+  // Aktif temaya scroll + grid render
+  setTimeout(function(){
+    var _ac = document.getElementById('lm-tcard-'+_activeTi);
+    if(_ac) _ac.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+  }, 100);
+
+  _renderGrid(_activeTi);
 }
 
 function watchAdForExtraAmmo(){
