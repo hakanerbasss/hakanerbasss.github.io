@@ -1421,7 +1421,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.113';
+const APP_VERSION      = '1.0.114';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1439,8 +1439,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 17:44';
-const APP_VERSION_NOTE = 'Akarsu tanklar ve hayvanlar guncellendi';
+const APP_VERSION_DATE = '2026.05.19 17:55';
+const APP_VERSION_NOTE = 'Agaclar degisti sikligi azaldi akarsu degisti';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -2852,22 +2852,24 @@ function drawDecorations(c, th){
   const st = styles ? styles[Math.min(styleIdx, styles.length-1)] : null;
 
   const positions=[];
-  for(let i=0;i<8;i++){
-    const x=W*(0.04+i*0.055);
-    if(x>W*0.15) break;
+  // Sol kenar — daha seyrek
+  for(let i=0;i<5;i++){
+    const x=W*(0.04+i*0.085);
+    if(x>W*0.18) break;
     positions.push(x);
   }
-  for(let i=0;i<10;i++){
-    const x=W*(0.55+i*0.055);
+  // Sağ kenar — daha seyrek
+  for(let i=0;i<7;i++){
+    const x=W*(0.56+i*0.075);
     if(x>W*0.97) break;
     positions.push(x);
   }
-  // Orta bolge — nehir kenarlari ve bos alanlar
-  for(let i=0;i<6;i++){
-    positions.push(W*(0.16+i*0.04));  // sol-orta
+  // Orta bölge — sadece birkaç tane
+  for(let i=0;i<3;i++){
+    positions.push(W*(0.20+i*0.06));  // sol-orta
   }
-  for(let i=0;i<6;i++){
-    positions.push(W*(0.38+i*0.04));  // sag-orta
+  for(let i=0;i<3;i++){
+    positions.push(W*(0.40+i*0.06));  // sağ-orta
   }
 
   positions.forEach(dx=>{
@@ -2891,6 +2893,49 @@ function drawDecorations(c, th){
       else drawTree(c,dx,dy,col,'pine');
     }
   });
+
+  // ── YER DEKORLARI — küçük kayalar ve çalılar ───────────────────
+  // Snow ve volcano temasında daha az/farklı, valley/forest/meadow/tropical'da bol
+  const groundEnabled = !th.hasLava && !th.hasCity;
+  if(groundEnabled){
+    let _gseed = 7919;
+    const _grn = ()=>{ _gseed=(_gseed*9301+49297)%233280; return _gseed/233280; };
+    for(let i=0; i<14; i++){
+      const dx = W*(0.03 + i*0.072) + (_grn()-0.5)*W*0.025;
+      if(caveData){
+        const clearL = caveData.mx - caveData.mw - 15;
+        const clearR = caveData.mx + 15;
+        if(dx >= clearL && dx <= clearR) continue;
+      }
+      if(dx<0 || dx>W-3) continue;
+      const xi = Math.floor(Math.max(0, Math.min(W-1, dx)));
+      const dy = terrain[xi];
+      const r = _grn();
+      // Snow temada sadece beyaz kar tutamı + nadiren kaya
+      if(th.hasSnow){
+        if(r < 0.30){
+          _groundRock(c, dx, dy, 3 + _grn()*3);
+        } else if(r < 0.55){
+          // Kar tutamı (beyaz çalı)
+          _groundBush(c, dx, dy-1, 4 + _grn()*3, '#f0f4fa');
+        }
+      } else if(th.hasSand){
+        // Çöl/tropikal: daha çok kaya, az çalı
+        if(r < 0.45){
+          _groundRock(c, dx, dy, 4 + _grn()*4);
+        } else if(r < 0.55 && th.treeColor){
+          _groundBush(c, dx, dy-1, 4 + _grn()*3, th.treeColor);
+        }
+      } else {
+        // Normal: dengeli karışım
+        if(r < 0.30){
+          _groundRock(c, dx, dy, 4 + _grn()*4);
+        } else if(r < 0.60 && th.treeColor){
+          _groundBush(c, dx, dy-1, 5 + _grn()*4, th.treeColor);
+        }
+      }
+    }
+  }
 }
 
 function drawTree(c,x,y,col,style){
@@ -2988,20 +3033,159 @@ function drawTreeNew(c, x, y, st){
 
 function _trunk(c,x,y,h,w,lean,col){
   const topX=x+Math.sin(lean)*h*0.12, topY=y-h;
+  // Ana gövde dolgusu
   const tg=c.createLinearGradient(x-w,y,x+w,topY);
-  tg.addColorStop(0,_dk(col,8));tg.addColorStop(0.4,_lt(col,12));tg.addColorStop(1,_dk(col,5));
+  tg.addColorStop(0,_dk(col,12));
+  tg.addColorStop(0.45,_lt(col,16));
+  tg.addColorStop(1,_dk(col,6));
   c.fillStyle=tg;
   c.beginPath();
   c.moveTo(x-w*0.9,y);
-  c.bezierCurveTo(x-w*0.5,y-h*0.35,topX-w*0.4,y-h*0.65,topX-w*0.5,topY);
+  c.bezierCurveTo(x-w*0.55,y-h*0.35,topX-w*0.4,y-h*0.65,topX-w*0.5,topY);
   c.lineTo(topX+w*0.5,topY);
-  c.bezierCurveTo(topX+w*0.4,y-h*0.65,x+w*0.5,y-h*0.35,x+w*0.9,y);
+  c.bezierCurveTo(topX+w*0.4,y-h*0.65,x+w*0.55,y-h*0.35,x+w*0.9,y);
   c.closePath();c.fill();
-  c.strokeStyle='rgba(0,0,0,0.10)';c.lineWidth=0.4;
-  for(let k=0;k<3;k++){const ky=y-h*(0.12+k*0.22);c.beginPath();c.moveTo(x-w*0.5,ky);c.lineTo(x+w*0.5,ky+1);c.stroke();}
+  // Dikey bark grain
+  c.strokeStyle='rgba(0,0,0,0.30)';
+  c.lineWidth=0.45;
+  for(let g=0; g<4; g++){
+    const gx = x + (g-1.5)*w*0.32;
+    const gxT = gx + Math.sin(lean)*h*0.1;
+    c.beginPath();
+    c.moveTo(gx,y-2);
+    c.quadraticCurveTo(gx+(Math.random()-0.5)*1.2,y-h*0.5, gxT, topY);
+    c.stroke();
+  }
+  // Yatay bark çatlakları
+  c.strokeStyle='rgba(0,0,0,0.22)';
+  c.lineWidth=0.5;
+  for(let k=0;k<4;k++){
+    const ky=y-h*(0.10+k*0.20);
+    c.beginPath();
+    c.moveTo(x-w*0.55+(Math.random()-0.5)*1.5,ky);
+    c.lineTo(x+w*0.55+(Math.random()-0.5)*1.5,ky+(Math.random()-0.5)*1.2);
+    c.stroke();
+  }
+  // Bark düğüm (knot) - bazen
+  if(Math.random()<0.5){
+    const knotY=y-h*(0.25+Math.random()*0.45);
+    const knotX=x+(Math.random()-0.5)*w*0.5;
+    c.fillStyle=_dk(col,28);
+    c.beginPath();c.ellipse(knotX,knotY,w*0.55,w*0.35,0,0,Math.PI*2);c.fill();
+    c.fillStyle=_dk(col,45);
+    c.beginPath();c.ellipse(knotX,knotY,w*0.25,w*0.15,0,0,Math.PI*2);c.fill();
+  }
+  // Köke yakın taban genişlemesi (root flare)
+  c.fillStyle=_dk(col,12);
+  c.beginPath();
+  c.moveTo(x-w*0.9,y);
+  c.quadraticCurveTo(x-w*1.3,y+0.5,x-w*1.5,y+1.5);
+  c.lineTo(x-w*0.5,y+1.5);
+  c.lineTo(x-w*0.9,y);
+  c.closePath();c.fill();
+  c.beginPath();
+  c.moveTo(x+w*0.9,y);
+  c.quadraticCurveTo(x+w*1.3,y+0.5,x+w*1.5,y+1.5);
+  c.lineTo(x+w*0.5,y+1.5);
+  c.lineTo(x+w*0.9,y);
+  c.closePath();c.fill();
+}
+
+// ── YER DEKORLARI ────────────────────────────────────────────────
+// Ağaç dibi yumuşak gölge
+function _treeShadow(c, x, y, w, alpha){
+  c.fillStyle = 'rgba(0,0,0,'+(alpha||0.28)+')';
+  c.beginPath();
+  c.ellipse(x, y+1, w, Math.max(2.5, w*0.30), 0, 0, Math.PI*2);
+  c.fill();
+}
+
+// Küçük yer kayası
+function _groundRock(c, x, y, size){
+  // Gölge
+  c.fillStyle='rgba(0,0,0,0.30)';
+  c.beginPath();
+  c.ellipse(x+1, y+1, size*1.1, size*0.35, 0, 0, Math.PI*2);
+  c.fill();
+  // Kaya gövde
+  const g = c.createLinearGradient(x, y-size, x, y);
+  g.addColorStop(0, '#9a9a9a');
+  g.addColorStop(0.45, '#5a5a5a');
+  g.addColorStop(1, '#2a2a2a');
+  c.fillStyle = g;
+  c.beginPath();
+  c.moveTo(x-size, y);
+  c.quadraticCurveTo(x-size*0.75, y-size*1.0, x, y-size*0.95);
+  c.quadraticCurveTo(x+size*0.65, y-size*0.9, x+size, y-size*0.15);
+  c.quadraticCurveTo(x+size*0.55, y, x, y);
+  c.quadraticCurveTo(x-size*0.55, y+1, x-size, y);
+  c.closePath();
+  c.fill();
+  c.strokeStyle='rgba(0,0,0,0.5)';
+  c.lineWidth=0.5;
+  c.stroke();
+  // Üst parlak
+  c.fillStyle='rgba(255,255,255,0.22)';
+  c.beginPath();
+  c.ellipse(x-size*0.30, y-size*0.7, size*0.40, size*0.20, -0.3, 0, Math.PI*2);
+  c.fill();
+  // Çatlak çizgisi
+  c.strokeStyle='rgba(0,0,0,0.4)';
+  c.lineWidth=0.4;
+  c.beginPath();
+  c.moveTo(x-size*0.5, y-size*0.4);
+  c.lineTo(x-size*0.1, y-size*0.7);
+  c.lineTo(x+size*0.3, y-size*0.5);
+  c.stroke();
+}
+
+// Çalı tutamı (yer kümesi)
+function _groundBush(c, x, y, size, col){
+  // Gölge
+  c.fillStyle='rgba(0,0,0,0.25)';
+  c.beginPath();
+  c.ellipse(x+1, y+1, size*1.1, size*0.35, 0, 0, Math.PI*2);
+  c.fill();
+  // Koyu temel kümeler
+  c.fillStyle = _dk(col, 18);
+  const blobs = [
+    [-size*0.65,  0,        size*0.55],
+    [-size*0.10, -size*0.25, size*0.65],
+    [ size*0.55, -size*0.05, size*0.55],
+    [ size*0.20,  size*0.10, size*0.42],
+    [-size*0.30,  size*0.15, size*0.40],
+  ];
+  blobs.forEach(b => {
+    c.beginPath();
+    c.arc(x+b[0], y+b[1], b[2], 0, Math.PI*2);
+    c.fill();
+  });
+  // Açık tonlu yüzey
+  c.fillStyle = col;
+  blobs.forEach(b => {
+    c.beginPath();
+    c.arc(x+b[0]-size*0.05, y+b[1]-size*0.1, b[2]*0.78, 0, Math.PI*2);
+    c.fill();
+  });
+  // Vurgu
+  c.fillStyle = 'rgba(255,255,255,0.20)';
+  c.beginPath();
+  c.arc(x-size*0.2, y-size*0.45, size*0.30, 0, Math.PI*2);
+  c.fill();
+  // Birkaç sapların çıkıntısı
+  c.strokeStyle = _dk(col, 30);
+  c.lineWidth = 0.5;
+  for(let i=0;i<4;i++){
+    const a = -Math.PI/2 + (i-1.5)*0.3;
+    c.beginPath();
+    c.moveTo(x + Math.cos(a)*size*0.2, y + Math.sin(a)*size*0.2);
+    c.lineTo(x + Math.cos(a)*size*0.85, y + Math.sin(a)*size*0.75 - size*0.15);
+    c.stroke();
+  }
 }
 
 function drawNewPine(c,x,y,h,lean,st,layers){
+  _treeShadow(c, x, y, h*0.18, 0.30);
   const tw=Math.max(2.5,h*0.042);
   _trunk(c,x,y,h*0.35,tw,lean,st.trunk);
   for(let i=0;i<layers;i++){
@@ -3009,15 +3193,44 @@ function drawNewPine(c,x,y,h,lean,st,layers){
     const bx=x+Math.sin(lean)*h*(0.88-f*0.5);
     const by=y-h*(0.88-f*0.50);
     const lw=h*(0.09+f*0.20), lh=h*(0.15+f*0.03);
-    c.fillStyle='rgba(0,0,0,0.08)';c.beginPath();c.moveTo(bx+2,by-1);c.lineTo(bx-lw+3,by+lh+1);c.lineTo(bx+lw+3,by+lh+1);c.closePath();c.fill();
+    // Gölge
+    c.fillStyle='rgba(0,0,0,0.10)';
+    c.beginPath();c.moveTo(bx+3,by-1);c.lineTo(bx-lw+3,by+lh+1);c.lineTo(bx+lw+3,by+lh+1);c.closePath();c.fill();
+    // Koyu temel
     c.fillStyle=st.col2;c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw,by+lh);c.lineTo(bx+lw,by+lh);c.closePath();c.fill();
-    c.fillStyle=i===0?_lt(st.col,10):i===layers-1?_dk(st.col,6):st.col;
+    // Dal sacağları (sıra altta çıkıntılar)
+    c.fillStyle=st.col2;
+    for(let s=1;s<4;s++){
+      const sf=s/4;
+      const sxL=bx-lw*sf;
+      const sxR=bx+lw*sf;
+      const syM=by+lh*sf;
+      c.beginPath();c.moveTo(sxL,syM);c.lineTo(sxL-2.5,syM+1.5);c.lineTo(sxL-1,syM+3.5);c.closePath();c.fill();
+      c.beginPath();c.moveTo(sxR,syM);c.lineTo(sxR+2.5,syM+1.5);c.lineTo(sxR+1,syM+3.5);c.closePath();c.fill();
+    }
+    // Ana renk
+    c.fillStyle=i===0?_lt(st.col,12):i===layers-1?_dk(st.col,6):st.col;
     c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw*0.90,by+lh*0.88);c.lineTo(bx+lw*0.90,by+lh*0.88);c.closePath();c.fill();
-    c.fillStyle='rgba(255,255,255,0.06)';c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw*0.32,by+lh*0.5);c.lineTo(bx-lw*0.08,by+lh*0.88);c.closePath();c.fill();
+    // Işık vurgusu (sol-üst)
+    c.fillStyle='rgba(255,255,255,0.11)';
+    c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw*0.34,by+lh*0.50);c.lineTo(bx-lw*0.10,by+lh*0.88);c.closePath();c.fill();
+    // İğne yaprakları — ince benekler
+    c.fillStyle=_dk(st.col,14);
+    for(let k=0;k<4;k++){
+      const kx=bx+(Math.random()-0.5)*lw*1.6;
+      const ky=by+lh*(0.3+Math.random()*0.65);
+      c.beginPath();c.ellipse(kx,ky,1.2,0.5,0,0,Math.PI*2);c.fill();
+    }
   }
+  // Tepe çam kozalağı ipucu
+  const topY=y-h+2;
+  const topX=x+Math.sin(lean)*h*0.88;
+  c.fillStyle=_lt(st.col,18);
+  c.beginPath();c.arc(topX,topY,1.5,0,Math.PI*2);c.fill();
 }
 
 function drawNewSpruce(c,x,y,h,lean,st){
+  _treeShadow(c, x, y, h*0.16, 0.30);
   const tw=Math.max(2,h*0.032);
   _trunk(c,x,y,h*0.22,tw,lean,st.trunk);
   const layers=8;
@@ -3026,108 +3239,510 @@ function drawNewSpruce(c,x,y,h,lean,st){
     const bx=x+Math.sin(lean)*h*(0.92-f*0.58);
     const by=y-h*(0.92-f*0.58);
     const lw=h*(0.035+f*0.13), lh=h*(0.12+f*0.02);
+    // Gölge
+    c.fillStyle='rgba(0,0,0,0.10)';
+    c.beginPath();c.moveTo(bx+2,by-1);c.lineTo(bx-lw+2,by+lh+1);c.lineTo(bx+lw+2,by+lh+1);c.closePath();c.fill();
+    // Koyu temel
     c.fillStyle=st.col2;c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw,by+lh);c.lineTo(bx+lw,by+lh);c.closePath();c.fill();
-    c.fillStyle=f<0.3?_lt(st.col,8):st.col;c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw*0.88,by+lh*0.9);c.lineTo(bx+lw*0.88,by+lh*0.9);c.closePath();c.fill();
-    if(i>0){c.strokeStyle=st.col2;c.lineWidth=0.8;c.beginPath();c.moveTo(bx-lw,by+lh*0.5);c.lineTo(bx-lw*1.4,by+lh*0.65);c.stroke();c.beginPath();c.moveTo(bx+lw,by+lh*0.5);c.lineTo(bx+lw*1.4,by+lh*0.65);c.stroke();}
+    // Ana renk
+    c.fillStyle=f<0.3?_lt(st.col,10):st.col;
+    c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw*0.88,by+lh*0.9);c.lineTo(bx+lw*0.88,by+lh*0.9);c.closePath();c.fill();
+    // Yana sarkıtan dallar (daha bełirgin)
+    if(i>0){
+      c.strokeStyle=st.col2;
+      c.lineWidth=0.9;
+      c.lineCap='round';
+      c.beginPath();c.moveTo(bx-lw,by+lh*0.5);c.lineTo(bx-lw*1.45,by+lh*0.70);c.stroke();
+      c.beginPath();c.moveTo(bx+lw,by+lh*0.5);c.lineTo(bx+lw*1.45,by+lh*0.70);c.stroke();
+      // İnce çıkıntılar
+      c.lineWidth=0.5;
+      c.beginPath();c.moveTo(bx-lw*1.45,by+lh*0.70);c.lineTo(bx-lw*1.55,by+lh*0.90);c.stroke();
+      c.beginPath();c.moveTo(bx+lw*1.45,by+lh*0.70);c.lineTo(bx+lw*1.55,by+lh*0.90);c.stroke();
+    }
+    // Işık vurgusu
+    c.fillStyle='rgba(255,255,255,0.10)';
+    c.beginPath();c.moveTo(bx,by);c.lineTo(bx-lw*0.3,by+lh*0.5);c.lineTo(bx-lw*0.06,by+lh*0.88);c.closePath();c.fill();
   }
 }
 
 function drawNewOak(c,x,y,h,lean,st){
+  _treeShadow(c, x, y, h*0.22, 0.32);
   const tw=Math.max(3,h*0.06);
   _trunk(c,x,y,h*0.45,tw,lean,st.trunk);
   const cx=x+Math.sin(lean)*h*0.35, cy=y-h*0.70, cr=h*0.30;
-  c.fillStyle='rgba(0,0,0,0.10)';c.beginPath();c.ellipse(cx+4,cy+5,cr*0.92,cr*0.70,0,0,Math.PI*2);c.fill();
-  c.fillStyle=st.col2;
-  c.beginPath();c.ellipse(cx-cr*0.22,cy+cr*0.12,cr*0.70,cr*0.58,0.15,0,Math.PI*2);c.fill();
-  c.beginPath();c.ellipse(cx+cr*0.22,cy+cr*0.12,cr*0.66,cr*0.56,-0.15,0,Math.PI*2);c.fill();
-  c.fillStyle=st.col;c.beginPath();c.arc(cx,cy,cr,0,Math.PI*2);c.fill();
-  c.fillStyle='rgba(255,255,255,0.07)';c.beginPath();c.ellipse(cx-cr*0.18,cy-cr*0.28,cr*0.40,cr*0.28,0,0,Math.PI*2);c.fill();
+
+  // Drop shadow under canopy
+  c.fillStyle='rgba(0,0,0,0.12)';
+  c.beginPath();c.ellipse(cx+4,cy+5,cr*0.95,cr*0.72,0,0,Math.PI*2);c.fill();
+
+  // Taban katman — koyu geşil kümeler
+  c.fillStyle=_dk(st.col,18);
+  const base=[
+    [-cr*0.35, cr*0.10, cr*0.72, cr*0.55],
+    [ cr*0.28, cr*0.16, cr*0.72, cr*0.55],
+    [-cr*0.05,-cr*0.18, cr*0.55, cr*0.45],
+    [ cr*0.18, cr*0.38, cr*0.50, cr*0.36],
+    [-cr*0.50,-cr*0.10, cr*0.35, cr*0.28],
+    [ cr*0.55, cr*0.05, cr*0.35, cr*0.28],
+  ];
+  base.forEach(b=>{
+    c.beginPath();c.ellipse(cx+b[0],cy+b[1],b[2],b[3],(Math.random()-0.5)*0.5,0,Math.PI*2);c.fill();
+  });
+  // Orta katman — ana renk
+  c.fillStyle=st.col;
+  [
+    [-cr*0.25, cr*0.05, cr*0.52, cr*0.42],
+    [ cr*0.25, cr*0.10, cr*0.52, cr*0.42],
+    [ 0,      -cr*0.10, cr*0.45, cr*0.36],
+    [-cr*0.45,-cr*0.18, cr*0.30, cr*0.24],
+    [ cr*0.45,-cr*0.06, cr*0.32, cr*0.25],
+  ].forEach(b=>{
+    c.beginPath();c.ellipse(cx+b[0],cy+b[1],b[2],b[3],(Math.random()-0.5)*0.4,0,Math.PI*2);c.fill();
+  });
+  // Işık vurgusu (sol-üst)
+  c.fillStyle=_lt(st.col,16);
+  [
+    [-cr*0.30,-cr*0.30, cr*0.34, cr*0.22],
+    [ 0,      -cr*0.32, cr*0.28, cr*0.20],
+    [-cr*0.50,-cr*0.15, cr*0.20, cr*0.13],
+  ].forEach(b=>{
+    c.beginPath();c.ellipse(cx+b[0],cy+b[1],b[2],b[3],0,0,Math.PI*2);c.fill();
+  });
+  // Küçük yaprak benekleri
+  c.fillStyle=_dk(st.col,8);
+  for(let i=0;i<10;i++){
+    const a=Math.random()*Math.PI*2;
+    const r=cr*(0.55+Math.random()*0.45);
+    const lx=cx+Math.cos(a)*r;
+    const ly=cy+Math.sin(a)*r*0.7;
+    c.beginPath();c.arc(lx,ly,1.2+Math.random()*1.2,0,Math.PI*2);c.fill();
+  }
+  // Birkaç koyu kontur leke
+  c.fillStyle='rgba(0,0,0,0.18)';
+  for(let i=0;i<5;i++){
+    const a=Math.PI+(Math.random()-0.5)*Math.PI;
+    const r=cr*(0.7+Math.random()*0.3);
+    c.beginPath();c.arc(cx+Math.cos(a)*r,cy+Math.sin(a)*r*0.7,1.5,0,Math.PI*2);c.fill();
+  }
 }
 
 function drawNewCherry(c,x,y,h,lean,st){
+  _treeShadow(c, x, y, h*0.22, 0.28);
   const tw=Math.max(2.5,h*0.046);
   _trunk(c,x,y,h*0.40,tw,lean,st.trunk);
   const cx=x+Math.sin(lean)*h*0.32, cy=y-h*0.65;
-  const lrs=[
-    {dy:h*0.12,rx:h*0.22,ry:h*0.15,a:'0.5'},
-    {dy:h*0.02,rx:h*0.28,ry:h*0.19,a:'0.78'},
-    {dy:-h*0.08,rx:h*0.20,ry:h*0.16,a:'0.65'},
+
+  // Drop shadow under canopy
+  c.fillStyle='rgba(80,30,60,0.18)';
+  c.beginPath();c.ellipse(cx+4,cy+6,h*0.30,h*0.20,0,0,Math.PI*2);c.fill();
+
+  // Pembe çiçek kümeleri — 3 katman (koyu/orta/açık)
+  const blobs=[
+    {dx:-h*0.20, dy: h*0.06, rx:h*0.20, ry:h*0.16, t:'dark'},
+    {dx: h*0.10, dy: h*0.08, rx:h*0.22, ry:h*0.17, t:'mid'},
+    {dx:-h*0.06, dy:-h*0.08, rx:h*0.20, ry:h*0.16, t:'mid'},
+    {dx: h*0.22, dy:-h*0.04, rx:h*0.16, ry:h*0.13, t:'dark'},
+    {dx:-h*0.24, dy:-h*0.04, rx:h*0.15, ry:h*0.12, t:'mid'},
+    {dx: 0,       dy:-h*0.16, rx:h*0.15, ry:h*0.12, t:'light'},
+    {dx: h*0.08,  dy: h*0.18, rx:h*0.14, ry:h*0.11, t:'light'},
   ];
-  lrs.forEach(l=>{
-    c.fillStyle=`rgba(${_ph(st.col)},${l.a})`;
-    c.beginPath();c.ellipse(cx-l.rx*0.25,cy+l.dy,l.rx*0.70,l.ry*0.86,0.2,0,Math.PI*2);c.fill();
-    c.beginPath();c.ellipse(cx+l.rx*0.25,cy+l.dy,l.rx*0.68,l.ry*0.83,-0.2,0,Math.PI*2);c.fill();
-    c.fillStyle=`rgba(${_ph(st.col)},${parseFloat(l.a)+0.1})`;
-    c.beginPath();c.ellipse(cx,cy+l.dy-l.ry*0.1,l.rx*0.60,l.ry*0.75,0,0,Math.PI*2);c.fill();
+  blobs.forEach(b=>{
+    let col;
+    if(b.t==='dark')  col='rgba('+_ph(st.col2)+',0.92)';
+    else if(b.t==='light') col='rgba('+_ph(_lt(st.col,22))+',0.88)';
+    else              col='rgba('+_ph(st.col)+',0.90)';
+    c.fillStyle=col;
+    c.beginPath();c.ellipse(cx+b.dx,cy+b.dy,b.rx,b.ry,(Math.random()-0.5)*0.5,0,Math.PI*2);c.fill();
   });
-  c.fillStyle='rgba(255,230,240,0.40)';
-  for(let f=0;f<10;f++){const fa=Math.random()*Math.PI*2,fr=Math.random()*h*0.20;c.beginPath();c.arc(cx+Math.cos(fa)*fr,cy+Math.sin(fa)*fr*0.62,1+Math.random()*1.5,0,Math.PI*2);c.fill();}
+  // Çiçek tüyleri — pembe noktalar
+  c.fillStyle='rgba(255,196,222,0.85)';
+  for(let f=0;f<28;f++){
+    const fa=Math.random()*Math.PI*2;
+    const fr=Math.random()*h*0.22;
+    c.beginPath();
+    c.arc(cx+Math.cos(fa)*fr,cy+Math.sin(fa)*fr*0.7,0.8+Math.random()*1.4,0,Math.PI*2);
+    c.fill();
+  }
+  // Beyaz çiçek yıldızları
+  c.fillStyle='rgba(255,242,250,0.95)';
+  for(let f=0;f<10;f++){
+    const fa=Math.random()*Math.PI*2;
+    const fr=Math.random()*h*0.18;
+    c.beginPath();
+    c.arc(cx+Math.cos(fa)*fr,cy+Math.sin(fa)*fr*0.65,0.6,0,Math.PI*2);
+    c.fill();
+  }
+  // Düşen yapraklar — ağacın altında
+  c.fillStyle='rgba(255,196,222,0.65)';
+  for(let f=0;f<6;f++){
+    const fx=x+(Math.random()-0.5)*h*0.5;
+    const fy=y-Math.random()*h*0.15;
+    c.beginPath();c.arc(fx,fy,0.8+Math.random()*0.7,0,Math.PI*2);c.fill();
+  }
 }
 
 function drawNewBirch(c,x,y,h,lean,st){
+  _treeShadow(c, x, y, h*0.16, 0.28);
   const tw=Math.max(2,h*0.036);
   const topX=x+Math.sin(lean)*h*0.12;
+  // Beyaz huzme gövde
   const tg=c.createLinearGradient(x-tw,y,x+tw,y-h*0.42);
-  tg.addColorStop(0,'#c8c0a8');tg.addColorStop(0.4,'#e8e0d0');tg.addColorStop(1,'#c0b898');
+  tg.addColorStop(0,'#bcb4a0');
+  tg.addColorStop(0.4,'#f0e8d8');
+  tg.addColorStop(0.55,'#fdf8ec');
+  tg.addColorStop(1,'#b8a890');
   c.fillStyle=tg;
-  c.beginPath();c.moveTo(x-tw,y);c.bezierCurveTo(x-tw*0.5,y-h*0.2,topX-tw*0.4,y-h*0.32,topX-tw*0.45,y-h*0.42);c.lineTo(topX+tw*0.45,y-h*0.42);c.bezierCurveTo(topX+tw*0.4,y-h*0.32,x+tw*0.5,y-h*0.2,x+tw,y);c.closePath();c.fill();
-  c.fillStyle='rgba(50,30,15,0.22)';for(let k=0;k<4;k++){const ky=y-h*(0.05+k*0.07);c.beginPath();c.ellipse(x+(topX-x)*(0.05+k*0.07)/0.42,ky,tw*0.52,tw*0.20,0,0,Math.PI*2);c.fill();}
-  for(let i=0;i<4;i++){
-    const f=i/3, bx=x+Math.sin(lean)*h*(0.85-f*0.42), by=y-h*(0.85-f*0.32);
-    const lw=h*(0.09+f*0.12);
-    c.strokeStyle=i===0?_lt(st.col,12):st.col;c.lineWidth=1;
-    for(let d=-2;d<=2;d++){const dx2=bx+d*lw*0.42;c.beginPath();c.moveTo(dx2,by);c.quadraticCurveTo(dx2,by+h*0.04,dx2+lean*h*0.04,by+h*0.08);c.stroke();}
-    c.fillStyle=st.col;c.globalAlpha=0.72;c.beginPath();c.ellipse(bx,by+h*0.03+f*h*0.02,lw*0.72,lw*0.42,0,0,Math.PI*2);c.fill();c.globalAlpha=1;
+  c.beginPath();
+  c.moveTo(x-tw,y);
+  c.bezierCurveTo(x-tw*0.5,y-h*0.2,topX-tw*0.4,y-h*0.32,topX-tw*0.45,y-h*0.42);
+  c.lineTo(topX+tw*0.45,y-h*0.42);
+  c.bezierCurveTo(topX+tw*0.4,y-h*0.32,x+tw*0.5,y-h*0.2,x+tw,y);
+  c.closePath();c.fill();
+  // Siyah huzme bantları
+  c.fillStyle='rgba(28,18,10,0.85)';
+  for(let k=0;k<6;k++){
+    const ky=y-h*(0.05+k*0.06);
+    const wRand=0.4+Math.random()*0.4;
+    c.beginPath();c.ellipse(x+(topX-x)*(0.05+k*0.06)/0.42,ky,tw*wRand,tw*0.20,0,0,Math.PI*2);c.fill();
+  }
+  // Bant kenarları — incelen uçlar
+  c.strokeStyle='rgba(40,28,18,0.5)';
+  c.lineWidth=0.6;
+  for(let k=0;k<3;k++){
+    const ky=y-h*(0.12+k*0.14);
+    c.beginPath();
+    c.moveTo(x-tw*0.6,ky);
+    c.quadraticCurveTo(x,ky+(Math.random()-0.5)*1.5,x+tw*0.6,ky);
+    c.stroke();
+  }
+  // Sarkıtan yaprak kümeleri — daha çok katman
+  for(let i=0;i<5;i++){
+    const f=i/4;
+    const bx=x+Math.sin(lean)*h*(0.88-f*0.45);
+    const by=y-h*(0.85-f*0.30);
+    const lw=h*(0.10+f*0.14);
+    // Sarkıtan çizgi yapraklar
+    c.strokeStyle=i===0?_lt(st.col,16):i===4?_dk(st.col,8):st.col;
+    c.lineWidth=0.8;
+    for(let d=-3;d<=3;d++){
+      const dx2=bx+d*lw*0.30;
+      c.beginPath();
+      c.moveTo(dx2,by);
+      c.quadraticCurveTo(dx2-1+Math.random(),by+h*0.04,dx2+lean*h*0.04+(Math.random()-0.5)*1,by+h*0.10);
+      c.stroke();
+    }
+    // Yaprak küme dolgusu
+    c.fillStyle=st.col;
+    c.globalAlpha=0.65;
+    c.beginPath();c.ellipse(bx,by+h*0.04+f*h*0.02,lw*0.78,lw*0.46,0,0,Math.PI*2);c.fill();
+    c.fillStyle=_lt(st.col,15);
+    c.globalAlpha=0.55;
+    c.beginPath();c.ellipse(bx-lw*0.2,by+h*0.02+f*h*0.02,lw*0.45,lw*0.28,0,0,Math.PI*2);c.fill();
+    c.globalAlpha=1;
   }
 }
 
 function drawNewDead(c,x,y,h,lean,st){
+  _treeShadow(c, x, y, h*0.10, 0.22);
   const tw=Math.max(2,h*0.042);
-  c.strokeStyle=st.trunk;c.lineCap='round';c.lineJoin='round';
-  c.lineWidth=tw*2;c.beginPath();c.moveTo(x,y);
-  c.bezierCurveTo(x,y-h*0.3,x+Math.sin(lean)*h*0.1,y-h*0.6,x+Math.sin(lean+0.2)*h*0.14,y-h*0.9);c.stroke();
-  [{fy:0.55,a:0.8,l:0.18},{fy:0.68,a:-0.6,l:0.14},{fy:0.78,a:0.5,l:0.10},{fy:0.85,a:-0.4,l:0.08}].forEach(b=>{
-    const bx=x+Math.sin(lean)*h*b.fy, by=y-h*b.fy;
-    c.lineWidth=tw*0.75;c.beginPath();c.moveTo(bx,by);c.lineTo(bx+Math.cos(b.a)*h*b.l,by-Math.sin(Math.abs(b.a))*h*b.l*0.55);c.stroke();
+
+  c.strokeStyle=st.trunk;
+  c.lineCap='round';
+  c.lineJoin='round';
+
+  // Ana gövde (incelen)
+  const midY=y-h*0.5;
+  const topX=x+Math.sin(lean+0.2)*h*0.14;
+  const topY=y-h*0.95;
+  c.lineWidth=tw*2.2;
+  c.beginPath();
+  c.moveTo(x,y);
+  c.bezierCurveTo(x,y-h*0.3, x+Math.sin(lean)*h*0.10, midY, topX, topY);
+  c.stroke();
+  c.lineWidth=tw*1.4;
+  c.beginPath();
+  c.moveTo(topX, topY);
+  c.lineTo(topX+Math.sin(lean+0.3)*h*0.05, y-h);
+  c.stroke();
+
+  // Gövde ışık vurgusu (sağ kenar)
+  c.strokeStyle=_lt(st.trunk,30);
+  c.lineWidth=tw*0.7;
+  c.beginPath();
+  c.moveTo(x+tw*0.5,y-tw);
+  c.bezierCurveTo(x+tw*0.4,y-h*0.3, x+Math.sin(lean)*h*0.10+tw*0.3,midY, topX+tw*0.2,topY);
+  c.stroke();
+
+  // Düğüm — oyuk
+  if(h > 30){
+    const knotY=y-h*(0.30+Math.random()*0.3);
+    const knotX=x+(Math.random()-0.5)*tw*0.5;
+    c.fillStyle=_dk(st.trunk,25);
+    c.beginPath();c.ellipse(knotX,knotY,tw*0.9,tw*0.55,0,0,Math.PI*2);c.fill();
+    c.fillStyle='#000';
+    c.beginPath();c.ellipse(knotX,knotY,tw*0.4,tw*0.25,0,0,Math.PI*2);c.fill();
+  }
+
+  // Çoklu dal sistemleri (alt-dallar dahil)
+  c.strokeStyle=st.trunk;
+  const branches=[
+    {fy:0.28, a: 0.55, l:0.26, sub:true},
+    {fy:0.42, a:-0.70, l:0.30, sub:true},
+    {fy:0.55, a: 0.65, l:0.22, sub:true},
+    {fy:0.68, a:-0.50, l:0.20, sub:true},
+    {fy:0.78, a: 0.50, l:0.16, sub:false},
+    {fy:0.86, a:-0.45, l:0.12, sub:false},
+    {fy:0.92, a: 0.40, l:0.08, sub:false},
+  ];
+  branches.forEach(b=>{
+    const bx=x+Math.sin(lean)*h*b.fy;
+    const by=y-h*b.fy;
+    const ex=bx+Math.cos(b.a)*h*b.l;
+    const ey=by-Math.sin(Math.abs(b.a))*h*b.l*0.55;
+    c.lineWidth=tw*0.85;
+    c.beginPath();
+    c.moveTo(bx,by);
+    c.bezierCurveTo(
+      bx+Math.cos(b.a)*h*b.l*0.35, by-Math.sin(Math.abs(b.a))*h*b.l*0.18,
+      bx+Math.cos(b.a)*h*b.l*0.7,  by-Math.sin(Math.abs(b.a))*h*b.l*0.42,
+      ex, ey
+    );
+    c.stroke();
+
+    // Uç incelen kısmı
+    c.lineWidth=tw*0.5;
+    c.beginPath();
+    c.moveTo(ex,ey);
+    c.lineTo(ex+Math.cos(b.a+(Math.random()-0.5)*0.4)*h*b.l*0.4,
+             ey-Math.sin(Math.abs(b.a))*h*b.l*0.18);
+    c.stroke();
+
+    if(b.sub){
+      // Alt-dal
+      const subA=b.a+(Math.random()-0.5)*0.6;
+      const subL=h*b.l*0.55;
+      const mx=bx+Math.cos(b.a)*h*b.l*0.6;
+      const my=by-Math.sin(Math.abs(b.a))*h*b.l*0.35;
+      const sx2=mx+Math.cos(subA)*subL;
+      const sy2=my-Math.sin(Math.abs(subA))*subL*0.5;
+      c.lineWidth=tw*0.5;
+      c.beginPath();
+      c.moveTo(mx,my);
+      c.bezierCurveTo(
+        mx+Math.cos(subA)*subL*0.5, my-Math.sin(Math.abs(subA))*subL*0.2,
+        sx2-Math.cos(subA)*subL*0.2, sy2,
+        sx2, sy2
+      );
+      c.stroke();
+      // Tırtıklı dal
+      c.lineWidth=tw*0.3;
+      c.beginPath();
+      c.moveTo(sx2,sy2);
+      c.lineTo(sx2+Math.cos(subA+0.3)*subL*0.4, sy2-Math.sin(Math.abs(subA))*subL*0.15);
+      c.stroke();
+    }
   });
+
+  // Tepedeki bir kaç minik dal
+  for(let i=0;i<3;i++){
+    const ang=-Math.PI/2+(Math.random()-0.5)*1.4;
+    const tl=h*(0.04+Math.random()*0.05);
+    c.lineWidth=tw*0.35;
+    c.beginPath();
+    c.moveTo(topX,topY);
+    c.lineTo(topX+Math.cos(ang)*tl, topY+Math.sin(ang)*tl);
+    c.stroke();
+  }
 }
 
 function drawNewCactus(c,x,y,h,lean,st){
+  _treeShadow(c, x, y, h*0.16, 0.25);
   const tw=Math.max(4,h*0.11);
-  c.fillStyle='rgba(0,0,0,0.14)';c.beginPath();c.ellipse(x+3,y+3,tw*0.8,3.5,0,0,Math.PI*2);c.fill();
   const cg=c.createLinearGradient(x-tw,y-h,x+tw,y);
-  cg.addColorStop(0,_lt(st.col,15));cg.addColorStop(0.4,st.col);cg.addColorStop(1,_dk(st.col,10));
+  cg.addColorStop(0,_lt(st.col,18));
+  cg.addColorStop(0.4,st.col);
+  cg.addColorStop(1,_dk(st.col,12));
   c.fillStyle=cg;
   const topX=x+Math.sin(lean)*h*0.07;
-  c.beginPath();c.moveTo(x-tw,y);c.bezierCurveTo(x-tw*1.05,y-h*0.3,topX-tw*0.88,y-h*0.7,topX-tw*0.65,y-h);c.lineTo(topX+tw*0.65,y-h);c.bezierCurveTo(topX+tw*0.88,y-h*0.7,x+tw*1.05,y-h*0.3,x+tw,y);c.closePath();c.fill();
-  c.strokeStyle='rgba(0,0,0,0.08)';c.lineWidth=0.6;
-  for(let r=-1;r<=1;r++){c.beginPath();c.moveTo(x+r*tw*0.42,y);c.lineTo(topX+r*tw*0.32,y-h*0.94);c.stroke();}
+  c.beginPath();
+  c.moveTo(x-tw,y);
+  c.bezierCurveTo(x-tw*1.05,y-h*0.3,topX-tw*0.88,y-h*0.7,topX-tw*0.65,y-h);
+  c.lineTo(topX+tw*0.65,y-h);
+  c.bezierCurveTo(topX+tw*0.88,y-h*0.7,x+tw*1.05,y-h*0.3,x+tw,y);
+  c.closePath();c.fill();
+  // Konturlu kontur
+  c.strokeStyle=_dk(st.col,30);
+  c.lineWidth=0.8;
+  c.stroke();
+  // Dikey nervi (rib) çizgileri
+  c.strokeStyle='rgba(0,0,0,0.16)';
+  c.lineWidth=0.7;
+  for(let r=-2;r<=2;r++){
+    c.beginPath();
+    c.moveTo(x+r*tw*0.32,y);
+    c.lineTo(topX+r*tw*0.25,y-h*0.94);
+    c.stroke();
+  }
+  // Nervi vurguları
+  c.strokeStyle='rgba(255,255,255,0.18)';
+  c.lineWidth=0.5;
+  for(let r=-2;r<=2;r++){
+    if(r===0) continue;
+    c.beginPath();
+    c.moveTo(x+r*tw*0.32-0.6,y);
+    c.lineTo(topX+r*tw*0.25-0.6,y-h*0.94);
+    c.stroke();
+  }
+  // Sol kol
   if(h>28){
-    c.fillStyle=st.col;const ax=x-tw,ay=y-h*0.54,al=h*0.30,ah=h*0.20;
-    c.beginPath();c.moveTo(ax,ay);c.bezierCurveTo(ax-al*0.5,ay+5,ax-al*0.88,ay-5,ax-al,ay-8);c.lineTo(ax-al+tw*0.55,ay-8-ah);c.bezierCurveTo(ax-al*0.65+tw,ay-ah*0.5,ax-tw*0.28,ay+ah*0.2,ax,ay-tw*0.4);c.closePath();c.fill();
+    c.fillStyle=cg;
+    const ax=x-tw,ay=y-h*0.54,al=h*0.30,ah=h*0.20;
+    c.beginPath();
+    c.moveTo(ax,ay);
+    c.bezierCurveTo(ax-al*0.5,ay+5,ax-al*0.88,ay-5,ax-al,ay-8);
+    c.lineTo(ax-al+tw*0.55,ay-8-ah);
+    c.bezierCurveTo(ax-al*0.65+tw,ay-ah*0.5,ax-tw*0.28,ay+ah*0.2,ax,ay-tw*0.4);
+    c.closePath();c.fill();
+    c.strokeStyle=_dk(st.col,30);c.lineWidth=0.7;c.stroke();
   }
+  // Sağ kol
   if(h>38){
-    c.fillStyle=st.col;const ax2=x+tw,ay2=y-h*0.37,al2=h*0.24,ah2=h*0.16;
-    c.beginPath();c.moveTo(ax2,ay2);c.bezierCurveTo(ax2+al2*0.5,ay2+4,ax2+al2*0.82,ay2-4,ax2+al2,ay2-6);c.lineTo(ax2+al2-tw*0.45,ay2-6-ah2);c.bezierCurveTo(ax2+al2*0.55,ay2-ah2*0.3,ax2+tw*0.18,ay2+ah2*0.15,ax2,ay2-tw*0.35);c.closePath();c.fill();
+    c.fillStyle=cg;
+    const ax2=x+tw,ay2=y-h*0.37,al2=h*0.24,ah2=h*0.16;
+    c.beginPath();
+    c.moveTo(ax2,ay2);
+    c.bezierCurveTo(ax2+al2*0.5,ay2+4,ax2+al2*0.82,ay2-4,ax2+al2,ay2-6);
+    c.lineTo(ax2+al2-tw*0.45,ay2-6-ah2);
+    c.bezierCurveTo(ax2+al2*0.55,ay2-ah2*0.3,ax2+tw*0.18,ay2+ah2*0.15,ax2,ay2-tw*0.35);
+    c.closePath();c.fill();
+    c.strokeStyle=_dk(st.col,30);c.lineWidth=0.7;c.stroke();
   }
-  c.fillStyle=_lt(st.col,12);c.beginPath();c.ellipse(topX,y-h+tw*0.48,tw*0.68,tw*0.50,0,0,Math.PI*2);c.fill();
-  c.strokeStyle='rgba(255,255,200,0.55)';c.lineWidth=0.6;c.lineCap='round';
-  for(let d=0;d<5;d++){const dy2=y-h*(0.16+d*0.15),dx2=topX+(topX-x)*d*0.05;c.beginPath();c.moveTo(dx2+tw,dy2);c.lineTo(dx2+tw*1.55,dy2-2.5);c.stroke();c.beginPath();c.moveTo(dx2-tw,dy2);c.lineTo(dx2-tw*1.55,dy2-2.5);c.stroke();}
+  // Tepe kısmı yuvarlak
+  c.fillStyle=_lt(st.col,18);
+  c.beginPath();
+  c.ellipse(topX,y-h+tw*0.48,tw*0.68,tw*0.50,0,0,Math.PI*2);
+  c.fill();
+  // Çiceklik (yuvarlak tepe)
+  if(Math.random()<0.4){
+    c.fillStyle='#f06090';
+    c.beginPath();
+    c.arc(topX-1,y-h-1,2.5,0,Math.PI*2);
+    c.fill();
+    c.fillStyle='#ffb0c8';
+    c.beginPath();
+    c.arc(topX-1.5,y-h-1.5,1.2,0,Math.PI*2);
+    c.fill();
+  }
+  // Dikenler — çift yönlü, beyaz-sarı
+  c.strokeStyle='rgba(255,255,200,0.7)';
+  c.lineWidth=0.6;c.lineCap='round';
+  for(let d=0;d<6;d++){
+    const dy2=y-h*(0.14+d*0.13);
+    const dx2=topX+(topX-x)*d*0.04;
+    c.beginPath();c.moveTo(dx2+tw,dy2);c.lineTo(dx2+tw*1.55,dy2-2.5);c.stroke();
+    c.beginPath();c.moveTo(dx2-tw,dy2);c.lineTo(dx2-tw*1.55,dy2-2.5);c.stroke();
+  }
+  // Ön yüz üzerinde küçük ççt dikenler
+  c.fillStyle='rgba(40,20,10,0.55)';
+  for(let i=0;i<8;i++){
+    const ix=x+(Math.random()-0.5)*tw*1.6;
+    const iy=y-h*(0.1+Math.random()*0.8);
+    c.beginPath();c.arc(ix,iy,0.5,0,Math.PI*2);c.fill();
+  }
 }
 
 function drawNewPalm(c,x,y,h,lean,st){
+  _treeShadow(c, x, y, h*0.18, 0.30);
   const tw=Math.max(2.5,h*0.046);
   const baseA=lean+0.14, tipX=x+Math.sin(baseA)*h*0.32, tipY=y-h;
+  // Gövde
   const pg=c.createLinearGradient(x-tw,y,tipX+tw,tipY);
-  pg.addColorStop(0,_dk(st.trunk,10));pg.addColorStop(0.5,_lt(st.trunk,15));pg.addColorStop(1,st.trunk);
+  pg.addColorStop(0,_dk(st.trunk,12));
+  pg.addColorStop(0.5,_lt(st.trunk,18));
+  pg.addColorStop(1,_dk(st.trunk,6));
   c.fillStyle=pg;
-  c.beginPath();c.moveTo(x-tw,y);c.bezierCurveTo(x-tw*0.6,y-h*0.3,tipX-tw*0.5,y-h*0.65,tipX-tw*0.4,tipY);c.lineTo(tipX+tw*0.4,tipY);c.bezierCurveTo(tipX+tw*0.5,y-h*0.65,x+tw*0.6,y-h*0.3,x+tw,y);c.closePath();c.fill();
-  c.strokeStyle='rgba(100,70,20,0.22)';c.lineWidth=0.8;
-  for(let k=0;k<7;k++){const kf=k/7,kx2=x+(tipX-x)*kf,ky2=y-h*kf,kw=tw*(1-kf*0.4);c.beginPath();c.moveTo(kx2-kw,ky2);c.lineTo(kx2+kw,ky2);c.stroke();}
+  c.beginPath();
+  c.moveTo(x-tw,y);
+  c.bezierCurveTo(x-tw*0.6,y-h*0.3,tipX-tw*0.5,y-h*0.65,tipX-tw*0.4,tipY);
+  c.lineTo(tipX+tw*0.4,tipY);
+  c.bezierCurveTo(tipX+tw*0.5,y-h*0.65,x+tw*0.6,y-h*0.3,x+tw,y);
+  c.closePath();c.fill();
+  // Gövde üzerindeki halka deseni — palmiyenin karakteri
+  c.strokeStyle='rgba(60,30,8,0.55)';
+  c.lineWidth=1.0;
+  for(let k=0;k<8;k++){
+    const kf=k/8;
+    const kx2=x+(tipX-x)*kf;
+    const ky2=y-h*kf;
+    const kw=tw*(1-kf*0.35);
+    c.beginPath();
+    c.ellipse(kx2,ky2,kw*0.95,kw*0.25,0,0,Math.PI*2);
+    c.stroke();
+  }
+  // Halka gölgesi (alt taraf)
+  c.strokeStyle='rgba(0,0,0,0.30)';
+  c.lineWidth=0.6;
+  for(let k=0;k<8;k++){
+    const kf=k/8;
+    const kx2=x+(tipX-x)*kf;
+    const ky2=y-h*kf;
+    const kw=tw*(1-kf*0.35);
+    c.beginPath();
+    c.ellipse(kx2,ky2+0.4,kw*0.9,kw*0.15,0,0,Math.PI*2);
+    c.stroke();
+  }
+  // Hindistan cevizi tutamları (tepenin altında)
+  if(Math.random()<0.6){
+    c.fillStyle='#3a1f08';
+    [-2.5, 2.5, 0].forEach(dx => {
+      c.beginPath();
+      c.arc(tipX+dx, tipY+2, 2, 0, Math.PI*2);
+      c.fill();
+    });
+    c.fillStyle='rgba(80,40,15,0.7)';
+    [-2.5, 2.5, 0].forEach(dx => {
+      c.beginPath();
+      c.arc(tipX+dx-0.5, tipY+1.5, 0.8, 0, Math.PI*2);
+      c.fill();
+    });
+  }
+  // Yapraklar — 6 büyük dal + her birinde küçük yan yapraklar
   for(let i=0;i<6;i++){
-    const angle=(i/6)*Math.PI*2, lLen=h*(0.36+Math.random()*0.16), sag=lLen*0.32;
-    c.strokeStyle=i%2===0?st.col:_dk(st.col,10);c.lineWidth=2.5+Math.random()*1.5;c.lineCap='round';
-    c.beginPath();c.moveTo(tipX,tipY);c.quadraticCurveTo(tipX+Math.cos(angle)*lLen*0.52,tipY+Math.sin(angle)*lLen*0.38-sag*0.28,tipX+Math.cos(angle)*lLen,tipY+Math.sin(angle)*lLen*0.28+sag);c.stroke();
+    const angle=(i/6)*Math.PI*2;
+    const lLen=h*(0.36+Math.random()*0.16);
+    const sag=lLen*0.32;
+    const endX = tipX+Math.cos(angle)*lLen;
+    const endY = tipY+Math.sin(angle)*lLen*0.28+sag;
+    // Ana dal (orta omurga)
+    c.strokeStyle=i%2===0?st.col:_dk(st.col,12);
+    c.lineWidth=3+Math.random()*1.5;
+    c.lineCap='round';
+    c.beginPath();
+    c.moveTo(tipX,tipY);
+    c.quadraticCurveTo(
+      tipX+Math.cos(angle)*lLen*0.52,
+      tipY+Math.sin(angle)*lLen*0.38-sag*0.28,
+      endX, endY
+    );
+    c.stroke();
+    // Yan ufak yapraklar (yelpazeli)
+    c.strokeStyle=_lt(st.col,8);
+    c.lineWidth=0.8;
+    for(let f=1;f<=5;f++){
+      const fr=f/6;
+      const fx=tipX+(endX-tipX)*fr+Math.cos(angle)*0;
+      const fy=tipY+(endY-tipY)*fr;
+      const perpA=angle+Math.PI/2;
+      const finL=lLen*0.10*(1-fr*0.5);
+      c.beginPath();
+      c.moveTo(fx,fy);
+      c.lineTo(fx+Math.cos(perpA)*finL, fy+Math.sin(perpA)*finL);
+      c.stroke();
+      c.beginPath();
+      c.moveTo(fx,fy);
+      c.lineTo(fx-Math.cos(perpA)*finL, fy-Math.sin(perpA)*finL);
+      c.stroke();
+    }
   }
 }
 
