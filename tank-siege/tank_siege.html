@@ -41,7 +41,28 @@ html,body{
   backdrop-filter:blur(6px);
 }
 #hud-shots{color:#fff;border-color:rgba(255,107,53,0.35);}
-#hud-level{color:#FFD700;border-color:rgba(255,215,0,0.45);background:rgba(40,30,5,0.6);}
+#hud-level{
+  color:#FFD700;
+  border:1.5px solid rgba(255,215,0,0.55) !important;
+  background:linear-gradient(180deg,rgba(80,60,15,0.85),rgba(40,28,5,0.85)) !important;
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.4),
+    0 0 14px rgba(255,215,0,0.18),
+    inset 0 1px 0 rgba(255,215,0,0.20) !important;
+  cursor:pointer;pointer-events:auto !important;
+  transition:transform 0.08s, box-shadow 0.12s;
+  display:inline-flex;align-items:center;gap:5px;
+}
+#hud-level:active{transform:scale(0.93);}
+#hud-level::before{
+  content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#FFD700;box-shadow:0 0 6px #FFD700;
+  animation:hudLevelPulse 2s ease-in-out infinite;
+}
+@keyframes hudLevelPulse{
+  0%,100%{opacity:1;transform:scale(1);}
+  50%{opacity:0.55;transform:scale(0.75);}
+}
 #hud-score{color:#00E5FF;border-color:rgba(0,229,255,0.35);}
 #hud-stars{color:#FFD700;border-color:rgba(255,215,0,0.45);background:rgba(40,30,5,0.55);}
 
@@ -691,23 +712,67 @@ button:active{opacity:0.75;transform:scale(0.96);}
 #ad-puan-btn.disabled{opacity:0.5;pointer-events:none;}
 #ad-puan-btn.disabled::before{display:none;}
 
-/* Gallery close & play */
+/* Gallery footer — sticky bottom bar with 3D buttons */
 #gallery-footer{
-  padding:12px 16px 24px;display:flex;gap:10px;flex-shrink:0;
-  position:sticky;bottom:0;background:rgba(0,0,0,0.85);
+  padding:12px 14px 22px;display:flex;gap:10px;flex-shrink:0;align-items:stretch;
+  position:sticky;bottom:0;
+  background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0.85) 35%,rgba(0,0,0,0.95) 100%);
+  border-top:1px solid rgba(255,255,255,0.06);
 }
 #btn-gallery-play{
-  flex:1;background:linear-gradient(135deg,#FF6B35,#ff3d00);color:white;
-  border:none;border-radius:28px;padding:14px;
-  font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;
-  cursor:pointer;box-shadow:0 4px 0 #b32200;letter-spacing:2px;
-  -webkit-tap-highlight-color:transparent;
+  flex:1;
+  background:linear-gradient(180deg,#FF7E45 0%,#FF6B35 30%,#ff3d00 100%);
+  color:#fff;border:none;border-radius:18px;padding:14px 16px;
+  font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:800;
+  letter-spacing:2.5px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  box-shadow:
+    0 5px 0 #a02500,
+    0 6px 22px rgba(255,107,53,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.28),
+    inset 0 -2px 0 rgba(0,0,0,0.15);
+  text-shadow:0 2px 0 rgba(0,0,0,0.35), 0 0 12px rgba(255,180,80,0.4);
+  transition:transform 0.08s, box-shadow 0.08s, filter 0.12s;
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+#btn-gallery-play::before{
+  content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.20),transparent);
+  animation:btnGoShine 3s linear infinite;
+  pointer-events:none;
+}
+@keyframes btnGoShine{
+  0%{left:-50%;}
+  100%{left:120%;}
+}
+#btn-gallery-play:active{
+  transform:translateY(4px);
+  box-shadow:
+    0 1px 0 #a02500,
+    0 2px 10px rgba(255,107,53,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.18);
 }
 #btn-gallery-close{
-  background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
-  color:white;border-radius:28px;padding:14px 20px;
-  font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;
+  width:54px;height:54px;flex-shrink:0;
+  background:linear-gradient(180deg,rgba(60,60,75,0.92),rgba(30,30,45,0.95));
+  border:1.5px solid rgba(255,255,255,0.18);
+  color:rgba(255,255,255,0.85);border-radius:18px;
+  font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;line-height:1;
   cursor:pointer;-webkit-tap-highlight-color:transparent;
+  box-shadow:
+    0 4px 0 rgba(0,0,0,0.55),
+    0 5px 14px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+  transition:transform 0.08s, box-shadow 0.08s;
+  display:flex;align-items:center;justify-content:center;
+}
+#btn-gallery-close:active{
+  transform:translateY(3px);
+  box-shadow:
+    0 1px 0 rgba(0,0,0,0.55),
+    0 2px 8px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 /* Stat bars in gallery */
@@ -1159,7 +1224,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 <div id="hud">
   <span id="hud-shots">💣 3</span>
-  <span id="hud-level">LEVEL 1</span>
+  <span id="hud-level" onclick="openLevelPreview()">LEVEL 1</span>
   <span id="hud-score">🏆 0</span>
   <span id="hud-stars" style="color:#FFD700;font-size:15px;font-weight:700;padding:4px 8px;border-radius:10px;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);">⭐ 0</span>
 </div>
@@ -1427,7 +1492,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.119';
+const APP_VERSION      = '1.0.120';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1445,8 +1510,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 21:48';
-const APP_VERSION_NOTE = 'Tank ve muhimmat icon degisti';
+const APP_VERSION_DATE = '2026.05.19 22:05';
+const APP_VERSION_NOTE = 'kapatma butonkari degisti levrl onizleme geldi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -11243,6 +11308,13 @@ const LANG = {
     buried_body:        'Bu hedef toprak altında gizli.<br><br>Normal silahlar <b style="color:#FFB74D;">az hasar</b> verir.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>💥 Güçlü patlamalar terreni <b style="color:#FFD700;">sarsarak</b> hedefi açığa çıkarabilir.',
     buried_ok:          'Anladım',
     cloud_title:        '🎮 Play Games',
+    lvl_prev_next:      'Sıradaki Level',
+    lvl_prev_lvl:       'LEVEL',
+    lvl_prev_stars:     'YILDIZ',
+    lvl_prev_target:    'HEDEF',
+    lvl_prev_wind:      'RÜZGAR',
+    lvl_prev_map:       '🗺 Harita',
+    lvl_prev_play:      '▶ SAVAŞA GİR',
     cloud_save_title:   'Bulut Kayıt',
     cloud_not_signed:   'Giriş yapılmadı',
     cloud_signin:       'Google Play Games Giriş',
@@ -11718,6 +11790,13 @@ const LANG = {
     buried_body:        'This target is buried underground.<br><br>Normal weapons deal <b style="color:#FFB74D;">low damage</b>.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> drills through the ground for full damage.<br><br>💥 Strong explosions can <b style="color:#FFD700;">shake the terrain</b> and expose the target.',
     buried_ok:          'Got it',
     cloud_title:        '🎮 Play Games',
+    lvl_prev_next:      'Next Level',
+    lvl_prev_lvl:       'LEVEL',
+    lvl_prev_stars:     'STARS',
+    lvl_prev_target:    'TARGET',
+    lvl_prev_wind:      'WIND',
+    lvl_prev_map:       '🗺 Map',
+    lvl_prev_play:      '▶ BATTLE',
     cloud_save_title:   'Cloud Save',
     cloud_not_signed:   'Not signed in',
     cloud_signin:       'Sign in with Google Play Games',
@@ -12613,10 +12692,8 @@ function showLevelMap(){
   map.style.visibility='visible';
   map.style.pointerEvents='auto';
   map.style.opacity='1';
-  setTimeout(()=>{
-    const cur = document.getElementById('lm-card-'+curLevel);
-    if(cur) cur.scrollIntoView({behavior:'smooth', block:'center'});
-  }, 150);
+  // Açılışta en üst — sıradaki level hero kartı görünsün
+  map.scrollTop = 0;
 }
 
 function closeLevelMap(restoreGame=true){
@@ -14157,9 +14234,7 @@ function openTacticalInfo(){
   <div id="level-map-header">
     <h1 data-i18n="map_title">🗺️ Level Haritası</h1>
     <span id="lm-total-stars" style="color:#FFD700;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;"></span>
-    <button onclick="closeLevelMap()" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
-      color:white;border-radius:12px;padding:6px 14px;font-size:14px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;transition:transform 0.08s,opacity 0.08s;" ontouchstart="this.style.transform='scale(0.85)';this.style.opacity='0.6'" ontouchend="this.style.transform='';this.style.opacity=''">✕</button>
+    <button id="lm-close-btn" onclick="closeLevelMap()" style="width:42px;height:42px;border-radius:14px;background:linear-gradient(180deg,rgba(60,60,75,0.92),rgba(30,30,45,0.95));border:1.5px solid rgba(255,255,255,0.22);color:rgba(255,255,255,0.85);font-size:18px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 0 rgba(0,0,0,0.55),0 4px 12px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.12);transition:transform 0.08s,box-shadow 0.08s;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.08)'" ontouchend="this.style.transform='';this.style.boxShadow=''">✕</button>
   </div>
 
   <!-- SIRADAKİ LEVEL hero kartı (renderLevelMap doldurur) -->
@@ -15252,7 +15327,117 @@ function closeCloudSettings() {
 </div>
 
 <!-- ════════════════════════════════════════════════════════════════════ -->
-<!-- İLK AÇILIŞ — Play Games tek-seferlik tanıtım                          -->
+<!-- HUD Level Badge — sıradaki level önizleme popup'ı                     -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<div id="lvl-preview-bg" onclick="closeLevelPreview()" style="display:none;position:fixed;inset:0;z-index:830;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px);"></div>
+<div id="lvl-preview-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:831;width:300px;max-width:calc(100vw - 28px);background:linear-gradient(180deg,#1f2940 0%,#101828 100%);border-radius:22px;border-top:3px solid #FFD700;box-shadow:0 16px 48px rgba(0,0,0,0.7),0 0 0 1px rgba(255,215,0,0.22),0 0 36px rgba(255,215,0,0.12),inset 0 1px 0 rgba(255,255,255,0.05);overflow:hidden;animation:lvlPrevIn 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+  <!-- HEADER -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;">
+    <span style="color:#FFD700;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;font-family:'Rajdhani',sans-serif;" data-i18n="lvl_prev_next">Sıradaki Level</span>
+    <button onclick="closeLevelPreview()" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.65);font-size:14px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">✕</button>
+  </div>
+  <!-- LEVEL HERO -->
+  <div style="padding:6px 16px 4px;display:flex;align-items:center;gap:13px;">
+    <div id="lvl-prev-numbox" style="width:62px;height:62px;border-radius:14px;background:linear-gradient(135deg,rgba(255,215,0,0.20),rgba(255,140,0,0.08));border:1.5px solid rgba(255,215,0,0.55);box-shadow:0 0 14px rgba(255,215,0,0.18),inset 0 1px 0 rgba(255,255,255,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;">
+      <span style="font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:800;color:#FFD700;letter-spacing:1.2px;line-height:1;" data-i18n="lvl_prev_lvl">LEVEL</span>
+      <span id="lvl-prev-num" style="font-family:'Fredoka One',sans-serif;font-size:24px;color:#FFD700;line-height:1;margin-top:3px;text-shadow:0 0 10px rgba(255,215,0,0.4);">1</span>
+    </div>
+    <div style="flex:1;min-width:0;">
+      <div id="lvl-prev-name" style="font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">—</div>
+      <div id="lvl-prev-theme" style="font-size:11.5px;color:rgba(255,255,255,0.6);font-family:'Rajdhani',sans-serif;font-weight:600;margin-top:3px;">—</div>
+    </div>
+  </div>
+  <!-- STATS -->
+  <div style="display:flex;gap:6px;padding:10px 16px 6px;">
+    <div style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:7px 4px;text-align:center;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.45);letter-spacing:1.2px;font-weight:800;font-family:'Rajdhani',sans-serif;" data-i18n="lvl_prev_stars">YILDIZ</div>
+      <div id="lvl-prev-stars" style="font-size:14px;letter-spacing:1px;margin-top:2px;">☆☆☆</div>
+    </div>
+    <div style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:7px 4px;text-align:center;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.45);letter-spacing:1.2px;font-weight:800;font-family:'Rajdhani',sans-serif;" data-i18n="lvl_prev_target">HEDEF</div>
+      <div id="lvl-prev-mat" style="font-size:14px;color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;margin-top:2px;">—</div>
+    </div>
+    <div style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:7px 4px;text-align:center;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.45);letter-spacing:1.2px;font-weight:800;font-family:'Rajdhani',sans-serif;" data-i18n="lvl_prev_wind">RÜZGAR</div>
+      <div id="lvl-prev-wind" style="font-size:14px;color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;margin-top:2px;">—</div>
+    </div>
+  </div>
+  <!-- BUTTONS -->
+  <div style="display:flex;gap:8px;padding:8px 16px 18px;">
+    <button onclick="closeLevelPreview();showLevelMap();" style="flex:1;padding:11px;border-radius:14px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.85);font-family:'Rajdhani',sans-serif;font-weight:800;font-size:13px;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 0 rgba(0,0,0,0.45);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 rgba(0,0,0,0.45)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="lvl_prev_map">🗺 Harita</button>
+    <button id="lvl-prev-play-btn" onclick="closeLevelPreview();_lvlPreviewPlay();" style="flex:2;padding:11px;border-radius:14px;border:none;background:linear-gradient(180deg,#FF7E45,#FF6B35,#ff3d00);color:#fff;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:14px;letter-spacing:1px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a02500,0 5px 14px rgba(255,107,53,0.4),inset 0 1px 0 rgba(255,255,255,0.22);text-shadow:0 1px 0 rgba(0,0,0,0.3);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a02500'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="lvl_prev_play">▶ SAVAŞA GİR</button>
+  </div>
+</div>
+<style>
+@keyframes lvlPrevIn{
+  0%{transform:translate(-50%,-50%) scale(0.85);opacity:0;}
+  100%{transform:translate(-50%,-50%) scale(1);opacity:1;}
+}
+</style>
+
+<script>
+function openLevelPreview(){
+  if(typeof SFX!=='undefined' && SFX.uiOpen) SFX.uiOpen();
+  var lvd = (typeof LEVELS!=='undefined' && LEVELS[curLevel]) ? LEVELS[curLevel] : lv;
+  if(!lvd) return;
+  var th  = (typeof THEMES!=='undefined' && THEMES[lvd.theme]) ? THEMES[lvd.theme] : null;
+  document.getElementById('lvl-prev-num').textContent = lvd.id;
+  document.getElementById('lvl-prev-name').textContent = (typeof tLevel==='function') ? tLevel(lvd.name) : lvd.name;
+  document.getElementById('lvl-prev-theme').textContent = (th?(th.emoji+' '):'') + (th?th.name:'');
+  // Yıldız
+  var st = parseInt((typeof lsGet==='function'?lsGet('stars_'+lvd.id):localStorage.getItem('stars_'+lvd.id))||'0');
+  var starStr = '';
+  for(var s=0;s<3;s++) starStr += (s<st?'<span style="color:#FFD700">⭐</span>':'<span style="color:rgba(255,255,255,0.25)">☆</span>');
+  document.getElementById('lvl-prev-stars').innerHTML = starStr;
+  // Hedef materyali
+  var MI = (typeof MAT_ICONS!=='undefined') ? MAT_ICONS : {};
+  var matEl = document.getElementById('lvl-prev-mat');
+  if(matEl){
+    var mi = MI[lvd.targetMat]||'';
+    var mname = (typeof t==='function' && t('mat_'+lvd.targetMat)!=='mat_'+lvd.targetMat)
+      ? t('mat_'+lvd.targetMat) : (lvd.targetMat||'—');
+    matEl.innerHTML = mi+' <span style="font-size:11px;color:rgba(255,255,255,0.65)">'+mname+'</span>';
+  }
+  // Rüzgar
+  var w = lvd.wind||0;
+  document.getElementById('lvl-prev-wind').textContent = w===0?'—':(w>0?('→ '+w):('← '+Math.abs(w)));
+  // Numbox renk
+  var nbox = document.getElementById('lvl-prev-numbox');
+  if(nbox){
+    if(st>=3){
+      nbox.style.borderColor='#00E5C7';
+      nbox.style.background='linear-gradient(135deg,rgba(0,229,199,0.22),rgba(0,229,199,0.05))';
+      nbox.style.boxShadow='0 0 14px rgba(0,229,199,0.20),inset 0 1px 0 rgba(255,255,255,0.08)';
+      nbox.querySelector('span:first-child').style.color='#00E5C7';
+      document.getElementById('lvl-prev-num').style.color='#00E5C7';
+      document.getElementById('lvl-prev-num').style.textShadow='0 0 10px rgba(0,229,199,0.4)';
+    } else {
+      nbox.style.borderColor='rgba(255,215,0,0.55)';
+      nbox.style.background='linear-gradient(135deg,rgba(255,215,0,0.20),rgba(255,140,0,0.08))';
+      nbox.style.boxShadow='0 0 14px rgba(255,215,0,0.18),inset 0 1px 0 rgba(255,255,255,0.08)';
+      nbox.querySelector('span:first-child').style.color='#FFD700';
+      document.getElementById('lvl-prev-num').style.color='#FFD700';
+      document.getElementById('lvl-prev-num').style.textShadow='0 0 10px rgba(255,215,0,0.4)';
+    }
+  }
+  document.getElementById('lvl-preview-bg').style.display='block';
+  document.getElementById('lvl-preview-card').style.display='block';
+  // i18n uygula (yeni eklenen elementler için)
+  if(typeof applyLang === 'function') applyLang();
+}
+
+function closeLevelPreview(){
+  document.getElementById('lvl-preview-bg').style.display='none';
+  document.getElementById('lvl-preview-card').style.display='none';
+}
+
+function _lvlPreviewPlay(){
+  // Mevcut level zaten yüklü — sadece haritayı kapat
+  if(typeof closeLevelMap === 'function') closeLevelMap(true);
+}
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
 <!-- ════════════════════════════════════════════════════════════════════ -->
 <div id="pg-firstlaunch-bg" onclick="pgFirstLaunchDecline()" style="display:none;position:fixed;inset:0;z-index:910;background:rgba(0,0,0,0.78);backdrop-filter:blur(8px);"></div>
 <div id="pg-firstlaunch-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:911;background:linear-gradient(180deg,#1f2940 0%,#101828 100%);border-radius:24px;padding:24px 22px 20px;width:300px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(66,133,244,0.25),0 0 40px rgba(66,133,244,0.18),inset 0 1px 0 rgba(255,255,255,0.05);border-top:3px solid #4285F4;text-align:center;animation:pgFirstLaunchIn 0.4s cubic-bezier(0.34,1.56,0.64,1);">
