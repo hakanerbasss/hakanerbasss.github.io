@@ -1421,7 +1421,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.112';
+const APP_VERSION      = '1.0.113';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1439,8 +1439,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 17:23';
-const APP_VERSION_NOTE = 'Hayvanlar guncellendi. Yeni tasarim olceklendirme';
+const APP_VERSION_DATE = '2026.05.19 17:44';
+const APP_VERSION_NOTE = 'Akarsu tanklar ve hayvanlar guncellendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1763,6 +1763,8 @@ let extraBullets = [];  // triple/split için ek mermiler
 let particles = [];
 let animals   = [];
 let _flockTick = 0;
+let _tankRecoil = 0;       // 0..1 atış geri tepme animasyon değeri
+let _tankDamage = 0;       // 0..1 hasar görsel etkisi (gelecek seviyeler için)
 let missiles  = [];  // karsi atak fuzeleri
 let _missileBlocked = false; // level gecisinde fuze engelle
 let _initLoad = false; // ilk yuklemede can kontrolu atla
@@ -2288,6 +2290,143 @@ function drawTerrainOn(c){
   c.closePath();
   c.fill();
 
+  // ═══════════════════════════════════════════════════════════════════
+  // TERRAIN DERİNLİK — slope-bazlı gölge/ışık + jeoloji katmanları
+  // (kar teması kendi tedavisini sürdürüyor, hasSnow olunca sadece
+  //  hafif slope shading uygulanır, kalın strata çizilmez)
+  // ═══════════════════════════════════════════════════════════════════
+  c.save();
+  // Terrain silüetine clip
+  c.beginPath();
+  c.moveTo(0,H);
+  for(let x=0;x<W;x++) c.lineTo(x,terrain[x]);
+  c.lineTo(W,H);
+  c.closePath();
+  c.clip();
+
+  // 1) Slope-bazlı yan ışıklandırma — sol bakanlar gölgede, sağ bakanlar aydınlık
+  // (güneş sağ üstte, dağlarla tutarlı)
+  const slopeStep = 2;
+  const shadeDepth = H * 0.22;
+  for(let x = 0; x < W; x += slopeStep){
+    const xl = Math.max(0, x-3);
+    const xr = Math.min(W-1, x+3);
+    const slope = terrain[xr] - terrain[xl]; // + = sağa iniyor (sol yüz = aydınlık tarafının arkası), - = sağa çıkıyor
+    if(slope > 1.2){
+      // sola bakan yamaç → güneş arkadan: GÖLGE
+      const intensity = Math.min(0.32, slope * 0.045);
+      c.fillStyle = `rgba(0,0,0,${intensity})`;
+      c.fillRect(x, terrain[x], slopeStep, shadeDepth);
+    } else if(slope < -1.2){
+      // sağa bakan yamaç → güneşe dönük: AYDINLIK
+      const intensity = Math.min(0.20, -slope * 0.030);
+      c.fillStyle = `rgba(255,248,210,${intensity})`;
+      c.fillRect(x, terrain[x], slopeStep, shadeDepth*0.6);
+    }
+  }
+
+  // 2) Jeoloji strata — yatay koyu bantlar (kar dışındaki temalarda)
+  if(!th.hasSnow){
+    const strata = [
+      {y: H*0.62, h: 2,   col:'rgba(0,0,0,0.15)'},
+      {y: H*0.71, h: 4,   col:'rgba(0,0,0,0.22)'},
+      {y: H*0.82, h: 2.5, col:'rgba(0,0,0,0.18)'},
+      {y: H*0.92, h: 3,   col:'rgba(0,0,0,0.14)'},
+    ];
+    strata.forEach(s=>{
+      c.fillStyle = s.col;
+      c.fillRect(0, s.y, W, s.h);
+    });
+
+    // Açık tonlu strata (kum çizgisi gibi parlak ara katman)
+    c.fillStyle = 'rgba(255,240,200,0.10)';
+    c.fillRect(0, H*0.66, W, 1.5);
+    c.fillRect(0, H*0.78, W, 1);
+  }
+
+  // 3) Yüzey altı çatlaklar/fissürler — deterministik rastgele
+  let _fseed = 9173;
+  const _r = () => { _fseed = (_fseed*9301+49297)%233280; return _fseed/233280; };
+  const fissureCount = Math.floor(W / 90);
+  for(let i = 0; i < fissureCount; i++){
+    const x = i*90 + 20 + _r()*50;
+    if(x >= W) break;
+    const ty = terrain[Math.floor(x)];
+    const len = 22 + _r()*55;
+    c.strokeStyle = `rgba(0,0,0,${0.18 + _r()*0.18})`;
+    c.lineWidth = 0.7 + _r()*0.5;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(x, ty + 4 + _r()*6);
+    let cx = x, cy = ty + 4;
+    const steps = 3 + Math.floor(_r()*3);
+    for(let s = 0; s < steps; s++){
+      cx += (_r()-0.5)*8;
+      cy += len/steps;
+      c.lineTo(cx, cy);
+    }
+    c.stroke();
+
+    // Dal çatlaklar
+    if(_r() < 0.5){
+      const bx = x + (_r()-0.5)*4;
+      const by = ty + 12 + _r()*20;
+      c.strokeStyle = `rgba(0,0,0,${0.12 + _r()*0.10})`;
+      c.lineWidth = 0.5;
+      c.beginPath();
+      c.moveTo(bx, by);
+      c.lineTo(bx + (_r()-0.5)*12, by + 8 + _r()*10);
+      c.stroke();
+    }
+  }
+
+  // 4) Yüzey grain — küçük koyu noktalar (taş/toprak parçaları)
+  const grainCount = Math.floor(W * 0.5);
+  for(let i = 0; i < grainCount; i++){
+    const x = _r()*W;
+    const ty = terrain[Math.floor(x)];
+    const y = ty + _r()*shadeDepth*1.5;
+    const sz = _r() < 0.85 ? 1 : 1.5;
+    c.fillStyle = `rgba(0,0,0,${0.10 + _r()*0.18})`;
+    c.fillRect(x, y, sz, sz);
+  }
+
+  // 5) Açık tonlu kum/kaya parçaları (kontrast için)
+  for(let i = 0; i < Math.floor(grainCount*0.3); i++){
+    const x = _r()*W;
+    const ty = terrain[Math.floor(x)];
+    const y = ty + _r()*shadeDepth*0.7;
+    c.fillStyle = `rgba(255,245,210,${0.08 + _r()*0.10})`;
+    c.fillRect(x, y, 1, 1);
+  }
+
+  c.restore();
+
+  // 6) Yüzey üstü ışık çizgisi (rim light) — kar olmayan temalarda
+  if(!th.hasSnow){
+    c.save();
+    c.strokeStyle = 'rgba(255,250,220,0.32)';
+    c.lineWidth = 1.4;
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    c.beginPath();
+    let started = false;
+    for(let x = 0; x < W; x++){
+      const xl = Math.max(0, x-2), xr = Math.min(W-1, x+2);
+      const slope = terrain[xr] - terrain[xl];
+      // Sadece tepe ve sağa-bakan yüzeyleri vurgula
+      if(slope < 0.5){
+        if(!started){ c.moveTo(x, terrain[x] - 0.3); started = true; }
+        else c.lineTo(x, terrain[x] - 0.3);
+      } else {
+        if(started){ c.stroke(); c.beginPath(); started = false; }
+      }
+    }
+    if(started) c.stroke();
+    c.restore();
+  }
+  // ═══════════════════════════════════════════════════════════════════
+
   // Snow cap overlay — sadece terrain yüzeyini kapla, taban doldurma
   if(th.hasSnow){
     // Kar kaplamasi: terrain yuzeyini takip eder, sert kesim yok
@@ -2498,83 +2637,208 @@ function drawTerrainOn(c){
     const sourceY = H*0.45; // yüksekten başlar
 
     if(th.hasSnow){
-      // Donmuş nehir — ince çizgi
-      c.strokeStyle='rgba(180,220,255,0.8)';
-      c.lineWidth=3+Math.random()*4;
-      c.lineCap='round';
+      // Donmuş nehir — buzul yüzey, çatlaklar, ışık vurgusu
+      const _icePts = [];
+      let _ix = midX, _iy = sourceY;
+      for(let step=0;step<22;step++){
+        _icePts.push({x:_ix, y:_iy, w: 4 + step*1.4});
+        _ix += (Math.random()-0.5)*18;
+        _iy += H*0.025;
+        if(_iy > H+5) break;
+      }
+      // Bank perpendicular
+      for(let i=0;i<_icePts.length;i++){
+        const p = _icePts[i];
+        const np = _icePts[i+1] || p, pp = _icePts[i-1] || p;
+        const dx = np.x-pp.x, dy = np.y-pp.y;
+        const len = Math.sqrt(dx*dx+dy*dy)||1;
+        p.nx = -dy/len; p.ny = dx/len;
+      }
+      // Outer ice rim (darker)
+      c.fillStyle = 'rgba(140,170,200,0.8)';
       c.beginPath();
-      let rx=midX, ry2=sourceY;
-      c.moveTo(rx,ry2);
-      for(let step=0;step<20;step++){
-        rx+=((Math.random()-0.5)*20);
-        ry2+=H*0.025;
-        if(ry2>H) break;
-        c.lineTo(rx,ry2);
+      _icePts.forEach((p,i)=>{
+        const lx = p.x - p.nx*p.w/2*1.2, ly = p.y - p.ny*p.w/2*1.2;
+        if(i===0) c.moveTo(lx,ly); else c.lineTo(lx,ly);
+      });
+      for(let i=_icePts.length-1;i>=0;i--){
+        const p = _icePts[i];
+        c.lineTo(p.x + p.nx*p.w/2*1.2, p.y + p.ny*p.w/2*1.2);
       }
-      c.stroke();
-      // Buz yüzeyi parlaması
-      c.strokeStyle='rgba(255,255,255,0.4)';
+      c.closePath(); c.fill();
+
+      // Inner ice — açık mavi gradient
+      const _ig = c.createLinearGradient(0,sourceY,0,H);
+      _ig.addColorStop(0,'#dceaf5');
+      _ig.addColorStop(0.5,'#b8d4ea');
+      _ig.addColorStop(1,'#90b8d8');
+      c.fillStyle = _ig;
+      c.beginPath();
+      _icePts.forEach((p,i)=>{
+        const lx = p.x - p.nx*p.w/2, ly = p.y - p.ny*p.w/2;
+        if(i===0) c.moveTo(lx,ly); else c.lineTo(lx,ly);
+      });
+      for(let i=_icePts.length-1;i>=0;i--){
+        const p = _icePts[i];
+        c.lineTo(p.x + p.nx*p.w/2, p.y + p.ny*p.w/2);
+      }
+      c.closePath(); c.fill();
+
+      // Buz çatlakları — zigzag
+      c.strokeStyle = 'rgba(80,120,160,0.55)';
+      c.lineWidth = 0.7; c.lineCap='round';
+      for(let i=2;i<_icePts.length-1;i+=2){
+        const p = _icePts[i];
+        c.beginPath();
+        let x = p.x + (Math.random()-0.5)*p.w*0.6;
+        let y = p.y;
+        c.moveTo(x,y);
+        const steps = 3 + Math.floor(Math.random()*2);
+        for(let s=0;s<steps;s++){
+          x += p.nx * ((Math.random()-0.5)*p.w*0.4) + (Math.random()-0.5)*2;
+          y += p.ny * ((Math.random()-0.5)*p.w*0.4) + 2 + Math.random()*2;
+          c.lineTo(x,y);
+        }
+        c.stroke();
+      }
+      // Beyaz parlama çizgileri
+      c.strokeStyle='rgba(255,255,255,0.55)';
       c.lineWidth=1;
-      c.beginPath();c.moveTo(midX-2,sourceY);
-      for(let step=0;step<12;step++){
-        c.lineTo(midX-2+(Math.random()-0.5)*8, sourceY+step*H*0.035);
+      for(let i=0;i<_icePts.length-2;i+=3){
+        const p = _icePts[i], pn = _icePts[i+2];
+        c.beginPath();
+        c.moveTo(p.x - p.nx*p.w*0.25, p.y - p.ny*p.w*0.25);
+        c.lineTo(pn.x - pn.nx*pn.w*0.25, pn.y - pn.ny*pn.w*0.25);
+        c.stroke();
       }
-      c.stroke();
     } else {
-      // Akan nehir — inceden kalına, terrain takip eder
-      // Önce nehir yolunu hesapla
+      // ═══════════════════════════════════════════════════════════
+      // AKAN NEHİR — derinlik + yansıma + kıyı köpüğü + kayalar
+      // ═══════════════════════════════════════════════════════════
       const riverPts=[];
       let cx2=midX, cy2=sourceY;
       for(let step=0;step<25;step++){
         const terrY=terrain[Math.floor(Math.max(0,Math.min(W-1,cx2)))];
         cy2=Math.max(cy2,terrY-2);
-        riverPts.push({x:cx2,y:cy2,w:3+step*1.8}); // giderek genişler
-        cx2+=(Math.random()-0.45)*18; // hafif kıvrım
+        riverPts.push({x:cx2,y:cy2,w:4+step*2.0});
+        cx2+=(Math.random()-0.45)*18;
         cy2+=H*0.022;
         if(cy2>H+10) break;
       }
 
-      // Global'e kaydet — animasyon icin
-      _riverData = {pts: riverPts.map(p=>({...p})), particles:[]};
+      // Bank koordinatları — yerel akış normaline göre
+      for(let i=0;i<riverPts.length;i++){
+        const p = riverPts[i];
+        const np = riverPts[i+1] || p;
+        const pp = riverPts[i-1] || p;
+        const dx = np.x - pp.x, dy = np.y - pp.y;
+        const len = Math.sqrt(dx*dx + dy*dy) || 1;
+        p.nx = -dy/len; p.ny = dx/len; // perpendicular (sağ-el normal)
+      }
 
-      // Nehir gölgesi (derinlik hissi)
-      c.strokeStyle='rgba(0,60,120,0.3)';
-      riverPts.forEach((p,i)=>{
-        if(i===0) return;
-        const prev=riverPts[i-1];
-        c.lineWidth=p.w+4;
-        c.beginPath();c.moveTo(prev.x,prev.y);c.lineTo(p.x,p.y);c.stroke();
-      });
-
-      // Nehir ana gövde
-      const wg=c.createLinearGradient(0,sourceY,0,H);
-      wg.addColorStop(0,'#4FC3F7');wg.addColorStop(0.4,'#0288D1');wg.addColorStop(1,'#01579B');
-      riverPts.forEach((p,i)=>{
-        if(i===0) return;
-        const prev=riverPts[i-1];
-        c.strokeStyle=wg;
-        c.lineWidth=p.w;
-        c.lineCap='round';
-        c.beginPath();c.moveTo(prev.x,prev.y);c.lineTo(p.x,p.y);c.stroke();
-      });
-
-      // Parlaklık (üst şerit)
-      c.strokeStyle='rgba(255,255,255,0.35)';
-      riverPts.forEach((p,i)=>{
-        if(i===0) return;
-        const prev=riverPts[i-1];
-        c.lineWidth=Math.max(1,p.w*0.25);
+      // Polygon helper — şerit genişliği faktörüne göre
+      function _riverStrip(widthFactor){
         c.beginPath();
-        c.moveTo(prev.x-prev.w*0.2,prev.y);
-        c.lineTo(p.x-p.w*0.2,p.y);
-        c.stroke();
+        for(let i=0;i<riverPts.length;i++){
+          const p = riverPts[i];
+          const hw = p.w/2*widthFactor;
+          if(i===0) c.moveTo(p.x - p.nx*hw, p.y - p.ny*hw);
+          else      c.lineTo(p.x - p.nx*hw, p.y - p.ny*hw);
+        }
+        for(let i=riverPts.length-1;i>=0;i--){
+          const p = riverPts[i];
+          const hw = p.w/2*widthFactor;
+          c.lineTo(p.x + p.nx*hw, p.y + p.ny*hw);
+        }
+        c.closePath();
+      }
+
+      // 1) Dış kıyı şeridi — ıslak toprak/çamur
+      c.fillStyle = 'rgba(35,50,70,0.55)';
+      _riverStrip(1.18);
+      c.fill();
+
+      // 2) Sığ su (kenar) — açık mavi
+      const gShallow = c.createLinearGradient(0, sourceY, 0, H);
+      gShallow.addColorStop(0, '#7dd0f0');
+      gShallow.addColorStop(0.5, '#3a96c8');
+      gShallow.addColorStop(1, '#155080');
+      c.fillStyle = gShallow;
+      _riverStrip(1.00);
+      c.fill();
+
+      // 3) Derin su (orta) — koyu mavi
+      const gDeep = c.createLinearGradient(0, sourceY, 0, H);
+      gDeep.addColorStop(0, '#2080b8');
+      gDeep.addColorStop(0.5, '#0a4878');
+      gDeep.addColorStop(1, '#022a4a');
+      c.fillStyle = gDeep;
+      _riverStrip(0.75);
+      c.fill();
+
+      // 4) Gökyüzü yansıması — merkez parlak şerit
+      const gSky = c.createLinearGradient(0, sourceY, 0, H);
+      gSky.addColorStop(0, 'rgba(220,240,250,0.55)');
+      gSky.addColorStop(0.5, 'rgba(160,210,235,0.35)');
+      gSky.addColorStop(1, 'rgba(90,160,210,0.18)');
+      c.fillStyle = gSky;
+      _riverStrip(0.32);
+      c.fill();
+
+      // 5) Kıyı köpüğü — banks boyunca beyaz tutamlar
+      c.fillStyle = 'rgba(255,255,255,0.62)';
+      riverPts.forEach((p, i)=>{
+        if(i%2!==0) return;
+        const hw = p.w/2;
+        const lx = p.x - p.nx*hw, ly = p.y - p.ny*hw;
+        const rx = p.x + p.nx*hw, ry = p.y + p.ny*hw;
+        const sz = 1.2 + Math.random()*1.5;
+        c.beginPath(); c.arc(lx, ly, sz, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc(rx, ry, sz, 0, Math.PI*2); c.fill();
+      });
+      // Hafif köpük halesi
+      c.fillStyle = 'rgba(255,255,255,0.25)';
+      riverPts.forEach((p, i)=>{
+        if(i%3!==0) return;
+        const hw = p.w/2*1.05;
+        const lx = p.x - p.nx*hw, ly = p.y - p.ny*hw;
+        const rx = p.x + p.nx*hw, ry = p.y + p.ny*hw;
+        c.beginPath(); c.arc(lx, ly, 2.5, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc(rx, ry, 2.5, 0, Math.PI*2); c.fill();
       });
 
-      // Şelale sesi görsel — başlangıç noktasında köpük
-      c.fillStyle='rgba(255,255,255,0.6)';
-      c.beginPath();c.arc(midX,sourceY,riverPts[0].w*0.8,0,Math.PI*2);c.fill();
-      c.fillStyle='rgba(255,255,255,0.3)';
-      c.beginPath();c.arc(midX,sourceY+8,riverPts[0].w*1.4,0,Math.PI*2);c.fill();
+      // 6) Sualtı kayalar — küçük koyu noktalar + köpük halkası
+      for(let i=3; i<riverPts.length; i+=4){
+        if(Math.random() < 0.4) continue;
+        const p = riverPts[i];
+        const rxOff = (Math.random()-0.5) * p.w*0.35;
+        const ryOff = (Math.random()-0.5) * 1.5;
+        c.fillStyle = 'rgba(20,12,5,0.75)';
+        c.beginPath();
+        c.ellipse(p.x + rxOff, p.y + ryOff, 2 + Math.random()*1.2, 1.3, 0, 0, Math.PI*2);
+        c.fill();
+        // Kaya üstü ışık
+        c.fillStyle = 'rgba(255,255,255,0.55)';
+        c.beginPath();
+        c.ellipse(p.x + rxOff, p.y + ryOff - 1, 3 + Math.random(), 0.8, 0, 0, Math.PI*2);
+        c.fill();
+      }
+
+      // 7) Kaynak köpüğü — şelale girişi
+      c.fillStyle='rgba(255,255,255,0.75)';
+      c.beginPath();c.arc(midX, sourceY, riverPts[0].w*0.9, 0, Math.PI*2);c.fill();
+      c.fillStyle='rgba(255,255,255,0.40)';
+      c.beginPath();c.arc(midX, sourceY+6, riverPts[0].w*1.6, 0, Math.PI*2);c.fill();
+      c.fillStyle='rgba(255,255,255,0.20)';
+      c.beginPath();c.arc(midX, sourceY+14, riverPts[0].w*2.2, 0, Math.PI*2);c.fill();
+
+      // Animasyon için sakla (bank verileri dahil)
+      _riverData = {
+        pts: riverPts.map(p=>({...p})),
+        particles:[],
+        flowOffset: 0,
+        shimmerOffset: 0,
+      };
     }
   }
 
@@ -4526,6 +4790,8 @@ function update(){
 
   // Screen shake decay
   if(screenShake>0) screenShake=Math.max(0,screenShake-0.6);
+  // Tank recoil decay
+  if(_tankRecoil > 0) _tankRecoil = Math.max(0, _tankRecoil - 0.07);
   updateSpecialFX();
   updateAnimals();
   if(missiles.length > 0 || _missileQueue.length > 0) updateMissiles();
@@ -5043,20 +5309,209 @@ function _drawMtnLayer(pts, botY, fillStyle, alpha){
 // ── Dağ tepesine kar/buz vurgusu ─────────────────────────────────────────────
 function _drawSnowCaps(pts, capH, alpha){
   ctx.globalAlpha = alpha;
-  pts.forEach(p=>{
-    if(p.isPeak){
-      const rx = p.capRx || W*0.045;
-      const ry = capH;
-      const g  = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y+ry, rx*1.8);
-      g.addColorStop(0,   'rgba(230,242,255,0.95)');
-      g.addColorStop(0.5, 'rgba(200,225,245,0.60)');
-      g.addColorStop(1,   'rgba(180,210,235,0)');
-      ctx.fillStyle = g;
+  pts.forEach((p, idx)=>{
+    if(!p.isPeak) return;
+    const pp = pts[idx-1] || {x:p.x-W*0.05, y:p.y+capH*3};
+    const pn = pts[idx+1] || {x:p.x+W*0.05, y:p.y+capH*3};
+    const rx = p.capRx || W*0.045;
+
+    // Snow polygon: peak'ten her iki yana doğru, ridge çizgisini takip eden kar tabakası
+    const lx = p.x + (pp.x - p.x) * 0.35;
+    const ly = p.y + (pp.y - p.y) * 0.40;
+    const rxp = p.x + (pn.x - p.x) * 0.35;
+    const ryp = p.y + (pn.y - p.y) * 0.40;
+
+    // Dolu kar tabakası — parlak beyaz gradient
+    const snowG = ctx.createLinearGradient(0, p.y - capH*0.3, 0, ly);
+    snowG.addColorStop(0,   '#ffffff');
+    snowG.addColorStop(0.5, '#eef4fb');
+    snowG.addColorStop(1,   'rgba(190,210,235,0.4)');
+    ctx.fillStyle = snowG;
+    ctx.beginPath();
+    // Tırtıklı tepe — kar şişikliği
+    ctx.moveTo(lx, ly);
+    ctx.bezierCurveTo(
+      lx + (p.x-lx)*0.3, ly - capH*0.3,
+      p.x - rx*0.3,      p.y - capH*0.55,
+      p.x,               p.y - capH*0.15
+    );
+    ctx.bezierCurveTo(
+      p.x + rx*0.3,      p.y - capH*0.45,
+      rxp - (rxp-p.x)*0.3, ryp - capH*0.25,
+      rxp, ryp
+    );
+    // Alt sınır — slope eğrisini takip ediyor
+    ctx.quadraticCurveTo(p.x + (rxp-p.x)*0.4, p.y + capH*0.3, p.x, p.y + capH*0.45);
+    ctx.quadraticCurveTo(p.x - (p.x-lx)*0.4, p.y + capH*0.3, lx, ly);
+    ctx.closePath();
+    ctx.fill();
+
+    // Gölgede kalan kar çizgisi (sol yamaç altında)
+    ctx.fillStyle = 'rgba(150,170,200,0.45)';
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.quadraticCurveTo(p.x - (p.x-lx)*0.4, p.y + capH*0.3, p.x, p.y + capH*0.45);
+    ctx.lineTo(p.x, p.y + capH*0.55);
+    ctx.quadraticCurveTo(p.x - (p.x-lx)*0.5, p.y + capH*0.55, lx, ly + capH*0.1);
+    ctx.closePath();
+    ctx.fill();
+
+    // Tepe ışıltısı — küçük beyaz vurgu
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.ellipse(p.x + rx*0.1, p.y - capH*0.1, rx*0.35, capH*0.18, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+// ── Dağa 3D form — sol yamaca gölge poligonları ──────────────────────────────
+function _drawMtnShadowSide(pts, botY, shadowCol, alpha){
+  if(!pts.length) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Önce silüete clip
+  ctx.beginPath();
+  ctx.moveTo(0, botY);
+  ctx.lineTo(pts[0].x, botY);
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i], pn=pts[i+1]||{x:W,y:botY}, pp=pts[i-1]||{x:0,y:botY};
+    const cp1x = p.x + (pn.x-pp.x)*0.20;
+    const cp1y = p.y + (pn.y-pp.y)*0.20;
+    const cp2x = pn.x - (pn.x-pp.x)*0.20;
+    const cp2y = pn.y - (pn.y-pp.y)*0.20;
+    ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,pn.x,pn.y);
+  }
+  ctx.lineTo(W, botY); ctx.closePath();
+  ctx.clip();
+
+  ctx.fillStyle = shadowCol;
+  pts.forEach((p, idx)=>{
+    if(!p.isPeak) return;
+    const pp = pts[idx-1] || {x:p.x-W*0.05, y:botY};
+    // Tepeden aşağı sol yamacı kapsayan poligon — sol yüz gölgede
+    const midX = pp.x + (p.x - pp.x) * 0.55;
+    const midY = pp.y + (p.y - pp.y) * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    // Hafif sol kayma: ridge'in sol yamacı
+    ctx.lineTo(p.x - 1, p.y + 1);
+    ctx.lineTo(p.x - 1, botY);
+    ctx.lineTo(midX, botY);
+    ctx.lineTo(midX, midY);
+    ctx.bezierCurveTo(
+      midX + (p.x-midX)*0.2, midY + (p.y-midY)*0.3,
+      p.x - 4, p.y + 3,
+      p.x, p.y
+    );
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // İkincil katman — daha derin shadow küçük poligonlar (çatlak hissi)
+  ctx.fillStyle = shadowCol;
+  ctx.globalAlpha = alpha * 0.55;
+  pts.forEach((p, idx)=>{
+    if(!p.isPeak) return;
+    const pp = pts[idx-1] || {x:p.x-W*0.05, y:botY};
+    // Daha sığ ama dik bir gölge yarığı
+    const tipX = p.x - (p.x - pp.x)*0.18;
+    const tipY = p.y + (pp.y - p.y)*0.12;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y + 0.5);
+    ctx.lineTo(tipX, tipY);
+    ctx.lineTo(tipX + 2, tipY + 4);
+    ctx.lineTo(p.x + 1, p.y + 4);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+// ── Ridge ışık vurgusu — tepe sağ kenar parlak çizgi ─────────────────────────
+function _drawMtnLitEdge(pts, litCol, alpha, lineWidth){
+  if(!pts.length) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = litCol;
+  ctx.lineWidth = lineWidth || 1.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for(let i=0;i<pts.length-1;i++){
+    const p = pts[i], pn = pts[i+1];
+    if(!p.isPeak) continue;
+    // Sadece inen sağ yamaç
+    if(pn.y <= p.y) continue;
+    const pp = pts[i-1] || {x:0, y:p.y};
+    const cp1x = p.x + (pn.x-pp.x)*0.20;
+    const cp1y = p.y + (pn.y-pp.y)*0.20;
+    const cp2x = pn.x - (pn.x-pp.x)*0.20;
+    const cp2y = pn.y - (pn.y-pp.y)*0.20;
+    // İlk yarı — en parlak
+    ctx.beginPath();
+    ctx.moveTo(p.x + 0.5, p.y + 0.3);
+    ctx.bezierCurveTo(
+      p.x + (cp1x-p.x)*0.55, p.y + (cp1y-p.y)*0.55,
+      p.x + (cp2x-p.x)*0.50, p.y + (cp2y-p.y)*0.50,
+      p.x + (pn.x-p.x)*0.5, p.y + (pn.y-p.y)*0.5
+    );
+    ctx.stroke();
+  }
+
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+// ── Kaya dokusu — dikey ince çizgi/çatlaklar (yakın katmanlar için) ──────────
+function _drawMtnRockTexture(pts, botY, color, alpha, density){
+  if(!pts.length) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Silüete clip
+  ctx.beginPath();
+  ctx.moveTo(0, botY);
+  ctx.lineTo(pts[0].x, botY);
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i], pn=pts[i+1]||{x:W,y:botY}, pp=pts[i-1]||{x:0,y:botY};
+    const cp1x = p.x + (pn.x-pp.x)*0.20;
+    const cp1y = p.y + (pn.y-pp.y)*0.20;
+    const cp2x = pn.x - (pn.x-pp.x)*0.20;
+    const cp2y = pn.y - (pn.y-pp.y)*0.20;
+    ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,pn.x,pn.y);
+  }
+  ctx.lineTo(W, botY); ctx.closePath();
+  ctx.clip();
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 0.7;
+  ctx.lineCap = 'round';
+
+  // Deterministik kaya çatlağı — peak çevresinde
+  let seed = 12345;
+  const rand = () => { seed = (seed*9301 + 49297) % 233280; return seed/233280; };
+
+  pts.forEach((p, idx)=>{
+    if(!p.isPeak) return;
+    const n = density || 6;
+    for(let i=0;i<n;i++){
+      const off = (rand() - 0.5) * 30;
+      const len = 6 + rand() * 14;
+      const x1 = p.x + off;
+      const y1 = p.y + rand() * 14;
       ctx.beginPath();
-      ctx.ellipse(p.x, p.y + ry*0.4, rx, ry*1.2, 0, 0, Math.PI*2);
-      ctx.fill();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 + (rand()-0.5)*3, y1 + len);
+      ctx.stroke();
     }
   });
+
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function drawBgMountains(){
@@ -5094,6 +5549,8 @@ function drawBgMountains(){
     const gL1 = ctx.createLinearGradient(0,H*0.28,0,bot);
     gL1.addColorStop(0, '#182438'); gL1.addColorStop(1, '#101828');
     _drawMtnLayer(L1, bot, gL1, 0.38);
+    _drawMtnShadowSide(L1, bot, '#0a1224', 0.30);
+    _drawMtnLitEdge(L1, '#3a5478', 0.45, 1);
     _drawSnowCaps(L1, H*0.028, 0.55);
 
     // ── KATMAN 2: Orta uzak — karışık yükseklik, biraz daha koyu ─
@@ -5119,6 +5576,8 @@ function drawBgMountains(){
     const gL2 = ctx.createLinearGradient(0,H*0.33,0,bot);
     gL2.addColorStop(0, '#1E3050'); gL2.addColorStop(1, '#141E30');
     _drawMtnLayer(L2, bot, gL2, 0.48);
+    _drawMtnShadowSide(L2, bot, '#0a1224', 0.42);
+    _drawMtnLitEdge(L2, '#5a7898', 0.55, 1.2);
     _drawSnowCaps(L2, H*0.024, 0.65);
 
     // ── KATMAN 3: Orta yakın — daha geniş kütleler, farklı ritim ─
@@ -5143,6 +5602,9 @@ function drawBgMountains(){
     const gL3 = ctx.createLinearGradient(0,H*0.38,0,bot);
     gL3.addColorStop(0, '#263C58'); gL3.addColorStop(1, '#18283A');
     _drawMtnLayer(L3, bot, gL3, 0.55);
+    _drawMtnShadowSide(L3, bot, '#0c1828', 0.50);
+    _drawMtnLitEdge(L3, '#7898b8', 0.60, 1.4);
+    _drawMtnRockTexture(L3, bot, 'rgba(8,16,28,0.4)', 0.35, 5);
     _drawSnowCaps(L3, H*0.020, 0.70);
 
     // ── KATMAN 4: En yakın ön plan — koyu, terrain'e zemin hazırlar
@@ -5163,6 +5625,9 @@ function drawBgMountains(){
     const gL4 = ctx.createLinearGradient(0,H*0.44,0,bot);
     gL4.addColorStop(0, '#304860'); gL4.addColorStop(1, '#1C2E42');
     _drawMtnLayer(L4, bot, gL4, 0.60);
+    _drawMtnShadowSide(L4, bot, '#0c1828', 0.55);
+    _drawMtnLitEdge(L4, '#a8c4d8', 0.65, 1.6);
+    _drawMtnRockTexture(L4, bot, 'rgba(8,16,28,0.5)', 0.45, 8);
     _drawSnowCaps(L4, H*0.015, 0.60);
 
     // ── Ufuk sisi: katmanlar arasi yumusak gecis ─────────────────
@@ -5175,12 +5640,11 @@ function drawBgMountains(){
 
   } else {
     // ═══════════════════════════════════════════════════════════════
-    // DİĞER TEMALAR — 3 katmanlı sistem
+    // DİĞER TEMALAR — 4 katman + 3D form (gölge + ışık)
     // ═══════════════════════════════════════════════════════════════
     const mc   = th.bgMtnColor;
     const bot2 = H * 0.735;
 
-    // Tema renginden 3 ton türet: açık→orta→koyu
     function hexToRgb(h){
       const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
       return [r,g,b];
@@ -5189,40 +5653,121 @@ function drawBgMountains(){
       const ra=hexToRgb(a),rb=hexToRgb(b);
       return `rgb(${Math.round(ra[0]+(rb[0]-ra[0])*t)},${Math.round(ra[1]+(rb[1]-ra[1])*t)},${Math.round(ra[2]+(rb[2]-ra[2])*t)})`;
     }
-    const c0=mc[0], c1=mc[1];
+    function rgbToStr(r,g,b){ return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`; }
+    function darken(col,amt){
+      const m=col.match(/(\d+)/g);
+      return rgbToStr(Math.max(0,m[0]-amt),Math.max(0,m[1]-amt),Math.max(0,m[2]-amt));
+    }
+    function lighten(col,amt){
+      const m=col.match(/(\d+)/g);
+      return rgbToStr(Math.min(255,+m[0]+amt),Math.min(255,+m[1]+amt),Math.min(255,+m[2]+amt));
+    }
+    function hexLighten(h,amt){ return lighten(blendCol(h,h,0), amt); }
+    function hexDarken(h,amt){ return darken(blendCol(h,h,0), amt); }
 
-    // Katman A — en uzak, soluk
+    const c0=mc[0], c1=mc[1];
+    const cMid = blendCol(c0,c1,0.5);
+    const cNear = blendCol(c0,c1,0.85);
+
+    // ── Katman A — En uzak (gökyüzüne karışan soluk hayalet) ─────
     const LA=[
-      {x:W*0.00,y:bot2},{x:W*0.10,y:H*0.46},{x:W*0.22,y:H*0.38},
-      {x:W*0.35,y:H*0.44},{x:W*0.47,y:H*0.34},{x:W*0.58,y:H*0.42},
-      {x:W*0.70,y:H*0.36},{x:W*0.82,y:H*0.44},{x:W*0.92,y:H*0.40},
-      {x:W*1.00,y:bot2},
+      {x:W*0.00, y:bot2, isPeak:false},
+      {x:W*0.06, y:H*0.50, isPeak:true,  capRx:W*0.045},
+      {x:W*0.14, y:H*0.42, isPeak:true,  capRx:W*0.055},
+      {x:W*0.22, y:H*0.48, isPeak:false},
+      {x:W*0.30, y:H*0.36, isPeak:true,  capRx:W*0.060},
+      {x:W*0.38, y:H*0.44, isPeak:false},
+      {x:W*0.47, y:H*0.32, isPeak:true,  capRx:W*0.068},
+      {x:W*0.55, y:H*0.42, isPeak:false},
+      {x:W*0.64, y:H*0.36, isPeak:true,  capRx:W*0.058},
+      {x:W*0.72, y:H*0.46, isPeak:false},
+      {x:W*0.80, y:H*0.38, isPeak:true,  capRx:W*0.055},
+      {x:W*0.88, y:H*0.44, isPeak:false},
+      {x:W*0.95, y:H*0.40, isPeak:true,  capRx:W*0.045},
+      {x:W*1.00, y:bot2, isPeak:false},
     ];
     const gA=ctx.createLinearGradient(0,H*0.28,0,bot2);
-    gA.addColorStop(0,c0); gA.addColorStop(1,c1);
-    _drawMtnLayer(LA, bot2, gA, 0.18);
+    gA.addColorStop(0, c0); gA.addColorStop(1, cMid);
+    _drawMtnLayer(LA, bot2, gA, 0.22);
+    _drawMtnShadowSide(LA, bot2, hexDarken(c0,30), 0.20);
+    _drawMtnLitEdge(LA, hexLighten(c0,55), 0.35, 1);
 
-    // Katman B — orta
+    // ── Atmosferik sis bandı 1 ──
+    const haze1 = ctx.createLinearGradient(0, H*0.40, 0, H*0.55);
+    haze1.addColorStop(0, 'rgba(255,255,255,0)');
+    haze1.addColorStop(1, blendCol(c0, '#ffffff', 0.4).replace('rgb(','rgba(').replace(')',',0.18)'));
+    ctx.fillStyle = haze1; ctx.globalAlpha = 1;
+    ctx.fillRect(0, H*0.40, W, H*0.15);
+
+    // ── Katman B — Orta uzak ─────────────────────────────────────
     const LB=[
-      {x:W*0.00,y:bot2},{x:W*0.08,y:H*0.55},{x:W*0.18,y:H*0.46},
-      {x:W*0.27,y:H*0.52},{x:W*0.37,y:H*0.42},{x:W*0.47,y:H*0.50},
-      {x:W*0.56,y:H*0.44},{x:W*0.65,y:H*0.52},{x:W*0.74,y:H*0.46},
-      {x:W*0.83,y:H*0.54},{x:W*0.92,y:H*0.48},{x:W*1.00,y:bot2},
+      {x:W*0.00, y:bot2, isPeak:false},
+      {x:W*0.05, y:H*0.56, isPeak:false},
+      {x:W*0.12, y:H*0.46, isPeak:true,  capRx:W*0.040},
+      {x:W*0.20, y:H*0.54, isPeak:false},
+      {x:W*0.28, y:H*0.42, isPeak:true,  capRx:W*0.052},
+      {x:W*0.35, y:H*0.50, isPeak:false},
+      {x:W*0.43, y:H*0.38, isPeak:true,  capRx:W*0.058},
+      {x:W*0.50, y:H*0.52, isPeak:false},
+      {x:W*0.58, y:H*0.44, isPeak:true,  capRx:W*0.048},
+      {x:W*0.66, y:H*0.54, isPeak:false},
+      {x:W*0.74, y:H*0.42, isPeak:true,  capRx:W*0.054},
+      {x:W*0.82, y:H*0.50, isPeak:false},
+      {x:W*0.90, y:H*0.46, isPeak:true,  capRx:W*0.044},
+      {x:W*0.97, y:H*0.54, isPeak:false},
+      {x:W*1.00, y:bot2, isPeak:false},
     ];
     const gB=ctx.createLinearGradient(0,H*0.34,0,bot2);
-    gB.addColorStop(0,blendCol(c0,c1,0.35)); gB.addColorStop(1,c1);
-    _drawMtnLayer(LB, bot2, gB, 0.24);
+    gB.addColorStop(0, blendCol(c0,c1,0.40)); gB.addColorStop(1, blendCol(c0,c1,0.75));
+    _drawMtnLayer(LB, bot2, gB, 0.40);
+    _drawMtnShadowSide(LB, bot2, hexDarken(c1,40), 0.35);
+    _drawMtnLitEdge(LB, hexLighten(c0,40), 0.50, 1.2);
 
-    // Katman C — en yakın, en koyu
+    // ── Katman C — Orta yakın ────────────────────────────────────
     const LC=[
-      {x:W*0.00,y:bot2},{x:W*0.09,y:H*0.60},{x:W*0.19,y:H*0.54},
-      {x:W*0.30,y:H*0.60},{x:W*0.40,y:H*0.54},{x:W*0.50,y:H*0.62},
-      {x:W*0.60,y:H*0.56},{x:W*0.70,y:H*0.62},{x:W*0.80,y:H*0.56},
-      {x:W*0.90,y:H*0.62},{x:W*1.00,y:bot2},
+      {x:W*0.00, y:bot2, isPeak:false},
+      {x:W*0.07, y:H*0.60, isPeak:false},
+      {x:W*0.15, y:H*0.50, isPeak:true,  capRx:W*0.040},
+      {x:W*0.22, y:H*0.62, isPeak:false},
+      {x:W*0.30, y:H*0.52, isPeak:true,  capRx:W*0.048},
+      {x:W*0.38, y:H*0.62, isPeak:false},
+      {x:W*0.46, y:H*0.48, isPeak:true,  capRx:W*0.056},
+      {x:W*0.54, y:H*0.65, isPeak:false},
+      {x:W*0.62, y:H*0.54, isPeak:true,  capRx:W*0.044},
+      {x:W*0.70, y:H*0.62, isPeak:false},
+      {x:W*0.78, y:H*0.50, isPeak:true,  capRx:W*0.050},
+      {x:W*0.86, y:H*0.62, isPeak:false},
+      {x:W*0.94, y:H*0.56, isPeak:true,  capRx:W*0.040},
+      {x:W*1.00, y:bot2, isPeak:false},
     ];
     const gC=ctx.createLinearGradient(0,H*0.40,0,bot2);
-    gC.addColorStop(0,blendCol(c0,c1,0.6)); gC.addColorStop(1,c1);
-    _drawMtnLayer(LC, bot2, gC, 0.28);
+    gC.addColorStop(0, blendCol(c0,c1,0.65)); gC.addColorStop(1, c1);
+    _drawMtnLayer(LC, bot2, gC, 0.55);
+    _drawMtnShadowSide(LC, bot2, hexDarken(c1,50), 0.45);
+    _drawMtnLitEdge(LC, hexLighten(c0,25), 0.55, 1.4);
+    _drawMtnRockTexture(LC, bot2, hexDarken(c1,45), 0.30, 5);
+
+    // ── Katman D — En yakın ön plan (en koyu, ışık vurgulu) ──────
+    const LD=[
+      {x:W*0.00, y:bot2, isPeak:false},
+      {x:W*0.09, y:H*0.66, isPeak:false},
+      {x:W*0.18, y:H*0.60, isPeak:true,  capRx:W*0.032},
+      {x:W*0.27, y:H*0.68, isPeak:false},
+      {x:W*0.36, y:H*0.62, isPeak:true,  capRx:W*0.038},
+      {x:W*0.45, y:H*0.70, isPeak:false},
+      {x:W*0.54, y:H*0.63, isPeak:true,  capRx:W*0.034},
+      {x:W*0.63, y:H*0.69, isPeak:false},
+      {x:W*0.72, y:H*0.61, isPeak:true,  capRx:W*0.036},
+      {x:W*0.81, y:H*0.68, isPeak:false},
+      {x:W*0.90, y:H*0.64, isPeak:false},
+      {x:W*1.00, y:bot2, isPeak:false},
+    ];
+    const gD=ctx.createLinearGradient(0,H*0.50,0,bot2);
+    gD.addColorStop(0, c1); gD.addColorStop(1, hexDarken(c1,25));
+    _drawMtnLayer(LD, bot2, gD, 0.65);
+    _drawMtnShadowSide(LD, bot2, hexDarken(c1,60), 0.55);
+    _drawMtnLitEdge(LD, hexLighten(c0,15), 0.60, 1.6);
+    _drawMtnRockTexture(LD, bot2, hexDarken(c1,55), 0.40, 8);
   }
 
   ctx.restore();
@@ -5277,184 +5822,539 @@ function drawCaveForeground(){
   // devre dışı — çerçeve yapıyordu
 }
 function drawTank(){
-  // selectedTank varsa onu kullan, yoksa lv.tankType
   const tankKey = selectedTank||lv.tankType||'basic';
   const td = TANK_DEF[tankKey]||TANK_DEF.basic;
   const tx=tankX, ty=tankY;
   const rad = angle*Math.PI/180;
   const col = td.color;
 
-  ctx.save();
-  ctx.translate(tx, ty);
+  // Recoil: hull slightly pushes back, barrel slides back
+  const recoilHull   = _tankRecoil * 2.5;
+  const recoilBarrel = _tankRecoil * (4 + td.barrelL * 0.10);
+  // Recoil yön vektörü — namlu yönünün tersi (negatif x ekseninde sağa nişan = ileri)
+  const rdx = Math.cos(-rad), rdy = Math.sin(-rad);
 
-  // Ground shadow
-  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.save();
+  ctx.translate(tx - rdx*recoilHull*0.5, ty - rdy*recoilHull*0.5);
+
+  // ── GROUND SHADOW ──────────────────────────────────────────────
+  ctx.fillStyle = `rgba(0,0,0,${0.28 + _tankDamage*0.12})`;
   ctx.beginPath();
-  ctx.ellipse(2, 5, td.w/2+6, 7, 0, 0, Math.PI*2);
+  ctx.ellipse(2, 6, td.w/2+8, 7, 0, 0, Math.PI*2);
   ctx.fill();
 
-  // ── TRACKS (left & right) ─────────────────────────────────────
-  const trackY = 0;
-  const trackH = 14;
-  [-1,1].forEach(side=>{
+  // ── TRACKS (oblique view: back + front) ─────────────────────────
+  const trackH = 13 + (tankKey==='titan'?2:0);
+  const sprocketR = 7 + (tankKey==='titan'?1:0);
+  const idlerR    = 6;
+  const roadWheelR = 5;
+  const returnRollerR = 2.5;
+
+  [-1, 1].forEach((side, sIdx) => {
+    const isFront = side > 0; // front track (closer to viewer)
     const ty2 = side * (td.h*0.32 - 2);
-    // Track body
-    const tg2 = ctx.createLinearGradient(0,trackY-trackH/2,0,trackY+trackH/2);
-    tg2.addColorStop(0,'#1a1a1a');
-    tg2.addColorStop(0.4,'#2d2d2d');
-    tg2.addColorStop(1,'#111');
-    ctx.fillStyle=tg2;
+    const tcMid  = isFront ? '#2d2d2d' : '#222';
+    const tcDark = isFront ? '#0f0f0f' : '#080808';
+
+    // Track strip body
+    const tg2 = ctx.createLinearGradient(0, ty2-trackH/2, 0, ty2+trackH/2);
+    tg2.addColorStop(0,  tcDark);
+    tg2.addColorStop(0.35, tcMid);
+    tg2.addColorStop(0.65, tcMid);
+    tg2.addColorStop(1, '#000');
+    ctx.fillStyle = tg2;
     ctx.beginPath();
-    ctx.roundRect(-td.w/2, ty2-trackH/2, td.w, trackH, 5);
+    ctx.roundRect(-td.w/2, ty2-trackH/2, td.w, trackH, trackH*0.45);
     ctx.fill();
-    // Track segments
-    const segCount=9;
-    for(let i=0;i<segCount;i++){
-      const sx = -td.w/2+4 + i*(td.w-8)/(segCount-1);
-      ctx.fillStyle = i%2===0?'#3a3a3a':'#222';
-      ctx.beginPath();
-      ctx.roundRect(sx-4, ty2-trackH/2+2, 7, trackH-4, 2);
-      ctx.fill();
+
+    // Track grousers (cleats) — densely spaced verticals
+    const grouserCount = Math.floor(td.w / 4);
+    for(let i=0; i<grouserCount; i++){
+      const sx = -td.w/2 + 4 + i*((td.w-8)/(grouserCount-1));
+      // alternating depth for "moving" feel
+      const isLite = i%2===0;
+      ctx.fillStyle = isLite ? 'rgba(80,80,80,0.6)' : 'rgba(0,0,0,0.4)';
+      ctx.fillRect(sx-1, ty2-trackH/2+2, 2, trackH-4);
     }
-    // Wheels on track
-    [0.15,0.5,0.85].forEach(wx=>{
-      const wheelX = -td.w/2 + td.w*wx;
-      const wg = ctx.createRadialGradient(wheelX-1,ty2-1,1,wheelX,ty2,6);
-      wg.addColorStop(0,'#555');wg.addColorStop(1,'#1a1a1a');
-      ctx.fillStyle=wg;
-      ctx.beginPath();ctx.arc(wheelX,ty2,6,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.stroke();
-      ctx.fillStyle='#333';
-      ctx.beginPath();ctx.arc(wheelX,ty2,3,0,Math.PI*2);ctx.fill();
-    });
+
+    // Track top highlight
+    ctx.fillStyle = isFront ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)';
+    ctx.beginPath();
+    ctx.roundRect(-td.w/2+2, ty2-trackH/2+1, td.w-4, 2, 1);
+    ctx.fill();
+
+    // ── WHEELS — sprocket + road wheels + idler + return rollers ──
+    const wheelY = ty2;
+    // Sprocket (drive wheel) — at rear (left), 8-pointed star
+    const sprX = -td.w/2 + sprocketR + 2;
+    _drawTankWheel(sprX, wheelY, sprocketR, col, true, isFront);
+    // Idler (smaller, at front/right)
+    const idlX = td.w/2 - idlerR - 2;
+    _drawTankWheel(idlX, wheelY, idlerR, col, false, isFront);
+    // Road wheels — 4 across bottom
+    const roadCount = tankKey==='titan' || tankKey==='elite' ? 5 : 4;
+    const roadStart = sprX + sprocketR + 4;
+    const roadEnd   = idlX - idlerR - 4;
+    for(let i=0;i<roadCount;i++){
+      const rwx = roadStart + (roadEnd-roadStart)*(i/(roadCount-1));
+      _drawTankWheel(rwx, wheelY, roadWheelR, col, false, isFront);
+    }
+    // Return rollers — 2-3 above, smaller
+    const rrCount = tankKey==='basic' ? 2 : 3;
+    for(let i=0;i<rrCount;i++){
+      const rrx = roadStart + (roadEnd-roadStart)*((i+0.5)/rrCount);
+      _drawTankWheel(rrx, wheelY-trackH/2-1, returnRollerR, col, false, isFront);
+    }
   });
 
-  // ── HULL BODY ─────────────────────────────────────────────────
+  // ── HULL BODY ──────────────────────────────────────────────────
   const hullW = td.w-10;
   const hullH = td.h+2;
   const hullY = -hullH*0.55;
-  const hg = ctx.createLinearGradient(0,hullY,0,hullY+hullH);
-  hg.addColorStop(0, lightenColor(col,28));
-  hg.addColorStop(0.35, lightenColor(col,10));
-  hg.addColorStop(0.7, col);
-  hg.addColorStop(1, darkenColor(col,18));
-  ctx.fillStyle=hg;
+
+  // Glacis plate (sloped front armor) — Elite & Titan
+  if(tankKey==='elite' || tankKey==='titan'){
+    const glacW = hullW*0.22;
+    const glacH = hullH;
+    ctx.fillStyle = _vGrad(ctx, hullY, hullY+glacH, lightenColor(col,32), col, darkenColor(col,22));
+    ctx.beginPath();
+    ctx.moveTo(hullW/2 - 2, hullY);
+    ctx.lineTo(hullW/2 + glacW, hullY + glacH*0.55);
+    ctx.lineTo(hullW/2 - 2, hullY + glacH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = darkenColor(col, 35);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  const hg = ctx.createLinearGradient(0, hullY, 0, hullY+hullH);
+  hg.addColorStop(0,    lightenColor(col, 32));
+  hg.addColorStop(0.30, lightenColor(col, 12));
+  hg.addColorStop(0.65, col);
+  hg.addColorStop(1,    darkenColor(col, 22));
+  ctx.fillStyle = hg;
   ctx.beginPath();
   ctx.roundRect(-hullW/2, hullY, hullW, hullH, 5);
   ctx.fill();
-  ctx.strokeStyle=darkenColor(col,35);
-  ctx.lineWidth=1.5;ctx.stroke();
+  ctx.strokeStyle = darkenColor(col, 38);
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
 
-  // Hull armor plates
-  ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(-hullW/2+8,hullY+4);ctx.lineTo(-hullW/2+8,hullY+hullH-4);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(hullW/2-8,hullY+4);ctx.lineTo(hullW/2-8,hullY+hullH-4);ctx.stroke();
-  // Ekstra zırh plakaları (upgraded+)
-  if(td.armor){
-    ctx.fillStyle='rgba(255,255,255,0.08)';
-    ctx.beginPath();ctx.roundRect(-hullW/2,hullY+hullH*0.6,hullW,hullH*0.3,3);ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.stroke();
-  }
-  // Chrome kaplama (titan)
-  if(td.chrome){
-    ctx.strokeStyle='rgba(200,220,255,0.35)';ctx.lineWidth=2;
-    ctx.beginPath();ctx.roundRect(-hullW/2+2,hullY+2,hullW-4,hullH-4,4);ctx.stroke();
-  }
-  // Hull highlight top
-  ctx.fillStyle='rgba(255,255,255,0.12)';
-  ctx.beginPath();ctx.roundRect(-hullW/2+2,hullY+2,hullW-4,hullH*0.3,3);ctx.fill();
-  // Bolt details
-  [[-hullW/2+5, hullY+5],[hullW/2-5, hullY+5],[-hullW/2+5, hullY+hullH-5],[hullW/2-5, hullY+hullH-5]].forEach(([bx,by])=>{
-    ctx.fillStyle='rgba(0,0,0,0.4)';
-    ctx.beginPath();ctx.arc(bx,by,2,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.15)';
-    ctx.beginPath();ctx.arc(bx-0.5,by-0.5,1,0,Math.PI*2);ctx.fill();
+  // Hull horizontal panel line (welded plates)
+  ctx.strokeStyle='rgba(0,0,0,0.30)';
+  ctx.lineWidth=0.9;
+  ctx.beginPath();
+  ctx.moveTo(-hullW/2+3, hullY+hullH*0.4);
+  ctx.lineTo(hullW/2-3, hullY+hullH*0.4);
+  ctx.stroke();
+  // Vertical panel lines
+  [-hullW*0.35, -hullW*0.05, hullW*0.20].forEach(px=>{
+    ctx.beginPath();
+    ctx.moveTo(px, hullY+2);
+    ctx.lineTo(px, hullY+hullH-2);
+    ctx.stroke();
   });
 
-  // ── TURRET ────────────────────────────────────────────────────
-  const turretY = hullY - 4;
-  const turretW = td.w*0.48;
-  const turretH = td.h*0.55;
-  const turretX = -turretW*0.1; // slightly forward
-
-  const turrG = ctx.createLinearGradient(turretX,turretY,turretX,turretY+turretH);
-  turrG.addColorStop(0, lightenColor(col,22));
-  turrG.addColorStop(0.4, lightenColor(col,8));
-  turrG.addColorStop(1, darkenColor(col,15));
-  ctx.fillStyle=turrG;
+  // Hull top highlight
+  ctx.fillStyle='rgba(255,255,255,0.14)';
   ctx.beginPath();
-  // Turret shape - hexagonal military look
-  ctx.moveTo(turretX-turretW/2+4, turretY+turretH);
-  ctx.lineTo(turretX-turretW/2, turretY+turretH*0.5);
-  ctx.lineTo(turretX-turretW/2+4, turretY);
-  ctx.lineTo(turretX+turretW/2-2, turretY);
-  ctx.lineTo(turretX+turretW/2+4, turretY+turretH*0.4);
-  ctx.lineTo(turretX+turretW/2, turretY+turretH);
+  ctx.roundRect(-hullW/2+2, hullY+1.5, hullW-4, hullH*0.28, 3);
+  ctx.fill();
+
+  // ── ERA / SIDE ARMOR BLOCKS (upgraded+) ─────────────────────────
+  if(tankKey==='upgraded' || tankKey==='elite' || tankKey==='titan'){
+    const blockW = (hullW-12) / 6;
+    const blockH = 5;
+    const blockY = hullY + hullH - blockH - 2;
+    for(let i=0; i<6; i++){
+      const bx = -hullW/2 + 6 + i*blockW;
+      // Block fill
+      const bg2 = ctx.createLinearGradient(0, blockY, 0, blockY+blockH);
+      bg2.addColorStop(0, lightenColor(col, 18));
+      bg2.addColorStop(1, darkenColor(col, 20));
+      ctx.fillStyle = bg2;
+      ctx.fillRect(bx+1, blockY, blockW-2, blockH);
+      ctx.strokeStyle = darkenColor(col, 40);
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(bx+1, blockY, blockW-2, blockH);
+    }
+  }
+
+  // Bolts on hull corners
+  [[-hullW/2+5, hullY+5],[hullW/2-5, hullY+5]].forEach(([bx,by])=>{
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.beginPath();ctx.arc(bx,by,2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.20)';
+    ctx.beginPath();ctx.arc(bx-0.5,by-0.5,0.9,0,Math.PI*2);ctx.fill();
+  });
+
+  // Headlight (basic + upgraded) — small disc on front
+  if(tankKey==='basic' || tankKey==='upgraded'){
+    ctx.fillStyle='#f0e8c0';
+    ctx.beginPath();
+    ctx.arc(hullW/2-3, hullY+hullH*0.35, 2.2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = darkenColor(col, 45);
+    ctx.lineWidth=0.6;
+    ctx.stroke();
+    // glow
+    ctx.fillStyle='rgba(255,250,180,0.4)';
+    ctx.beginPath();
+    ctx.arc(hullW/2-3, hullY+hullH*0.35, 3.5, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // ── TURRET ─────────────────────────────────────────────────────
+  const turretY = hullY - 4;
+  const turretW = td.w*0.48 + (tankKey==='titan'?6:0);
+  const turretH = td.h*0.55 + (tankKey==='titan'?3:0);
+  const turretX = -turretW*0.1;
+
+  const turrG = ctx.createLinearGradient(turretX, turretY, turretX, turretY+turretH);
+  turrG.addColorStop(0,   lightenColor(col, 26));
+  turrG.addColorStop(0.40, lightenColor(col, 8));
+  turrG.addColorStop(1,   darkenColor(col, 18));
+  ctx.fillStyle = turrG;
+
+  if(tankKey==='elite'){
+    // Modern angular wedge (Leopard/Abrams-vari)
+    ctx.beginPath();
+    ctx.moveTo(turretX-turretW/2+2, turretY+turretH);
+    ctx.lineTo(turretX-turretW/2-1, turretY+turretH*0.6);
+    ctx.lineTo(turretX-turretW/2+3, turretY+turretH*0.15);
+    ctx.lineTo(turretX-turretW*0.05, turretY-1);
+    ctx.lineTo(turretX+turretW/2-4, turretY);
+    ctx.lineTo(turretX+turretW/2+6, turretY+turretH*0.45);
+    ctx.lineTo(turretX+turretW/2+2, turretY+turretH);
+    ctx.closePath();
+  } else if(tankKey==='titan'){
+    // Massive rounded turret
+    ctx.beginPath();
+    ctx.moveTo(turretX-turretW/2+3, turretY+turretH);
+    ctx.quadraticCurveTo(turretX-turretW/2-3, turretY+turretH*0.5, turretX-turretW/2+5, turretY);
+    ctx.lineTo(turretX+turretW/2-4, turretY);
+    ctx.quadraticCurveTo(turretX+turretW/2+8, turretY+turretH*0.5, turretX+turretW/2+2, turretY+turretH);
+    ctx.closePath();
+  } else {
+    // Classic hexagonal (basic, upgraded)
+    ctx.beginPath();
+    ctx.moveTo(turretX-turretW/2+4, turretY+turretH);
+    ctx.lineTo(turretX-turretW/2,   turretY+turretH*0.5);
+    ctx.lineTo(turretX-turretW/2+4, turretY);
+    ctx.lineTo(turretX+turretW/2-2, turretY);
+    ctx.lineTo(turretX+turretW/2+4, turretY+turretH*0.4);
+    ctx.lineTo(turretX+turretW/2,   turretY+turretH);
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.strokeStyle = darkenColor(col, 32);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Turret top highlight
+  ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.beginPath();
+  ctx.moveTo(turretX-turretW/2+5, turretY+2);
+  ctx.lineTo(turretX+turretW/2-3, turretY+2);
+  ctx.lineTo(turretX+turretW/2,   turretY+turretH*0.32);
+  ctx.lineTo(turretX-turretW/2+2, turretY+turretH*0.32);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle=darkenColor(col,30);ctx.lineWidth=1.5;ctx.stroke();
-
-  // Turret highlight
-  ctx.fillStyle='rgba(255,255,255,0.1)';
-  ctx.beginPath();
-  ctx.moveTo(turretX-turretW/2+5,turretY+2);
-  ctx.lineTo(turretX+turretW/2-3,turretY+2);
-  ctx.lineTo(turretX+turretW/2,turretY+turretH*0.35);
-  ctx.lineTo(turretX-turretW/2+2,turretY+turretH*0.35);
-  ctx.closePath();ctx.fill();
 
   // Commander hatch
-  ctx.fillStyle=darkenColor(col,10);
-  ctx.beginPath();ctx.ellipse(turretX-4,turretY+turretH*0.45,7,5,0,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle=darkenColor(col,30);ctx.lineWidth=1;ctx.stroke();
-  ctx.fillStyle='rgba(0,0,0,0.5)';
-  ctx.beginPath();ctx.ellipse(turretX-4,turretY+turretH*0.45,4,3,0,0,Math.PI*2);ctx.fill();
+  const hatchX = turretX + (tankKey==='elite' ? -2 : -4);
+  ctx.fillStyle = darkenColor(col, 12);
+  ctx.beginPath();
+  ctx.ellipse(hatchX, turretY+turretH*0.42, 6.5, 4.5, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = darkenColor(col, 35);
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(hatchX, turretY+turretH*0.42, 4, 2.8, 0, 0, Math.PI*2);
+  ctx.fill();
 
-  // ── BARREL ────────────────────────────────────────────────────
+  // ── TURRET ACCESSORIES per type ────────────────────────────────
+  // Smoke grenade launchers (elite + titan) — 3 small tubes on side
+  if(tankKey==='elite' || tankKey==='titan'){
+    ctx.fillStyle = darkenColor(col, 25);
+    ctx.strokeStyle = darkenColor(col, 45);
+    ctx.lineWidth = 0.5;
+    for(let i=0;i<3;i++){
+      const sgx = turretX - turretW*0.25 + i*3;
+      const sgy = turretY + 1;
+      ctx.fillRect(sgx, sgy, 2.4, 4);
+      ctx.strokeRect(sgx, sgy, 2.4, 4);
+    }
+  }
+
+  // Commander's machine gun (elite)
+  if(tankKey==='elite'){
+    ctx.fillStyle = darkenColor(col, 28);
+    ctx.beginPath();
+    ctx.roundRect(hatchX-1, turretY+turretH*0.20, 2, 5, 0.5);
+    ctx.fill();
+    // MG barrel
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(hatchX-0.5, turretY-3, 1, 5);
+  }
+
+  // Antenna (elite) — with flag tip
+  if(tankKey==='elite'){
+    ctx.strokeStyle = darkenColor(col, 18);
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(turretX-turretW/2+10, turretY-1);
+    ctx.lineTo(turretX-turretW/2+13, turretY-22);
+    ctx.stroke();
+    // Flag
+    ctx.fillStyle = '#e84030';
+    ctx.beginPath();
+    ctx.moveTo(turretX-turretW/2+13, turretY-22);
+    ctx.lineTo(turretX-turretW/2+20, turretY-19);
+    ctx.lineTo(turretX-turretW/2+13, turretY-16);
+    ctx.closePath();
+    ctx.fill();
+    // Antenna tip
+    ctx.fillStyle='#ffd000';
+    ctx.beginPath();
+    ctx.arc(turretX-turretW/2+13, turretY-22, 1.5, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Chrome detailing (titan)
+  if(td.chrome){
+    ctx.strokeStyle='rgba(220,235,255,0.4)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    if(tankKey==='titan'){
+      ctx.moveTo(turretX-turretW/2+5, turretY+turretH*0.30);
+      ctx.lineTo(turretX+turretW/2-3, turretY+turretH*0.30);
+    }
+    ctx.stroke();
+    // Chrome plate accents on hull
+    ctx.strokeStyle='rgba(220,235,255,0.30)';
+    ctx.lineWidth=1.2;
+    ctx.strokeRect(-hullW/2+3, hullY+3, hullW-6, hullH-6);
+  }
+
+  // ── BARREL ──────────────────────────────────────────────────────
   ctx.save();
-  ctx.translate(turretX+turretW*0.35, turretY+turretH*0.38);
+  // Barrel pivot
+  const pivotX = turretX + turretW*0.30;
+  const pivotY = turretY + turretH*0.38;
+  ctx.translate(pivotX, pivotY);
   ctx.rotate(-rad);
+  // Recoil — slide back along barrel axis
+  ctx.translate(-recoilBarrel, 0);
 
-  // Barrel sleeve (thick base)
-  const sleeveG=ctx.createLinearGradient(0,-td.barrelW-2,0,td.barrelW+2);
-  sleeveG.addColorStop(0,lightenColor(col,15));
-  sleeveG.addColorStop(0.5,col);
-  sleeveG.addColorStop(1,darkenColor(col,25));
-  ctx.fillStyle=sleeveG;
-  ctx.beginPath();ctx.roundRect(0,-(td.barrelW+2)/2,td.barrelL*0.35,td.barrelW+2,3);ctx.fill();
-  ctx.strokeStyle=darkenColor(col,35);ctx.lineWidth=1;ctx.stroke();
-
-  // Barrel tube (thinner)
-  const barrelG=ctx.createLinearGradient(0,-td.barrelW,0,td.barrelW);
-  barrelG.addColorStop(0,lightenColor(col,8));
-  barrelG.addColorStop(0.5,darkenColor(col,5));
-  barrelG.addColorStop(1,darkenColor(col,30));
-  ctx.fillStyle=barrelG;
-  ctx.beginPath();ctx.roundRect(td.barrelL*0.3,-td.barrelW/2,td.barrelL*0.72,td.barrelW,2);ctx.fill();
-  ctx.strokeStyle=darkenColor(col,30);ctx.lineWidth=1;ctx.stroke();
-
-  // Muzzle brake
-  const muzzleX=td.barrelL;
-  ctx.fillStyle=darkenColor(col,20);
-  ctx.beginPath();ctx.roundRect(muzzleX-4,-td.barrelW/2-2,8,td.barrelW+4,2);ctx.fill();
-  ctx.strokeStyle=darkenColor(col,35);ctx.lineWidth=1;ctx.stroke();
-  // Muzzle holes
-  ctx.fillStyle='rgba(0,0,0,0.7)';
-  [-td.barrelW/2+1,td.barrelW/2-1].forEach(hy=>{
-    ctx.beginPath();ctx.arc(muzzleX,hy,1.5,0,Math.PI*2);ctx.fill();
+  // Mantlet (thick barrel base shield)
+  ctx.fillStyle = _vGrad(ctx, -td.barrelW-3, td.barrelW+3, lightenColor(col,18), col, darkenColor(col,28));
+  ctx.beginPath();
+  ctx.roundRect(-3, -td.barrelW/2-3, td.barrelL*0.32+3, td.barrelW+6, 3);
+  ctx.fill();
+  ctx.strokeStyle = darkenColor(col, 38);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Mantlet bolts
+  [[-1, -td.barrelW/2-2],[-1, td.barrelW/2+2]].forEach(([bx,by])=>{
+    ctx.fillStyle='rgba(0,0,0,0.6)';
+    ctx.beginPath();ctx.arc(bx,by,1,0,Math.PI*2);ctx.fill();
   });
+
+  // Barrel sleeve (thermal sleeve — elite/titan ribbed)
+  const sleeveL = td.barrelL * 0.45;
+  const sleeveG = ctx.createLinearGradient(0, -td.barrelW-2, 0, td.barrelW+2);
+  sleeveG.addColorStop(0, lightenColor(col, 18));
+  sleeveG.addColorStop(0.5, col);
+  sleeveG.addColorStop(1, darkenColor(col, 30));
+  ctx.fillStyle = sleeveG;
+  ctx.beginPath();
+  ctx.roundRect(td.barrelL*0.30, -td.barrelW/2-1, sleeveL, td.barrelW+2, 1.5);
+  ctx.fill();
+  ctx.strokeStyle = darkenColor(col, 35);
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // Thermal sleeve ribs (elite/titan)
+  if(tankKey==='elite' || tankKey==='titan'){
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 0.6;
+    const ribCount = 5;
+    for(let i=1;i<ribCount;i++){
+      const rx = td.barrelL*0.30 + sleeveL*(i/ribCount);
+      ctx.beginPath();
+      ctx.moveTo(rx, -td.barrelW/2-1);
+      ctx.lineTo(rx, td.barrelW/2+1);
+      ctx.stroke();
+    }
+    // White marker band (NATO standard)
+    ctx.fillStyle = '#fafaf0';
+    ctx.fillRect(td.barrelL*0.30 + sleeveL*0.65, -td.barrelW/2-1, 2, td.barrelW+2);
+  }
+
+  // Barrel tube (thin)
+  const tubeStart = td.barrelL*0.30 + sleeveL;
+  const tubeEnd = td.barrelL;
+  const barrelG = ctx.createLinearGradient(0, -td.barrelW/2, 0, td.barrelW/2);
+  barrelG.addColorStop(0, lightenColor(col, 10));
+  barrelG.addColorStop(0.5, darkenColor(col, 8));
+  barrelG.addColorStop(1, darkenColor(col, 32));
+  ctx.fillStyle = barrelG;
+  ctx.beginPath();
+  ctx.roundRect(tubeStart, -td.barrelW/2+0.5, tubeEnd-tubeStart, td.barrelW-1, 1);
+  ctx.fill();
+  ctx.strokeStyle = darkenColor(col, 35);
+  ctx.lineWidth = 0.7;
+  ctx.stroke();
+
+  // Muzzle brake — different per type
+  const muzzleX = td.barrelL;
+  if(tankKey==='titan'){
+    // Double-baffle muzzle brake (heavy)
+    ctx.fillStyle = darkenColor(col, 25);
+    ctx.beginPath();
+    ctx.roundRect(muzzleX-1, -td.barrelW/2-3, 10, td.barrelW+6, 1.5);
+    ctx.fill();
+    ctx.strokeStyle = darkenColor(col, 40);
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    // Baffle slots
+    ctx.fillStyle='rgba(0,0,0,0.75)';
+    [muzzleX+2, muzzleX+5].forEach(bx=>{
+      ctx.fillRect(bx-0.5, -td.barrelW/2-2.5, 1, td.barrelW+5);
+    });
+  } else if(tankKey==='elite'){
+    // Bore evacuator + simple brake
+    ctx.fillStyle = darkenColor(col, 22);
+    ctx.beginPath();
+    ctx.ellipse(tubeStart + (tubeEnd-tubeStart)*0.55, 0, 4, td.barrelW/2+2, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = darkenColor(col, 38);
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+    // Muzzle brake
+    ctx.fillStyle = darkenColor(col, 25);
+    ctx.beginPath();
+    ctx.roundRect(muzzleX-2, -td.barrelW/2-2, 7, td.barrelW+4, 1.5);
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    // Simple muzzle (basic, upgraded)
+    ctx.fillStyle = darkenColor(col, 22);
+    ctx.beginPath();
+    ctx.roundRect(muzzleX-3, -td.barrelW/2-2, 7, td.barrelW+4, 1.5);
+    ctx.fill();
+    ctx.strokeStyle = darkenColor(col, 38);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+  // Muzzle bore (dark center)
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(muzzleX+2, 0, td.barrelW/2-0.3, 0, Math.PI*2);
+  ctx.fill();
+  // Bore inner highlight
+  ctx.fillStyle = 'rgba(80,60,40,0.4)';
+  ctx.beginPath();
+  ctx.arc(muzzleX+2, -0.2, td.barrelW/2-0.8, 0, Math.PI*2);
+  ctx.fill();
+
   // Barrel highlight stripe
-  ctx.fillStyle='rgba(255,255,255,0.12)';
-  ctx.beginPath();ctx.roundRect(td.barrelL*0.3,-td.barrelW/2,td.barrelL*0.72,td.barrelW*0.3,1);ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fillRect(tubeStart, -td.barrelW/2+0.5, tubeEnd-tubeStart, 1);
 
   ctx.restore();
 
-  // ── ANTENNA (elite only) ──────────────────────────────────────
-  if(lv.tankType==='elite'){
-    ctx.strokeStyle=darkenColor(col,20);ctx.lineWidth=1.5;ctx.lineCap='round';
-    ctx.beginPath();ctx.moveTo(turretX-turretW/2+10,turretY);ctx.lineTo(turretX-turretW/2+12,turretY-18);ctx.stroke();
-    ctx.fillStyle='#FF3D00';
-    ctx.beginPath();ctx.arc(turretX-turretW/2+12,turretY-18,2.5,0,Math.PI*2);ctx.fill();
+  // ── DAMAGE OVERLAY ──────────────────────────────────────────────
+  if(_tankDamage > 0){
+    ctx.save();
+    // Soot/scorch marks on hull
+    ctx.fillStyle = `rgba(0,0,0,${_tankDamage*0.45})`;
+    ctx.beginPath();
+    ctx.ellipse(-hullW*0.25, hullY+hullH*0.5, hullW*0.18, hullH*0.35, 0.2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(hullW*0.15, hullY+hullH*0.4, hullW*0.12, hullH*0.25, -0.1, 0, Math.PI*2);
+    ctx.fill();
+    // Damage dents
+    ctx.strokeStyle = `rgba(0,0,0,${_tankDamage*0.6})`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-hullW*0.10, hullY+5); ctx.lineTo(-hullW*0.05, hullY+10); ctx.lineTo(-hullW*0.12, hullY+12);
+    ctx.stroke();
+    ctx.restore();
+
+    // Smoke wisp from turret (damaged)
+    if(_tankDamage > 0.4 && Math.random() < 0.18){
+      particles.push({
+        x: tx + turretX, y: ty + turretY-2,
+        vx: (Math.random()-0.5)*0.4, vy: -0.6 - Math.random()*0.5,
+        size: 4 + Math.random()*3, life: 50, maxLife: 50,
+        color: 'rgba(60,60,60,0.7)', type: 'smoke',
+      });
+    }
+  }
+
+  ctx.restore();
+}
+
+// ── Tek tekerlek çiz: sprocket (8-tepe yıldız) veya düz tekerlek ─────────────
+function _drawTankWheel(wx, wy, r, col, isSprocket, isFront){
+  const alpha = isFront ? 1 : 0.82;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Wheel outer
+  const wg = ctx.createRadialGradient(wx-r*0.3, wy-r*0.3, r*0.15, wx, wy, r);
+  wg.addColorStop(0, '#6a6a6a');
+  wg.addColorStop(0.5, '#3a3a3a');
+  wg.addColorStop(1, '#0a0a0a');
+  ctx.fillStyle = wg;
+  ctx.beginPath();
+  ctx.arc(wx, wy, r, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+
+  if(isSprocket){
+    // Sprocket teeth (8 etrafa)
+    ctx.fillStyle = '#1a1a1a';
+    for(let i=0;i<8;i++){
+      const ang = i*Math.PI/4;
+      ctx.beginPath();
+      ctx.moveTo(wx + Math.cos(ang)*r, wy + Math.sin(ang)*r);
+      ctx.lineTo(wx + Math.cos(ang+0.18)*(r+1.5), wy + Math.sin(ang+0.18)*(r+1.5));
+      ctx.lineTo(wx + Math.cos(ang+0.32)*r, wy + Math.sin(ang+0.32)*r);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Center hub — colored (tank color)
+    ctx.fillStyle = darkenColor(col, 15);
+    ctx.beginPath();
+    ctx.arc(wx, wy, r*0.45, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  } else {
+    // Standard wheel hub
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath();
+    ctx.arc(wx, wy, r*0.45, 0, Math.PI*2);
+    ctx.fill();
+    // Center bolt
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(wx, wy, r*0.2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(wx-r*0.06, wy-r*0.06, r*0.08, 0, Math.PI*2);
+    ctx.fill();
   }
 
   ctx.restore();
@@ -6785,6 +7685,7 @@ function fire(){
 function _doFire(){
   if(phase!=='aim'||shotsLeft<=0) return;
   SFX.fire(selectedAmmo);
+  _tankRecoil = 1; // recoil tetikle
   const td=TANK_DEF[selectedTank]||TANK_DEF[lv.tankType]||TANK_DEF.basic;
   const rad=angle*Math.PI/180;
   const bx=tankX+Math.cos(-rad)*td.barrelL;
@@ -7047,42 +7948,127 @@ function drawRiverAnim(){
 
   _riverTime++;
   const pts = _riverData.pts;
+  if(!pts[0].nx) return; // banks hesaplanmamış (geri uyumluluk)
 
-  // Akan su dalgalari — her N frame'de yeni parcacik ekle
-  if(_riverTime % 4 === 0){
+  _riverData.flowOffset = (_riverData.flowOffset || 0) + 0.006;
+  _riverData.shimmerOffset = (_riverData.shimmerOffset || 0) + 0.012;
+
+  ctx.save();
+  // Nehir polygonuna clip
+  ctx.beginPath();
+  for(let i=0;i<pts.length;i++){
+    const p = pts[i];
+    const hw = p.w/2;
+    if(i===0) ctx.moveTo(p.x - p.nx*hw, p.y - p.ny*hw);
+    else      ctx.lineTo(p.x - p.nx*hw, p.y - p.ny*hw);
+  }
+  for(let i=pts.length-1;i>=0;i--){
+    const p = pts[i];
+    const hw = p.w/2;
+    ctx.lineTo(p.x + p.nx*hw, p.y + p.ny*hw);
+  }
+  ctx.closePath();
+  ctx.clip();
+
+  // 1) Akan dalga bantları — 5 bant, hafif farklı hızlarla aşağı kayar
+  ctx.lineWidth = 0.9;
+  ctx.lineCap = 'round';
+  for(let band=0; band<5; band++){
+    const bandT = ((_riverData.flowOffset + band*0.20) % 1.0);
+    const fIdx = bandT * (pts.length - 1.001);
+    const i0 = Math.floor(fIdx);
+    const t = fIdx - i0;
+    if(i0 >= pts.length-1) continue;
+    const p = pts[i0], pn = pts[i0+1];
+    const cx = p.x + (pn.x - p.x)*t;
+    const cy = p.y + (pn.y - p.y)*t;
+    const cw = p.w + (pn.w - p.w)*t;
+    const nx = p.nx + (pn.nx - p.nx)*t;
+    const ny = p.ny + (pn.ny - p.ny)*t;
+
+    // Bantın yaşı: ortada parlak, uçlarda solgun
+    const lifeAlpha = Math.sin(bandT * Math.PI) * 0.45;
+    ctx.strokeStyle = `rgba(255,255,255,${lifeAlpha})`;
+
+    // Yatay s şekli (perpendicular boyunca, hafif sin dalgası)
+    ctx.beginPath();
+    const segs = 7;
+    for(let s=0; s<=segs; s++){
+      const u = s/segs - 0.5; // -0.5..+0.5
+      const ax = cx + nx * u * cw * 0.95;
+      const ay = cy + ny * u * cw * 0.95;
+      // Akış yönünde küçük bombe (waveCrest)
+      const swirl = Math.sin(u*Math.PI*2 + _riverTime*0.18 + band*0.7) * 1.2;
+      const fx = ax + (-ny)*swirl;
+      const fy = ay + ( nx)*swirl;
+      if(s===0) ctx.moveTo(fx, fy); else ctx.lineTo(fx, fy);
+    }
+    ctx.stroke();
+  }
+
+  // 2) Parlaklık şeritleri — daha hızlı, daha parlak, daha az (2 adet)
+  ctx.lineWidth = 2;
+  for(let s=0; s<2; s++){
+    const shimT = ((_riverData.shimmerOffset + s*0.50) % 1.0);
+    const fIdx = shimT * (pts.length - 1.001);
+    const i0 = Math.floor(fIdx);
+    const t = fIdx - i0;
+    if(i0 >= pts.length-1) continue;
+    const p = pts[i0], pn = pts[i0+1];
+    const cx = p.x + (pn.x - p.x)*t;
+    const cy = p.y + (pn.y - p.y)*t;
+    const cw = (p.w + (pn.w - p.w)*t) * 0.45;
+    const nx = p.nx + (pn.nx - p.nx)*t;
+    const ny = p.ny + (pn.ny - p.ny)*t;
+
+    const lifeAlpha = Math.sin(shimT * Math.PI) * 0.85;
+    ctx.strokeStyle = `rgba(255,255,255,${lifeAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(cx - nx*cw*0.3 + ny*1.5, cy - ny*cw*0.3 - nx*1.5);
+    ctx.lineTo(cx + nx*cw*0.3 - ny*1.5, cy + ny*cw*0.3 + nx*1.5);
+    ctx.stroke();
+
+    // Çevresine küçük parlama halesi
+    ctx.fillStyle = `rgba(255,255,255,${lifeAlpha*0.25})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, cw*0.4, 1.5, Math.atan2(ny,nx), 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // 3) Foam partikülleri — eskisi gibi ama biraz daha yumuşak
+  if(_riverTime % 5 === 0){
     const idx = Math.floor(Math.random() * (pts.length - 1));
     const p = pts[idx];
     _riverData.particles.push({
-      x: p.x + (Math.random()-0.5)*p.w*0.6,
+      x: p.x + (Math.random()-0.5)*p.w*0.7,
       y: p.y,
-      vy: 1.2 + Math.random()*1.5,
+      vy: 1.3 + Math.random()*1.5,
       vx: (Math.random()-0.5)*0.5,
       life: 1.0,
-      size: 1.5 + Math.random()*2.5,
-      type: Math.random() < 0.3 ? 'foam' : 'wave',
+      size: 1.4 + Math.random()*2.5,
+      type: Math.random() < 0.35 ? 'foam' : 'wave',
     });
   }
 
-  // Parcaciklari guncelle ve ciz
   _riverData.particles = _riverData.particles.filter(p => {
     p.x += p.vx;
     p.y += p.vy;
-    p.life -= 0.025;
+    p.life -= 0.022;
     if(p.life <= 0) return false;
-
     const alpha = Math.min(1, p.life * 2);
-    ctx.save();
-    ctx.globalAlpha = alpha * 0.7;
-
+    ctx.globalAlpha = alpha * 0.75;
     if(p.type === 'foam'){
-      // Kopuk — beyaz daire
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
       ctx.fill();
+      // Köpük halesi
+      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size*1.7, 0, Math.PI*2);
+      ctx.fill();
     } else {
-      // Dalga — ince yatay cizgi
-      ctx.strokeStyle = 'rgba(180,230,255,0.8)';
+      ctx.strokeStyle = 'rgba(220,240,255,0.85)';
       ctx.lineWidth = 1;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -7090,14 +8076,15 @@ function drawRiverAnim(){
       ctx.lineTo(p.x + p.size, p.y);
       ctx.stroke();
     }
-    ctx.restore();
     return true;
   });
+  ctx.globalAlpha = 1;
 
-  // Max parcacik siniri
-  if(_riverData.particles.length > 80){
-    _riverData.particles.splice(0, _riverData.particles.length - 80);
+  if(_riverData.particles.length > 90){
+    _riverData.particles.splice(0, _riverData.particles.length - 90);
   }
+
+  ctx.restore();
 }
 
 function spawnMuzzleFlash(x,y,rad){
