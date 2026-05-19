@@ -1400,7 +1400,11 @@ button:active{opacity:0.75;transform:scale(0.96);}
 <!-- Kalkan + Bunker — sağa yaslanmış, kalkan üstte bunker altta -->
 <div id="right-action-wrap" style="position:fixed;top:148px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
   <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🛡️</button>
-  <div id="buried-unlock-btn" onclick="showBuriedInfo()" style="display:none;width:36px;height:36px;background:rgba(0,0,0,0.7);border:1.5px solid #FFD700;border-radius:50%;cursor:pointer;pointer-events:auto;align-items:center;justify-content:center;animation:nukePulse 1.4s ease-in-out infinite;"><span style="font-size:18px;display:inline-block;animation:nukeSpin 3s linear infinite;">☢️</span></div>
+  <div id="buried-unlock-btn" onclick="showBuriedInfo()" style="display:none;width:48px;height:48px;border-radius:14px;cursor:pointer;pointer-events:auto;align-items:center;justify-content:center;position:relative;-webkit-tap-highlight-color:transparent;background:linear-gradient(180deg,#3a2008,#0e0602);border:1.5px solid #FFD700;box-shadow:0 3px 0 #5a3800,0 4px 14px rgba(255,180,40,0.45),inset 0 1px 0 rgba(255,215,0,0.35),inset 0 0 12px rgba(255,180,40,0.18);overflow:visible;transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 #5a3800,0 2px 8px rgba(255,180,40,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''">
+    <span style="position:absolute;inset:-3px;border-radius:16px;border:1.5px solid rgba(255,215,0,0.4);animation:nukePulse 1.4s ease-in-out infinite;pointer-events:none;"></span>
+    <span style="font-size:24px;line-height:1;display:inline-block;animation:nukeSpin 4s linear infinite;filter:drop-shadow(0 0 6px rgba(255,180,40,0.7));">☢️</span>
+    <span style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#FF3D00,#a02500);border:1.5px solid #fff;font-size:9px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Rajdhani',sans-serif;box-shadow:0 1px 4px rgba(0,0,0,0.6);line-height:1;">!</span>
+  </div>
 </div>
 
 <div id="power-wrap">
@@ -1513,7 +1517,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.122';
+const APP_VERSION      = '1.0.123';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1531,8 +1535,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 22:37';
-const APP_VERSION_NOTE = 'Terrain tipleri degisti';
+const APP_VERSION_DATE = '2026.05.19 23:28';
+const APP_VERSION_NOTE = 'bunker buster tasarim duzeltildi.';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -7953,6 +7957,127 @@ function drawBullet(){
       ctx.restore();
     }
     } // end if(!bullet.underground)
+    else {
+      // ── BUNKER BUSTER UNDERGROUND VISUALIZATION ──────────────────
+      // Toprağa girdiği nokta, toprak içi yörünge ve mermi pozisyonu
+      const ad = AMMO_DEF[bullet.ammoType||selectedAmmo]||AMMO_DEF.normal;
+      const ex = bullet.undergroundStartX;
+      const ey = bullet.undergroundStartY;
+      const bx = bullet.x;
+      const by = bullet.y;
+      // Toprak rengini al
+      const th = currentTheme || THEMES.valley;
+      const earthCols = th.terrainColors || ['#6B7C5A','#5A6B4A','#4A5A3A'];
+      const earthDark = earthCols[3] || earthCols[2] || '#3a2a1a';
+      const earthMid  = earthCols[2] || '#5a4a30';
+
+      // 1) Giriş çatlağı — V şeklinde radyal çatlaklar
+      ctx.save();
+      ctx.translate(ex, ey);
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = 'round';
+      const _seed = Math.floor(ex*7+ey*3);
+      const _rng = (n) => { const v = Math.sin(_seed+n*127.1)*43758.5; return v-Math.floor(v); };
+      for(let i=0;i<7;i++){
+        const ang = -Math.PI/2 + (_rng(i)-0.5)*2.4;
+        const len = 3 + _rng(i+30)*4;
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.lineTo(Math.cos(ang)*len, Math.sin(ang)*len);
+        ctx.stroke();
+      }
+      // Giriş ağzı — koyu krater
+      const ehGrad = ctx.createRadialGradient(0,0,0,0,0,9);
+      ehGrad.addColorStop(0,'rgba(10,5,2,0.95)');
+      ehGrad.addColorStop(0.55,'rgba(30,18,8,0.75)');
+      ehGrad.addColorStop(1,'rgba(30,18,8,0)');
+      ctx.fillStyle = ehGrad;
+      ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fill();
+      // Sıcak çekirdek (yeni girdi)
+      const _heatGrad = ctx.createRadialGradient(0,0,0,0,0,4);
+      _heatGrad.addColorStop(0,'rgba(255,180,40,0.65)');
+      _heatGrad.addColorStop(1,'rgba(255,80,0,0)');
+      ctx.fillStyle = _heatGrad;
+      ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      // 2) Toprak içi yörünge — dashed kazıma izi (giriş → mermi)
+      ctx.save();
+      ctx.strokeStyle = earthDark;
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      // Üst orta açık çizgi (kazılan kanal)
+      ctx.strokeStyle = 'rgba(40,28,18,0.75)';
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([3, 3]);
+      ctx.lineDashOffset = -(Date.now()/60) % 6;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // 3) Mermi konumu — toprak içinde silüet (içeri girdiği belli)
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(Math.atan2(bullet.vy, bullet.vx));
+      // Toprak içi gölge halo
+      const _ug = ctx.createRadialGradient(0,0,0,0,0,14);
+      _ug.addColorStop(0,'rgba(255,180,40,0.45)');
+      _ug.addColorStop(0.6,'rgba(120,40,0,0.20)');
+      _ug.addColorStop(1,'rgba(120,40,0,0)');
+      ctx.fillStyle = _ug;
+      ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.fill();
+      // Mermi gövdesi (daha koyu, içeride hissi)
+      const _bg = ctx.createLinearGradient(-8,-4,8,4);
+      _bg.addColorStop(0, lightenColor(ad.color, 8));
+      _bg.addColorStop(1, darkenColor(ad.color, 35));
+      ctx.fillStyle = _bg;
+      ctx.beginPath(); ctx.roundRect(-7, -3.5, 14, 7, 3.5); ctx.fill();
+      // Burun kıvılcımı
+      ctx.fillStyle = 'rgba(255,180,40,0.85)';
+      ctx.beginPath();
+      ctx.moveTo(6, 0); ctx.lineTo(11, -2); ctx.lineTo(11, 2);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+
+      // 4) Mermi ardından koyu toprak parçacıkları (her frame spawn)
+      if(Math.random() < 0.55){
+        const t2 = Math.random();
+        const px = ex + (bx-ex)*t2 + (Math.random()-0.5)*3;
+        const py = ey + (by-ey)*t2 + (Math.random()-0.5)*3;
+        particles.push({
+          x: px, y: py,
+          vx: (Math.random()-0.5)*0.8,
+          vy: -0.3 - Math.random()*0.5,
+          size: 0.8 + Math.random()*1.4,
+          life: 14 + Math.random()*10, maxLife: 24,
+          color: earthMid,
+          type: 'dust',
+        });
+      }
+      // Giriş ağzından sürekli toz fışkırması
+      if(Math.random() < 0.35){
+        const ang = -Math.PI/2 + (Math.random()-0.5)*1.4;
+        const v = 1.2 + Math.random()*1.8;
+        particles.push({
+          x: ex + (Math.random()-0.5)*4,
+          y: ey - 1,
+          vx: Math.cos(ang)*v,
+          vy: Math.sin(ang)*v,
+          size: 1.2 + Math.random()*1.6,
+          life: 20 + Math.random()*15, maxLife: 35,
+          color: Math.random()<0.4 ? '#3a2a18' : earthMid,
+          type: 'dust',
+        });
+      }
+    }
   } // end if(bullet)
 
   // Extra mermiler (triple/split parçaları) — aynı görsel stilte
@@ -11849,6 +11974,11 @@ const LANG = {
     buried_title:       'Gömülü Hedef',
     buried_body:        'Bu hedef toprak altında gizli.<br><br>Normal silahlar <b style="color:#FFB74D;">az hasar</b> verir.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>💥 Güçlü patlamalar terreni <b style="color:#FFD700;">sarsarak</b> hedefi açığa çıkarabilir.',
     buried_ok:          'Anladım',
+    buried_chip_low:    'Normal silahlar toprağa karşı <b style="color:#FF8A5A">az hasar</b> verir',
+    buried_chip_bunker: '<b style="color:#80CBC4">Bunker Buster</b> toprağı delerek tam hasar verir',
+    buried_chip_shake:  'Güçlü patlamalar zemini <b style="color:#A5D6A7">sarsar</b> ve hedefi açığa çıkarır',
+    guided_body_short:  'Hedef mağara içinde gizli. <b style="color:#FFB874">Isıya Güdümlü Başlık</b> mermin ısı kaynağına otomatik yönelir.',
+    guided_chip_scope:  'Sadece bu level için geçerli',
     cloud_title:        '🎮 Play Games',
     lvl_prev_next:      'Sıradaki Level',
     lvl_prev_lvl:       'LEVEL',
@@ -12331,6 +12461,11 @@ const LANG = {
     buried_title:       'Buried Target',
     buried_body:        'This target is buried underground.<br><br>Normal weapons deal <b style="color:#FFB74D;">low damage</b>.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> drills through the ground for full damage.<br><br>💥 Strong explosions can <b style="color:#FFD700;">shake the terrain</b> and expose the target.',
     buried_ok:          'Got it',
+    buried_chip_low:    'Regular weapons deal <b style="color:#FF8A5A">low damage</b> against earth',
+    buried_chip_bunker: '<b style="color:#80CBC4">Bunker Buster</b> drills through ground for full damage',
+    buried_chip_shake:  'Strong explosions <b style="color:#A5D6A7">shake</b> the ground and expose the target',
+    guided_body_short:  'The target is hidden inside the cave. <b style="color:#FFB874">Heat-Seeking Warhead</b> auto-tracks the heat source.',
+    guided_chip_scope:  'Only valid for this level',
     cloud_title:        '🎮 Play Games',
     lvl_prev_next:      'Next Level',
     lvl_prev_lvl:       'LEVEL',
@@ -15353,41 +15488,48 @@ function openTacticalInfo(){
   </div>
 </div>
 
-<!-- Isıya Güdümlü Başlık Hint Kartı -->
-<div id="guided-hint-bg" style="display:none;position:fixed;inset:0;z-index:800;
-  background:rgba(0,0,0,0.72);align-items:center;justify-content:center;">
-  <div style="background:linear-gradient(135deg,#1a0a00,#2a1000);
-    border:1.5px solid rgba(255,100,0,0.45);border-radius:22px;
-    padding:26px 20px;width:290px;text-align:center;
-    box-shadow:0 0 40px rgba(255,80,0,0.15);">
-    <div style="font-size:44px;margin-bottom:8px;">🔥</div>
-    <div style="color:#FF6B35;font-size:18px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;margin-bottom:8px;" data-i18n="guided_title">Mağara Hedefi!</div>
-    <div style="color:rgba(255,255,255,0.75);font-size:13px;line-height:1.6;margin-bottom:18px;" data-i18n-html="guided_body">
-      Hedef mağara içinde gizli.<br>
-      <b style="color:#FFB74D;">Isıya Güdümlü Başlık</b> ile<br>
-      mermin ısı kaynağına otomatik yönelir.<br>
-      <span style="color:rgba(255,255,255,0.45);font-size:11px;">Bu level için geçerli</span>
+<!-- Mağara Hedefi / Isıya Güdümlü Başlık — modern redesigned card -->
+<div id="guided-hint-bg" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.78);backdrop-filter:blur(8px);align-items:center;justify-content:center;">
+  <div style="background:linear-gradient(180deg,#1a0f08 0%,#0a0604 100%);border:1.5px solid rgba(255,107,53,0.35);border-radius:24px;padding:0;width:300px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(255,107,53,0.25),0 0 40px rgba(255,80,0,0.22),inset 0 1px 0 rgba(255,255,255,0.06);overflow:hidden;animation:caveCardIn 0.35s cubic-bezier(0.34,1.56,0.64,1);">
+    <!-- Hero band: cave silhouette + fire icon -->
+    <div style="position:relative;height:96px;overflow:hidden;background:linear-gradient(180deg,#3a1808 0%,#0a0402 100%);">
+      <!-- Cave silhouette SVG -->
+      <svg viewBox="0 0 300 96" preserveAspectRatio="xMidYEnd slice" style="position:absolute;inset:0;width:100%;height:100%;display:block;">
+        <path d="M 0 96 L 0 70 Q 40 60 80 65 Q 120 55 145 50 Q 165 30 175 32 Q 195 8 215 12 Q 240 5 265 18 Q 290 22 300 35 L 300 96 Z" fill="#1a0a04" opacity="0.85"/>
+        <ellipse cx="200" cy="70" rx="28" ry="20" fill="#000"/>
+        <ellipse cx="200" cy="72" rx="24" ry="16" fill="url(#caveGlow)"/>
+        <defs>
+          <radialGradient id="caveGlow" cx="50%" cy="60%" r="50%">
+            <stop offset="0%" stop-color="#FF6B35" stop-opacity="0.85"/>
+            <stop offset="60%" stop-color="#a02000" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+      </svg>
+      <!-- Fire icon overlay -->
+      <div style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+        <div style="width:60px;height:60px;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(255,180,80,0.85),rgba(170,40,0,0.6) 60%,rgba(60,10,0,0.0) 100%);box-shadow:0 0 22px rgba(255,80,0,0.5),inset 0 0 14px rgba(255,140,40,0.4);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,140,40,0.55);">
+          <span style="font-size:30px;filter:drop-shadow(0 0 6px rgba(255,140,40,0.8));">🔥</span>
+        </div>
+      </div>
+      <div style="position:absolute;top:10px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,140,40,0.6);font-weight:800;font-family:'Rajdhani',sans-serif;">HEAT-SEEKING</div>
+      <div style="position:absolute;top:10px;right:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,140,40,0.6);font-weight:800;font-family:'Rajdhani',sans-serif;">CAVE OPS</div>
     </div>
-    <button onclick="guidedHintAd()"
-      style="width:100%;padding:13px;border:none;border-radius:14px;
-      background:linear-gradient(135deg,#FF4500,#FF6B35);
-      color:white;font-size:15px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:10px;" data-i18n="guided_ad_btn">
-      📺 Reklam İzle → 1 Level Aç
-    </button>
-    <button onclick="closeGuidedHint();switchTab('boost');openGallery(curLevel);"
-      style="width:100%;padding:10px;border-radius:14px;
-      border:1.5px solid rgba(255,100,0,0.3);
-      background:rgba(255,100,0,0.08);color:#FF6B35;
-      font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;" data-i18n="guided_perm_btn">
-      ⚡ Güçlendirmeler'den Al
-    </button>
-    <button onclick="closeGuidedHint()"
-      style="width:100%;padding:8px;border:none;background:none;
-      color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;" data-i18n="piercer_skip">
-      Şimdi değil
-    </button>
+    <!-- Body -->
+    <div style="padding:18px 18px 16px;text-align:center;font-family:'Rajdhani',sans-serif;">
+      <div style="background:linear-gradient(180deg,#FFB874,#FF6B35);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:21px;font-weight:800;letter-spacing:0.5px;margin-bottom:6px;" data-i18n="guided_title">Mağara Hedefi!</div>
+      <div style="color:rgba(255,255,255,0.62);font-size:12.5px;line-height:1.55;margin-bottom:14px;font-weight:600;" data-i18n-html="guided_body_short">Hedef mağara içinde gizli. <b style="color:#FFB874">Isıya Güdümlü Başlık</b> mermin ısı kaynağına otomatik yönelir.</div>
+
+      <!-- Info chip: level scope -->
+      <div style="display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:10px;background:rgba(255,107,53,0.10);border:1px solid rgba(255,107,53,0.22);margin-bottom:14px;text-align:left;">
+        <span style="font-size:16px;">📍</span>
+        <span style="color:rgba(255,255,255,0.78);font-size:11.5px;font-weight:600;" data-i18n="guided_chip_scope">Sadece bu level için geçerli</span>
+      </div>
+
+      <button onclick="guidedHintAd()" style="width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(180deg,#FF8E5A,#FF6B35 50%,#ff3d00 100%);color:#fff;font-size:14px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a02500,0 5px 14px rgba(255,107,53,0.4),inset 0 1px 0 rgba(255,255,255,0.25);text-shadow:0 1px 0 rgba(0,0,0,0.3);margin-bottom:8px;transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a02500,inset 0 1px 0 rgba(255,255,255,0.18)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="guided_ad_btn">📺 Reklam İzle → 1 Level Aç</button>
+      <button onclick="closeGuidedHint();switchTab('boost');openGallery(curLevel);" style="width:100%;padding:11px;border-radius:13px;border:1.5px solid rgba(255,107,53,0.35);background:rgba(255,107,53,0.08);color:#FFB874;font-size:12.5px;font-weight:800;letter-spacing:0.3px;cursor:pointer;font-family:'Rajdhani',sans-serif;-webkit-tap-highlight-color:transparent;margin-bottom:6px;" data-i18n="guided_perm_btn">⚡ Güçlendirmeler'den Al</button>
+      <button onclick="closeGuidedHint()" style="width:100%;padding:7px;border:none;background:none;color:rgba(255,255,255,0.4);font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;-webkit-tap-highlight-color:transparent;" data-i18n="piercer_skip">ŞİMDİ DEĞİL</button>
+    </div>
   </div>
 </div>
 
@@ -15422,20 +15564,52 @@ function openTacticalInfo(){
   </div>
 </div>
 
-<!-- Buried info popup -->
-<div id="buried-info-pop" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;" onclick="closeBuriedInfo()">
-  <div style="background:#1a1a2e;border:2px solid #FFD700;border-radius:16px;padding:24px 20px;max-width:280px;text-align:center;font-family:'Rajdhani',sans-serif;" onclick="event.stopPropagation()">
-    <div style="font-size:36px;margin-bottom:8px;">☢️</div>
-    <div style="color:#FFD700;font-size:18px;font-weight:700;margin-bottom:12px;" data-i18n="buried_title">Gömülü Hedef</div>
-    <div style="color:rgba(255,255,255,0.85);font-size:13px;line-height:1.6;margin-bottom:14px;" data-i18n-html="buried_body">
-      Bu hedef toprak altında gizli.<br>
-      Normal silahlar <b style="color:#FF6B35;">az hasar</b> verir.<br><br>
-      🪛 <b style="color:#80CBC4;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>
-      💥 Güçlü patlamalar terreni <b style="color:#A5D6A7;">sarsarak</b> hedefi açığa çıkarabilir.
+<!-- Buried info popup — modern redesigned card -->
+<div id="buried-info-pop" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.78);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="closeBuriedInfo()">
+  <div style="background:linear-gradient(180deg,#241a08 0%,#0e0a02 100%);border:1.5px solid rgba(255,180,40,0.35);border-radius:24px;padding:0;width:300px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(255,215,0,0.22),0 0 40px rgba(255,140,40,0.18),inset 0 1px 0 rgba(255,255,255,0.06);overflow:hidden;animation:buriedCardIn 0.35s cubic-bezier(0.34,1.56,0.64,1);" onclick="event.stopPropagation()">
+    <!-- Hero band with rotating radiation icon -->
+    <div style="position:relative;height:90px;background:radial-gradient(circle at center,rgba(255,180,40,0.32),rgba(50,20,0,0.05) 70%);overflow:hidden;display:flex;align-items:center;justify-content:center;border-bottom:1px solid rgba(255,180,40,0.18);">
+      <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(255,180,40,0.04) 8px,rgba(255,180,40,0.04) 16px);"></div>
+      <div style="position:relative;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(255,215,0,0.55),rgba(80,30,0,0.85));border:2px solid #FFD700;box-shadow:0 0 18px rgba(255,180,40,0.55),inset 0 0 12px rgba(255,180,40,0.4);display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:32px;display:inline-block;animation:nukeSpin 4s linear infinite;filter:drop-shadow(0 0 8px rgba(255,180,40,0.7));">☢️</span>
+      </div>
+      <div style="position:absolute;top:10px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,180,40,0.55);font-weight:800;font-family:'Rajdhani',sans-serif;">DANGER</div>
+      <div style="position:absolute;top:10px;right:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,180,40,0.55);font-weight:800;font-family:'Rajdhani',sans-serif;">CLASS-A</div>
     </div>
-    <button onclick="closeBuriedInfo()" style="background:linear-gradient(135deg,#FFD700,#FF8C00);border:none;border-radius:10px;padding:10px 28px;color:#000;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="buried_ok">Anladım</button>
+    <!-- Body -->
+    <div style="padding:18px 18px 16px;text-align:center;font-family:'Rajdhani',sans-serif;">
+      <div style="background:linear-gradient(180deg,#FFE066,#FFD700);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:21px;font-weight:800;letter-spacing:0.5px;margin-bottom:14px;" data-i18n="buried_title">Gömülü Hedef</div>
+
+      <!-- Info chips stacked -->
+      <div style="display:flex;flex-direction:column;gap:6px;text-align:left;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:10px;background:rgba(255,107,53,0.10);border:1px solid rgba(255,107,53,0.22);">
+          <span style="font-size:18px;">⚠️</span>
+          <span style="color:rgba(255,255,255,0.82);font-size:12.5px;font-weight:600;line-height:1.4;" data-i18n-html="buried_chip_low">Normal silahlar toprağa karşı <b style="color:#FF8A5A">az hasar</b> verir</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:10px;background:rgba(128,203,196,0.10);border:1px solid rgba(128,203,196,0.25);">
+          <span style="font-size:18px;">🪛</span>
+          <span style="color:rgba(255,255,255,0.82);font-size:12.5px;font-weight:600;line-height:1.4;" data-i18n-html="buried_chip_bunker"><b style="color:#80CBC4">Bunker Buster</b> toprağı delerek tam hasar verir</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:10px;background:rgba(165,214,167,0.10);border:1px solid rgba(165,214,167,0.25);">
+          <span style="font-size:18px;">💥</span>
+          <span style="color:rgba(255,255,255,0.82);font-size:12.5px;font-weight:600;line-height:1.4;" data-i18n-html="buried_chip_shake">Güçlü patlamalar zemini <b style="color:#A5D6A7">sarsar</b> ve hedefi açığa çıkarır</span>
+        </div>
+      </div>
+
+      <button onclick="closeBuriedInfo()" style="width:100%;padding:12px;border:none;border-radius:14px;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);color:#1a0800;font-size:14px;font-weight:800;letter-spacing:1px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a85a00,0 5px 14px rgba(255,140,0,0.35),inset 0 1px 0 rgba(255,255,255,0.5);text-shadow:0 1px 0 rgba(255,255,255,0.3);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a85a00,inset 0 1px 0 rgba(255,255,255,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="buried_ok">ANLADIM</button>
+    </div>
   </div>
 </div>
+<style>
+@keyframes buriedCardIn{
+  0%{transform:scale(0.85);opacity:0;}
+  100%{transform:scale(1);opacity:1;}
+}
+@keyframes caveCardIn{
+  0%{transform:scale(0.85);opacity:0;}
+  100%{transform:scale(1);opacity:1;}
+}
+</style>
 
 <!-- Sandbox Giriş Kartı (WebView 1'de gösterilir) -->
 <div id="sandbox-entry-card" style="display:none;position:fixed;inset:0;z-index:950;
