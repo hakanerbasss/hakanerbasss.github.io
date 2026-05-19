@@ -1421,7 +1421,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.116';
+const APP_VERSION      = '1.0.117';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1439,8 +1439,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 18:58';
-const APP_VERSION_NOTE = 'Leaderboard eklendi';
+const APP_VERSION_DATE = '2026.05.19 19:09';
+const APP_VERSION_NOTE = 'Leaderbord textker en tr yapildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -11223,11 +11223,26 @@ const LANG = {
     buried_title:       'Gömülü Hedef',
     buried_body:        'Bu hedef toprak altında gizli.<br><br>Normal silahlar <b style="color:#FFB74D;">az hasar</b> verir.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>💥 Güçlü patlamalar terreni <b style="color:#FFD700;">sarsarak</b> hedefi açığa çıkarabilir.',
     buried_ok:          'Anladım',
-    cloud_title:        '☁️ Bulut Kayıt',
+    cloud_title:        '🎮 Play Games',
+    cloud_save_title:   'Bulut Kayıt',
+    cloud_not_signed:   'Giriş yapılmadı',
     cloud_signin:       'Google Play Games Giriş',
-    cloud_save_now:     'Şimdi Kaydet',
-    cloud_load:         'Buluttan Yükle',
+    cloud_save_now:     '⬆ Kaydet',
+    cloud_load:         '⬇ Yükle',
     cloud_signout:      'Hesap Değiştir / Çıkış',
+    lb_title:           'Skor Tabloları',
+    lb_weekly:          'Haftalık',
+    lb_monthly:         'Aylık',
+    lb_yearly:          'Yıllık',
+    lb_alltime:         'Tüm Zamanlar',
+    pg_first_title:     "Play Games'e Bağlan",
+    pg_first_body:      'İlerlemen güvende olsun, skor tablolarında yarışın ve cihaz değişimlerinde verilerini kaybetme.',
+    pg_first_b1:        'Otomatik bulut kayıt',
+    pg_first_b2:        'Haftalık/aylık skor tabloları',
+    pg_first_b3:        'Cihazlar arası senkron',
+    pg_first_accept:    '▶  ŞİMDİ BAĞLA',
+    pg_first_later:     'ŞİMDİLİK ATLA',
+    pg_first_note:      'Sonradan ayarlardan açabilirsin',
     cloud_hint_title:   'Hesap değiştirmek için:',
     cloud_hint_body:    '1. <b style="color:rgba(255,255,255,0.75);">Ayarlar</b> uygulamasını aç<br>2. <b style="color:rgba(255,255,255,0.75);">Google</b> bölümüne gir<br>3. <b style="color:rgba(255,255,255,0.75);">Google Hizmetleri</b> veya <b style="color:rgba(255,255,255,0.75);">Tüm Hizmetler</b> sekmesini seç<br>4. <b style="color:rgba(255,255,255,0.75);">Play Games</b> üzerine dokun<br>5. <b style="color:rgba(255,255,255,0.75);">Oturum Açılan Hesap</b> yazısına dokun<br>6. İstediğin hesabı seç veya <b style="color:rgba(255,255,255,0.75);">Tüm Oyunlardan Çıkış Yap</b> seçeneğini kullan<br>7. Oyuna geri dön ve <b style="color:rgba(255,255,255,0.75);">Giriş Yap</b> tuşuna bas',
     cloud_auto_save:    'Level tamamlandığında otomatik kaydedilir.',
@@ -11683,11 +11698,26 @@ const LANG = {
     buried_title:       'Buried Target',
     buried_body:        'This target is buried underground.<br><br>Normal weapons deal <b style="color:#FFB74D;">low damage</b>.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> drills through the ground for full damage.<br><br>💥 Strong explosions can <b style="color:#FFD700;">shake the terrain</b> and expose the target.',
     buried_ok:          'Got it',
-    cloud_title:        '☁️ Cloud Save',
+    cloud_title:        '🎮 Play Games',
+    cloud_save_title:   'Cloud Save',
+    cloud_not_signed:   'Not signed in',
     cloud_signin:       'Sign in with Google Play Games',
-    cloud_save_now:     'Save Now',
-    cloud_load:         'Load from Cloud',
+    cloud_save_now:     '⬆ Save',
+    cloud_load:         '⬇ Load',
     cloud_signout:      'Switch Account / Sign Out',
+    lb_title:           'Leaderboards',
+    lb_weekly:          'Weekly',
+    lb_monthly:         'Monthly',
+    lb_yearly:          'Yearly',
+    lb_alltime:         'All Time',
+    pg_first_title:     'Connect Play Games',
+    pg_first_body:      'Keep your progress safe, compete on leaderboards, never lose your data when you switch devices.',
+    pg_first_b1:        'Automatic cloud save',
+    pg_first_b2:        'Weekly/monthly leaderboards',
+    pg_first_b3:        'Cross-device sync',
+    pg_first_accept:    '▶  CONNECT NOW',
+    pg_first_later:     'SKIP FOR NOW',
+    pg_first_note:      'You can enable it later from settings',
     cloud_hint_title:   'To switch accounts:',
     cloud_hint_body:    '1. Open the <b style="color:rgba(255,255,255,0.75);">Settings</b> app<br>2. Go to <b style="color:rgba(255,255,255,0.75);">Google</b><br>3. Choose <b style="color:rgba(255,255,255,0.75);">Google Services</b> or <b style="color:rgba(255,255,255,0.75);">All Services</b><br>4. Tap on <b style="color:rgba(255,255,255,0.75);">Play Games</b><br>5. Tap <b style="color:rgba(255,255,255,0.75);">Signed-in Account</b><br>6. Pick the desired account or use <b style="color:rgba(255,255,255,0.75);">Sign Out of All Games</b><br>7. Return to the game and press <b style="color:rgba(255,255,255,0.75);">Sign In</b>',
     cloud_auto_save:    'Auto-saved when a level is completed.',
@@ -15106,15 +15136,15 @@ function closeCloudSettings() {
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
     <button onclick="openLeaderboard('weekly')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(255,215,0,0.30);background:linear-gradient(180deg,rgba(255,215,0,0.10),rgba(255,215,0,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
-      <span style="font-size:16px;">📅</span>
+      <span style="font-size:16px;">⚡</span>
       <span data-i18n="lb_weekly">Haftalık</span>
     </button>
     <button onclick="openLeaderboard('monthly')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(0,201,177,0.30);background:linear-gradient(180deg,rgba(0,201,177,0.10),rgba(0,201,177,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
-      <span style="font-size:16px;">📆</span>
+      <span style="font-size:16px;">🌙</span>
       <span data-i18n="lb_monthly">Aylık</span>
     </button>
     <button onclick="openLeaderboard('yearly')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(156,100,255,0.32);background:linear-gradient(180deg,rgba(156,100,255,0.10),rgba(156,100,255,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
-      <span style="font-size:16px;">🗓️</span>
+      <span style="font-size:16px;">☀️</span>
       <span data-i18n="lb_yearly">Yıllık</span>
     </button>
     <button onclick="openLeaderboard('alltime')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(255,107,53,0.32);background:linear-gradient(180deg,rgba(255,107,53,0.12),rgba(255,107,53,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
