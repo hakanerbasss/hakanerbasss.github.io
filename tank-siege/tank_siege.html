@@ -238,62 +238,168 @@ button:active{opacity:0.75;transform:scale(0.96);}
   padding:4px 12px;border-radius:20px;
 }
 #gallery-tabs{
-  display:flex;gap:0;margin:0 16px 12px;
-  background:rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;
+  display:flex;gap:4px;margin:0 14px 12px;
+  background:rgba(0,0,0,0.4);
+  border:1.5px solid rgba(255,255,255,0.08);
+  border-radius:14px;padding:4px;
   flex-shrink:0;
 }
 .gtab{
-  flex:1;padding:10px;text-align:center;cursor:pointer;
-  font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;
-  color:rgba(255,255,255,0.5);border:none;background:none;
+  flex:1;padding:9px 6px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;
+  color:rgba(255,255,255,0.5);border:1.5px solid transparent;
+  background:none;border-radius:10px;
   -webkit-tap-highlight-color:transparent;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:background 0.15s, color 0.15s, border-color 0.15s;
 }
-.gtab.active{background:rgba(255,215,0,0.18);color:#FFD700;}
+.gtab.active{
+  background:linear-gradient(180deg,rgba(255,215,0,0.25),rgba(255,215,0,0.12));
+  color:#FFD700;
+  border-color:rgba(255,215,0,0.55);
+  box-shadow:0 0 12px rgba(255,215,0,0.15);
+}
 
 /* Galeri grid */
 .gallery-grid{padding:0 12px 20px;display:flex;flex-direction:column;gap:10px;}
 .gallery-card{
-  background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,255,255,0.1);
-  border-radius:16px;padding:14px 16px;
-  display:flex;align-items:center;gap:14px;
+  position:relative;
+  background:linear-gradient(135deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0.02) 100%);
+  border:1.5px solid rgba(255,255,255,0.10);
+  border-radius:16px;padding:14px 14px;
+  display:flex;align-items:flex-start;gap:12px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.25);
+  transition:transform 0.12s, box-shadow 0.12s;
 }
-.gallery-card.owned{border-color:rgba(0,201,177,0.5);background:rgba(0,201,177,0.08);}
-.gallery-card.selected-card{border-color:#FFD700;background:rgba(255,215,0,0.1);}
-.gallery-card.temp-card{border-color:rgba(255,107,53,0.6);background:rgba(255,107,53,0.08);}
-.gc-icon{font-size:32px;flex-shrink:0;width:44px;text-align:center;}
+.gallery-card.owned{
+  border-color:rgba(0,201,177,0.55);
+  background:linear-gradient(135deg,rgba(0,201,177,0.12) 0%,rgba(0,201,177,0.03) 100%);
+  box-shadow:0 4px 14px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,201,177,0.18);
+}
+.gallery-card.selected-card{
+  border-color:#FFD700;
+  background:linear-gradient(135deg,rgba(255,215,0,0.18) 0%,rgba(255,215,0,0.04) 100%);
+  box-shadow:0 4px 18px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,215,0,0.4), 0 0 24px rgba(255,215,0,0.12);
+}
+.gallery-card.temp-card{
+  border-color:rgba(255,107,53,0.65);
+  background:linear-gradient(135deg,rgba(255,107,53,0.12) 0%,rgba(255,107,53,0.03) 100%);
+  box-shadow:0 4px 14px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,107,53,0.25);
+}
+/* Icon: now a rounded box with a glowy colored background per state */
+.gc-icon{
+  flex-shrink:0;width:56px;height:56px;
+  border-radius:14px;
+  background:radial-gradient(circle at 30% 25%,rgba(255,255,255,0.10),rgba(0,0,0,0.35));
+  border:1.5px solid rgba(255,255,255,0.10);
+  display:flex;align-items:center;justify-content:center;
+  font-size:30px;text-align:center;
+}
+.gallery-card.owned .gc-icon{
+  background:radial-gradient(circle at 30% 25%,rgba(0,201,177,0.28),rgba(0,201,177,0.05));
+  border-color:rgba(0,201,177,0.45);
+}
+.gallery-card.selected-card .gc-icon{
+  background:radial-gradient(circle at 30% 25%,rgba(255,215,0,0.32),rgba(255,215,0,0.06));
+  border-color:rgba(255,215,0,0.55);
+  box-shadow:0 0 14px rgba(255,215,0,0.25);
+}
+.gallery-card.temp-card .gc-icon{
+  background:radial-gradient(circle at 30% 25%,rgba(255,107,53,0.30),rgba(255,107,53,0.05));
+  border-color:rgba(255,107,53,0.5);
+}
 .gc-info{flex:1;min-width:0;}
-.gc-name{color:white;font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;}
-.gc-desc{color:rgba(255,255,255,0.5);font-size:12px;margin-top:1px;}
-.gc-badge{
-  font-size:11px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:3px;
+.gc-name{
+  color:white;font-family:'Rajdhani',sans-serif;
+  font-size:17px;font-weight:700;letter-spacing:0.2px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
 }
-.gc-badge.owned-badge{background:rgba(0,201,177,0.2);color:#00C9B1;}
-.gc-badge.temp-badge{background:rgba(255,107,53,0.2);color:#FF6B35;}
-.gc-badge.locked-badge{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);}
+.gc-desc{color:rgba(255,255,255,0.55);font-size:12px;margin-top:2px;line-height:1.3;}
+.gc-badge{
+  font-size:10px;font-weight:800;letter-spacing:0.8px;
+  padding:2px 8px;border-radius:8px;display:inline-block;
+  text-transform:uppercase;
+  vertical-align:middle;
+}
+.gc-badge.owned-badge{
+  background:rgba(0,201,177,0.18);color:#00E5C7;
+  border:1px solid rgba(0,201,177,0.4);
+}
+.gc-badge.temp-badge{
+  background:rgba(255,107,53,0.20);color:#FF8A5A;
+  border:1px solid rgba(255,107,53,0.5);
+}
+.gc-badge.locked-badge{
+  background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.55);
+  border:1px solid rgba(255,255,255,0.15);
+}
+/* Buttons — 3D feel matching FIRE button */
 .gc-btn{
   flex-shrink:0;border:none;border-radius:12px;padding:8px 14px;
-  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;
+  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:800;letter-spacing:0.5px;
   cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;
+  transition:transform 0.08s, box-shadow 0.08s;
 }
-.gc-btn.btn-select{background:linear-gradient(135deg,#00C9B1,#007a6e);color:white;}
-.gc-btn.btn-selected{background:rgba(255,215,0,0.2);color:#FFD700;border:1.5px solid #FFD700;}
-.gc-btn.btn-buy{background:linear-gradient(135deg,#FF6B35,#ff3d00);color:white;}
-.gc-btn.btn-ad{background:linear-gradient(135deg,#FFD700,#FF8C00);color:#000;}
-.gc-btn.btn-locked{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.3);}
-.gc-btn:disabled{opacity:0.5;pointer-events:none;}
+.gc-btn.btn-select{
+  background:linear-gradient(180deg,#00C9B1,#009685);color:white;
+  box-shadow:0 3px 0 #007a6e, 0 4px 12px rgba(0,201,177,0.3);
+}
+.gc-btn.btn-select:active{transform:translateY(2px);box-shadow:0 1px 0 #007a6e;}
+.gc-btn.btn-selected{
+  background:rgba(255,215,0,0.18);color:#FFD700;
+  border:1.5px solid #FFD700;
+  box-shadow:0 0 12px rgba(255,215,0,0.2);
+}
+.gc-btn.btn-buy{
+  background:linear-gradient(180deg,#FF6B35,#ff3d00);color:white;
+  box-shadow:0 3px 0 #b32200, 0 4px 12px rgba(255,107,53,0.35);
+}
+.gc-btn.btn-buy:active{transform:translateY(2px);box-shadow:0 1px 0 #b32200;}
+.gc-btn.btn-ad{
+  background:linear-gradient(180deg,#FFD700,#FF8C00);color:#1a1a1a;
+  box-shadow:0 3px 0 #a85a00, 0 4px 12px rgba(255,140,0,0.3);
+}
+.gc-btn.btn-ad:active{transform:translateY(2px);box-shadow:0 1px 0 #a85a00;}
+.gc-btn.btn-locked{
+  background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.35);
+  border:1px solid rgba(255,255,255,0.10);
+}
+.gc-btn:disabled{opacity:0.45;pointer-events:none;}
 
 /* Puan reklam butonu */
 #ad-puan-btn{
-  margin:0 16px 16px;padding:14px;border-radius:16px;
-  background:linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,140,0,0.1));
-  border:1.5px solid rgba(255,215,0,0.35);
-  display:flex;align-items:center;justify-content:space-between;
+  margin:0 14px 12px;padding:11px 14px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(255,215,0,0.20),rgba(255,107,53,0.10));
+  border:1.5px solid rgba(255,215,0,0.45);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
   cursor:pointer;-webkit-tap-highlight-color:transparent;
+  box-shadow:0 4px 14px rgba(255,140,0,0.12), 0 0 0 1px rgba(255,215,0,0.08);
   flex-shrink:0;
+  position:relative;overflow:hidden;
 }
-#ad-puan-btn .ad-left{color:white;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;}
-#ad-puan-btn .ad-right{color:#FFD700;font-family:'Rajdhani',sans-serif;font-size:13px;}
-#ad-puan-btn.disabled{opacity:0.4;pointer-events:none;}
+#ad-puan-btn::before{
+  content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);
+  animation:adShine 3.5s linear infinite;
+}
+@keyframes adShine{
+  0%{left:-60%;} 100%{left:160%;}
+}
+#ad-puan-btn .ad-left{
+  display:flex;align-items:center;gap:9px;
+  color:white;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;
+  position:relative;z-index:1;
+}
+#ad-puan-btn .ad-right{
+  color:#1a1a1a;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:800;
+  background:linear-gradient(180deg,#FFD700,#FF8C00);
+  padding:5px 11px;border-radius:10px;
+  box-shadow:0 2px 0 #a85a00;
+  position:relative;z-index:1;
+  white-space:nowrap;
+}
+#ad-puan-btn.disabled{opacity:0.5;pointer-events:none;}
+#ad-puan-btn.disabled::before{display:none;}
 
 /* Gallery close & play */
 #gallery-footer{
@@ -316,9 +422,22 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 /* Stat bars in gallery */
 .stat-row{display:flex;align-items:center;gap:6px;margin-top:4px;}
-.stat-label{color:rgba(255,255,255,0.45);font-size:11px;width:55px;flex-shrink:0;}
-.stat-bar-bg{flex:1;min-width:0;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
-.stat-bar-fill{height:100%;border-radius:3px;}
+.stat-label{
+  color:rgba(255,255,255,0.45);font-size:10px;font-weight:700;
+  letter-spacing:0.5px;text-transform:uppercase;
+  width:55px;flex-shrink:0;
+}
+.stat-bar-bg{
+  flex:1;min-width:0;height:6px;
+  background:rgba(0,0,0,0.4);
+  border:1px solid rgba(255,255,255,0.05);
+  border-radius:3px;overflow:hidden;
+}
+.stat-bar-fill{
+  height:100%;border-radius:3px;
+  box-shadow:0 0 6px currentColor;
+  transition:width 0.3s;
+}
 
 .gc-icon svg{display:block;margin:0 auto;overflow:visible;}
 .ammo-btn svg{max-width:28px;max-height:28px;width:auto;height:auto;}
@@ -470,6 +589,97 @@ button:active{opacity:0.75;transform:scale(0.96);}
   20%{opacity:1;transform:translateX(-50%) scale(1.2);}
   60%{opacity:1;transform:translateX(-50%) scale(1.0);}
   100%{opacity:0;transform:translateX(-50%) translateY(-40px) scale(0.9);}
+}
+
+/* ── SIRADAKİ LEVEL hero kartı ─────────────────────────── */
+#lm-next-hero{
+  margin:10px 14px 4px;
+  border-radius:18px;
+  background:#161e2e;
+  border:1.5px solid rgba(255,215,0,0.6);
+  box-shadow:0 4px 18px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,215,0,0.18);
+  overflow:hidden; position:relative;
+  cursor:pointer; -webkit-tap-highlight-color:transparent;
+  transition:transform 0.1s;
+}
+#lm-next-hero:active{ transform:scale(0.985); }
+
+/* preview band (sky + mountain + tank + target) */
+#lm-hero-preview{
+  position:relative; height:132px; overflow:hidden;
+}
+#lm-hero-sky{ position:absolute; inset:0; }
+#lm-hero-sun{
+  position:absolute; top:14px; right:26px;
+  width:30px; height:30px; border-radius:50%;
+  background:#fff5d8; box-shadow:0 0 24px rgba(255,245,216,0.7);
+}
+#lm-hero-cloud1, #lm-hero-cloud2{
+  position:absolute; border-radius:8px; background:rgba(255,255,255,0.75);
+}
+#lm-hero-cloud1{ top:26px; left:30px; width:56px; height:14px; }
+#lm-hero-cloud2{ top:14px; left:140px; width:36px; height:10px;
+  background:rgba(255,255,255,0.5); }
+#lm-hero-mountain{
+  position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+  width:170px; height:118px;
+}
+#lm-hero-tank{ position:absolute; left:10px; bottom:8px; width:90px; height:54px; }
+#lm-hero-target{ position:absolute; right:18px; bottom:6px; width:42px; height:54px; }
+#lm-hero-arc{ position:absolute; inset:0; pointer-events:none; }
+
+#lm-hero-badge{
+  position:absolute; top:10px; left:12px;
+  background:rgba(0,0,0,0.55);
+  border:1px solid rgba(255,215,0,0.5); border-radius:6px;
+  padding:3px 9px;
+  font-family:'Rajdhani',sans-serif; font-size:10px; font-weight:700;
+  color:#FFD700; letter-spacing:1.5px;
+}
+
+/* info row */
+#lm-hero-info{
+  padding:12px 14px;
+  display:flex; align-items:center; gap:12px;
+}
+#lm-hero-numbox{
+  width:56px; height:56px; border-radius:12px;
+  background:rgba(255,215,0,0.12);
+  border:1.5px solid #FFD700;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+#lm-hero-numbox .lvl-label{
+  font-family:'Rajdhani',sans-serif; font-size:9px; font-weight:700;
+  color:#FFD700; letter-spacing:1px; line-height:1;
+}
+#lm-hero-numbox .lvl-num{
+  font-family:'Fredoka One',sans-serif; font-size:22px;
+  color:#FFD700; line-height:1; margin-top:2px;
+}
+#lm-hero-text{ flex:1; min-width:0; }
+#lm-hero-name{
+  font-family:'Rajdhani',sans-serif; font-size:17px; font-weight:700; color:#fff;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+#lm-hero-meta{
+  font-size:11px; color:rgba(255,255,255,0.6); margin-top:2px;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+#lm-hero-meta .sep{ color:rgba(255,255,255,0.3); }
+#lm-hero-play{
+  width:52px; height:52px; border-radius:50%;
+  background:linear-gradient(135deg,#FF6B35,#ff3d00);
+  border:none; padding:0; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; color:#fff; font-size:22px;
+  box-shadow:0 4px 0 #b32200, 0 5px 18px rgba(255,107,53,0.5);
+  -webkit-tap-highlight-color:transparent;
+  transition:transform 0.08s, box-shadow 0.08s;
+}
+#lm-hero-play:active{
+  transform:translateY(2px);
+  box-shadow:0 2px 0 #b32200, 0 3px 12px rgba(255,107,53,0.5);
 }
 </style>
 </head>
@@ -748,7 +958,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.107';
+const APP_VERSION      = '1.0.108';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -766,8 +976,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 14:38';
-const APP_VERSION_NOTE = 'Stars sustemi ipyal edildi. Dil ekleme devam etti.';
+const APP_VERSION_DATE = '2026.05.19 16:06';
+const APP_VERSION_NOTE = 'Level map ve galeri tasarim degisti';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -9303,9 +9513,114 @@ function closeLevelMap(restoreGame=true){
   }
 }
 
+// ─── SIRADAKİ LEVEL hero card update ────────────────────────────
+function updateNextLevelHero(){
+  // Sıradaki level = ilk yıldızsız (ya da curLevel)
+  var nextIdx = curLevel;
+  for(var i = curLevel; i < LEVELS.length; i++){
+    var st = parseInt(lsGet('stars_'+LEVELS[i].id)||'0');
+    if(st < 3){ nextIdx = i; break; }
+  }
+  var lvd = LEVELS[nextIdx];
+  if(!lvd) return;
+
+  var SKY_GRADS = {
+    valley:['#3a7bd5','#87CEEB','#5a9b6a'],
+    desert:['#c4742a','#e8a050','#b0824a'],
+    snow:['#0d1b3e','#3a4a7e','#7898B8'],
+    forest:['#1a3a4a','#2a5a4a','#3a6a4a'],
+    rocky:['#3a2a4a','#5a4a6a','#4a3a5a'],
+    meadow:['#5a3a10','#a08040','#6a4a20'],
+    volcano:['#1a0a0a','#4a1010','#7a2a1a'],
+    nightcity:['#05071a','#1a1a3a','#3a3a5a'],
+    tropical:['#006994','#0099cc','#3ab0d8'],
+    skyislands:['#1a7aaa','#5aaadd','#a0d0f0'],
+    cloudy:['#445a6a','#7a8a9a','#a8b8c8'],
+    rainy:['#1c2833','#3a4a5a','#5a6a7a'],
+    snowyweather:['#2c3e50','#5a6a7a','#a0b0c0']
+  };
+  var THEME_EMOJI = {valley:'🌳',desert:'🌞',snow:'🏔',forest:'🌲',rocky:'🗻',meadow:'🌴',volcano:'🌋',nightcity:'🌙',tropical:'🌊',skyislands:'💫',cloudy:'⛅',rainy:'⚡',snowyweather:'🌨'};
+  var MTN = {
+    valley:{f:'#6a7864',b:'#3a4a3a'},
+    desert:{f:'#a08260',b:'#6a4e30'},
+    snow:{f:'#7898b8',b:'#344e68'},
+    forest:{f:'#3a5a3a',b:'#1a3a1a'},
+    rocky:{f:'#5a4a5a',b:'#3a2a4a'},
+    meadow:{f:'#7a6a3a',b:'#4a3a1a'},
+    volcano:{f:'#5a2a1a',b:'#2a0a0a'},
+    nightcity:{f:'#2a2a4a',b:'#0a0a2a'},
+    tropical:{f:'#3a7a6a',b:'#1a4a3a'},
+    skyislands:{f:'#5a8aba',b:'#3a6a8a'},
+    cloudy:{f:'#5a6a7a',b:'#3a4a5a'},
+    rainy:{f:'#3a4a5a',b:'#1a2a3a'},
+    snowyweather:{f:'#5a6a7a',b:'#3a4a5a'}
+  };
+  var MAT_ICONS = {wood:'🪵',iron:'⚙️',steel:'🛡️',concrete:'🧱'};
+
+  var theme = lvd.theme || 'valley';
+  var grad = SKY_GRADS[theme] || SKY_GRADS.valley;
+  var mtn = MTN[theme] || MTN.valley;
+
+  var skyEl = document.getElementById('lm-hero-sky');
+  if(skyEl) skyEl.style.background = 'linear-gradient(180deg,'+grad[0]+' 0%,'+grad[1]+' 70%,'+grad[2]+' 100%)';
+
+  var sunEl = document.getElementById('lm-hero-sun');
+  if(sunEl){
+    var sunC = (theme==='snow'||theme==='nightcity') ? '#e8f0ff' : '#fff5d8';
+    sunEl.style.background = sunC;
+    sunEl.style.boxShadow = '0 0 24px '+sunC+'aa';
+    sunEl.style.opacity = (theme==='rainy'||theme==='cloudy') ? '0.4' : '1';
+  }
+
+  var mb = document.getElementById('lm-hero-mtn-back');
+  var mf = document.getElementById('lm-hero-mtn-front');
+  if(mb) mb.setAttribute('fill', mtn.b);
+  if(mf) mf.setAttribute('fill', mtn.f);
+
+  var n = (typeof lvd.id === 'number' ? lvd.id : (nextIdx+1));
+  var numEl = document.getElementById('lm-hero-num');
+  if(numEl) numEl.textContent = ('0'+n).slice(-2);
+
+  var nameEl = document.getElementById('lm-hero-name');
+  if(nameEl) nameEl.textContent = tLevel(lvd.name);
+
+  var themeName = t('theme_'+theme) || theme;
+  var thEl = document.getElementById('lm-hero-theme');
+  if(thEl) thEl.textContent = (THEME_EMOJI[theme]||'🗺')+' '+themeName;
+
+  var matBadge = MAT_BADGE[lvd.targetMat] || '';
+  var matEl = document.getElementById('lm-hero-mat');
+  if(matEl) matEl.textContent = (MAT_ICONS[lvd.targetMat]||'')+' '+matBadge;
+
+  var stars = parseInt(lsGet('stars_'+lvd.id)||'0');
+  var starStr = '';
+  for(var s=0; s<3; s++) starStr += (s<stars ? '⭐' : '☆');
+  var stEl = document.getElementById('lm-hero-stars');
+  if(stEl) stEl.textContent = starStr;
+
+  var hero = document.getElementById('lm-next-hero');
+  if(hero) hero.setAttribute('data-level-idx', nextIdx);
+}
+
+function onNextLevelHeroClick(){
+  var hero = document.getElementById('lm-next-hero');
+  if(!hero) return;
+  var idx = parseInt(hero.getAttribute('data-level-idx')||'0');
+  if(_lmNavigating) return;
+  _lmNavigating = true;
+  var _m = document.getElementById('level-map');
+  _m.style.visibility = 'hidden';
+  _m.style.pointerEvents = 'none';
+  _m.style.opacity = '0';
+  restoreGameLayers(function(){ openGallery(idx); _lmNavigating = false; });
+}
+
 function renderLevelMap(){
   var _lmCont = document.getElementById('level-map-content');
   _lmCont.innerHTML = '';
+
+  // SIRADAKİ LEVEL hero kartını güncelle
+  updateNextLevelHero();
 
   var _lmTotal = getTotalStars();
   var _lmMax   = LEVELS.length * 3;
@@ -10724,6 +11039,77 @@ function openTacticalInfo(){
       color:white;border-radius:12px;padding:6px 14px;font-size:14px;font-weight:700;
       font-family:'Rajdhani',sans-serif;cursor:pointer;transition:transform 0.08s,opacity 0.08s;" ontouchstart="this.style.transform='scale(0.85)';this.style.opacity='0.6'" ontouchend="this.style.transform='';this.style.opacity=''">✕</button>
   </div>
+
+  <!-- SIRADAKİ LEVEL hero kartı (renderLevelMap doldurur) -->
+  <div id="lm-next-hero" onclick="onNextLevelHeroClick()">
+    <div id="lm-hero-preview">
+      <div id="lm-hero-sky"></div>
+      <div id="lm-hero-sun"></div>
+      <div id="lm-hero-cloud1"></div>
+      <div id="lm-hero-cloud2"></div>
+      <svg id="lm-hero-mountain" viewBox="0 0 200 160" preserveAspectRatio="xMidYEnd meet">
+        <path id="lm-hero-mtn-back" d="M 20 160 L 70 60 L 110 110 L 130 80 L 180 160 Z" fill="#3a4a3a" stroke="rgba(0,0,0,0.5)" stroke-width="1.2"/>
+        <path id="lm-hero-mtn-front" d="M 10 160 L 90 30 L 130 90 L 150 60 L 195 160 Z" fill="#6a7864" stroke="rgba(0,0,0,0.5)" stroke-width="1.2"/>
+        <path d="M 90 30 L 130 90 L 90 60 Z" fill="#fff" opacity="0.15"/>
+        <path d="M 90 30 L 90 60 L 60 100 L 10 160 Z" fill="#000" opacity="0.18"/>
+        <ellipse cx="50" cy="148" rx="14" ry="6" fill="#3a4a3a" opacity="0.8"/>
+      </svg>
+      <!-- Tank (side-view, simplified inline SVG) -->
+      <svg id="lm-hero-tank" viewBox="0 0 200 120">
+        <ellipse cx="100" cy="115" rx="80" ry="4" fill="#000" opacity="0.35"/>
+        <rect x="14" y="86" width="172" height="22" rx="11" fill="#1a1a1a"/>
+        <circle cx="26" cy="97" r="10" fill="#2a2a2a" stroke="#000" stroke-width="1"/>
+        <circle cx="174" cy="97" r="10" fill="#2a2a2a" stroke="#000" stroke-width="1"/>
+        <circle cx="60" cy="97" r="8" fill="#2a2a2a"/>
+        <circle cx="100" cy="97" r="8" fill="#2a2a2a"/>
+        <circle cx="140" cy="97" r="8" fill="#2a2a2a"/>
+        <path d="M 18 86 L 26 70 L 178 70 L 188 86 Z" fill="#3a3024"/>
+        <path d="M 22 70 L 36 50 L 174 50 L 188 70 Z" fill="#5a6a3a" stroke="#000" stroke-width="1.2"/>
+        <path d="M 38 52 L 172 52" stroke="#fff" stroke-opacity="0.35" stroke-width="1.5"/>
+        <path d="M 72 50 Q 70 38 80 30 L 112 30 Q 122 38 120 50 Z" fill="#5a6a3a" stroke="#000" stroke-width="1.2"/>
+        <line x1="110" y1="38" x2="170" y2="22" stroke="#1a1a1a" stroke-width="8" stroke-linecap="round"/>
+        <line x1="110" y1="38" x2="170" y2="22" stroke="#5a6a3a" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="170" cy="22" r="4" fill="#1a1a1a"/>
+        <circle cx="86" cy="36" r="2.5" fill="#1a1a1a"/>
+        <line x1="118" y1="30" x2="124" y2="14" stroke="#1a1a1a" stroke-width="1.4"/>
+        <circle cx="124" cy="14" r="1.5" fill="#FFD700"/>
+      </svg>
+      <!-- Target -->
+      <svg id="lm-hero-target" viewBox="0 0 100 130">
+        <rect x="46" y="80" width="8" height="44" fill="#5a3a20" stroke="#000" stroke-width="1"/>
+        <polygon points="30,124 70,124 64,118 36,118" fill="#3a2a14"/>
+        <circle cx="50" cy="50" r="42" fill="#f5f1e6" stroke="#000" stroke-width="1.5"/>
+        <circle cx="50" cy="50" r="34" fill="#e63946"/>
+        <circle cx="50" cy="50" r="26" fill="#f5f1e6"/>
+        <circle cx="50" cy="50" r="18" fill="#e63946"/>
+        <circle cx="50" cy="50" r="10" fill="#f5f1e6"/>
+        <circle cx="50" cy="50" r="5" fill="#1a1a1a"/>
+      </svg>
+      <!-- Trajectory arc -->
+      <svg id="lm-hero-arc" viewBox="0 0 384 132" preserveAspectRatio="none">
+        <path d="M 70 100 Q 192 -10 320 90" fill="none" stroke="#FFD700" stroke-opacity="0.7" stroke-width="1.8" stroke-dasharray="3 5"/>
+      </svg>
+      <div id="lm-hero-badge">SIRADAKİ LEVEL</div>
+    </div>
+    <div id="lm-hero-info">
+      <div id="lm-hero-numbox">
+        <span class="lvl-label">LVL</span>
+        <span class="lvl-num" id="lm-hero-num">01</span>
+      </div>
+      <div id="lm-hero-text">
+        <div id="lm-hero-name">Başlangıç</div>
+        <div id="lm-hero-meta">
+          <span id="lm-hero-theme">🌳 Yeşil Vadi</span>
+          <span class="sep">·</span>
+          <span id="lm-hero-mat">🪵 Tahta</span>
+          <span class="sep">·</span>
+          <span id="lm-hero-stars" style="letter-spacing:1px;color:#FFD700;">☆☆☆</span>
+        </div>
+      </div>
+      <button id="lm-hero-play" type="button" aria-label="Oyna">▶</button>
+    </div>
+  </div>
+
   <div id="level-map-content" style="padding:8px 0 80px;"></div>
 </div>
 
