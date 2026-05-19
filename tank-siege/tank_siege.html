@@ -1421,7 +1421,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.115';
+const APP_VERSION      = '1.0.116';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1439,8 +1439,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 18:09';
-const APP_VERSION_NOTE = 'Daglar eski haline getirikdi';
+const APP_VERSION_DATE = '2026.05.19 18:58';
+const APP_VERSION_NOTE = 'Leaderboard eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1989,6 +1989,13 @@ function init(){
       console.error('init error:',e);
     }
   }, 50);
+
+  // Play Games — sessiz oturum dene + ilk açılış tanıtımı
+  setTimeout(function(){
+    try{ if(typeof tryAutoSignIn === 'function') tryAutoSignIn(); }catch(_){}
+    try{ if(typeof _maybeShowFirstLaunchPgPrompt === 'function') _maybeShowFirstLaunchPgPrompt(); }catch(_){}
+  }, 600);
+
   requestAnimationFrame(loop);
 }
 
@@ -10007,6 +10014,8 @@ function onWin(){
     : '+'+gained+' pts';
   showResult(true, stars, subText);
   autoCloudSave();
+  // Leaderboard'a gönder
+  try{ if(typeof submitAllLeaderboards === 'function') submitAllLeaderboards(); }catch(_){}
 }
 
 function onFail(){
@@ -14800,6 +14809,110 @@ function openTacticalInfo(){
 var _cloudSignedIn = false;
 
 var _cloudUserName = '';
+
+// ════════════════════════════════════════════════════════════════════
+// LEADERBOARD SİSTEMİ
+// ════════════════════════════════════════════════════════════════════
+// Play Console'da 4 farklı leaderboard oluştur ve aşağıdaki ID'leri yapıştır:
+//  - Haftalık (weekly), Aylık (monthly), Yıllık (yearly), Tüm Zamanlar (alltime)
+// Android tarafında şu metodlar olmalı:
+//   Android.submitLeaderboardScore(boardId, score)
+//   Android.showLeaderboard(boardId)
+//   Android.trySilentSignIn()  // opsiyonel — açılışta sessiz oturum dene
+var LEADERBOARD_IDS = {
+  weekly:  'CgkItfTat7UREAIQAQ',   // Haftalık Skor
+  monthly: 'CgkItfTat7UREAIQAg',   // Aylık Skor
+  yearly:  'CgkItfTat7UREAIQAw',   // Yıllık Skor
+  alltime: 'CgkItfTat7UREAIQBA',   // Tüm Zamanlar
+};
+
+function submitToLeaderboard(kind, score){
+  if(typeof Android === 'undefined') return;
+  if(!Android.submitLeaderboardScore) return;
+  var id = LEADERBOARD_IDS[kind];
+  if(!id) return; // ID atanmamış — sessizce atla
+  try{ Android.submitLeaderboardScore(id, score|0); }catch(_){}
+}
+
+function submitAllLeaderboards(){
+  if(typeof Android === 'undefined') return;
+  var total = 0;
+  try { total = parseInt(lsGet('total_score')||'0') || 0; } catch(_) {}
+  ['weekly','monthly','yearly','alltime'].forEach(function(k){
+    submitToLeaderboard(k, total);
+  });
+}
+
+function openLeaderboard(kind){
+  if(typeof Android === 'undefined'){
+    if(typeof showToast === 'function') showToast(t ? t('toast_app_only') : 'Bu özellik yalnızca uygulamada');
+    return;
+  }
+  if(!_cloudSignedIn){
+    cloudSignIn();
+    return;
+  }
+  if(!Android.showLeaderboard){
+    if(typeof showToast === 'function') showToast('Bu sürümde skor tablosu yok');
+    return;
+  }
+  var id = LEADERBOARD_IDS[kind];
+  if(!id){
+    if(typeof showToast === 'function') showToast('Skor tablosu hazır değil');
+    return;
+  }
+  try{ Android.showLeaderboard(id); }
+  catch(e){
+    if(typeof showToast === 'function') showToast('Skor tablosu açılamadı: '+e.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// İLK AÇILIŞ — Play Games tek-seferlik tanıtım
+// ════════════════════════════════════════════════════════════════════
+function _maybeShowFirstLaunchPgPrompt(){
+  if(typeof Android === 'undefined') return; // sadece app içinde
+  try {
+    if(lsGet('pg_prompt_shown')) return;     // daha önce gösterilmiş
+  } catch(_) { return; }
+  setTimeout(function(){
+    var bg = document.getElementById('pg-firstlaunch-bg');
+    var card = document.getElementById('pg-firstlaunch-card');
+    if(bg && card){
+      bg.style.display = 'block';
+      card.style.display = 'block';
+    }
+  }, 1600);
+}
+
+function pgFirstLaunchAccept(){
+  try{ lsSet('pg_prompt_shown', '1'); }catch(_){}
+  var bg = document.getElementById('pg-firstlaunch-bg');
+  var card = document.getElementById('pg-firstlaunch-card');
+  if(bg) bg.style.display = 'none';
+  if(card) card.style.display = 'none';
+  // Sign-in başlat
+  if(typeof Android !== 'undefined' && Android.signInPlayGames){
+    try{ Android.signInPlayGames(); }catch(_){}
+  }
+}
+
+function pgFirstLaunchDecline(){
+  try{ lsSet('pg_prompt_shown', '1'); }catch(_){}
+  var bg = document.getElementById('pg-firstlaunch-bg');
+  var card = document.getElementById('pg-firstlaunch-card');
+  if(bg) bg.style.display = 'none';
+  if(card) card.style.display = 'none';
+}
+
+// Açılışta sessiz oturum dene (kullanıcı bağlamışsa otomatik bağlan)
+function tryAutoSignIn(){
+  if(typeof Android === 'undefined') return;
+  if(Android.trySilentSignIn){
+    try{ Android.trySilentSignIn(); }catch(_){}
+  }
+}
+
 function _updateCloudBadge(success, name) {
   var btn = document.getElementById('cloud-games-btn');
   if (btn) {
@@ -14924,16 +15037,32 @@ function _refreshCloudSettingsUI() {
   var statusEl   = document.getElementById('cloud-account-status');
   var signoutBtn = document.getElementById('cloud-signout-btn');
   var signinBtn  = document.getElementById('cloud-signin-btn');
-  var hintEl = document.getElementById('cloud-account-hint');
+  var hintEl     = document.getElementById('cloud-account-hint');
+  var avatarEl   = document.getElementById('cloud-avatar');
   if (_cloudSignedIn) {
-    if (nameEl)     { nameEl.textContent = _cloudUserName || 'Bilinmiyor'; nameEl.style.color = '#4285F4'; }
-    if (statusEl)   { statusEl.textContent = 'Play Games bagli'; statusEl.style.color = '#00C853'; }
+    var nm = _cloudUserName || 'Bilinmiyor';
+    if (nameEl)     { nameEl.textContent = nm; nameEl.style.color = '#fff'; }
+    if (statusEl)   {
+      statusEl.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#00C853;margin-right:6px;vertical-align:middle;box-shadow:0 0 6px rgba(0,200,83,0.6);"></span>Bağlı';
+      statusEl.style.color = '#00C853';
+    }
+    if (avatarEl)   {
+      avatarEl.textContent = (nm.charAt(0) || '?').toUpperCase();
+      avatarEl.style.background = 'linear-gradient(135deg,#4285F4,#2a6acc)';
+    }
     if (signoutBtn) signoutBtn.style.display = 'block';
     if (signinBtn)  signinBtn.style.display  = 'none';
-    if (hintEl)     hintEl.style.display = 'none'; // giris yapildi, hint'i gizle
+    if (hintEl)     hintEl.style.display = 'none';
   } else {
-    if (nameEl)     { nameEl.textContent = 'Giris yapilmadi'; nameEl.style.color = 'rgba(255,255,255,0.4)'; }
-    if (statusEl)   { statusEl.textContent = ''; }
+    if (nameEl)     { nameEl.textContent = 'Giriş yapılmadı'; nameEl.style.color = 'rgba(255,255,255,0.45)'; }
+    if (statusEl)   {
+      statusEl.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#666;margin-right:6px;vertical-align:middle;"></span>Bağlı değil';
+      statusEl.style.color = 'rgba(255,255,255,0.45)';
+    }
+    if (avatarEl)   {
+      avatarEl.textContent = '?';
+      avatarEl.style.background = 'linear-gradient(135deg,#3a4258,#2a2f3f)';
+    }
     if (signoutBtn) signoutBtn.style.display = 'none';
     if (signinBtn)  signinBtn.style.display  = 'block';
   }
@@ -14947,36 +15076,124 @@ function closeCloudSettings() {
 }
 </script>
 
-<div id="cloud-settings-bg" onclick="closeCloudSettings()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
-<div id="cloud-settings-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:3px solid #4285F4;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="cloud_title">☁️ Bulut Kayıt</span>
-    <button onclick="closeCloudSettings()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;line-height:1;">✕</button>
-  </div>
-  <div style="background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.2);border-radius:12px;padding:12px;margin-bottom:14px;text-align:center;">
-    <div id="cloud-account-name" style="font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;color:rgba(255,255,255,0.4);"></div>
-    <div id="cloud-account-status" style="font-size:11px;margin-top:3px;"></div>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:8px;">
-    <button id="cloud-signin-btn" onclick="cloudSignIn()" style="padding:10px;border-radius:12px;border:1px solid #4285F4;background:rgba(66,133,244,0.15);color:#4285F4;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="cloud_signin">Google Play Games Giriş</button>
-    <button onclick="cloudSave()" style="padding:10px;border-radius:12px;border:1px solid #00C853;background:rgba(0,200,83,0.15);color:#00C853;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="cloud_save_now">Şimdi Kaydet</button>
-    <button onclick="cloudLoad()" style="padding:10px;border-radius:12px;border:1px solid #FF6B35;background:rgba(255,107,53,0.15);color:#FF6B35;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;" data-i18n="cloud_load">Buluttan Yükle</button>
-    <button id="cloud-signout-btn" onclick="cloudSignOut()" style="display:none;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;" data-i18n="cloud_signout">Hesap Değiştir / Çıkış</button>
-    <div id="cloud-account-hint" style="display:none;margin-top:6px;padding:10px 12px;border-radius:10px;background:rgba(255,193,7,0.07);border:1px solid rgba(255,193,7,0.2);">
-      <div style="color:#FFD54F;font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif;margin-bottom:5px;" data-i18n="cloud_hint_title">Hesap değiştirmek için:</div>
-      <div style="color:rgba(255,255,255,0.55);font-size:10px;line-height:1.6;" data-i18n-html="cloud_hint_body">
-        1. <b style="color:rgba(255,255,255,0.75);">Ayarlar</b> uygulamasını aç<br>
-        2. <b style="color:rgba(255,255,255,0.75);">Google</b> bölümüne gir<br>
-        3. <b style="color:rgba(255,255,255,0.75);">Google Hizmetleri</b> veya <b style="color:rgba(255,255,255,0.75);">Tüm Hizmetler</b> sekmesini seç<br>
-        4. <b style="color:rgba(255,255,255,0.75);">Play Games</b> üzerine dokun<br>
-        5. <b style="color:rgba(255,255,255,0.75);">Oturum Açılan Hesap</b> yazısına dokun<br>
-        6. İstediğin hesabı seç veya <b style="color:rgba(255,255,255,0.75);">Tüm Oyunlardan Çıkış Yap</b> seçeneğini kullan<br>
-        7. Oyuna geri dön ve <b style="color:rgba(255,255,255,0.75);">Giriş Yap</b> tuşuna bas
-      </div>
+<div id="cloud-settings-bg" onclick="closeCloudSettings()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);"></div>
+<div id="cloud-settings-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:linear-gradient(180deg,#1f2940 0%,#101828 100%);border-radius:22px;padding:18px 18px 16px;width:320px;max-width:calc(100vw - 32px);max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(66,133,244,0.18),inset 0 1px 0 rgba(255,255,255,0.05);border-top:3px solid #4285F4;">
+
+  <!-- HEADER -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#4285F4,#2a6acc);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(66,133,244,0.4);font-size:18px;">🎮</div>
+      <span style="background:linear-gradient(180deg,#7eb0ff,#4285F4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:17px;font-weight:800;font-family:'Rajdhani',sans-serif;letter-spacing:0.3px;" data-i18n="cloud_title">Play Games</span>
     </div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:2px;line-height:1.5;" data-i18n="cloud_auto_save">Level tamamlandığında otomatik kaydedilir.</div>
+    <button onclick="closeCloudSettings()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:14px;cursor:pointer;width:26px;height:26px;border-radius:50%;line-height:1;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">✕</button>
   </div>
+
+  <!-- ACCOUNT CARD -->
+  <div style="background:linear-gradient(135deg,rgba(66,133,244,0.12),rgba(66,133,244,0.04));border:1.5px solid rgba(66,133,244,0.30);border-radius:14px;padding:12px;margin-bottom:14px;display:flex;align-items:center;gap:11px;">
+    <div id="cloud-avatar" style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#4285F4,#2a6acc);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;flex-shrink:0;font-family:'Rajdhani',sans-serif;box-shadow:0 2px 8px rgba(66,133,244,0.35);">?</div>
+    <div style="flex:1;min-width:0;">
+      <div id="cloud-account-name" style="font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" data-i18n="cloud_not_signed">Giriş yapılmadı</div>
+      <div id="cloud-account-status" style="font-size:11px;margin-top:2px;color:rgba(255,255,255,0.45);font-weight:600;font-family:'Rajdhani',sans-serif;letter-spacing:0.3px;"></div>
+    </div>
+  </div>
+
+  <!-- SIGN IN (only when signed out) -->
+  <button id="cloud-signin-btn" onclick="cloudSignIn()" style="width:100%;padding:11px;border-radius:14px;border:none;background:linear-gradient(180deg,#4285F4,#2a6acc);color:#fff;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.3px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 0 #1a4a8f,0 4px 12px rgba(66,133,244,0.35);margin-bottom:14px;transition:transform 0.08s,box-shadow 0.08s;" data-i18n="cloud_signin">▶  Google Play Games Giriş</button>
+
+  <!-- LEADERBOARDS SECTION -->
+  <div style="color:#FFD700;font-size:10px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;margin:4px 2px 8px;display:flex;align-items:center;gap:6px;">
+    <span>🏆</span><span data-i18n="lb_title">Skor Tabloları</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+    <button onclick="openLeaderboard('weekly')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(255,215,0,0.30);background:linear-gradient(180deg,rgba(255,215,0,0.10),rgba(255,215,0,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
+      <span style="font-size:16px;">📅</span>
+      <span data-i18n="lb_weekly">Haftalık</span>
+    </button>
+    <button onclick="openLeaderboard('monthly')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(0,201,177,0.30);background:linear-gradient(180deg,rgba(0,201,177,0.10),rgba(0,201,177,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
+      <span style="font-size:16px;">📆</span>
+      <span data-i18n="lb_monthly">Aylık</span>
+    </button>
+    <button onclick="openLeaderboard('yearly')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(156,100,255,0.32);background:linear-gradient(180deg,rgba(156,100,255,0.10),rgba(156,100,255,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
+      <span style="font-size:16px;">🗓️</span>
+      <span data-i18n="lb_yearly">Yıllık</span>
+    </button>
+    <button onclick="openLeaderboard('alltime')" class="pg-lb-btn" style="padding:10px 8px;border-radius:12px;border:1.5px solid rgba(255,107,53,0.32);background:linear-gradient(180deg,rgba(255,107,53,0.12),rgba(255,107,53,0.03));color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;transition:transform 0.08s;">
+      <span style="font-size:16px;">🏆</span>
+      <span data-i18n="lb_alltime">Tüm Zamanlar</span>
+    </button>
+  </div>
+
+  <!-- CLOUD SAVE SECTION -->
+  <div style="color:#7eb0ff;font-size:10px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;margin:4px 2px 8px;display:flex;align-items:center;gap:6px;">
+    <span>☁️</span><span data-i18n="cloud_save_title">Bulut Kayıt</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+    <button onclick="cloudSave()" style="padding:10px;border-radius:12px;border:1.5px solid rgba(0,200,83,0.40);background:linear-gradient(180deg,rgba(0,200,83,0.15),rgba(0,200,83,0.04));color:#00E676;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;letter-spacing:0.2px;transition:transform 0.08s;" data-i18n="cloud_save_now">⬆ Kaydet</button>
+    <button onclick="cloudLoad()" style="padding:10px;border-radius:12px;border:1.5px solid rgba(255,107,53,0.40);background:linear-gradient(180deg,rgba(255,107,53,0.15),rgba(255,107,53,0.04));color:#FF8A5A;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;letter-spacing:0.2px;transition:transform 0.08s;" data-i18n="cloud_load">⬇ Yükle</button>
+  </div>
+
+  <!-- SIGN OUT -->
+  <button id="cloud-signout-btn" onclick="cloudSignOut()" style="display:none;width:100%;padding:9px;border-radius:11px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-bottom:8px;letter-spacing:0.3px;" data-i18n="cloud_signout">Hesap Değiştir / Çıkış</button>
+
+  <!-- ACCOUNT SWITCH HINT -->
+  <div id="cloud-account-hint" style="display:none;margin-top:6px;padding:10px 12px;border-radius:10px;background:rgba(255,193,7,0.07);border:1px solid rgba(255,193,7,0.2);">
+    <div style="color:#FFD54F;font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif;margin-bottom:5px;" data-i18n="cloud_hint_title">Hesap değiştirmek için:</div>
+    <div style="color:rgba(255,255,255,0.55);font-size:10px;line-height:1.6;" data-i18n-html="cloud_hint_body">
+      1. <b style="color:rgba(255,255,255,0.75);">Ayarlar</b> uygulamasını aç<br>
+      2. <b style="color:rgba(255,255,255,0.75);">Google</b> bölümüne gir<br>
+      3. <b style="color:rgba(255,255,255,0.75);">Google Hizmetleri</b> veya <b style="color:rgba(255,255,255,0.75);">Tüm Hizmetler</b> sekmesini seç<br>
+      4. <b style="color:rgba(255,255,255,0.75);">Play Games</b> üzerine dokun<br>
+      5. <b style="color:rgba(255,255,255,0.75);">Oturum Açılan Hesap</b> yazısına dokun<br>
+      6. İstediğin hesabı seç veya <b style="color:rgba(255,255,255,0.75);">Tüm Oyunlardan Çıkış Yap</b> seçeneğini kullan<br>
+      7. Oyuna geri dön ve <b style="color:rgba(255,255,255,0.75);">Giriş Yap</b> tuşuna bas
+    </div>
+  </div>
+
+  <div style="font-size:10.5px;color:rgba(255,255,255,0.30);text-align:center;margin-top:8px;line-height:1.5;font-family:'Rajdhani',sans-serif;" data-i18n="cloud_auto_save">Level tamamlandığında otomatik kaydedilir.</div>
 </div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- İLK AÇILIŞ — Play Games tek-seferlik tanıtım                          -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<div id="pg-firstlaunch-bg" onclick="pgFirstLaunchDecline()" style="display:none;position:fixed;inset:0;z-index:910;background:rgba(0,0,0,0.78);backdrop-filter:blur(8px);"></div>
+<div id="pg-firstlaunch-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:911;background:linear-gradient(180deg,#1f2940 0%,#101828 100%);border-radius:24px;padding:24px 22px 20px;width:300px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(66,133,244,0.25),0 0 40px rgba(66,133,244,0.18),inset 0 1px 0 rgba(255,255,255,0.05);border-top:3px solid #4285F4;text-align:center;animation:pgFirstLaunchIn 0.4s cubic-bezier(0.34,1.56,0.64,1);">
+  <div style="font-size:54px;margin-bottom:6px;filter:drop-shadow(0 4px 16px rgba(66,133,244,0.5));animation:pgIconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;">🎮</div>
+  <div style="background:linear-gradient(180deg,#9bc4ff,#4285F4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:22px;font-weight:800;font-family:'Rajdhani',sans-serif;letter-spacing:0.3px;margin-bottom:6px;" data-i18n="pg_first_title">Play Games'e Bağlan</div>
+  <div style="color:rgba(255,255,255,0.65);font-size:13px;line-height:1.55;font-family:'Rajdhani',sans-serif;font-weight:600;padding:0 6px;margin-bottom:18px;" data-i18n="pg_first_body">İlerlemen güvende olsun, skor tablolarında yarışın ve cihaz değişimlerinde verilerini kaybetme.</div>
+
+  <!-- Benefit chips -->
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;text-align:left;">
+    <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.18);">
+      <span style="font-size:18px;">☁️</span>
+      <span style="color:rgba(255,255,255,0.85);font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="pg_first_b1">Otomatik bulut kayıt</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.18);">
+      <span style="font-size:18px;">🏆</span>
+      <span style="color:rgba(255,255,255,0.85);font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="pg_first_b2">Haftalık/aylık skor tabloları</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;background:rgba(0,201,177,0.08);border:1px solid rgba(0,201,177,0.18);">
+      <span style="font-size:18px;">🔄</span>
+      <span style="color:rgba(255,255,255,0.85);font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="pg_first_b3">Cihazlar arası senkron</span>
+    </div>
+  </div>
+
+  <button onclick="pgFirstLaunchAccept()" style="width:100%;padding:13px;border-radius:14px;border:none;background:linear-gradient(180deg,#4285F4,#2a6acc);color:#fff;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #1a4a8f,0 5px 16px rgba(66,133,244,0.45);margin-bottom:8px;transition:transform 0.08s,box-shadow 0.08s;" data-i18n="pg_first_accept">▶  ŞİMDİ BAĞLA</button>
+  <button onclick="pgFirstLaunchDecline()" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.45);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;letter-spacing:0.3px;" data-i18n="pg_first_later">ŞİMDİLİK ATLA</button>
+  <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:10px;font-family:'Rajdhani',sans-serif;" data-i18n="pg_first_note">Sonradan ayarlardan açabilirsin</div>
+</div>
+<style>
+@keyframes pgFirstLaunchIn{
+  0%{transform:translate(-50%,-50%) scale(0.85);opacity:0;}
+  100%{transform:translate(-50%,-50%) scale(1);opacity:1;}
+}
+@keyframes pgIconPop{
+  0%{transform:scale(0.3) rotate(-20deg);opacity:0;}
+  60%{transform:scale(1.15) rotate(8deg);}
+  100%{transform:scale(1) rotate(0);opacity:1;}
+}
+.pg-lb-btn:active{transform:scale(0.95);}
+#cloud-signin-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #1a4a8f;}
+</style>
 
 <script>
 var MAX_LIVES=5;
