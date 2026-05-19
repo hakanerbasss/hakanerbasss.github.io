@@ -1267,27 +1267,60 @@ button:active{opacity:0.75;transform:scale(0.96);}
 <!-- Mermi slotları — sağ altta eski yerinde -->
 <!-- Slot bilgi kartı -->
 <!-- Tank bilgi kartı -->
-<div id="tank-card-bg" onclick="closeTankCard()" style="display:none;position:fixed;inset:0;z-index:340;background:rgba(0,0,0,0.3);"></div>
+<div id="tank-card-bg" onclick="closeTankCard()" style="display:none;position:fixed;inset:0;z-index:340;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);"></div>
 <div id="tank-card" style="display:none;position:fixed;z-index:350;
-  bottom:76px;left:50%;transform:translateX(-50%);
-  background:rgba(10,10,20,0.97);border:1.5px solid rgba(255,255,255,0.18);
-  border-radius:18px;padding:16px 18px;width:280px;max-width:calc(100vw - 32px);
-  font-family:'Rajdhani',sans-serif;color:white;
-  box-shadow:0 -4px 30px rgba(0,0,0,0.6);">
-  <div id="tc-name" style="font-size:18px;font-weight:700;color:#FFD700;margin-bottom:4px;"></div>
-  <div id="tc-desc" style="font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:8px;"></div>
-  <div id="tc-bars"></div>
-  <div id="tc-temp" style="font-size:11px;color:#FF6B35;margin-top:6px;min-height:16px;"></div>
-  <div style="display:flex;gap:8px;margin-top:12px;">
-    <button onclick="closeTankCard()" style="flex:1;background:rgba(255,255,255,0.1);
-      border:1px solid rgba(255,255,255,0.2);color:white;border-radius:10px;
-      padding:9px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✕</button>
-    <button onclick="openChangeTank()" style="flex:2;
-      background:linear-gradient(135deg,#FF6B35,#ff3d00);border:none;color:white;
-      border-radius:10px;padding:9px;font-family:'Rajdhani',sans-serif;
-      font-size:15px;font-weight:700;cursor:pointer;" data-i18n="tank_card_change">🔄 Değiştir</button>
+  bottom:78px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(180deg,#1f2940 0%,#0e1322 100%);
+  border:1.5px solid rgba(255,215,0,0.30);
+  border-radius:22px;padding:0;width:300px;max-width:calc(100vw - 32px);
+  font-family:'Rajdhani',sans-serif;color:white;overflow:hidden;
+  box-shadow:0 14px 44px rgba(0,0,0,0.75),0 0 0 1px rgba(255,215,0,0.10),0 0 30px rgba(255,140,0,0.12),inset 0 1px 0 rgba(255,255,255,0.05);
+  animation:tankCardIn 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+
+  <!-- HERO BAND -->
+  <div style="position:relative;height:64px;background:radial-gradient(ellipse at 50% 110%,rgba(255,160,40,0.30),rgba(20,12,4,0.0) 60%),linear-gradient(180deg,#2a1a08 0%,#0f0a04 100%);border-bottom:1px solid rgba(255,140,40,0.18);overflow:hidden;">
+    <!-- Diagonal hash pattern -->
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(255,140,40,0.04) 8px,rgba(255,140,40,0.04) 16px);"></div>
+    <!-- Top labels -->
+    <div style="position:absolute;top:9px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,140,40,0.5);font-weight:800;">VEHICLE</div>
+    <div style="position:absolute;top:9px;right:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,140,40,0.5);font-weight:800;" id="tc-class-tag">CLASS-A</div>
+    <!-- Close x -->
+    <button onclick="closeTankCard()" style="position:absolute;top:6px;right:48px;width:24px;height:24px;border-radius:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.55);font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;display:none;line-height:1;">✕</button>
+    <!-- Big icon on the right -->
+    <div style="position:absolute;right:12px;bottom:8px;width:78px;height:42px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 10px rgba(255,140,40,0.35));" id="tc-icon"></div>
+    <!-- Title on the left -->
+    <div style="position:absolute;left:16px;bottom:6px;right:96px;">
+      <div id="tc-name" style="font-size:19px;font-weight:800;letter-spacing:0.4px;line-height:1.05;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.4));"></div>
+      <div id="tc-desc" style="font-size:11.5px;color:rgba(255,255,255,0.55);font-weight:600;margin-top:1px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div style="padding:13px 16px 14px;">
+    <div id="tc-bars"></div>
+    <div id="tc-temp" style="font-size:11px;color:#FF8A5A;margin-top:8px;min-height:14px;font-weight:700;letter-spacing:0.3px;text-align:center;"></div>
+
+    <!-- Buttons -->
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button onclick="closeTankCard()" style="flex:0 0 44px;height:42px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.7);border-radius:13px;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 0 rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.05);transition:transform 0.08s,box-shadow 0.08s;line-height:1;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 0 0 rgba(0,0,0,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''">✕</button>
+      <button onclick="openChangeTank()" style="flex:1;height:42px;background:linear-gradient(180deg,#FF8E5A,#FF6B35 50%,#ff3d00 100%);border:none;color:white;border-radius:13px;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 0 #a02500,0 4px 14px rgba(255,107,53,0.4),inset 0 1px 0 rgba(255,255,255,0.25);text-shadow:0 1px 0 rgba(0,0,0,0.3);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 #a02500,inset 0 1px 0 rgba(255,255,255,0.18)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="tank_card_change">🔄 Değiştir</button>
+    </div>
   </div>
 </div>
+<style>
+@keyframes tankCardIn{
+  0%{transform:translateX(-50%) translateY(20px) scale(0.92);opacity:0;}
+  100%{transform:translateX(-50%) translateY(0) scale(1);opacity:1;}
+}
+@keyframes slotCardIn{
+  0%{transform:translateX(-50%) translateY(20px) scale(0.92);opacity:0;}
+  100%{transform:translateX(-50%) translateY(0) scale(1);opacity:1;}
+}
+@keyframes targetCardIn{
+  0%{transform:scale(0.85);opacity:0;}
+  100%{transform:scale(1);opacity:1;}
+}
+</style>
 
 <!-- Tank değiştir listesi -->
 <div id="tank-change-overlay" style="display:none;position:fixed;inset:0;z-index:360;
@@ -1334,25 +1367,41 @@ button:active{opacity:0.75;transform:scale(0.96);}
   </div>
 </div>
 
-<div id="slot-card-bg" onclick="closeSlotCard()"   style="display:none;position:fixed;inset:0;z-index:340;background:rgba(0,0,0,0.3);"></div>
+<div id="slot-card-bg" onclick="closeSlotCard()" style="display:none;position:fixed;inset:0;z-index:340;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);"></div>
 <div id="slot-card" style="display:none;position:fixed;z-index:350;
-  bottom:76px;left:50%;transform:translateX(-50%);
-  background:rgba(10,10,20,0.97);border:1.5px solid rgba(255,255,255,0.18);
-  border-radius:18px;padding:16px 18px;width:280px;max-width:calc(100vw - 32px);
-  font-family:'Rajdhani',sans-serif;color:white;
-  box-shadow:0 -4px 30px rgba(0,0,0,0.6);">
-  <div id="sc-name" style="font-size:18px;font-weight:700;color:#FFD700;margin-bottom:4px;"></div>
-  <div id="sc-desc" style="font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:8px;"></div>
-  <div id="sc-bars"></div>
-  <div id="sc-temp" style="font-size:11px;color:#FF6B35;margin-top:6px;min-height:16px;"></div>
-  <div style="display:flex;gap:8px;margin-top:12px;">
-    <button onclick="closeSlotCard()" style="flex:1;background:rgba(255,255,255,0.1);
-      border:1px solid rgba(255,255,255,0.2);color:white;border-radius:10px;
-      padding:9px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✕</button>
-    <button id="sc-change-btn" onclick="openChangeForSlot()" style="flex:2;
-      background:linear-gradient(135deg,#FF6B35,#ff3d00);border:none;color:white;
-      border-radius:10px;padding:9px;font-family:'Rajdhani',sans-serif;
-      font-size:15px;font-weight:700;cursor:pointer;letter-spacing:0.5px;" data-i18n="slot_card_change">🔄 Değiştir</button>
+  bottom:78px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(180deg,#1f2940 0%,#0e1322 100%);
+  border:1.5px solid rgba(0,229,255,0.30);
+  border-radius:22px;padding:0;width:300px;max-width:calc(100vw - 32px);
+  font-family:'Rajdhani',sans-serif;color:white;overflow:hidden;
+  box-shadow:0 14px 44px rgba(0,0,0,0.75),0 0 0 1px rgba(0,229,255,0.10),0 0 30px rgba(0,200,255,0.12),inset 0 1px 0 rgba(255,255,255,0.05);
+  animation:slotCardIn 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+
+  <!-- HERO BAND -->
+  <div style="position:relative;height:64px;background:radial-gradient(ellipse at 50% 110%,rgba(0,200,255,0.30),rgba(4,12,20,0.0) 60%),linear-gradient(180deg,#082030 0%,#040a14 100%);border-bottom:1px solid rgba(0,200,255,0.18);overflow:hidden;">
+    <!-- Diagonal hash -->
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(0,200,255,0.04) 8px,rgba(0,200,255,0.04) 16px);"></div>
+    <!-- Top labels -->
+    <div style="position:absolute;top:9px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(0,200,255,0.55);font-weight:800;">AMMUNITION</div>
+    <div style="position:absolute;top:9px;right:14px;font-size:9px;letter-spacing:2.5px;color:rgba(0,200,255,0.55);font-weight:800;" id="sc-class-tag">SLOT</div>
+    <!-- Big icon -->
+    <div style="position:absolute;right:14px;bottom:8px;width:60px;height:42px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 10px rgba(0,200,255,0.4));" id="sc-icon"></div>
+    <!-- Title -->
+    <div style="position:absolute;left:16px;bottom:6px;right:84px;">
+      <div id="sc-name" style="font-size:19px;font-weight:800;letter-spacing:0.4px;line-height:1.05;background:linear-gradient(180deg,#9BE7FF,#00E5FF 50%,#0288D1 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.4));"></div>
+      <div id="sc-desc" style="font-size:11.5px;color:rgba(255,255,255,0.55);font-weight:600;margin-top:1px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div style="padding:13px 16px 14px;">
+    <div id="sc-bars"></div>
+    <div id="sc-temp" style="font-size:11px;color:#FF8A5A;margin-top:8px;min-height:14px;font-weight:700;letter-spacing:0.3px;text-align:center;"></div>
+
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button onclick="closeSlotCard()" style="flex:0 0 44px;height:42px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.7);border-radius:13px;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 0 rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.05);transition:transform 0.08s,box-shadow 0.08s;line-height:1;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 0 0 rgba(0,0,0,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''">✕</button>
+      <button id="sc-change-btn" onclick="openChangeForSlot()" style="flex:1;height:42px;background:linear-gradient(180deg,#33E0FF,#00B8DB 50%,#0078A6 100%);border:none;color:white;border-radius:13px;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 0 #004864,0 4px 14px rgba(0,200,255,0.45),inset 0 1px 0 rgba(255,255,255,0.30);text-shadow:0 1px 0 rgba(0,0,0,0.3);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 #004864,inset 0 1px 0 rgba(255,255,255,0.18)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="slot_card_change">🔄 Değiştir</button>
+    </div>
   </div>
 </div>
 
@@ -1517,7 +1566,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.123';
+const APP_VERSION      = '1.0.124';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1535,8 +1584,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 23:28';
-const APP_VERSION_NOTE = 'bunker buster tasarim duzeltildi.';
+const APP_VERSION_DATE = '2026.05.19 23:42';
+const APP_VERSION_NOTE = 'slot hedef tank bilgi kartkari degisti';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -8554,8 +8603,21 @@ function openTankCard(){
     </div>
     <span style="font-size:10px;font-weight:700;color:${col};width:36px;text-align:right;">${valStr}</span>
   </div>`;
-  document.getElementById('tc-name').innerHTML=gDef.icon+'&nbsp;'+tankName(type)
-    +(tULvl>0?` <span style="font-size:11px;color:#FFD700;font-weight:700;">${t('lvl_short')}${tULvl}</span>`:'');
+  document.getElementById('tc-name').innerHTML=tankName(type)
+    +(tULvl>0?` <span style="font-size:11px;color:#FFD700;font-weight:700;letter-spacing:0.5px;">${t('lvl_short')}${tULvl}</span>`:'');
+  // Hero icon
+  const _tcIcon=document.getElementById('tc-icon');
+  if(_tcIcon){
+    _tcIcon.innerHTML = gDef.icon || '<span style="font-size:32px">🚗</span>';
+    const _svg = _tcIcon.querySelector('svg');
+    if(_svg){ _svg.style.width='auto'; _svg.style.height='38px'; _svg.style.maxWidth='76px'; }
+  }
+  // Class tag — type-based
+  const _ctag=document.getElementById('tc-class-tag');
+  if(_ctag){
+    const _classMap={basic:'CLASS-A',upgraded:'CLASS-B',elite:'CLASS-S',titan:'CLASS-X'};
+    _ctag.textContent = _classMap[type]||'CLASS-A';
+  }
   document.getElementById('tc-desc').textContent=t('tank_desc_'+type)||st.desc;
   document.getElementById('tc-bars').innerHTML=
     _tStatRow(t('stat_menzil'),menzilVal,'#FF6B35','⚡'+td.maxPower)+
@@ -8768,8 +8830,17 @@ function openSlotCard(idx){
     </div>
     <span style="font-size:10px;font-weight:700;color:${col};width:32px;text-align:right;">${valStr}</span>
   </div>`;
-  document.getElementById('sc-name').innerHTML=def.icon+'&nbsp;'+ammoName(type)
-    +(uLvl>0?` <span style="font-size:11px;color:#FF6B35;font-weight:700;">${t('lvl_short')}${uLvl}</span>`:'');
+  document.getElementById('sc-name').innerHTML=ammoName(type)
+    +(uLvl>0?` <span style="font-size:11px;color:#FF6B35;font-weight:700;letter-spacing:0.5px;">${t('lvl_short')}${uLvl}</span>`:'');
+  // Hero icon
+  const _scIcon=document.getElementById('sc-icon');
+  if(_scIcon){
+    _scIcon.innerHTML = def.icon || '<span style="font-size:30px">'+(def.emoji||'💣')+'</span>';
+    const _svg = _scIcon.querySelector('svg');
+    if(_svg){ _svg.style.width='auto'; _svg.style.height='38px'; _svg.style.maxWidth='58px'; }
+  }
+  const _stag=document.getElementById('sc-class-tag');
+  if(_stag) _stag.textContent = 'SLOT-'+(typeof slotCardSlot==='number'?(slotCardSlot+1):'•');
   document.getElementById('sc-desc').textContent=t('ammo_desc_'+type)||st.desc;
   document.getElementById('sc-bars').innerHTML=
     _sRow(t('stat_dmg'),st.dmg,'#FF6B35',dmgBase)+
@@ -10672,9 +10743,14 @@ function onJoyDown(e){
   if(phase==='aim' && targetHP>0){
     const scaleX=window.innerWidth/W, scaleY=window.innerHeight/H;
     const cx=e.clientX/scaleX, cy=e.clientY/scaleY;
-    const embedDepth=targetH*0.35;
-    if(cx>targetX-targetW/2-10 && cx<targetX+targetW/2+10 &&
-       cy>targetY-targetH+embedDepth-10 && cy<targetY+embedDepth+10){
+    // Görsel hedef kutusu: drawTarget içinde (tx-tw/2, ty-th+embedDepth) x (tw, th)
+    // Hit zone: cömert padding ile gerçek görsel bbox'ı kapsa
+    const embedDepth = targetH * 0.35;
+    const top    = targetY - targetH + embedDepth - 14;
+    const bottom = targetY + embedDepth + 14;
+    const left   = targetX - targetW/2 - 14;
+    const right  = targetX + targetW/2 + 14;
+    if(cx >= left && cx <= right && cy >= top && cy <= bottom){
       showTargetInfo(); return;
     }
   }
@@ -13227,18 +13303,26 @@ function showTargetInfo(){
   // Kalan atış
   mkRow(t('tip_shots_label'), shotsLeft+' '+t('shots_suffix'));
 
-  // Konumlandır — hedefin üstüne
+  // Konumlandır — hedefin üstüne (yeni kart 264px geniş)
   const scaleX = window.innerWidth  / W;
   const scaleY = window.innerHeight / H;
   const screenX = targetX * scaleX;
+  // Kartın gerçek boyutu DOM'dan, yoksa 264 varsayılan
+  popup.style.left = '-9999px';
+  popup.style.display = 'block';
+  popup.style.visibility = 'hidden';
+  const pw = Math.max(240, popup.offsetWidth || 264);
+  const ph = Math.max(160, popup.offsetHeight || 220);
+  popup.style.visibility = '';
   const screenY = (targetY - targetH - 20) * scaleY;
-  const pw = 240;
-  const left = Math.max(8, Math.min(window.innerWidth-pw-8, screenX-pw/2));
-  const top  = Math.max(60, screenY - 10);
-  popup.style.left = left+'px';
-  popup.style.top  = top+'px';
+  const left = Math.max(8, Math.min(window.innerWidth - pw - 8, screenX - pw/2));
+  // Üstte yer varsa üste, yoksa altta
+  let top = screenY - ph - 4;
+  if(top < 60) top = Math.min(window.innerHeight - ph - 8, (targetY + 24) * scaleY);
+  popup.style.left = left + 'px';
+  popup.style.top  = top + 'px';
 
-  bg.style.display='block';
+  bg.style.display = 'block';
   popup.style.display='block';
 }
 
@@ -15278,25 +15362,39 @@ function openTacticalInfo(){
 
 
 <!-- Karargah Bilgi Popup -->
-<div id="target-info-bg" onclick="closeTargetInfo()" style="display:none;position:fixed;inset:0;z-index:400;"></div>
+<div id="target-info-bg" onclick="closeTargetInfo()" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);"></div>
 <div id="target-info-popup" style="display:none;position:fixed;z-index:401;
-  background:#1a2030;border:1.5px solid rgba(255,255,255,0.15);border-radius:18px;
-  padding:16px;width:240px;max-width:calc(100vw - 32px);
-  box-shadow:0 8px 32px rgba(0,0,0,0.6);">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <span id="tip-title" style="color:#FFD700;font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;"></span>
-    <button onclick="closeTargetInfo()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;line-height:1;">✕</button>
+  background:linear-gradient(180deg,#1f2940 0%,#0e1322 100%);
+  border:1.5px solid rgba(255,255,255,0.22);
+  border-radius:22px;padding:0;width:264px;max-width:calc(100vw - 32px);overflow:hidden;
+  font-family:'Rajdhani',sans-serif;color:white;
+  box-shadow:0 14px 44px rgba(0,0,0,0.78),0 0 0 1px rgba(255,255,255,0.06),inset 0 1px 0 rgba(255,255,255,0.06);
+  animation:targetCardIn 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+
+  <!-- HERO BAND — mat-renkli accent -->
+  <div id="tip-hero" style="position:relative;height:54px;background:radial-gradient(ellipse at 50% 110%,rgba(255,255,255,0.18),transparent 60%),linear-gradient(180deg,#1a2238 0%,#0a0f1a 100%);border-bottom:1px solid rgba(255,255,255,0.10);overflow:hidden;">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(255,255,255,0.025) 8px,rgba(255,255,255,0.025) 16px);"></div>
+    <div style="position:absolute;top:8px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,0.45);font-weight:800;">TARGET</div>
+    <div style="position:absolute;top:8px;right:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,0.45);font-weight:800;" id="tip-mat-tag">HQ</div>
+    <button onclick="closeTargetInfo()" style="position:absolute;top:6px;right:38px;width:22px;height:22px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.55);font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1;display:none;">✕</button>
+    <div id="tip-title" style="position:absolute;left:16px;right:16px;bottom:7px;font-size:18px;font-weight:800;letter-spacing:0.5px;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.4));"></div>
   </div>
-  <div id="tip-hp-row" style="margin-bottom:10px;">
-    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-      <span style="color:#8b949e;font-size:12px;">HP</span>
-      <span id="tip-hp-val" style="color:white;font-size:12px;font-weight:700;"></span>
+
+  <!-- BODY -->
+  <div style="padding:13px 16px 14px;">
+    <!-- HP -->
+    <div id="tip-hp-row" style="margin-bottom:11px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">HP</span>
+        <span id="tip-hp-val" style="color:white;font-size:13px;font-weight:800;letter-spacing:0.3px;"></span>
+      </div>
+      <div style="background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.08);border-radius:5px;height:8px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.5);">
+        <div id="tip-hp-bar" style="height:100%;border-radius:4px;background:linear-gradient(90deg,#ff3d00,#FF8C00 35%,#FFD700 65%,#00e676);transition:width 0.3s;box-shadow:0 0 8px currentColor;"></div>
+      </div>
     </div>
-    <div style="background:rgba(255,255,255,0.1);border-radius:4px;height:6px;">
-      <div id="tip-hp-bar" style="height:100%;border-radius:4px;background:linear-gradient(90deg,#ff3d00,#FFD700,#00e676);transition:width 0.3s;"></div>
-    </div>
+    <div id="tip-rows" style="display:flex;flex-direction:column;gap:6px;font-size:12px;"></div>
+    <button onclick="closeTargetInfo()" style="width:100%;margin-top:13px;height:38px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.85);border-radius:12px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:800;letter-spacing:1.2px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 0 rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.05);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 0 0 rgba(0,0,0,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="buried_ok">ANLADIM</button>
   </div>
-  <div id="tip-rows" style="display:flex;flex-direction:column;gap:7px;font-size:12px;"></div>
 </div>
 
 
