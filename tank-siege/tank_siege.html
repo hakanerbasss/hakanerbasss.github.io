@@ -829,6 +829,179 @@ button:active{opacity:0.75;transform:scale(0.96);}
   0%,100% { box-shadow: 0 0 6px 2px rgba(255,210,0,0.5); }
   50%      { box-shadow: 0 0 14px 5px rgba(255,210,0,0.9); }
 }
+/* ── Toast v2 — daha belirgin ─────────────────────────────── */
+#toast{
+  background:linear-gradient(180deg,rgba(30,40,60,0.95) 0%,rgba(15,20,35,0.95) 100%);
+  border:1.5px solid rgba(255,215,0,0.4);
+  box-shadow:0 6px 20px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.08), 0 0 24px rgba(255,215,0,0.15);
+  text-shadow:0 1px 2px rgba(0,0,0,0.6);
+  animation:toastBounce 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes toastBounce{
+  0%{transform:translateX(-50%) translateY(-20px) scale(0.7);opacity:0;}
+  60%{transform:translateX(-50%) translateY(2px) scale(1.05);}
+  100%{transform:translateX(-50%) translateY(0) scale(1);opacity:1;}
+}
+
+/* ── GC dialog v2 — satın alma/onay ───────────────────────── */
+#gc-dialog{
+  background:linear-gradient(180deg,#1f2940 0%,#141a2a 100%) !important;
+  border:1.5px solid rgba(255,215,0,0.35);
+  border-radius:24px 24px 0 0 !important;
+  box-shadow:0 -12px 40px rgba(0,0,0,0.6), 0 -3px 0 rgba(255,215,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+  animation:gcSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes gcSlideUp{
+  from{transform:translateX(-50%) translateY(100%);opacity:0;}
+  to{transform:translateX(-50%) translateY(0);opacity:1;}
+}
+#gc-dialog-bg{backdrop-filter:blur(6px);}
+#gc-dialog-icon{
+  font-size:56px !important;
+  filter:drop-shadow(0 4px 14px rgba(255,215,0,0.4)) drop-shadow(0 0 18px rgba(255,107,53,0.3));
+  animation:gcIconPop 0.45s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes gcIconPop{
+  0%{transform:scale(0.3) rotate(-15deg);opacity:0;}
+  60%{transform:scale(1.15) rotate(5deg);}
+  100%{transform:scale(1) rotate(0);opacity:1;}
+}
+#gc-dialog-title{
+  font-size:22px !important;
+  background:linear-gradient(180deg,#FFE066,#FFD700);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:0.5px;
+}
+#gc-dialog-cost{
+  background:linear-gradient(135deg,rgba(255,215,0,0.18),rgba(255,107,53,0.10)) !important;
+  border:1.5px solid rgba(255,215,0,0.45) !important;
+  box-shadow:0 0 14px rgba(255,215,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  font-size:17px !important;
+}
+.gc-dialog-btn{
+  font-size:17px !important;letter-spacing:0.3px;
+  box-shadow:0 4px 0 rgba(0,0,0,0.3);
+  transition:transform 0.08s, box-shadow 0.08s;
+}
+.gc-dialog-btn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,0.3);}
+.gc-dialog-btn.confirm-buy{
+  background:linear-gradient(180deg,#FF6B35,#ff3d00) !important;
+  box-shadow:0 4px 0 #b32200, 0 5px 18px rgba(255,107,53,0.4) !important;
+}
+.gc-dialog-btn.confirm-buy:active{box-shadow:0 2px 0 #b32200 !important;}
+.gc-dialog-btn.confirm-ad{
+  background:linear-gradient(180deg,#FFD700,#FF8C00) !important;
+  box-shadow:0 4px 0 #a85a00, 0 5px 18px rgba(255,140,0,0.35) !important;
+}
+.gc-dialog-btn.confirm-ad:active{box-shadow:0 2px 0 #a85a00 !important;}
+.gc-dialog-btn.confirm-upg{
+  background:linear-gradient(180deg,#00C9B1,#007a6e) !important;
+  box-shadow:0 4px 0 #00564f, 0 5px 18px rgba(0,201,177,0.35) !important;
+}
+.gc-dialog-btn.confirm-upg:active{box-shadow:0 2px 0 #00564f !important;}
+
+/* ── Combo text — daha dramatik ───────────────────────────── */
+@keyframes comboAnim{
+  0%{opacity:0;transform:translateX(-50%) translateY(15px) scale(0.4) rotate(-8deg);}
+  20%{opacity:1;transform:translateX(-50%) translateY(-8px) scale(1.3) rotate(3deg);}
+  60%{opacity:1;transform:translateX(-50%) translateY(-20px) scale(1.0) rotate(0);}
+  100%{opacity:0;transform:translateX(-50%) translateY(-60px) scale(0.85) rotate(0);}
+}
+
+/* ── Popover / mini cards v2 ──────────────────────────────── */
+#tank-card, #slot-card, #streak-card, #tactical-info-card{
+  background:linear-gradient(180deg,#1f2940 0%,#141a2a 100%) !important;
+  border:1.5px solid rgba(255,215,0,0.35) !important;
+  border-radius:18px !important;
+  box-shadow:0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.08), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  animation:popIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes popIn{
+  from{transform:translateX(-50%) translateY(20px) scale(0.92);opacity:0;}
+  to{transform:translateX(-50%) translateY(0) scale(1);opacity:1;}
+}
+#streak-card, #tactical-info-card{animation:popInRight 0.25s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes popInRight{
+  from{transform:translateY(10px) scale(0.92);opacity:0;}
+  to{transform:translateY(0) scale(1);opacity:1;}
+}
+/* close buttons inside popovers */
+#tank-card button, #slot-card button, #streak-card button, #tactical-info-card button{
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* Buried info hint cards */
+#buried-info-card, #tactical-hint-card, #piercer-hint-card, #guided-hint-card{
+  border-radius:18px !important;
+  box-shadow:0 12px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* ── Result screen — stat blocks ──────────────────────────── */
+#res-stats{
+  display:flex;gap:8px;justify-content:center;flex-wrap:wrap;
+  margin:6px 0 4px;
+  animation:resStatsFade 0.6s ease-out 0.45s both;
+}
+@keyframes resStatsFade{
+  from{opacity:0;transform:translateY(10px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.res-stat{
+  background:linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03));
+  border:1.5px solid rgba(255,255,255,0.15);
+  border-radius:14px;
+  padding:8px 12px;min-width:72px;
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.res-stat-label{
+  color:rgba(255,255,255,0.55);
+  font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:800;
+  letter-spacing:1.2px;text-transform:uppercase;
+}
+.res-stat-value{
+  color:#FFD700;
+  font-family:'Fredoka One',sans-serif;font-size:20px;line-height:1;
+  text-shadow:0 0 12px rgba(255,215,0,0.4);
+}
+.res-stat.res-stat-orange .res-stat-value{
+  color:#FF6B35;text-shadow:0 0 12px rgba(255,107,53,0.4);
+}
+.res-stat.res-stat-cyan .res-stat-value{
+  color:#00E5FF;text-shadow:0 0 12px rgba(0,229,255,0.4);
+}
+
+/* ── Shot counter animasyonu (HUD top sayaç) ──────────────── */
+@keyframes shotPulse{
+  0%{transform:scale(1);}
+  30%{transform:scale(1.35);color:#FF3D00;}
+  100%{transform:scale(1);}
+}
+#hud-shots.shot-fired{animation:shotPulse 0.4s ease-out;}
+
+@keyframes scoreUp{
+  0%{transform:scale(1);}
+  40%{transform:scale(1.25);color:#00FF99;}
+  100%{transform:scale(1);}
+}
+#hud-score.score-up{animation:scoreUp 0.45s ease-out;}
+
+/* ── Hasar pop'u (canvas dışı HUD floater) ────────────────── */
+.dmg-pop{
+  position:fixed;pointer-events:none;z-index:200;
+  font-family:'Fredoka One',sans-serif;font-size:22px;
+  color:#FFD700;
+  text-shadow:0 0 10px rgba(255,215,0,0.6), 2px 2px 0 rgba(0,0,0,0.6);
+  animation:dmgPopAnim 0.85s ease-out forwards;
+}
+.dmg-pop.crit{color:#FF3D00;text-shadow:0 0 14px rgba(255,61,0,0.7), 2px 2px 0 rgba(0,0,0,0.6);font-size:28px;}
+@keyframes dmgPopAnim{
+  0%{opacity:0;transform:translate(-50%,0) scale(0.3);}
+  20%{opacity:1;transform:translate(-50%,-12px) scale(1.15);}
+  60%{opacity:1;transform:translate(-50%,-35px) scale(0.95);}
+  100%{opacity:0;transform:translate(-50%,-70px) scale(0.7);}
+}
+
 /* Onay dialog */
 #gc-dialog-bg{display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.7);}
 #gc-dialog{
@@ -1220,7 +1393,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.109';
+const APP_VERSION      = '1.0.110';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1238,8 +1411,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 16:17';
-const APP_VERSION_NOTE = 'Oyun alani badge yenilendi';
+const APP_VERSION_DATE = '2026.05.19 16:23';
+const APP_VERSION_NOTE = 'Animasyon eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -3567,8 +3740,11 @@ function closeBuriedInfo(){
   const pop = document.getElementById('buried-info-pop');
   if(pop) pop.style.display = 'none';
 }
-function applyBuriedDamage(dmg){
+function applyBuriedDamage(dmg, x, y, crit){
   targetHP = Math.max(0, targetHP - dmg);
+  if(typeof x === 'number' && typeof y === 'number' && dmg > 0){
+    showDmgPop(x, y, dmg, !!crit);
+  }
 }
 
 
@@ -5830,6 +6006,7 @@ function _doFire(){
   shotsLeft--;
   phase='flying';
   updateUI();
+  pulseShotCounter();
 
   // Muzzle flash particles
   spawnMuzzleFlash(bx,by,rad);
@@ -5871,7 +6048,7 @@ function onTerrainHit(){
     const ammoBonusMult = 1 + 0.25*(ammoUpgrades[selectedAmmo]||0);
     const tankBonusMult = 1 + 0.20*(tankUpgrades[selectedTank]||0);
     const dmg  = Math.max(1, Math.round(ad.damage * res * falloff * splashMult * ammoBonusMult * tankBonusMult * dmgBoostMultiplier()));
-    applyBuriedDamage(dmg);
+    applyBuriedDamage(dmg, bullet.x, bullet.y, false);
     _checkCounterAttackTrigger(bullet.x, bullet.y);
     // Küçük hasar efekti
     spawnImpact(targetX, targetY - targetH*0.5, 'target');
@@ -5999,7 +6176,7 @@ function onTargetHit(){
   }
 
   const dmg=Math.round(ad.damage*res*pen*ammoBonusMult*tankBonusMult*dmgBoostMultiplier()*comboMult);
-  applyBuriedDamage(dmg);
+  applyBuriedDamage(dmg, bullet?bullet.x:targetX, bullet?bullet.y:targetY-targetH/2, _comboCount>=2);
 
   spawnImpact(bullet.x,bullet.y,'target');
   spawnExplosionSprite(bullet.x,bullet.y,1.2);
@@ -7501,6 +7678,7 @@ function onWin(){
   const comboBonus = _comboCount >= 3 ? 1.5 : _comboCount === 2 ? 1.2 : 1.0;
   const gained = Math.round(lv.id * starMult * levelBonus * comboBonus);
   score += gained;
+  setTimeout(pulseScoreCounter, 80);
   // LocalStorage'a kaydet
   const key='stars_'+lv.id;
   const prev=parseInt(lsGet(key)||'0');
@@ -7536,8 +7714,71 @@ function showResult(win,stars,sub){
   document.getElementById('res-stars').textContent=win?'⭐'.repeat(stars)+'☆'.repeat(3-stars):'';
   document.getElementById('res-sub').textContent=sub;
   document.getElementById('btn-next').style.display=win?'block':'none';
+
+  // Stat blokları — atış / combo / puan
+  let statsEl = document.getElementById('res-stats');
+  if(!statsEl){
+    statsEl = document.createElement('div');
+    statsEl.id = 'res-stats';
+    // res-sub'tan hemen sonra ekle
+    const sub = document.getElementById('res-sub');
+    sub.parentNode.insertBefore(statsEl, sub.nextSibling);
+  }
+  const usedShots = (lv && typeof shotsLeft === 'number') ? (lv.shots - shotsLeft) : '—';
+  const totalShots = lv ? lv.shots : '—';
+  const cm = (typeof _comboCount === 'number') ? _comboCount : 0;
+  const comboLabel = cm >= 4 ? 'x2.0' : cm === 3 ? 'x1.5' : cm === 2 ? 'x1.25' : '×1';
+  const comboCls = cm >= 3 ? 'res-stat-orange' : '';
+  statsEl.innerHTML = win ? (
+    '<div class="res-stat">'
+      + '<span class="res-stat-label">'+(typeof t==='function'?t('shots_suffix')?'ATIŞ':'ATIŞ':'ATIŞ')+'</span>'
+      + '<span class="res-stat-value">'+usedShots+'<span style="font-size:13px;color:rgba(255,255,255,0.5);">/'+totalShots+'</span></span>'
+    + '</div>'
+    + '<div class="res-stat '+comboCls+'">'
+      + '<span class="res-stat-label">KOMBO</span>'
+      + '<span class="res-stat-value">'+comboLabel+'</span>'
+    + '</div>'
+    + '<div class="res-stat res-stat-cyan">'
+      + '<span class="res-stat-label">YILDIZ</span>'
+      + '<span class="res-stat-value">'+stars+'<span style="font-size:13px;color:rgba(255,255,255,0.5);">/3</span></span>'
+    + '</div>'
+  ) : '';
+
   ov.classList.add('show');
   if(win && stars>0) SFX.star(stars);
+}
+
+// ── HUD anim helpers ────────────────────────────────────────────
+function pulseShotCounter(){
+  const el = document.getElementById('hud-shots');
+  if(!el) return;
+  el.classList.remove('shot-fired');
+  void el.offsetWidth; // restart animation
+  el.classList.add('shot-fired');
+}
+function pulseScoreCounter(){
+  const el = document.getElementById('hud-score');
+  if(!el) return;
+  el.classList.remove('score-up');
+  void el.offsetWidth;
+  el.classList.add('score-up');
+}
+function showDmgPop(canvasX, canvasY, amount, crit){
+  const cv = document.getElementById('cv');
+  if(!cv || !document.body) return;
+  const rect = cv.getBoundingClientRect();
+  // canvas coords → screen coords (canvas might be scaled)
+  const scaleX = rect.width / cv.width;
+  const scaleY = rect.height / cv.height;
+  const sx = rect.left + canvasX * scaleX;
+  const sy = rect.top + canvasY * scaleY;
+  const el = document.createElement('div');
+  el.className = 'dmg-pop' + (crit ? ' crit' : '');
+  el.style.left = sx + 'px';
+  el.style.top  = sy + 'px';
+  el.textContent = (crit?'💥 ':'-') + Math.round(amount);
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 850);
 }
 
 // Hayvan çarpışma yarıçapı
