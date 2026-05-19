@@ -1513,7 +1513,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.121';
+const APP_VERSION      = '1.0.122';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1531,8 +1531,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 22:21';
-const APP_VERSION_NOTE = 'rota hakki duzeltildi';
+const APP_VERSION_DATE = '2026.05.19 22:37';
+const APP_VERSION_NOTE = 'Terrain tipleri degisti';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1798,7 +1798,26 @@ function makeLevels(){
       const showPath = globalId<=15;
       const pathDots = Math.max(0,40-globalId*2);
       // Terrain types cycling
-      const terrainTypes=['gentle','medium','twin','valley','fortress','high','medium','cave_mountain','valley','fortress'];
+// Her tema için 10 level'lık benzersiz terrain dizilimi.
+// Slot 7 (level 8) = 'cave_mountain', slot 8-9 (level 9-10) = 'buried_*' (oyun mekaniği).
+// İlk 7 slotta tema'ya özel imza terrain'leri + farklı sıralamalar.
+const THEME_TERRAIN_LAYOUTS = {
+  valley:       ['gentle','twin_low','triple','plateau','ridge','canyon','fortress','cave_mountain','buried_hills','buried_mesa'],
+  desert:       ['dunes','plateau','twin_high','canyon','quad','ridge','fortress','cave_dune','buried_dunes','buried_mesa'],
+  snow:         ['gentle','wave','plateau','triple','ridge','twin_high','canyon','cave_plateau','buried_hills','buried_ridge'],
+  forest:       ['triple','gentle','quad','plateau','twin_low','canyon','ridge','cave_twin','buried_hills','buried_swamp'],
+  rocky:        ['ridge','jagged','twin_high','plateau','cliff','canyon','fortress','cave_jagged','buried_rocky','buried_mesa'],
+  meadow:       ['gentle','wave','twin_low','triple','plateau','ridge','fortress','cave_mountain','buried_hills','buried_ridge'],
+  volcano:      ['ridge','crater','twin_high','volcano_peak','canyon','quad','fortress','cave_volcano','buried_rocky','buried_mesa'],
+  nightcity:    ['plateau','twin_low','cliff','ridge','canyon','triple','fortress','cave_plateau','buried_mesa','buried_hills'],
+  tropical:     ['gentle','wave','dunes','triple','twin_low','plateau','canyon','cave_dune','buried_dunes','buried_swamp'],
+  skyislands:   ['ridge','sky_islands','cliff','twin_high','plateau','canyon','fortress','cave_jagged','buried_ridge','buried_mesa'],
+  cloudy:       ['wave','plateau','twin_low','ridge','canyon','triple','fortress','cave_twin','buried_hills','buried_swamp'],
+  rainy:        ['gentle','plateau','wave','canyon','twin_high','quad','fortress','cave_twin','buried_swamp','buried_hills'],
+  snowyweather: ['gentle','triple','wave','plateau','ridge','canyon','twin_high','cave_plateau','buried_ridge','buried_mesa'],
+};
+
+      const terrainTypes = THEME_TERRAIN_LAYOUTS[theme] || THEME_TERRAIN_LAYOUTS.valley;
       // HP progression — tema çarpanı ile ölçeklenir
       const hpMult = Math.pow(1.42, ti);
       const hpValues=[120,150,200,280,350,400,550,700,950,1400].map(v=>Math.round(v*hpMult));
@@ -2289,6 +2308,78 @@ function generateTerrain(type){
         {x:W,       y:baseY},
       ];
       break;
+    case 'twin_low':
+      // Yan yana iki alçak tepe — geçişli, tank için kolay
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.15,  y:baseY-H*0.04},
+        {x:W*0.30,  y:baseY-H*0.18},
+        {x:W*0.40,  y:baseY-H*0.12},
+        {x:W*0.55,  y:baseY-H*0.20},
+        {x:W*0.68,  y:baseY-H*0.05},
+        {x:W*0.85,  y:baseY-H*0.02},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'triple':
+      // 3 ardışık tepe: küçük - büyük - küçük (dalgalı sıralama)
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.05},
+        {x:W*0.22,  y:baseY-H*0.20},
+        {x:W*0.30,  y:baseY-H*0.13},
+        {x:W*0.42,  y:baseY-H*0.32},
+        {x:W*0.50,  y:baseY-H*0.16},
+        {x:W*0.62,  y:baseY-H*0.24},
+        {x:W*0.74,  y:baseY-H*0.10},
+        {x:W*0.88,  y:baseY-H*0.04},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'plateau':
+      // Tank tarafında düz ova, hedef tarafında yüksek geniş plato
+      points = [
+        {x:0,       y:baseY+H*0.02},
+        {x:W*0.20,  y:baseY+H*0.01},
+        {x:W*0.32,  y:baseY-H*0.04},
+        {x:W*0.42,  y:baseY-H*0.22},
+        {x:W*0.50,  y:baseY-H*0.26},
+        {x:W*0.62,  y:baseY-H*0.26},
+        {x:W*0.74,  y:baseY-H*0.22},
+        {x:W*0.85,  y:baseY-H*0.05},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'ridge':
+      // Tek dik sivri zirve — meydan okuyucu
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.18,  y:baseY-H*0.04},
+        {x:W*0.34,  y:baseY-H*0.12},
+        {x:W*0.43,  y:baseY-H*0.30},
+        {x:W*0.50,  y:baseY-H*0.46},
+        {x:W*0.57,  y:baseY-H*0.30},
+        {x:W*0.66,  y:baseY-H*0.12},
+        {x:W*0.82,  y:baseY-H*0.04},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'canyon':
+      // Yüksek iki kenar, ortada derin vadi (zor)
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.10},
+        {x:W*0.22,  y:baseY-H*0.34},
+        {x:W*0.32,  y:baseY-H*0.20},
+        {x:W*0.42,  y:baseY-H*0.02},
+        {x:W*0.50,  y:baseY+H*0.04},
+        {x:W*0.58,  y:baseY-H*0.02},
+        {x:W*0.68,  y:baseY-H*0.20},
+        {x:W*0.78,  y:baseY-H*0.34},
+        {x:W*0.90,  y:baseY-H*0.10},
+        {x:W,       y:baseY},
+      ];
+      break;
     case 'valley':
       points = [
         {x:0,       y:baseY},
@@ -2313,6 +2404,143 @@ function generateTerrain(type){
         {x:W,       y:baseY},
       ];
       break;
+    case 'twin_high':
+      // İki yüksek dağ — büyük açı farkı gereken zor levelar
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.12,  y:baseY-H*0.05},
+        {x:W*0.25,  y:baseY-H*0.42},
+        {x:W*0.36,  y:baseY-H*0.18},
+        {x:W*0.50,  y:baseY-H*0.10},
+        {x:W*0.62,  y:baseY-H*0.18},
+        {x:W*0.74,  y:baseY-H*0.42},
+        {x:W*0.86,  y:baseY-H*0.06},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'quad':
+      // 4 testere dişi küçük tepe
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.04},
+        {x:W*0.20,  y:baseY-H*0.18},
+        {x:W*0.27,  y:baseY-H*0.08},
+        {x:W*0.36,  y:baseY-H*0.22},
+        {x:W*0.43,  y:baseY-H*0.10},
+        {x:W*0.52,  y:baseY-H*0.20},
+        {x:W*0.59,  y:baseY-H*0.08},
+        {x:W*0.68,  y:baseY-H*0.18},
+        {x:W*0.80,  y:baseY-H*0.06},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'wave':
+      // Uzun yumuşak dalga — okyanus benzeri
+      points = [
+        {x:0,       y:baseY+H*0.02},
+        {x:W*0.10,  y:baseY-H*0.06},
+        {x:W*0.20,  y:baseY-H*0.04},
+        {x:W*0.30,  y:baseY-H*0.14},
+        {x:W*0.40,  y:baseY-H*0.10},
+        {x:W*0.50,  y:baseY-H*0.18},
+        {x:W*0.60,  y:baseY-H*0.10},
+        {x:W*0.70,  y:baseY-H*0.16},
+        {x:W*0.82,  y:baseY-H*0.08},
+        {x:W*0.92,  y:baseY-H*0.04},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'jagged':
+      // Sivri kayalık dağlar — rocky tema imzası
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.08},
+        {x:W*0.18,  y:baseY-H*0.34},
+        {x:W*0.24,  y:baseY-H*0.20},
+        {x:W*0.32,  y:baseY-H*0.40},
+        {x:W*0.40,  y:baseY-H*0.22},
+        {x:W*0.50,  y:baseY-H*0.38},
+        {x:W*0.58,  y:baseY-H*0.18},
+        {x:W*0.66,  y:baseY-H*0.32},
+        {x:W*0.78,  y:baseY-H*0.10},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'cliff':
+      // Sağda dik uçurum + sol tarafta düz
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.20,  y:baseY},
+        {x:W*0.38,  y:baseY-H*0.04},
+        {x:W*0.55,  y:baseY-H*0.10},
+        {x:W*0.65,  y:baseY-H*0.36},
+        {x:W*0.72,  y:baseY-H*0.40},
+        {x:W*0.80,  y:baseY-H*0.42},
+        {x:W*0.90,  y:baseY-H*0.40},
+        {x:W,       y:baseY-H*0.35},
+      ];
+      break;
+    case 'dunes':
+      // Çöl kum tepecikleri — yumuşak, hafif simetrik
+      points = [
+        {x:0,       y:baseY+H*0.02},
+        {x:W*0.12,  y:baseY-H*0.05},
+        {x:W*0.24,  y:baseY-H*0.18},
+        {x:W*0.38,  y:baseY-H*0.10},
+        {x:W*0.50,  y:baseY-H*0.20},
+        {x:W*0.62,  y:baseY-H*0.10},
+        {x:W*0.76,  y:baseY-H*0.16},
+        {x:W*0.88,  y:baseY-H*0.06},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'volcano_peak':
+      // Tek geniş tabanlı sivri yanardağ konisi
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.02},
+        {x:W*0.22,  y:baseY-H*0.12},
+        {x:W*0.34,  y:baseY-H*0.28},
+        {x:W*0.45,  y:baseY-H*0.42},
+        {x:W*0.50,  y:baseY-H*0.46},
+        {x:W*0.55,  y:baseY-H*0.42},
+        {x:W*0.66,  y:baseY-H*0.28},
+        {x:W*0.78,  y:baseY-H*0.12},
+        {x:W*0.90,  y:baseY-H*0.02},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'sky_islands':
+      // Gökyüzü adaları — birbirinden ayrı dik tepeler
+      points = [
+        {x:0,       y:baseY+H*0.05},
+        {x:W*0.18,  y:baseY-H*0.06},
+        {x:W*0.25,  y:baseY-H*0.30},
+        {x:W*0.34,  y:baseY-H*0.04},
+        {x:W*0.45,  y:baseY+H*0.02},
+        {x:W*0.56,  y:baseY-H*0.04},
+        {x:W*0.65,  y:baseY-H*0.36},
+        {x:W*0.75,  y:baseY-H*0.06},
+        {x:W*0.86,  y:baseY-H*0.20},
+        {x:W,       y:baseY-H*0.04},
+      ];
+      break;
+    case 'crater':
+      // Ortada büyük krater — volcano/rocky için
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.12,  y:baseY-H*0.08},
+        {x:W*0.22,  y:baseY-H*0.22},
+        {x:W*0.32,  y:baseY-H*0.32},
+        {x:W*0.42,  y:baseY-H*0.16},
+        {x:W*0.50,  y:baseY-H*0.04},
+        {x:W*0.58,  y:baseY-H*0.16},
+        {x:W*0.68,  y:baseY-H*0.32},
+        {x:W*0.78,  y:baseY-H*0.22},
+        {x:W*0.88,  y:baseY-H*0.08},
+        {x:W,       y:baseY},
+      ];
+      break;
     case 'cave_mountain':
       // Mağara seviyesi: sağda yüksek ve geniş tek dağ
       points = [
@@ -2326,6 +2554,170 @@ function generateTerrain(type){
         {x:W*0.82,  y:baseY-H*0.48},
         {x:W*0.92,  y:baseY-H*0.18},
         {x:W,       y:baseY-H*0.05},
+      ];
+      break;
+    case 'cave_twin':
+      // Mağara: sol küçük + sağ büyük tepe (mağara büyük olanda)
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.04},
+        {x:W*0.22,  y:baseY-H*0.22},
+        {x:W*0.30,  y:baseY-H*0.20},
+        {x:W*0.40,  y:baseY-H*0.10},
+        {x:W*0.55,  y:baseY-H*0.18},
+        {x:W*0.66,  y:baseY-H*0.46},
+        {x:W*0.76,  y:baseY-H*0.50},
+        {x:W*0.86,  y:baseY-H*0.42},
+        {x:W*0.94,  y:baseY-H*0.16},
+        {x:W,       y:baseY-H*0.04},
+      ];
+      break;
+    case 'cave_jagged':
+      // Mağara: sivri kayalık dağ (rocky tema imzası)
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.05},
+        {x:W*0.22,  y:baseY-H*0.14},
+        {x:W*0.32,  y:baseY-H*0.06},
+        {x:W*0.42,  y:baseY-H*0.18},
+        {x:W*0.52,  y:baseY-H*0.28},
+        {x:W*0.62,  y:baseY-H*0.46},
+        {x:W*0.70,  y:baseY-H*0.36},
+        {x:W*0.78,  y:baseY-H*0.52},
+        {x:W*0.86,  y:baseY-H*0.40},
+        {x:W*0.94,  y:baseY-H*0.20},
+        {x:W,       y:baseY-H*0.04},
+      ];
+      break;
+    case 'cave_dune':
+      // Mağara: kum tepesi gibi yumuşak yamaçlı büyük tepe
+      points = [
+        {x:0,       y:baseY+H*0.02},
+        {x:W*0.12,  y:baseY-H*0.02},
+        {x:W*0.25,  y:baseY-H*0.06},
+        {x:W*0.38,  y:baseY-H*0.12},
+        {x:W*0.50,  y:baseY-H*0.22},
+        {x:W*0.62,  y:baseY-H*0.38},
+        {x:W*0.74,  y:baseY-H*0.48},
+        {x:W*0.84,  y:baseY-H*0.40},
+        {x:W*0.93,  y:baseY-H*0.20},
+        {x:W,       y:baseY-H*0.06},
+      ];
+      break;
+    case 'cave_volcano':
+      // Mağara: yanardağ konisi şeklinde — sivri tepe
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.12,  y:baseY-H*0.04},
+        {x:W*0.28,  y:baseY-H*0.06},
+        {x:W*0.42,  y:baseY-H*0.10},
+        {x:W*0.55,  y:baseY-H*0.28},
+        {x:W*0.65,  y:baseY-H*0.40},
+        {x:W*0.72,  y:baseY-H*0.50},
+        {x:W*0.78,  y:baseY-H*0.46},
+        {x:W*0.86,  y:baseY-H*0.30},
+        {x:W*0.94,  y:baseY-H*0.10},
+        {x:W,       y:baseY-H*0.02},
+      ];
+      break;
+    case 'cave_plateau':
+      // Mağara: düz tepeli geniş dağ (mesa benzeri)
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.12,  y:baseY-H*0.04},
+        {x:W*0.28,  y:baseY-H*0.06},
+        {x:W*0.40,  y:baseY-H*0.10},
+        {x:W*0.55,  y:baseY-H*0.34},
+        {x:W*0.65,  y:baseY-H*0.46},
+        {x:W*0.75,  y:baseY-H*0.46},
+        {x:W*0.85,  y:baseY-H*0.46},
+        {x:W*0.93,  y:baseY-H*0.20},
+        {x:W,       y:baseY-H*0.04},
+      ];
+      break;
+    case 'buried_hills':
+      // Hedef gömülü — yumuşak dalgalı tepeler, sağda küçük tümsek
+      points = [
+        {x:0,       y:baseY+H*0.01},
+        {x:W*0.12,  y:baseY-H*0.06},
+        {x:W*0.22,  y:baseY-H*0.02},
+        {x:W*0.34,  y:baseY-H*0.10},
+        {x:W*0.46,  y:baseY-H*0.04},
+        {x:W*0.58,  y:baseY-H*0.12},
+        {x:W*0.68,  y:baseY-H*0.16},
+        {x:W*0.78,  y:baseY-H*0.10},
+        {x:W*0.90,  y:baseY-H*0.04},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'buried_mesa':
+      // Hedef gömülü — geniş düz tepe (mesa); hedef tepede gömülü
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.15,  y:baseY-H*0.04},
+        {x:W*0.28,  y:baseY-H*0.18},
+        {x:W*0.40,  y:baseY-H*0.22},
+        {x:W*0.55,  y:baseY-H*0.22},
+        {x:W*0.70,  y:baseY-H*0.20},
+        {x:W*0.82,  y:baseY-H*0.10},
+        {x:W*0.92,  y:baseY-H*0.03},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'buried_dunes':
+      // Hedef gömülü — kum tepecikleri (desert)
+      points = [
+        {x:0,       y:baseY+H*0.02},
+        {x:W*0.14,  y:baseY-H*0.04},
+        {x:W*0.28,  y:baseY-H*0.14},
+        {x:W*0.42,  y:baseY-H*0.08},
+        {x:W*0.55,  y:baseY-H*0.16},
+        {x:W*0.68,  y:baseY-H*0.10},
+        {x:W*0.80,  y:baseY-H*0.18},
+        {x:W*0.92,  y:baseY-H*0.06},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'buried_rocky':
+      // Hedef gömülü — kayalık tümsekler (jagged'in alçağı)
+      points = [
+        {x:0,       y:baseY},
+        {x:W*0.10,  y:baseY-H*0.04},
+        {x:W*0.20,  y:baseY-H*0.14},
+        {x:W*0.30,  y:baseY-H*0.08},
+        {x:W*0.42,  y:baseY-H*0.16},
+        {x:W*0.52,  y:baseY-H*0.08},
+        {x:W*0.62,  y:baseY-H*0.18},
+        {x:W*0.72,  y:baseY-H*0.10},
+        {x:W*0.82,  y:baseY-H*0.14},
+        {x:W*0.92,  y:baseY-H*0.04},
+        {x:W,       y:baseY},
+      ];
+      break;
+    case 'buried_swamp':
+      // Hedef gömülü — bataklık benzeri çok alçak düz arazi
+      points = [
+        {x:0,       y:baseY+H*0.04},
+        {x:W*0.15,  y:baseY+H*0.02},
+        {x:W*0.30,  y:baseY-H*0.02},
+        {x:W*0.45,  y:baseY+H*0.01},
+        {x:W*0.60,  y:baseY-H*0.04},
+        {x:W*0.72,  y:baseY+H*0.01},
+        {x:W*0.84,  y:baseY-H*0.02},
+        {x:W,       y:baseY+H*0.02},
+      ];
+      break;
+    case 'buried_ridge':
+      // Hedef gömülü — orta yüksek tek tümsek
+      points = [
+        {x:0,       y:baseY+H*0.01},
+        {x:W*0.18,  y:baseY-H*0.02},
+        {x:W*0.32,  y:baseY-H*0.10},
+        {x:W*0.45,  y:baseY-H*0.20},
+        {x:W*0.58,  y:baseY-H*0.22},
+        {x:W*0.70,  y:baseY-H*0.14},
+        {x:W*0.84,  y:baseY-H*0.06},
+        {x:W,       y:baseY},
       ];
       break;
     default:
