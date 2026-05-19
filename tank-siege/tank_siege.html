@@ -482,7 +482,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <span id="hud-shots">💣 3</span>
   <span id="hud-level">LEVEL 1</span>
   <span id="hud-score">🏆 0</span>
-  <span id="hud-stars" onclick="openStarShop()" style="color:#FFD700;font-size:15px;font-weight:700;pointer-events:auto;cursor:pointer;padding:4px 8px;border-radius:10px;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);">⭐ 0</span>
+  <span id="hud-stars" style="color:#FFD700;font-size:15px;font-weight:700;padding:4px 8px;border-radius:10px;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);">⭐ 0</span>
 </div>
 
 <!-- Tank badge üstte küçük -->
@@ -625,7 +625,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
   <div style="display:flex;flex-direction:row;align-items:center;gap:5px;">
-    <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayit"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
+    <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayıt"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
     <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">❤️ 5/5</button>
     <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;pointer-events:none;">💨 Calm</div>
   </div>
@@ -748,7 +748,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.106';
+const APP_VERSION      = '1.0.107';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -766,8 +766,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 01:37';
-const APP_VERSION_NOTE = 'Tr - En dedtegi ekleme part 1';
+const APP_VERSION_DATE = '2026.05.19 14:38';
+const APP_VERSION_NOTE = 'Stars sustemi ipyal edildi. Dil ekleme devam etti.';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -4941,16 +4941,16 @@ function openTankCard(){
     </div>
     <span style="font-size:10px;font-weight:700;color:${col};width:36px;text-align:right;">${valStr}</span>
   </div>`;
-  document.getElementById('tc-name').innerHTML=gDef.icon+'&nbsp;'+gDef.name
+  document.getElementById('tc-name').innerHTML=gDef.icon+'&nbsp;'+tankName(type)
     +(tULvl>0?` <span style="font-size:11px;color:#FFD700;font-weight:700;">${t('lvl_short')}${tULvl}</span>`:'');
-  document.getElementById('tc-desc').textContent=st.desc;
+  document.getElementById('tc-desc').textContent=t('tank_desc_'+type)||st.desc;
   document.getElementById('tc-bars').innerHTML=
     _tStatRow(t('stat_menzil'),menzilVal,'#FF6B35','⚡'+td.maxPower)+
     _tStatRow(t('stat_ruzgar'),ruzgarVal,'#00C9B1',Math.round(ruzgarVal*100)+'%')+
     _tStatRow(t('stat_bonus'),Math.min(1,tBonNow/100),'#FFD700','+'+tBonNow+'%')+
     `<div style="margin-top:5px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
       ${targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${targetHPt.toLocaleString()} HP</b> ${t('hq')}</div>`:''}
-      <div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${dmgT.toLocaleString()}</b> (${amDef.name})${dmgTNext?` → <b style="color:#00E676">${dmgTNext.toLocaleString()}</b>`:''}</div>
+      <div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${dmgT.toLocaleString()}</b> (${ammoName(selectedAmmo)})${dmgTNext?` → <b style="color:#00E676">${dmgTNext.toLocaleString()}</b>`:''}</div>
       <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${shotsTColor}">${shotsT} ${t('shots_needed')}${shotsTNext&&shotsTNext<Number(shotsT)?` → <b style="color:#00E676">${shotsTNext}</b>`:''}</div>
       ${tBonNext!==null?`<div style="color:rgba(255,255,255,0.35);font-size:10px;">Upgrade: +${tBonNow}% → +${tBonNext}% (galeri)</div>`:''}
     </div>`;
@@ -4996,19 +4996,19 @@ function renderTankChangeList(){
       +(isCurrent?'':'cursor:pointer;');
     card.innerHTML='<div style="font-size:28px;flex-shrink:0;">'+gDef.icon+'</div>'
       +'<div style="flex:1;"><div style="color:white;font-family:Rajdhani,sans-serif;font-size:16px;font-weight:700;">'
-      +gDef.name
+      +tankName(type)
       +(isTemp?' <span style="color:#FF6B35;font-size:11px;">⏱'+(tempTank.expiresAtLevel-curLevel)+'L</span>':'')
-      +'</div><div style="color:rgba(255,255,255,0.5);font-size:12px;">'+st.desc+'</div></div>'
+      +'</div><div style="color:rgba(255,255,255,0.5);font-size:12px;">'+(t('tank_desc_'+type)||st.desc)+'</div></div>'
       +(isCurrent
         ?'<span style="color:#FFD700;font-size:18px;">✓</span>'
-        :'<button style="background:rgba(255,215,0,0.15);border:1.5px solid rgba(255,215,0,0.4);color:#FFD700;border-radius:10px;padding:6px 14px;font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">Seç</button>');
+        :'<button style="background:rgba(255,215,0,0.15);border:1.5px solid rgba(255,215,0,0.4);color:#FFD700;border-radius:10px;padding:6px 14px;font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">'+t('select_btn')+'</button>');
     if(!isCurrent){
       card.onclick=()=>{
         selectedTank=type;
         lsSet('sel_tank', type);
         updateHUD2();
         closeChangeTank();
-        showToast(gDef.emoji+' '+gDef.name+' seçildi!');
+        showToast(gDef.emoji+' '+tFmt('selected_toast', {name: tankName(type)}));
       };
     }
     cont.appendChild(card);
@@ -5016,7 +5016,7 @@ function renderTankChangeList(){
   // Galeri linki
   const galLink=document.createElement('button');
   galLink.style.cssText='width:100%;background:rgba(255,215,0,0.1);border:1.5px solid rgba(255,215,0,0.3);color:#FFD700;border-radius:14px;padding:12px;font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;';
-  galLink.textContent='⚔️ Galeri — Yeni Tank Al';
+  galLink.textContent=t('gallery_new_tank');
   galLink.onclick=()=>{closeChangeTank();openGallery(curLevel);switchTab('tank');};
   cont.appendChild(galLink);
 }
@@ -5155,9 +5155,9 @@ function openSlotCard(idx){
     </div>
     <span style="font-size:10px;font-weight:700;color:${col};width:32px;text-align:right;">${valStr}</span>
   </div>`;
-  document.getElementById('sc-name').innerHTML=def.icon+'&nbsp;'+def.name
+  document.getElementById('sc-name').innerHTML=def.icon+'&nbsp;'+ammoName(type)
     +(uLvl>0?` <span style="font-size:11px;color:#FF6B35;font-weight:700;">${t('lvl_short')}${uLvl}</span>`:'');
-  document.getElementById('sc-desc').textContent=st.desc;
+  document.getElementById('sc-desc').textContent=t('ammo_desc_'+type)||st.desc;
   document.getElementById('sc-bars').innerHTML=
     _sRow(t('stat_dmg'),st.dmg,'#FF6B35',dmgBase)+
     _sRow(t('stat_armor'),st.pen,'#FFD700','x'+def.apPen)+
@@ -5210,13 +5210,13 @@ function renderChangeList(){
     if(!isCurrent) card.style.cursor='pointer';
     card.innerHTML='<div style="font-size:28px;flex-shrink:0;">'+def.icon+'</div>'
       +'<div style="flex:1;"><div style="color:white;font-family:Rajdhani,sans-serif;font-size:16px;font-weight:700;">'
-      +def.name
+      +ammoName(type)
       +(isRec?' <span style="color:#00C9B1;font-size:11px;">💡</span>':'')
       +(isTemp?' <span style="color:#FF6B35;font-size:11px;">⏱'+(tempAmmo.expiresAtLevel-curLevel)+'L</span>':'')
-      +'</div><div style="color:rgba(255,255,255,0.5);font-size:12px;">'+st.desc+'</div></div>'
+      +'</div><div style="color:rgba(255,255,255,0.5);font-size:12px;">'+(t('ammo_desc_'+type)||st.desc)+'</div></div>'
       +(isCurrent
         ?'<span style="color:#FFD700;font-size:13px;font-weight:700;">✓</span>'
-        :'<button style="background:rgba(255,215,0,0.15);border:1.5px solid rgba(255,215,0,0.4);color:#FFD700;border-radius:10px;padding:6px 12px;font-family:Rajdhani,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">Seç</button>');
+        :'<button style="background:rgba(255,215,0,0.15);border:1.5px solid rgba(255,215,0,0.4);color:#FFD700;border-radius:10px;padding:6px 12px;font-family:Rajdhani,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">'+t('select_btn')+'</button>');
     if(!isCurrent){
       card.onclick=()=>{
         slots[changingSlotIdx]=type;
@@ -5242,10 +5242,10 @@ function selectGalleryAmmo(type){
 function getRecommended(){
   if(!lv) return null;
   const mat=lv.targetMat||'wood';
-  if(mat==='concrete') return {type:'piercer',reason:'Beton karargah — Piercer şart'};
-  if(mat==='steel') return {type:'ap',reason:'Çelik karargah — AP şart'};
-  if(mat==='iron')  return {type:'ap',reason:'Demir karargah — AP tavsiye'};
-  return {type:'normal',reason:'Tahta — Normal yeterli'};
+  if(mat==='concrete') return {type:'piercer',reason:t('rec_concrete')};
+  if(mat==='steel') return {type:'ap',reason:t('rec_steel')};
+  if(mat==='iron')  return {type:'ap',reason:t('rec_iron')};
+  return {type:'normal',reason:t('rec_wood')};
 }
 
 function onShieldTap(){
@@ -6257,9 +6257,9 @@ function openLevelStartCard(idx){
   const th = THEMES[lv_data.theme] || Object.values(THEMES)[0];
   document.getElementById('lsc-theme-emoji').textContent = th.emoji || '🎯';
   document.getElementById('lsc-level-name').textContent = lv_data.id + ' — ' + lv_data.name;
-  const matNames = {wood:'🪵 Tahta',iron:'⚙️ Demir',steel:'🛡️ Çelik',concrete:'🧱 Beton'};
+  const matNames = {wood:t('mat_wood'),iron:t('mat_iron'),steel:t('mat_steel'),concrete:t('mat_concrete')};
   document.getElementById('lsc-level-info').textContent =
-    (matNames[lv_data.targetMat]||'') + '  •  ' + lv_data.shots + ' atış';
+    (matNames[lv_data.targetMat]||'') + '  •  ' + lv_data.shots + ' ' + t('shots_suffix');
   document.getElementById('level-start-bg').style.display = 'block';
   document.getElementById('level-start-card').style.display = 'block';
 }
@@ -6320,13 +6320,13 @@ function updateAdButton(){
   const remaining=TWO_HOURS-elapsed;
   if(dailyAdCount>=5){
     btn.classList.add('disabled');
-    info.textContent='Günlük limit doldu';
+    info.textContent=t('daily_limit_full');
   } else if(remaining>0){
     btn.classList.add('disabled');
     const mins=Math.ceil(remaining/60000);
     const hrs=Math.floor(mins/60);
     const m=mins%60;
-    info.textContent=hrs>0?`${hrs}s ${m}dk sonra`:`${mins}dk sonra`;
+    info.textContent=hrs>0?tFmt('time_h_m_after',{h:hrs,m:m}):tFmt('time_m_after',{m:mins});
     // Sayaç güncelle
     setTimeout(updateAdButton, 30000);
   } else {
@@ -6437,7 +6437,7 @@ function renderAmmoGallery(cont){
     if(status==='locked'){
       btnHtml=`<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;">
         <button class="gc-btn btn-buy" onclick="buyAmmo('${key}')" ${score<def.cost?'disabled':''}>
-          ${def.cost>0?def.cost+'🏆':'Ücretsiz'}
+          ${def.cost>0?def.cost+'🏆':t('free_label')}
         </button>
         ${def.tempLevels>0?`<button class="gc-btn btn-ad" onclick="adAmmo('${key}')">📺 1 level</button>`:''}
       </div>`;
@@ -6463,7 +6463,7 @@ function renderAmmoGallery(cont){
         ?`<button class="gc-btn" style="background:linear-gradient(135deg,#FF6B35,#c94d1a);margin-top:4px;" onclick="upgradeAmmo('${key}')">⬆ ${t('lvl_short')}${uLvl+1} — ${AMMO_UPGRADE_COSTS[uLvl].toLocaleString()}🏆</button>`
         :`<button class="gc-btn" style="background:rgba(255,215,0,0.2);color:#FFD700;margin-top:4px;" disabled>🏆 MAX</button>`):'';
       btnHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;">
-        <button class="gc-btn btn-select" onclick="selectGalleryAmmo('${key}')">Seç</button>
+        <button class="gc-btn btn-select" onclick="selectGalleryAmmo('${key}')">${t('select_btn')}</button>
         ${upgBtn}
       </div>`;
     }
@@ -6530,7 +6530,7 @@ function renderTankGallery(cont){
     if(status==='locked'){
       btnHtml=`<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;">
         <button class="gc-btn btn-buy" onclick="buyTank('${key}')" ${score<def.cost?'disabled':''}>
-          ${def.cost>0?def.cost+'🏆':'Ücretsiz'}
+          ${def.cost>0?def.cost+'🏆':t('free_label')}
         </button>
         ${def.tempLevels>0?`<button class="gc-btn btn-ad" onclick="adTank('${key}')">📺 ${def.tempLevels} level</button>`:''}
       </div>`;
@@ -6548,7 +6548,7 @@ function renderTankGallery(cont){
         </div>`;
       } else {
         btnHtml=`<div style="display:flex;flex-direction:column;align-items:flex-end;">
-          <button class="gc-btn btn-select" onclick="selectGalleryTank('${key}')">Seç</button>
+          <button class="gc-btn btn-select" onclick="selectGalleryTank('${key}')">${t('select_btn')}</button>
           ${upgBtn}
         </div>`;
       }
@@ -6585,7 +6585,7 @@ function renderTankGallery(cont){
       ${_tStatRow(t('stat_bonus'),Math.min(1,_tBonNow/100),'#FFD700','+'+_tBonNow+'%')}
       <div style="margin-top:4px;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:11px;font-family:'Rajdhani',sans-serif;line-height:1.65;color:#fff;">
         ${_targetHPt?`<div><span style="color:rgba(255,255,255,0.45);">🏰</span> <b style="color:#fff">${_targetHPt.toLocaleString()} HP</b> ${t('hq')}</div>`:''}
-        ${(status==='owned'||status==='temp')?`<div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${_dmgT.toLocaleString()}</b> (${_amDef.name})${_dmgTNext?` → <b style="color:#00E676">${_dmgTNext.toLocaleString()}</b>`:''}</div>
+        ${(status==='owned'||status==='temp')?`<div><span style="color:rgba(255,255,255,0.45);">💥</span> <b style="color:#FF6B35">${_dmgT.toLocaleString()}</b> (${ammoName(selectedAmmo)})${_dmgTNext?` → <b style="color:#00E676">${_dmgTNext.toLocaleString()}</b>`:''}</div>
         <div><span style="color:rgba(255,255,255,0.45);">🎯</span> <b style="color:${_shotsTColor}">${_shotsT} ${t('shots_needed')}${_shotsTNext&&_shotsTNext<Number(_shotsT)?` → <b style="color:#00E676">${_shotsTNext}</b>`:''}</div>
         ${_tBonNext!==null?`<div style="color:rgba(255,255,255,0.4);font-size:10px;">Upgrade: +${_tBonNow}% → +${_tBonNext}% ${t('upg_dmg_bonus')}</div>`:''}`:
         `<div style="color:rgba(255,255,255,0.35);font-size:10px;">${t('stat_range')} ${_td.maxPower} | ${t('stat_windres')} ${Math.round(_ruzgarVal*100)}%</div>`}
@@ -6640,11 +6640,12 @@ function gcDialogConfirm(){
 
 function buyAmmo(type){
   const def=AMMO_DEF[type];
+  const _nm = ammoName(type);
   if(score<def.cost){SFX.locked();showToast(t('not_enough_pts'));return;}
   showGcDialog({
     icon: def.emoji||'💣',
-    title: def.name+' '+t('dlg_buy'),
-    desc: (AMMO_STATS[type]||{desc:''}).desc,
+    title: _nm+' '+t('dlg_buy'),
+    desc: t('ammo_desc_'+type)||(AMMO_STATS[type]||{desc:''}).desc,
     cost: tFmt('dlg_pts_will_spend', {n: def.cost}),
     costLabel: '',
     btnClass: 'confirm-buy',
@@ -6657,18 +6658,19 @@ function buyAmmo(type){
       lsSet('owned_ammo', JSON.stringify(ownedAmmo));
       lsSet('sel_ammo', selectedAmmo);
       SFX.buy(); updateGalleryScore(); updateUI(); renderGallery();
-      showToast(def.emoji+' '+tFmt('toast_purchased', {name: def.name}));
+      showToast(def.emoji+' '+tFmt('toast_purchased', {name: _nm}));
     }
   });
 }
 
 function buyTank(type){
   const def=TANK_DEF_GALLERY[type];
+  const _nm = tankName(type);
   if(score<def.cost){SFX.locked();showToast(t('not_enough_pts'));return;}
   showGcDialog({
     icon: def.emoji||'🚗',
-    title: def.name+' '+t('dlg_buy'),
-    desc: (TANK_STATS[type]||{desc:''}).desc,
+    title: _nm+' '+t('dlg_buy'),
+    desc: t('tank_desc_'+type)||(TANK_STATS[type]||{desc:''}).desc,
     cost: tFmt('dlg_pts_will_spend', {n: def.cost}),
     costLabel: '',
     btnClass: 'confirm-buy',
@@ -6681,7 +6683,7 @@ function buyTank(type){
       lsSet('owned_tanks', JSON.stringify(ownedTanks));
       lsSet('sel_tank', selectedTank);
       SFX.buy(); updateGalleryScore(); updateUI(); renderGallery();
-      showToast(def.emoji+' '+tFmt('toast_purchased', {name: def.name}));
+      showToast(def.emoji+' '+tFmt('toast_purchased', {name: _nm}));
     }
   });
 }
@@ -6693,9 +6695,10 @@ function upgradeAmmo(type){
   const cost = AMMO_UPGRADE_COSTS[curLvl];
   if(score<cost){SFX.locked();showToast(t('not_enough_pts')+' ('+cost+')');return;}
   const def=AMMO_DEF[type];
+  const _nm = ammoName(type);
   showGcDialog({
     icon: def.emoji||'💣',
-    title: def.name+' '+t('dlg_upgrade'),
+    title: _nm+' '+t('dlg_upgrade'),
     desc: t('upg_level')+' '+(curLvl+1)+' → '+(curLvl+2)+'. '+t('upg_dmg25'),
     cost: tFmt('dlg_pts_will_spend', {n: cost}),
     costLabel: '',
@@ -6707,7 +6710,7 @@ function upgradeAmmo(type){
       lsSet('total_score', score);
       lsSet('ammo_upgrades', JSON.stringify(ammoUpgrades));
       SFX.upgrade(); updateGalleryScore(); updateUI(); renderGallery();
-      showToast(def.emoji+' '+def.name+' '+t('toast_upg_ammo').replace('{n}',curLvl+2));
+      showToast(def.emoji+' '+_nm+' '+t('toast_upg_ammo').replace('{n}',curLvl+2));
     }
   });
 }
@@ -6718,9 +6721,10 @@ function upgradeTank(type){
   const cost = TANK_UPGRADE_COSTS[curLvl];
   if(score<cost){SFX.locked();showToast(t('not_enough_pts')+' ('+cost+')');return;}
   const def = TANK_DEF_GALLERY[type]||{};
+  const _nm = tankName(type);
   showGcDialog({
     icon: def.emoji||'🚗',
-    title: (def.name||type)+' '+t('dlg_upgrade'),
+    title: _nm+' '+t('dlg_upgrade'),
     desc: t('upg_level')+' '+(curLvl+1)+' → '+(curLvl+2)+'. '+t('upg_dmg20'),
     cost: tFmt('dlg_pts_will_spend', {n: cost}),
     costLabel: '',
@@ -6745,11 +6749,9 @@ function adAmmo(type){
     _adAmmoPending = type;
     const desc = document.getElementById('ammo-replace-desc');
     if(desc) desc.innerHTML =
-      t('swap_has')+' <b style="color:#FFD700">'+curDef.name+'</b>'+(t('swap_var')?' '+t('swap_var'):'')+' ' +
+      t('swap_has')+' <b style="color:#FFD700">'+ammoName(tempAmmo.type)+'</b>'+(t('swap_var')?' '+t('swap_var'):'')+' ' +
       '(<b style="color:#FF6B35">' + kalan + ' '+t('swap_left')+'</b>).<br><br>'
-      +(_curLang==='tr'
-        ? 'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve yerine <b style="color:#FFD700">'+newDef.name+'</b> gelir.'
-        : 'Continuing will reset this and replace with <b style="color:#FFD700">'+newDef.name+'</b>.');
+      + tFmt('swap_continue_tr', {name: ammoName(type)});
     const bg = document.getElementById('ammo-replace-bg');
     if(bg) bg.style.display = 'flex';
     return;
@@ -6757,7 +6759,7 @@ function adAmmo(type){
   const _def = AMMO_DEF[type];
   showGcDialog({
     icon: _def.emoji||'💣',
-    title: _def.name+' '+t('dlg_try_title'),
+    title: ammoName(type)+' '+t('dlg_try_title'),
     desc: t('dlg_ad_use').replace('{n}', (_def.tempLevels||1)),
     cost: '',
     btnClass: 'confirm-ad',
@@ -6796,7 +6798,7 @@ function giveAdAmmo(type){
   lsSet('temp_ammo', JSON.stringify(tempAmmo));
   lsSet('sel_ammo', selectedAmmo);
   renderGallery();
-  showToast(def.emoji+' '+def.name+' '+t('toast_active').replace('{n}',1));
+  showToast(def.emoji+' '+ammoName(type)+' '+t('toast_active').replace('{n}',1));
 }
 
 function adTank(type){
@@ -6808,11 +6810,9 @@ function adTank(type){
     _adTankPending = type;
     const desc = document.getElementById('tank-replace-desc');
     if(desc) desc.innerHTML =
-      (_curLang==='tr'?'Elinde ':'You have ')+' <b style="color:#FFD700">'+(curDef?curDef.name:tempTank.type)+'</b>'+(_curLang==='tr'?' var ':' ') +
+      tFmt('swap_have', {name: tankName(tempTank.type)}) + ' ' +
       '(<b style="color:#FF6B35">' + kalan + ' '+t('swap_left')+'</b>).<br><br>'
-      +(_curLang==='tr'
-        ? 'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve yerine <b style="color:#FFD700">'+newDef.name+'</b> gelir.'
-        : 'Continuing will reset this and replace with <b style="color:#FFD700">'+newDef.name+'</b>.');
+      + tFmt('swap_continue_tr', {name: tankName(type)});
     const bg = document.getElementById('tank-replace-bg');
     if(bg) bg.style.display = 'flex';
     return;
@@ -6820,7 +6820,7 @@ function adTank(type){
   const _tdef = TANK_DEF_GALLERY[type]||{};
   showGcDialog({
     icon: _tdef.emoji||'🚗',
-    title: (_tdef.name||type)+' '+t('dlg_try_title'),
+    title: tankName(type)+' '+t('dlg_try_title'),
     desc: t('dlg_ad_use').replace('{n}', (_tdef.tempLevels||1)),
     cost: '',
     btnClass: 'confirm-ad',
@@ -6860,7 +6860,7 @@ function giveAdTank(type){
   lsSet('temp_tank', JSON.stringify(tempTank));
   lsSet('sel_tank', selectedTank);
   renderGallery();
-  showToast(def.emoji+' '+def.name+' '+t('toast_active').replace('{n}',def.tempLevels));
+  showToast(def.emoji+' '+tankName(type)+' '+t('toast_active').replace('{n}',def.tempLevels));
 }
 
 // Slot tooltip — hover
@@ -7430,15 +7430,16 @@ function nextLevel(){
 function showThemeUnlock(newThemeIdx, nextLevelIdx){
   SFX.themeUnlock();
   const themes = Object.values(THEMES);
+  const themeKeys = Object.keys(THEMES);
   const newTheme = themes[newThemeIdx] || themes[0];
+  const newKey = themeKeys[newThemeIdx] || themeKeys[0];
   const popup = document.getElementById('theme-unlock-popup');
   document.getElementById('theme-unlock-emoji').textContent = newTheme.emoji || '🌟';
-  document.getElementById('theme-unlock-name').textContent = newTheme.name || 'Yeni Tema';
-  document.getElementById('theme-unlock-desc').textContent =
-    THEME_DESCS[Object.keys(THEMES)[newThemeIdx]] || '';
+  document.getElementById('theme-unlock-name').textContent = t('theme_'+newKey) || t('theme_new_fallback');
+  document.getElementById('theme-unlock-desc').textContent = t('theme_desc_'+newKey) || '';
   const starsEarned = getThemeStars(newThemeIdx-1);
   document.getElementById('theme-unlock-stars').textContent =
-    starsEarned + '/30 yıldız ile açıldı';
+    tFmt('theme_unlocked_stars', {n: starsEarned});
   // Kapat butonu levelı yüklesin
   document.getElementById('theme-unlock-popup').dataset.nextLevel = nextLevelIdx;
   if(popup){ popup.style.display='flex'; SFX.win && SFX.win(); }
@@ -7457,189 +7458,26 @@ function showThemeGate(have, need, themeIdx){
   document.getElementById('result').classList.remove('show');
   const missing = need - have;
   const themes = Object.values(THEMES);
+  const themeKeys = Object.keys(THEMES);
   const nextTh = themes[themeIdx+1] || themes[themeIdx];
-  const nextThKey = Object.keys(THEMES)[themeIdx+1] || Object.keys(THEMES)[themeIdx];
+  const nextThKey = themeKeys[themeIdx+1] || themeKeys[themeIdx];
   // overlay içeriklerini doldur
   document.getElementById('tgo-next-theme-name').textContent =
-    (nextTh.emoji||'🌟') + ' ' + (nextTh.name||'Yeni Tema');
+    (nextTh.emoji||'🌟') + ' ' + (t('theme_'+nextThKey) || t('theme_new_fallback'));
   const barFull = Math.min(have, need);
   document.getElementById('tgo-star-bar').textContent = '⭐ '+have+' / '+need;
   document.getElementById('tgo-star-text').textContent =
-    have + '/' + need + ' yıldız — ' + missing + ' eksik';
+    tFmt('theme_gate_stars', {have: have, need: need, miss: missing});
   // overlay'i göster
   const ov = document.getElementById('theme-gate-overlay');
   ov.style.display = 'flex';
-  // Reklam butonunu güncelle
-  const today2 = new Date().toDateString();
-  const adUsed = parseInt(lsGet('tgate_ad_'+today2)||'0');
-  const adBtn = document.getElementById('tgo-ad-btn');
-  if(adBtn){
-    if(adUsed>=3){ adBtn.disabled=true; adBtn.style.opacity='0.45'; adBtn.textContent='📺 Limit Doldu (3/3)'; }
-    else { adBtn.disabled=false; adBtn.style.opacity='1'; adBtn.textContent='📺 Reklam İzle → +2 ⭐ ('+(3-adUsed)+' hak)'; }
-  }
-}
-
-function onWatchAdForStars(){
-  const today = new Date().toDateString();
-  const key = 'star_ad_'+today;  // shop'a özel key
-  const used = parseInt(lsGet(key)||'0');
-  if(used >= 3){
-    showToast(t('toast_star_ad_limit'));
-    return;
-  }
-  lsSet(key, used+1);
-    if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
-  if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
-  try{ Android.showRewardedAd('extra_stars'); }
-  catch(e){ setTimeout(()=>giveAdStars(2), 800); }}}
-}
-
-function giveAdStars(count){
-  // Mevcut temada en az yıldızlı levellara yıldız ekle
-  const themeIdx=Math.floor(curLevel/10);
-  const startId=themeIdx*10+1;
-  let added=0;
-  for(let i=startId;i<startId+10&&added<count;i++){
-    const cur=parseInt(lsGet('stars_'+i)||'0');
-    if(cur<3){
-      lsSet('stars_'+i, Math.min(3,cur+1));
-      added++;
-    }
-  }
-  showToast(tFmt('toast_stars_won', {n: added}));
-  updateUI();
-  const starsNow=getThemeStars(themeIdx);
-  const gateOv=document.getElementById('theme-gate-overlay');
-  const shopOv=document.getElementById('star-shop-overlay');
-  if(starsNow>=20){
-    if(gateOv) gateOv.style.display='none';
-    if(shopOv) shopOv.style.display='none';
-    const nextIdx=themeIdx*10+10;
-    if(nextIdx<LEVELS.length){ showThemeUnlock(themeIdx+1,nextIdx); }
-    else { loadLevel(curLevel+1); }
-  } else {
-    refreshStarShopUI();
-    if(gateOv&&gateOv.style.display==='flex'){
-      const have=starsNow; const need=20; const barFull=Math.min(have,need);
-      document.getElementById('tgo-star-bar').textContent='⭐ '+have+' / '+need;
-      document.getElementById('tgo-star-text').textContent=have+'/'+need+' yıldız — '+(need-have)+' yıldız eksik';
-    }
-  }
+  // Reklam butonu kaldırıldı — theme gate sadeleştirildi
 }
 
 // ═══════════════════════════════════════
-// STAR SHOP & THEME GATE FUNCTIONS
+// THEME GATE — sadeleştirildi: sadece "Önceki Levellara Dön"
+// (Star shop ve reklam ile yıldız kazanma kaldırıldı — yıldız harcanmadığı için anlamsızdı)
 // ═══════════════════════════════════════
-function openStarShop(){
-  refreshStarShopUI();
-  document.getElementById('star-shop-overlay').style.display='flex';
-}
-
-function closeStarShop(){
-  closeStarShopCheckGate();
-}
-
-function refreshStarShopUI(){
-  const totalStars=getTotalStars();
-  document.getElementById('ss-current-stars').textContent='Toplam yıldızın: ⭐ '+totalStars;
-  const pts=parseInt(lsGet('total_score')||'0');
-  document.getElementById('ss-score-info').textContent='Puanın: 🏆 '+pts;
-  // Puan butonları
-  const btn1=document.getElementById('ss-btn-1star');
-  const btn3=document.getElementById('ss-btn-3star');
-  btn1.disabled = pts<200;
-  btn1.style.opacity = pts<200 ? '0.45' : '1';
-  btn3.disabled = pts<500;
-  btn3.style.opacity = pts<500 ? '0.45' : '1';
-  // Reklam butonu
-  const today=new Date().toDateString();
-  const adUsed=parseInt(lsGet('star_ad_'+today)||'0');
-  const adLeft=3-adUsed;
-  const adBtn=document.getElementById('ss-btn-ad');
-  adBtn.disabled = adLeft<=0;
-  adBtn.style.opacity = adLeft<=0 ? '0.45' : '1';
-  adBtn.textContent = adLeft<=0 ? '📺 Bugünlük Limit Doldu' : 'Reklam İzle → +2 ⭐';
-  document.getElementById('ss-ad-limit').textContent='Günlük '+adLeft+'/3 hak kaldı';
-}
-
-function buyStarWithPoints(count){
-  const cost = count===1 ? 200 : 500;
-  const pts=parseInt(lsGet('total_score')||'0');
-  if(pts<cost){ showToast(t('not_enough_pts')); return; }
-  // Önce kaç yıldız eklenebileceğini kontrol et
-  const themeIdx=Math.floor(curLevel/10);
-  const startId=themeIdx*10+1;
-  let canAdd=0;
-  for(let i=startId;i<startId+10;i++){
-    if(parseInt(lsGet('stars_'+i)||'0')<3) canAdd++;
-  }
-  if(canAdd===0){
-    showToast(t('toast_theme_full'));
-    return; // Para düşme!
-  }
-  // Puanı düş
-  score = score - cost;
-  SFX.coin();
-  lsSet('total_score', score);
-  // Yıldız ekle
-  let added=0;
-  for(let i=startId;i<startId+10&&added<count;i++){
-    const cur=parseInt(lsGet('stars_'+i)||'0');
-    if(cur<3){
-      lsSet('stars_'+i, Math.min(3,cur+1));
-      added++;
-    }
-  }
-  showToast(tFmt('toast_stars_bought', {n: added, cost: cost}));
-  updateUI();
-  refreshStarShopUI();
-  // Gate overlay güncelle — kapalı olsa bile 20 yıldıza ulaşınca geç
-  const gateOv=document.getElementById('theme-gate-overlay');
-  const shopOv2=document.getElementById('star-shop-overlay');
-  const starsNow2=getThemeStars(themeIdx);
-  if(gateOv&&gateOv.style.display==='flex'){
-    const need=20; const have=starsNow2;
-    document.getElementById('tgo-star-bar').textContent='⭐ '+have+' / '+need;
-    document.getElementById('tgo-star-text').textContent=have+'/'+need+' yıldız — '+(need-have)+' yıldız eksik';
-  }
-  if(starsNow2>=20){
-    if(gateOv) gateOv.style.display='none';
-    if(shopOv2) shopOv2.style.display='none';
-    const nextIdx=themeIdx*10+10;
-    // Son tema son level kontrolü
-    const isLastInTheme = (curLevel % 10 === 9);
-    if(isLastInTheme){
-      if(nextIdx<LEVELS.length){ showThemeUnlock(themeIdx+1,nextIdx); }
-      else { loadLevel(curLevel+1); }
-    } else {
-      // Son level değil ama 20 yıldıza ulaşıldı — sadece toast
-      showToast(t('toast_theme_star_done'));
-    }
-  }
-}
-
-
-function themeGateWatchAd(){
-  const today = new Date().toDateString();
-  const key = 'tgate_ad_'+today;  // themeGate'e özel key
-  const used = parseInt(lsGet(key)||'0');
-  if(used >= 3){
-    showToast(t('toast_theme_ad_limit'));
-    const btn = document.getElementById('tgo-ad-btn');
-    if(btn){ btn.disabled=true; btn.style.opacity='0.45'; btn.textContent='📺 Limit Doldu (3/3)'; }
-    return;
-  }
-  lsSet(key, used+1);  // reklam başlamadan say — APK callback ile ödül
-    if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
-  if(isSandbox){setTimeout(()=>giveAdStars(2), 800);}else{
-  try{ Android.showRewardedAd('extra_stars'); }
-  catch(e){ setTimeout(()=>giveAdStars(2), 800); }}}
-}
-
-function shopWatchAdForStars(){
-  onWatchAdForStars();
-}
-
 function themeGateGoMap(){
   document.getElementById('theme-gate-overlay').style.display='none';
   // Yıldız yetiyorsa direkt geç, yoksa level map
@@ -7654,30 +7492,9 @@ function themeGateGoMap(){
   }
 }
 
-function themeGateOpenShop(){
-  document.getElementById('theme-gate-overlay').style.display='none';
-  openStarShop();
-}
-
-function closeStarShopCheckGate(){
-  // Star shop kapanınca yıldız yetiyorsa geç
-  document.getElementById('star-shop-overlay').style.display='none';
-  const curThemeIdx = Math.floor(curLevel/10);
-  const isLastInTheme = (curLevel % 10 === 9);
-  if(isLastInTheme){
-    const starsNow = getThemeStars(curThemeIdx);
-    if(starsNow >= 20){
-      const nextIdx = curThemeIdx*10+10;
-      if(nextIdx < LEVELS.length){ showThemeUnlock(curThemeIdx+1, nextIdx); }
-      else { loadLevel(curLevel+1); }
-      return;
-    }
-  }
-}
-
 function showAllLevelsDone(){
-  document.getElementById('res-title').textContent='TÜM BÖLÜMLER BİTTİ!';
-  document.getElementById('res-sub').textContent='Yakında yeni bölümler geliyor...';
+  document.getElementById('res-title').textContent=t('all_done_title');
+  document.getElementById('res-sub').textContent=t('all_done_sub');
   document.getElementById('res-stars').textContent='🏆';
   document.getElementById('btn-next').style.display='none';
   document.getElementById('result').classList.add('show');
@@ -7846,37 +7663,48 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 // ═══════════════════════════════════════════════════════════════
 // SES MOTORU v3 — Web Audio Buffer (sıfır gecikme)
 // ── Local bildirim: can sistemi ──────────────────────────────────
-(function(){
-  function scheduleIfNeeded(){
-    if(typeof Android === 'undefined' || !Android.scheduleLifeNotification) return;
-    var lives    = parseInt(localStorage.getItem('lives_count')||'5');
-    var maxL     = 5;
-    var regenMs  = 20*60*1000;
-    if(lives >= maxL){ Android.cancelLifeNotification(); return; }
-    var missing  = maxL - lives;
-    var lastTime = parseInt(localStorage.getItem('lives_time')||String(Date.now()));
-    var elapsed  = Date.now() - lastTime;
-    var msNext   = Math.max(0, regenMs - (elapsed % regenMs));
-    var totalMs  = msNext + (missing - 1) * regenMs;
-    var minLeft  = Math.ceil(totalMs / 60000);
-    Android.scheduleLifeNotification(minLeft);
+// Mantık: Uygulama arka plana geçince Android tarafına
+//   "X dakika sonra canlar dolacak, bildirim göster" denir.
+//   Uygulama tekrar açılınca planlanmış bildirim iptal edilir.
+//   loseLife() çağrılınca da arka plandaysa bildirim yenilenir.
+function _scheduleLifeNotifIfNeeded(){
+  if(typeof Android === 'undefined' || !Android.scheduleLifeNotification) return;
+  var lives    = parseInt(localStorage.getItem('lives_count')||'5');
+  var maxL     = 5;
+  var regenMs  = 20*60*1000;
+  if(lives >= maxL){
+    try{ Android.cancelLifeNotification(); }catch(_){}
+    return;
   }
+  var missing  = maxL - lives;
+  var lastTime = parseInt(localStorage.getItem('lives_time')||String(Date.now()));
+  var elapsed  = Date.now() - lastTime;
+  var msNext   = Math.max(0, regenMs - (elapsed % regenMs));
+  var totalMs  = msNext + (missing - 1) * regenMs;
+  // En az 1 dakika — Android tarafının "0" ı yanlış yorumlamasını önle
+  var minLeft  = Math.max(1, Math.ceil(totalMs / 60000));
+  try{ Android.scheduleLifeNotification(minLeft); }catch(e){ console.warn('scheduleLifeNotification failed:', e); }
+}
 
-  // Acilinca bildirimi iptal et
+function _cancelLifeNotif(){
   if(typeof Android !== 'undefined' && Android.cancelLifeNotification){
-    Android.cancelLifeNotification();
+    try{ Android.cancelLifeNotification(); }catch(_){}
   }
+}
 
-  // Kapaninca / arka plana geçince planla
+(function(){
+  // Açılışta planlanmış varsa iptal et (uygulama önde)
+  _cancelLifeNotif();
+
+  // Görünürlük değişimi: arka plana geçince planla, öne çıkınca iptal et
   document.addEventListener('visibilitychange', function(){
-    if(document.hidden) scheduleIfNeeded();
-    else if(typeof Android !== 'undefined' && Android.cancelLifeNotification){
-      Android.cancelLifeNotification();
-    }
+    if(document.hidden) _scheduleLifeNotifIfNeeded();
+    else _cancelLifeNotif();
   });
 
-  window.addEventListener('pagehide', scheduleIfNeeded);
-  window.addEventListener('beforeunload', scheduleIfNeeded);
+  // Kapanırken (uygulama kill / tab kapanış) son bir planlama
+  window.addEventListener('pagehide', _scheduleLifeNotifIfNeeded);
+  window.addEventListener('beforeunload', _scheduleLifeNotifIfNeeded);
 })();
 
 // Dil uygula
@@ -7892,27 +7720,27 @@ const LANG = {
     close:          'Kapat',
     settings:       '⚙️ Ayarlar',
     sfx:            '🔊 Efektler',
-    music:          '🎵 Muzik',
+    music:          '🎵 Müzik',
     sound_label:    'SES',
     data_label:     'VERİ',
     lang_label:     'DİL',
-    reset_slots:    '🔧 Slotlari Sifirla',
-    reset_all:      '🗑️ Tum Veriyi Sifirla',
-    cloud:          '☁️ Bulut Kayit',
-    dev_mode:       '⚙️ Gelistirici Modu',
-    detail:         'detay icin dokun',
+    reset_slots:    '🔧 Slotları Sıfırla',
+    reset_all:      '🗑️ Tüm Veriyi Sıfırla',
+    cloud:          '☁️ Bulut Kayıt',
+    dev_mode:       '⚙️ Geliştirici Modu',
+    detail:         'detay için dokun',
     next_level:     'NEXT LEVEL →',
     retry:          'RETRY',
-    back_map:       '🗺️ Haritaya Don',
+    back_map:       '🗺️ Haritaya Dön',
     not_enough:     'Yeterli puan yok!',
-    not_enough_star:'Yeterli yildiz yok!',
-    bought:         'satin alindi!',
-    upgraded:       'yukseltildi!',
-    select:         'Sec',
-    buy:            'Satin Al',
-    ad_watch:       'Reklam Izle',
+    not_enough_star:'Yeterli yıldız yok!',
+    bought:         'satın alındı!',
+    upgraded:       'yükseltildi!',
+    select:         'Seç',
+    buy:            'Satın Al',
+    ad_watch:       'Reklam İzle',
     confirm:        'Onayla',
-    cancel:         'Vazgec',
+    cancel:         'Vazgeç',
     locked:         'Kilitli',
     theme_valley:    'Yeşil Vadi',
     theme_desert:    'Çöl',
@@ -7991,9 +7819,9 @@ const LANG = {
     gallery_title:  '⚔️ CEPHANE GALERİSİ',
     ad_watch_pts:   '📺 Reklam İzle → Puan Kazan',
     stat_dmg:       'Hasar',
-    ammo_normal:'Normal', ammo_ap:'Zırh Delici', ammo_explosive:'Patlayici',
-    ammo_cluster:'Kume Bombasi', ammo_piercer:'Delici', ammo_napalm:'Napalm',
-    ammo_split:'Bolucii', ammo_triple:'Uclu', ammo_bunker:'Signak Kirici', ammo_nuclear:'Nukleer',
+    ammo_normal:'Normal', ammo_ap:'Zırh Delici', ammo_explosive:'Patlayıcı',
+    ammo_cluster:'Küme Bombası', ammo_piercer:'Delici', ammo_napalm:'Napalm',
+    ammo_split:'Bölücü', ammo_triple:'Üçlü', ammo_bunker:'Sığınak Kırıcı', ammo_nuclear:'Nükleer',
     desc_normal:'Tahta karargahi 1 atista yok eder',
     desc_ap:'Zirhi deler. Demir ve celik icin sart',
     desc_explosive:'Genis alan hasari, orta zirh',
@@ -8065,6 +7893,7 @@ const LANG = {
     ammo_select_title:  '🔄 Mermi Seç',
     ammo_select_close:  '✕ Kapat',
     gallery_new_ammo:   '⚔️ Galeri — Yeni Mermi Al',
+    gallery_new_tank:   '⚔️ Galeri — Yeni Tank Al',
     extra_ammo_btn:     '📺 Reklam İzle → +3 Atış',
     drag_to_aim:        '◀ NİŞAN AL',
     loading:            'Hazırlanıyor...',
@@ -8263,6 +8092,85 @@ const LANG = {
     wb_info_inactive_desc: 'Rüzgarı 3 level boyunca tamamen sıfırlar.<br>Günlük 3 hak — bugün {n} hakkın kaldı.',
     lvl_short:             'Sv',
     lvl_short_plus1:       '+1sv',
+    toast_bonus_migrated:  'Önceki yıldız bakiyen puana çevrildi: +{n} 🏆',
+    streak_keep:           'Yarın da gir, seriyi koru!',
+    streak_warn:           '⚠️ Gün atlarsan seri sıfırlanır!',
+    streak_today_earn:     '{day}. gün — bugün +{n} 🏆 kazandın',
+    lbp_day1:              'Seri başladı! Her gün gir, daha fazla kazan.',
+    lbp_max:               '🔥 7. gün! Seri tamamlandı, yeniden başlıyor.',
+    lbp_continue:          '🔥 {n}. gün serisi! Devam et!',
+    lbp_daily_label:       'Günlük puan ödülü',
+    // Parça 4: dinamik metinler
+    select_btn:            'Seç',
+    selected_toast:        '{name} seçildi!',
+    free_label:            'Ücretsiz',
+    daily_limit_full:      'Günlük limit doldu',
+    pts_won_btn:           '+200 🏆 ({n} {hak})',
+    // Hedef materyalleri
+    mat_wood:              '🪵 Tahta',
+    mat_iron:              '⚙️ Demir',
+    mat_steel:             '🛡️ Çelik',
+    mat_concrete:          '🧱 Beton',
+    mat_label_wood:        'Tahta',
+    mat_label_iron:        'Demir',
+    mat_label_steel:       'Çelik',
+    mat_label_concrete:    'Beton',
+    // Atış sayısı eki
+    shots_suffix:          'atış',
+    // Mermi öneri sebepleri (rec.reason)
+    rec_concrete:          'Beton karargah — Piercer şart',
+    rec_steel:             'Çelik karargah — AP şart',
+    rec_iron:              'Demir karargah — AP tavsiye',
+    rec_wood:              'Tahta — Normal yeterli',
+    rec_buried:            'Gömülü hedef — Bunker Buster',
+    rec_cave:              'Mağara hedefi — Heat-Seeking',
+    rec_armor:             'Zırhlı hedef — AP/Piercer önerilir',
+    rec_wide:              'Geniş hedef — Patlayıcı/Cluster ideal',
+    // Mermi açıklamaları (AMMO_STATS.desc)
+    ammo_desc_normal:      'Tahta karargahı 1 atışta yok eder',
+    ammo_desc_ap:          'Zırhı deler. Demir & çelik için şart',
+    ammo_desc_explosive:   'Geniş alan hasarı, orta zırh',
+    ammo_desc_cluster:     '3 parçaya bölünür, geniş etki',
+    ammo_desc_piercer:     'Çeliği deler, yüksek tek hasar',
+    ammo_desc_napalm:      'Geniş alan + yanma efekti',
+    ammo_desc_split:       "3'e bölünür, hem güçlü hem geniş",
+    ammo_desc_triple:      '3 mermi aynı anda, yüksek hasar',
+    ammo_desc_bunker:      'Toprağı deler, gömülü hedefe ulaşır',
+    ammo_desc_nuclear:     'Her şeyi yok eder',
+    // Swap dialogu son cümle
+    swap_continue_tr:      'Devam edersen bu hakkın <b style="color:#FF4444">sıfırlanır</b> ve yerine <b style="color:#FFD700">{name}</b> gelir.',
+    swap_have:             'Elinde <b style="color:#FFD700">{name}</b> var',
+    // Hedef bilgi popup
+    tip_hq_suffix:         'Karargah',
+    tip_armor_label:       '🛡️ Zırh',
+    tip_best_label:        '🎯 En Etkili',
+    tip_tank_label:        '🚀 İdeal Tank',
+    tip_shots_label:       '💣 Kalan Atış',
+    tip_res_wood:          'Normal hasara tam',
+    tip_res_iron:          'Normale %40 direnç',
+    tip_res_steel:         'Normale %65 direnç',
+    tip_res_concrete:      'Normale %80 direnç',
+    // Tema açıklamaları (theme unlock popup)
+    theme_desc_valley:     'Mavi gökyüzü, yumuşak tepeler, nehir ve ağaçlar.',
+    theme_desc_desert:     'Turuncu gökyüzü, yassı dağlar, kaktüsler ve kum fırtınası.',
+    theme_desc_snow:       'Gece gökyüzü, sarp karla kaplı dağlar, donmuş nehir.',
+    theme_desc_forest:     'Koyu yeşil, yoğun orman, şelale ve sis perdesi.',
+    theme_desc_rocky:      'Mor-gri gökyüzü, sarp kayalıklar, uçan kartallar.',
+    theme_desc_meadow:     'Gün batımı, düz ovalar, koyun sürüleri ve çitler.',
+    theme_desc_volcano:    'Kızıl gökyüzü, lavlar, yanan dağlar.',
+    theme_desc_nightcity:  'Gece şehri, gökdelenler ve ışıklar.',
+    theme_desc_tropical:   'Tropik plaj, palmiyeler ve mavi okyanus.',
+    // Theme unlock dinamik
+    theme_unlocked_stars:  '{n}/30 yıldız ile açıldı',
+    theme_new_fallback:    'Yeni Tema',
+    theme_gate_stars:      '{have}/{need} yıldız — {miss} eksik',
+    // Result ekranı
+    all_done_title:        'TÜM BÖLÜMLER BİTTİ!',
+    all_done_sub:          'Yakında yeni bölümler geliyor...',
+    // Hak kelimesi
+    hak:                   'hak',
+    time_h_m_after:        '{h}s {m}dk sonra',
+    time_m_after:          '{m}dk sonra',
   },
   en: {
     fire:           'FIRE!',
@@ -8445,6 +8353,7 @@ const LANG = {
     ammo_select_title:  '🔄 Select Ammo',
     ammo_select_close:  '✕ Close',
     gallery_new_ammo:   '⚔️ Gallery — Get New Ammo',
+    gallery_new_tank:   '⚔️ Gallery — Get New Tank',
     extra_ammo_btn:     '📺 Watch Ad → +3 Shots',
     drag_to_aim:        '◀ DRAG TO AIM',
     loading:            'Loading...',
@@ -8643,6 +8552,83 @@ const LANG = {
     wb_info_inactive_desc: 'Cancels wind effect entirely for 3 levels.<br>Daily limit 3 — {n} left today.',
     lvl_short:             'Lv',
     lvl_short_plus1:       '+1lv',
+    toast_bonus_migrated:  'Previous star balance converted to points: +{n} 🏆',
+    streak_keep:           'Log in tomorrow to keep your streak!',
+    streak_warn:           '⚠️ Miss a day and your streak resets!',
+    streak_today_earn:     'Day {day} — today you earned +{n} 🏆',
+    lbp_day1:              'Streak started! Log in every day to earn more.',
+    lbp_max:               '🔥 Day 7! Streak complete, starting over.',
+    lbp_continue:          '🔥 Day {n} streak! Keep it going!',
+    lbp_daily_label:       'Daily point reward',
+    // Parça 4: dynamic texts
+    select_btn:            'Select',
+    selected_toast:        '{name} selected!',
+    free_label:            'Free',
+    daily_limit_full:      'Daily limit reached',
+    pts_won_btn:           '+200 🏆 ({n} {hak})',
+    // Target materials
+    mat_wood:              '🪵 Wood',
+    mat_iron:              '⚙️ Iron',
+    mat_steel:             '🛡️ Steel',
+    mat_concrete:          '🧱 Concrete',
+    mat_label_wood:        'Wood',
+    mat_label_iron:        'Iron',
+    mat_label_steel:       'Steel',
+    mat_label_concrete:    'Concrete',
+    shots_suffix:          'shots',
+    // Recommendation reasons
+    rec_concrete:          'Concrete HQ — Piercer required',
+    rec_steel:             'Steel HQ — AP required',
+    rec_iron:              'Iron HQ — AP suggested',
+    rec_wood:              'Wood — Normal is enough',
+    rec_buried:            'Buried target — Bunker Buster',
+    rec_cave:              'Cave target — Heat-Seeking',
+    rec_armor:             'Armored target — AP/Piercer suggested',
+    rec_wide:              'Wide target — Explosive/Cluster ideal',
+    // Ammo descriptions
+    ammo_desc_normal:      'Destroys wooden HQ in 1 shot',
+    ammo_desc_ap:          'Pierces armor. Required for iron & steel',
+    ammo_desc_explosive:   'Wide area damage, medium armor',
+    ammo_desc_cluster:     'Splits into 3 pieces, wide effect',
+    ammo_desc_piercer:     'Pierces steel, high single-target damage',
+    ammo_desc_napalm:      'Wide area + burning effect',
+    ammo_desc_split:       'Splits into 3, both strong and wide',
+    ammo_desc_triple:      '3 shells at once, high damage',
+    ammo_desc_bunker:      'Drills through ground, reaches buried targets',
+    ammo_desc_nuclear:     'Destroys everything',
+    // Swap dialog last sentence
+    swap_continue_tr:      'Continuing will <b style="color:#FF4444">reset</b> this and replace with <b style="color:#FFD700">{name}</b>.',
+    swap_have:             'You have <b style="color:#FFD700">{name}</b>',
+    // Target info popup
+    tip_hq_suffix:         'HQ',
+    tip_armor_label:       '🛡️ Armor',
+    tip_best_label:        '🎯 Most Effective',
+    tip_tank_label:        '🚀 Ideal Tank',
+    tip_shots_label:       '💣 Shots Left',
+    tip_res_wood:          'Full normal damage',
+    tip_res_iron:          '40% resistance to normal',
+    tip_res_steel:         '65% resistance to normal',
+    tip_res_concrete:      '80% resistance to normal',
+    // Theme descriptions (theme unlock popup)
+    theme_desc_valley:     'Blue sky, soft hills, rivers and trees.',
+    theme_desc_desert:     'Orange sky, flat-top mountains, cacti and sandstorms.',
+    theme_desc_snow:       'Night sky, jagged snow-capped mountains, frozen river.',
+    theme_desc_forest:     'Deep green, dense forest, waterfalls and mist.',
+    theme_desc_rocky:      'Purple-grey sky, steep cliffs, soaring eagles.',
+    theme_desc_meadow:     'Sunset, open plains, sheep herds and fences.',
+    theme_desc_volcano:    'Red sky, lava, burning mountains.',
+    theme_desc_nightcity:  'Night city, skyscrapers and lights.',
+    theme_desc_tropical:   'Tropical beach, palm trees and blue ocean.',
+    // Theme unlock dynamic
+    theme_unlocked_stars:  'Unlocked with {n}/30 stars',
+    theme_new_fallback:    'New Theme',
+    theme_gate_stars:      '{have}/{need} stars — {miss} missing',
+    // Result screen
+    all_done_title:        'ALL LEVELS DONE!',
+    all_done_sub:          'New levels coming soon...',
+    hak:                   'left',
+    time_h_m_after:        'in {h}h {m}m',
+    time_m_after:          'in {m}m',
   },
 };
 
@@ -8659,6 +8645,14 @@ function tFmt(key, vars){
 }
 
 function tLevel(name){ return t(name); }
+
+// Tip-aware ad çözücüler — i18n anahtarı varsa onu, yoksa def.name'i döndür
+function ammoName(type){
+  return t('ammo_'+type) !== ('ammo_'+type) ? t('ammo_'+type) : (AMMO_DEF[type]?.name || type);
+}
+function tankName(type){
+  return t('tank_'+type) !== ('tank_'+type) ? t('tank_'+type) : (TANK_DEF_GALLERY[type]?.name || TANK_DEF[type]?.name || type);
+}
 
 function applyLang(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{
@@ -8681,6 +8675,14 @@ function setLang(lang){
   _curLang = lang;
   localStorage.setItem('lang', lang);
   applyLang();
+  // Dil butonlarındaki sarı çerçeveyi anlık güncelle
+  ['tr','en'].forEach(l=>{
+    const b=document.getElementById('lang-btn-'+l);
+    if(b){
+      b.style.borderColor = l===_curLang ? '#FFD700' : 'rgba(255,255,255,0.15)';
+      b.style.color       = l===_curLang ? '#FFD700' : 'white';
+    }
+  });
   // Galeri aciksa yenile
   if(document.getElementById('gallery-overlay')?.classList.contains('show')) renderGallery();
 }
@@ -9067,8 +9069,8 @@ function updateMusicBtn(){
 
 
 // ── Karargah Bilgi Popup ─────────────────────────────────────────────────────
-const MAT_LABEL = {wood:'Tahta',iron:'Demir',steel:'Çelik',concrete:'Beton'};
 const MAT_ICON  = {wood:'🪵',iron:'⚙️',steel:'🛡️',concrete:'🧱'};
+function matLabel(mat){ return t('mat_label_'+mat) || mat; }
 
 // Her materyal için en etkili silahlar
 const MAT_AMMO_TIPS = {
@@ -9095,7 +9097,7 @@ function showTargetInfo(){
 
   // Başlık
   document.getElementById('tip-title').textContent =
-    MAT_ICON[mat]+' '+MAT_LABEL[mat]+' Karargah';
+    MAT_ICON[mat]+' '+matLabel(mat)+' '+t('tip_hq_suffix');
 
   // HP bar
   const pct = targetHP/targetMaxHP;
@@ -9115,29 +9117,27 @@ function showTargetInfo(){
   }
 
   // Materyal direnci açıklaması
-  const resMap={wood:'Normal hasara tam',iron:'Normale %40 direnç',
-                steel:'Normale %65 direnç',concrete:'Normale %80 direnç'};
-  mkRow('🛡️ Zırh', resMap[mat]||'—');
+  const resMap={wood:t('tip_res_wood'),iron:t('tip_res_iron'),
+                steel:t('tip_res_steel'),concrete:t('tip_res_concrete')};
+  mkRow(t('tip_armor_label'), resMap[mat]||'—');
 
   // En etkili silahlar
   const ammoTips = MAT_AMMO_TIPS[mat]||[];
   const ammoStr = ammoTips.map(x=>{
-    const def = AMMO_DEF[x.a];
     const owned = ownedAmmo.includes(x.a)||(tempAmmo&&tempAmmo.type===x.a);
     const lock = owned?'':'🔒';
-    return lock+(def?def.name:x.a)+' %'+x.pct;
+    return lock+ammoName(x.a)+' %'+x.pct;
   }).join(' · ');
-  mkRow('🎯 En Etkili', ammoStr);
+  mkRow(t('tip_best_label'), ammoStr);
 
   // Önerilen tank
   const tankTips = MAT_TANK_TIPS[mat]||[];
   const best = tankTips[tankTips.length-1];
-  const tankDef = TANK_DEF_GALLERY[best.t];
   const tankOwned = ownedTanks.includes(best.t)||(tempTank&&tempTank.type===best.t);
-  mkRow('🚀 İdeal Tank', (tankOwned?'':'🔒')+(tankDef?tankDef.name:best.t));
+  mkRow(t('tip_tank_label'), (tankOwned?'':'🔒')+tankName(best.t));
 
   // Kalan atış
-  mkRow('💣 Kalan Atış', shotsLeft+' atış');
+  mkRow(t('tip_shots_label'), shotsLeft+' '+t('shots_suffix'));
 
   // Konumlandır — hedefin üstüne
   const scaleX = window.innerWidth  / W;
@@ -9814,7 +9814,7 @@ function openStreakCard(){
   const dayNum = loginStreak + 1;
   // 7 gün çubuğu
   let bars = '<div style="display:flex;gap:3px;margin-bottom:12px;">';
-  STREAK_STARS.forEach(function(s,i){
+  STREAK_POINTS.forEach(function(s,i){
     var done = i < loginStreak;
     var cur  = i === loginStreak;
     var bg   = cur ? 'rgba(255,140,0,0.2)' : (done ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)');
@@ -9823,18 +9823,18 @@ function openStreakCard(){
     var ico  = (done || cur) ? '🔥' : '○';
     bars += '<div style="flex:1;text-align:center;border-radius:6px;padding:4px 1px;background:' + bg + ';border:1px solid ' + brd + ';">';
     bars += '<div style="font-size:11px">' + ico + '</div>';
-    bars += '<div style="font-size:9px;color:' + col + '">+' + s + '</div>';
+    bars += '<div style="font-size:9px;color:' + col + '">+' + s + '🏆</div>';
     bars += '</div>';
   });
   bars += '</div>';
 
   const warn = isActive
-    ? '<div style="color:rgba(255,255,255,0.5);font-size:11px;text-align:center;">Yarın da gir, seriyi koru!</div>'
-    : '<div style="color:#FF6B6B;font-size:11px;text-align:center;">⚠️ Gün atlarsan seri sıfırlanır!</div>';
+    ? '<div style="color:rgba(255,255,255,0.5);font-size:11px;text-align:center;">'+t('streak_keep')+'</div>'
+    : '<div style="color:#FF6B6B;font-size:11px;text-align:center;">'+t('streak_warn')+'</div>';
 
   body.innerHTML = bars +
     '<div style="color:rgba(255,255,255,0.6);font-size:12px;text-align:center;margin-bottom:8px;">'+
-      dayNum+'. gün — bugün +'+STREAK_STARS[loginStreak]+'⭐ kazandın'+
+      tFmt('streak_today_earn', {day: dayNum, n: STREAK_POINTS[loginStreak]})+
     '</div>' + warn;
 
   document.getElementById('streak-card-bg').style.display = 'block';
@@ -10165,9 +10165,27 @@ function renderBoostGallery(cont){
   cont.appendChild(_boostCard);
 }
 
-const STREAK_STARS = [1,1,2,2,3,3,5]; // 7 günlük seri ödülleri
+const STREAK_POINTS = [200, 200, 400, 400, 600, 600, 1000]; // 7 günlük seri ödülleri (puan)
+
+// Eski yıldız bakiyesini puana çevir (tek seferlik migration)
+function migrateBonusStarsToPoints(){
+  if(lsGet('bonus_stars_migrated')==='1') return;
+  const bs = parseInt(lsGet('bonus_stars')||'0');
+  if(bs > 0){
+    const pts = bs * 200;
+    score += pts;
+    lsSet('total_score', score);
+    showToast(tFmt('toast_bonus_migrated', {n: pts.toLocaleString()}));
+  }
+  lsSet('bonus_stars', '0');
+  bonusStars = 0;
+  lsSet('bonus_stars_migrated', '1');
+}
 
 function checkDailyLoginBonus(){
+  // Önce migration kontrolü (eski yıldız bakiyesini puana çevir)
+  migrateBonusStarsToPoints();
+
   const today = new Date().toDateString();
   if(lastLoginBonus === today) return;
 
@@ -10179,26 +10197,11 @@ function checkDailyLoginBonus(){
     loginStreak = 0; // Seri bozuldu, 1. günden başla
   }
 
-  // Ödüller
-  const starReward = STREAK_STARS[loginStreak];
-  score += 10; // Günlük puan (retention, ekonomiyi bozmaz)
+  // Ödül: günlük puan (yıldız sistemi kaldırıldı — yıldız sadece level başarısı için)
+  const pointReward = STREAK_POINTS[loginStreak];
+  score += pointReward;
 
-  // Yıldız ver — sadece mevcut temada boş levellara
-  let starsAdded = 0;
-  const themeIdx = Math.floor((curLevel||0)/10);
-  const startId  = themeIdx*10+1;
-  for(let i=startId; i<startId+10 && starsAdded<starReward; i++){
-    const cur = parseInt(lsGet('stars_'+i)||'0');
-    if(cur<3){ lsSet('stars_'+i, Math.min(3,cur+1)); starsAdded++; }
-  }
-  // Tema doluysa bonus yıldız havuzuna ekle (tank upgrade için kullanılır)
-  const leftover = starReward - starsAdded;
-  if(leftover > 0){
-    bonusStars += leftover;
-    lsSet('bonus_stars', bonusStars);
-  }
-
-  // 7 günlük seri tamamlandıysa +100 puan bonus
+  // 7 günlük seri tamamlandıysa +100 puan bonus (ek)
   if(loginStreak === 6){ // 0-6 arası, 6 = 7. gün
     score += 100;
     showToast(t('toast_streak_7'));
@@ -10213,40 +10216,39 @@ function checkDailyLoginBonus(){
   lsSet('total_score', score);
 
   setTimeout(function(){
-    updateLoginPopup(loginStreak+1, starReward, starsAdded);
+    updateLoginPopup(loginStreak+1, pointReward, 0);
     const popup = document.getElementById('login-bonus-popup');
     if(popup) popup.style.display = 'flex';
     updateStreakBadge();
   }, 300);
 }
 
-function updateLoginPopup(dayNum, starReward, starsAdded){
+function updateLoginPopup(dayNum, pointReward, _unused){
   const el = document.getElementById('lbp-content');
   if(!el) return;
-  const days = ['','2.','3.','4.','5.','6.','7.'];
   const isMax = dayNum>=7;
   el.innerHTML =
     '<div style="font-size:13px;color:rgba(255,255,255,0.55);margin-bottom:10px;">'+
-      (dayNum===1 ? 'Seri başladı! Her gün gir, daha fazla kazan.' :
-       isMax ? '🔥 7. gün! Seri tamamlandı, yeniden başlıyor.' :
-       '🔥 '+dayNum+'. gün serisi! Devam et!')+
+      (dayNum===1 ? t('lbp_day1') :
+       isMax ? t('lbp_max') :
+       tFmt('lbp_continue', {n: dayNum}))+
     '</div>'+
     '<div style="display:flex;justify-content:center;gap:4px;margin-bottom:14px;">'+
-    STREAK_STARS.map((s,i)=>{
+    STREAK_POINTS.map((s,i)=>{
       const done = i<dayNum; const cur = i===dayNum-1;
-      return '<div style="width:32px;height:36px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;'+
+      return '<div style="width:38px;height:40px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;'+
         'background:'+(cur?'rgba(255,215,0,0.25)':done?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.04)')+';'+
         'border:1.5px solid '+(cur?'#FFD700':done?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.08)')+';">'+
-        '<span style="font-size:12px;">'+(done||cur?'⭐':'☆')+'</span>'+
-        '<span style="color:'+(cur?'#FFD700':'rgba(255,255,255,0.4)')+';">'+s+'</span>'+
+        '<span style="font-size:12px;">'+(done||cur?'🔥':'○')+'</span>'+
+        '<span style="color:'+(cur?'#FFD700':'rgba(255,255,255,0.4)')+';">+'+s+'</span>'+
         '</div>';
     }).join('')+
     '</div>'+
     '<div style="background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.25);border-radius:12px;padding:12px;margin-bottom:4px;">'+
       '<div style="color:#FFD700;font-size:26px;font-weight:700;font-family:Rajdhani,sans-serif;">'+
-        '+50 🏆  +'+starsAdded+' ⭐'+
+        '+'+pointReward.toLocaleString()+' 🏆'+
       '</div>'+
-      '<div style="color:rgba(255,255,255,0.45);font-size:11px;margin-top:3px;">Günlük puan + gün '+dayNum+' yıldız ödülü</div>'+
+      '<div style="color:rgba(255,255,255,0.45);font-size:11px;margin-top:3px;">'+t('lbp_daily_label')+'</div>'+
     '</div>';
 }
 function closeLoginBonus(){
@@ -10261,7 +10263,6 @@ function giveReward(adType){
   SFX.buy(); // Ödül sesi
   switch(adType){
     case 'extra_ammo':   giveExtraAmmo(); break;
-    case 'extra_stars':  giveAdStars(2); break;
     case 'puan':         givePointsFromAd(); break;
     case 'shield':       activateShield(); break;
     case 'tactical':     giveTactical(); break;
@@ -10854,7 +10855,7 @@ function openTacticalInfo(){
     style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(66,133,244,0.4);
     background:rgba(66,133,244,0.08);color:#4285F4;font-size:14px;font-family:'Rajdhani',sans-serif;
     font-weight:700;cursor:pointer;margin-bottom:8px;">
-    <span data-i18n="cloud">☁️ Bulut Kayit</span>
+    <span data-i18n="cloud">☁️ Bulut Kayıt</span>
   </button>
 
   <button onclick="openDevMode()"
@@ -10865,7 +10866,7 @@ function openTacticalInfo(){
   </button>
 
   <!-- Dil secici -->
-  <div style="color:#8b949e;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;" data-i18n="lang_label">DIL</div>
+  <div style="color:#8b949e;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-top:18px;margin-bottom:10px;" data-i18n="lang_label">DIL</div>
   <div style="display:flex;gap:8px;margin-bottom:18px;">
     <button onclick="setLang('tr')" id="lang-btn-tr"
       style="flex:1;padding:8px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);
@@ -11042,18 +11043,6 @@ function openTacticalInfo(){
         font-family:'Rajdhani',sans-serif;font-weight:600;"></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <button id="tgo-ad-btn" onclick="themeGateWatchAd()"
-        style="width:100%;padding:13px;border-radius:13px;border:none;
-        background:linear-gradient(135deg,#FF6B35,#FF3D00);color:white;font-size:15px;font-weight:700;
-        font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="tgo_ad_btn">
-        📺 Reklam İzle → +2 ⭐
-      </button>
-      <button onclick="themeGateOpenShop()"
-        style="width:100%;padding:13px;border-radius:13px;border:none;
-        background:linear-gradient(135deg,#4CAF50,#2e7d32);color:white;font-size:15px;font-weight:700;
-        font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="tgo_buy_star">
-        ⭐ Puan ile Yıldız Al
-      </button>
       <button onclick="themeGateGoMap()"
         style="width:100%;padding:13px;border-radius:13px;border:1.5px solid rgba(255,255,255,0.2);
         background:rgba(255,255,255,0.08);color:white;font-size:15px;font-weight:700;
@@ -11065,67 +11054,8 @@ function openTacticalInfo(){
 </div>
 
 <!-- ═══ STAR SHOP OVERLAY ═══ -->
-<div id="star-shop-overlay" style="display:none;position:fixed;inset:0;z-index:700;
-  background:rgba(0,0,0,0.82);align-items:center;justify-content:center;">
-  <div style="background:linear-gradient(135deg,#1a2030,#0d1520);
-    border:2px solid rgba(255,215,0,0.4);border-radius:24px;
-    padding:28px 22px;width:300px;max-width:calc(100vw - 32px);text-align:center;
-    box-shadow:0 0 60px rgba(255,215,0,0.15);">
-    <div style="font-size:42px;margin-bottom:6px;">⭐</div>
-    <div style="color:#FFD700;font-size:13px;font-weight:700;letter-spacing:2px;
-      text-transform:uppercase;margin-bottom:4px;font-family:'Rajdhani',sans-serif;" data-i18n="ss_title">
-      YILDIZ MAĞAZASI
-    </div>
-    <div id="ss-current-stars" style="color:rgba(255,255,255,0.6);font-size:13px;
-      font-family:'Rajdhani',sans-serif;margin-bottom:18px;"></div>
+<!-- Star shop kaldırıldı: yıldız harcanmıyor, satın alma anlamsızdı -->
 
-    <!-- Puan ile satın al -->
-    <div style="background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);
-      border-radius:14px;padding:14px;margin-bottom:12px;">
-      <div style="color:#00E5FF;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;
-        margin-bottom:4px;" data-i18n="ss_pts_for_star">🏆 PUAN İLE YıLDıZ</div>
-      <div id="ss-score-info" style="color:rgba(255,255,255,0.6);font-size:12px;
-        font-family:'Rajdhani',sans-serif;margin-bottom:10px;"></div>
-      <div style="display:flex;gap:8px;justify-content:center;">
-        <button id="ss-btn-1star" onclick="buyStarWithPoints(1)"
-          style="flex:1;padding:10px 6px;border-radius:11px;border:none;
-          background:linear-gradient(135deg,#00E5FF,#0080aa);color:#000;font-size:13px;
-          font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">
-          200 <span data-i18n="ss_buy_1star">puan</span><br><span data-i18n="ss_to_star">→</span> 1 ⭐
-        </button>
-        <button id="ss-btn-3star" onclick="buyStarWithPoints(3)"
-          style="flex:1;padding:10px 6px;border-radius:11px;border:none;
-          background:linear-gradient(135deg,#00E5FF,#0080aa);color:#000;font-size:13px;
-          font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;">
-          500 <span data-i18n="ss_buy_1star">puan</span><br><span data-i18n="ss_to_star">→</span> 3 ⭐
-        </button>
-      </div>
-    </div>
-
-    <!-- Reklam ile kazan -->
-    <div style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);
-      border-radius:14px;padding:14px;margin-bottom:16px;">
-      <div style="color:#FFD700;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;
-        margin-bottom:10px;" data-i18n="ss_ad_label">📺 REKLAM İZLE</div>
-      <button id="ss-btn-ad" onclick="shopWatchAdForStars()"
-        style="width:100%;padding:11px;border-radius:11px;border:none;
-        background:linear-gradient(135deg,#FFD700,#FF8C00);color:#000;font-size:14px;
-        font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="ss_ad_btn">
-        Reklam İzle → +2 ⭐
-      </button>
-      <div id="ss-ad-limit" style="color:rgba(255,255,255,0.45);font-size:11px;
-        font-family:'Rajdhani',sans-serif;margin-top:6px;"></div>
-    </div>
-
-    <button onclick="closeStarShop()"
-      style="width:100%;padding:11px;border-radius:13px;
-      border:1.5px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.07);
-      color:rgba(255,255,255,0.7);font-size:14px;font-weight:700;
-      font-family:'Rajdhani',sans-serif;cursor:pointer;" data-i18n="ss_close">
-      Kapat
-    </button>
-  </div>
-</div>
 
 <div id="theme-unlock-popup" style="display:none;position:fixed;inset:0;z-index:600;
   background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
@@ -11631,6 +11561,10 @@ function loseLife(){
   lsSet("lives_count",String(newL));
   if(newL===MAX_LIVES-1) lsSet("lives_time",String(Date.now()));
   updateLivesBadge();
+  // Arka plandaysak bildirimi yenile (yeni regen zamanına göre)
+  if(document.hidden && typeof _scheduleLifeNotifIfNeeded === 'function'){
+    _scheduleLifeNotifIfNeeded();
+  }
   return newL;
 }
 function updateLivesBadge(){
@@ -11678,11 +11612,16 @@ function watchAdForLife(){
 function giveLifeFromAd(){
   var cur=_livesNow();
   if(cur>=MAX_LIVES){showToast(t('toast_lives_full'));return;}
-  lsSet("lives_count",String(cur+1));
+  var newL = cur+1;
+  lsSet("lives_count",String(newL));
   lsSet("ad_life_count",String(_adLifeCountToday()+1));
   updateLivesBadge();
   closeLivesCard();
   showToast(t('toast_life_won'));
+  // Eğer artık canlar doluysa planlı bildirimi iptal et
+  if(newL >= MAX_LIVES && typeof _cancelLifeNotif === 'function'){
+    _cancelLifeNotif();
+  }
   // Can geldi, level yukle
   if(typeof pendingLevelIdx !== "undefined") loadLevel(pendingLevelIdx);
 }
