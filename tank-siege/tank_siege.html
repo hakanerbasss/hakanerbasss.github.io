@@ -1320,6 +1320,10 @@ button:active{opacity:0.75;transform:scale(0.96);}
   0%{transform:scale(0.85);opacity:0;}
   100%{transform:scale(1);opacity:1;}
 }
+@keyframes livesCardIn{
+  0%{transform:translate(-50%,-50%) scale(0.85);opacity:0;}
+  100%{transform:translate(-50%,-50%) scale(1);opacity:1;}
+}
 </style>
 
 <!-- Tank değiştir listesi -->
@@ -1566,7 +1570,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.124';
+const APP_VERSION      = '1.0.125';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1584,8 +1588,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 23:42';
-const APP_VERSION_NOTE = 'slot hedef tank bilgi kartkari degisti';
+const APP_VERSION_DATE = '2026.05.19 23:59';
+const APP_VERSION_NOTE = 'Can ve gunkuk seri kartlari degisti';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -15166,13 +15170,27 @@ function openTacticalInfo(){
 <!-- Seri Bilgi Kartı -->
 <div id="streak-card-bg" onclick="closeStreakCard()" style="display:none;position:fixed;inset:0;z-index:700;"></div>
 <div id="streak-card" style="display:none;position:fixed;right:12px;top:165px;z-index:701;
-  background:#1a2030;border:1.5px solid rgba(255,140,0,0.4);border-radius:16px;
-  padding:16px;width:230px;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <span style="color:#FF8C00;font-size:15px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="streak_title">🔥 Giriş Serisi</span>
-    <button onclick="closeStreakCard()" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;">✕</button>
+  background:linear-gradient(180deg,#241808 0%,#0e0a04 100%);
+  border:1.5px solid rgba(255,140,0,0.35);
+  border-radius:22px;padding:0;width:248px;max-width:calc(100vw - 32px);overflow:hidden;
+  box-shadow:0 14px 44px rgba(0,0,0,0.75),0 0 0 1px rgba(255,140,0,0.10),0 0 30px rgba(255,107,0,0.18),inset 0 1px 0 rgba(255,255,255,0.05);
+  animation:popInRight 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+
+  <!-- Hero band -->
+  <div style="position:relative;height:60px;background:radial-gradient(ellipse at 50% 110%,rgba(255,140,40,0.34),transparent 60%),linear-gradient(180deg,#3a1f08 0%,#0e0703 100%);border-bottom:1px solid rgba(255,140,40,0.20);overflow:hidden;">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(255,140,40,0.05) 8px,rgba(255,140,40,0.05) 16px);"></div>
+    <div style="position:absolute;top:8px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,140,40,0.65);font-weight:800;font-family:'Rajdhani',sans-serif;">STREAK</div>
+    <button onclick="closeStreakCard()" style="position:absolute;top:6px;right:8px;width:24px;height:24px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.6);font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1;">✕</button>
+    <div style="position:absolute;left:16px;bottom:7px;display:flex;align-items:center;gap:7px;">
+      <span style="font-size:28px;filter:drop-shadow(0 2px 8px rgba(255,140,40,0.6));line-height:1;">🔥</span>
+      <span style="background:linear-gradient(180deg,#FFD680,#FF8C00 50%,#ff4500 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:18px;font-weight:800;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.5));" data-i18n="streak_title">Giriş Serisi</span>
+    </div>
   </div>
-  <div id="streak-card-body"></div>
+
+  <!-- Body -->
+  <div style="padding:13px 14px 14px;font-family:'Rajdhani',sans-serif;">
+    <div id="streak-card-body"></div>
+  </div>
 </div>
 
 <!-- ⚙️ Ayarlar Dialog -->
@@ -16416,19 +16434,49 @@ function closeLivesCard(){
 }
 setInterval(updateLivesBadge,30000);
 </script>
-<div id="lives-card-bg" onclick="closeLivesCard()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);"></div>
-<div id="lives-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;background:#1a2030;border-radius:20px;padding:20px;width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.7);border-top:3px solid #FF5555;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-    <span style="color:#fff;font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;" data-i18n="lives_title">❤️ Canlar</span>
-    <button onclick="closeLivesCard()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">×</button>
+<div id="lives-card-bg" onclick="closeLivesCard()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);"></div>
+<div id="lives-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;
+  background:linear-gradient(180deg,#241016 0%,#0e0608 100%);
+  border:1.5px solid rgba(255,80,100,0.35);
+  border-radius:22px;padding:0;width:300px;max-width:calc(100vw - 32px);overflow:hidden;
+  box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(255,80,100,0.12),0 0 30px rgba(255,60,80,0.20),inset 0 1px 0 rgba(255,255,255,0.05);
+  animation:livesCardIn 0.32s cubic-bezier(0.34,1.56,0.64,1);font-family:'Rajdhani',sans-serif;">
+
+  <!-- Hero band -->
+  <div style="position:relative;height:64px;background:radial-gradient(ellipse at 50% 110%,rgba(255,80,100,0.32),transparent 60%),linear-gradient(180deg,#3a1018 0%,#0f0508 100%);border-bottom:1px solid rgba(255,80,100,0.22);overflow:hidden;">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(255,80,100,0.04) 8px,rgba(255,80,100,0.04) 16px);"></div>
+    <div style="position:absolute;top:9px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,80,100,0.65);font-weight:800;">ENERGY</div>
+    <div style="position:absolute;top:9px;right:14px;font-size:9px;letter-spacing:2.5px;color:rgba(255,80,100,0.65);font-weight:800;">VITALITY</div>
+    <button onclick="closeLivesCard()" style="position:absolute;top:6px;right:38px;width:24px;height:24px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.6);font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1;display:none;">✕</button>
+    <div style="position:absolute;left:16px;bottom:7px;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:24px;filter:drop-shadow(0 2px 8px rgba(255,60,80,0.7));line-height:1;">❤️</span>
+      <span style="background:linear-gradient(180deg,#FFB0B8,#FF4458 50%,#a01020 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:19px;font-weight:800;letter-spacing:0.5px;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.5));" data-i18n="lives_title">Canlar</span>
+    </div>
   </div>
-  <div style="text-align:center;margin-bottom:14px;">
-    <div id="lives-card-hearts" style="font-size:28px;letter-spacing:4px;margin-bottom:8px;"></div>
-    <div id="lives-card-status" style="font-size:14px;color:rgba(255,255,255,0.7);font-family:'Rajdhani',sans-serif;font-weight:700;"></div>
-    <div id="lives-card-timer" style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;"></div>
+
+  <!-- Body -->
+  <div style="padding:16px 16px 14px;">
+    <div style="text-align:center;margin-bottom:12px;">
+      <div id="lives-card-hearts" style="font-size:30px;letter-spacing:5px;margin-bottom:8px;line-height:1;filter:drop-shadow(0 2px 6px rgba(255,60,80,0.35));"></div>
+      <div id="lives-card-status" style="font-size:15px;color:#fff;font-weight:800;letter-spacing:0.3px;"></div>
+    </div>
+
+    <!-- Timer chip -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 12px;border-radius:11px;background:rgba(255,80,100,0.08);border:1px solid rgba(255,80,100,0.22);margin-bottom:12px;">
+      <span style="font-size:14px;">⏱</span>
+      <span id="lives-card-timer" style="font-size:12.5px;color:rgba(255,255,255,0.78);font-weight:700;letter-spacing:0.3px;"></span>
+    </div>
+
+    <!-- Watch ad button -->
+    <button id="ad-life-btn" onclick="watchAdForLife()" style="width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);color:#1a0800;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a85a00,0 5px 14px rgba(255,140,0,0.4),inset 0 1px 0 rgba(255,255,255,0.5);text-shadow:0 1px 0 rgba(255,255,255,0.3);margin-bottom:10px;transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a85a00,inset 0 1px 0 rgba(255,255,255,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''">📺 Reklam izle → +1 Can (0/3)</button>
+
+    <div style="padding:9px 11px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
+      <div style="font-size:10.5px;color:rgba(255,255,255,0.55);line-height:1.55;text-align:center;font-weight:600;">
+        <span data-i18n="lives_info">Her 20 dakikada 1 can dolar. Maksimum 5 can.</span><br>
+        <span data-i18n="lives_ad_info">Reklam ile günlük 3 can kazanabilirsin.</span>
+      </div>
+    </div>
   </div>
-  <button id="ad-life-btn" onclick="watchAdForLife()" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.1);color:#FFD700;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px;">📺 Reklam izle → +1 Can (0/3)</button>
-  <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.5;"><span data-i18n="lives_info">Her 20 dakikada 1 can dolar. Maksimum 5 can.</span><br><span data-i18n="lives_ad_info">Reklam ile günlük 3 can kazanabilirsin.</span></div>
 </div>
 
 </body>
