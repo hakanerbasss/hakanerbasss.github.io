@@ -1571,7 +1571,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.129';
+const APP_VERSION      = '1.0.130';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1589,8 +1589,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 02:24';
-const APP_VERSION_NOTE = 'Play game sahte veriker silindi.onboardinge gunkuk girev karti eklendi.';
+const APP_VERSION_DATE = '2026.05.20 02:56';
+const APP_VERSION_NOTE = 'Hayvan avı puan/quest sistemi · Tema tracking fix · Hero kart dinamik tema dekorları"';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -5899,7 +5899,7 @@ function update(){
           const bdy = bullet.y - an.y;
           if(Math.sqrt(bdx*bdx+bdy*bdy) < _animalHitRadius(an.type)){ // küçük çarpışma yarıçapı
             _animalHitFX(an);
-            _birdHitReward(an.x, an.y);
+            _birdHitReward(an.x, an.y, an.type);
             // Kaybol, 5-8 saniye sonra farkli yerden yeniden dog
             an._hit = true;
             an._respawnTimer = 300 + Math.floor(Math.random() * 180); // 5-8 sn
@@ -6042,7 +6042,7 @@ function update(){
               _animalHitFX(an);
               an.scared=true; an.scaredTimer=300; an.speed=4+Math.random()*2;
               an.dir=bdx>=0?1:-1; an.moving=true;
-              _birdHitReward(an.x, an.y);
+              _birdHitReward(an.x, an.y, an.type);
             }
           }
         });
@@ -10831,7 +10831,11 @@ function onWin(){
             if(_s>=3) Quests.track('star3');
             if(lv && lv.cave) Quests.track('cave');
             if(lv && lv.buried) Quests.track('buried');
-            if(typeof currentTheme!=='undefined' && currentTheme && currentTheme.name) Quests.track('theme', currentTheme.name);
+            if(typeof currentTheme!=='undefined' && currentTheme && currentTheme.name){
+              // Tema key'i (lv.theme) en güvenilir tanımlayıcı; name fallback
+              var _themeKey = (lv && lv.theme) ? lv.theme : currentTheme.name;
+              Quests.track('theme', _themeKey);
+            }
             // combo zaten onTargetHit'te track edildi — burada tekrarlama (zamanlamada kayıp olur)
           }catch(_){}
         }, 100);
@@ -11444,10 +11448,45 @@ function _animalHitRadius(type){
   }
 }
 
-function _birdHitReward(x, y){
-  // Sadece efekt — yıldız yok
-  const msgs = ['Lucky!', 'Nice Shot!', 'Oops!', '🐦'];
-  showFloatingText(x, y-20, msgs[Math.floor(Math.random()*msgs.length)], '#ffffff');
+function _birdHitReward(x, y, anType){
+  // Hayvan türüne göre küçük puan ver; kuşlar daha değerli
+  var BIRD_TYPES = {eagle:true, bird:true, owl:true, rooster:true};
+  var SMALL_TYPES = {rabbit:true, squirrel:true, frog:true, turtle:true};
+  var LARGE_TYPES = {cow:true, camel:true, giraffe:true, mammoth:true, horse:true, lion:true};
+
+  var pts;
+  if(anType && BIRD_TYPES[anType])       pts = 25;   // kuşlar
+  else if(anType && LARGE_TYPES[anType]) pts = 12;   // büyük hayvanlar
+  else if(anType && SMALL_TYPES[anType]) pts = 6;    // küçük hayvanlar
+  else                                   pts = 8;    // diğer (koyun, keçi, geyik...)
+
+  // Skor ekle
+  if(typeof score !== 'undefined'){
+    score += pts;
+    lsSet('total_score', score);
+    if(typeof updateUI === 'function') updateUI();
+    if(typeof updateGalleryScore === 'function') updateGalleryScore();
+  }
+
+  // Floating text — puan + ikon
+  var icon = (anType && BIRD_TYPES[anType]) ? '🐦'
+           : (anType && LARGE_TYPES[anType]) ? '🐃'
+           : (anType && SMALL_TYPES[anType]) ? '🐇'
+           : '🐾';
+  var color = (anType && BIRD_TYPES[anType]) ? '#FFD700'
+            : (anType && LARGE_TYPES[anType]) ? '#FF8A5A'
+            : '#00E5C7';
+  if(typeof showFloatingText === 'function'){
+    showFloatingText(x, y-20, '+'+pts+' '+icon, color);
+  }
+
+  // Quest tracking
+  try {
+    if(typeof Quests!=='undefined'){
+      Quests.track('animal', anType||'any');
+      if(anType && BIRD_TYPES[anType]) Quests.track('bird', anType);
+    }
+  } catch(_) {}
 }
 
 // Aktif hasar çarpanı — geçici öncelikli, yoksa kalıcı
@@ -12383,6 +12422,11 @@ const LANG = {
     q_combo_title:         'Combo Yap (arka arkaya)',
     q_cave_title:          '1 Mağara Levelı Bitir',
     q_buried_title:        '1 Gömülü Hedef Bitir',
+    q_hunt3_title:         '3 Hayvan Avla',
+    q_hunt8_title:         '8 Hayvan Avla',
+    q_bird1_title:         '1 Kuş Düşür',
+    q_bird3_title:         '3 Kuş Düşür',
+    q_safari_title:        'Safari: 5 Hayvan Avla',
     tslb_empty_title:      '🌐 Online Sıralama',
     tslb_empty_body:       'Tam sıralamayı görmek için aşağıdaki butona dokun. Skorların otomatik olarak Google Play Games’e gönderiliyor.',
     tslb_empty_title_off:  '🔒 Henüz Bağlı Değilsin',
@@ -12916,6 +12960,11 @@ const LANG = {
     q_combo_title:         'Land a Combo Hit',
     q_cave_title:          'Beat 1 Cave Level',
     q_buried_title:        'Beat 1 Buried Target',
+    q_hunt3_title:         'Hunt 3 Animals',
+    q_hunt8_title:         'Hunt 8 Animals',
+    q_bird1_title:         'Down 1 Bird',
+    q_bird3_title:         'Down 3 Birds',
+    q_safari_title:        'Safari: Hunt 5 Animals',
     tslb_empty_title:      '🌐 Online Leaderboard',
     tslb_empty_body:       'Tap the button below to see the full rankings. Your scores are submitted to Google Play Games automatically.',
     tslb_empty_title_off:  '🔒 Not Connected Yet',
@@ -13668,6 +13717,40 @@ function updateNextLevelHero(){
   if(mb) mb.setAttribute('fill', mtn.b);
   if(mf) mf.setAttribute('fill', mtn.f);
 
+  // ─── Tema-spesifik tank renk paleti ───────────────────────────
+  var TANK_PALETTE = {
+    valley:{body:'#5a6a3a', dark:'#3a3024'},          // haki/zeytin
+    desert:{body:'#a8804a', dark:'#5a3a18'},          // çöl kamuflaj
+    snow:{body:'#cfd8dc', dark:'#607080'},            // beyaz/gri
+    forest:{body:'#2a4a28', dark:'#1a2a18'},          // koyu yeşil
+    rocky:{body:'#6a5a78', dark:'#3a2a48'},           // taş gri-mor
+    meadow:{body:'#8a8a3a', dark:'#5a5018'},          // saman sarı
+    volcano:{body:'#4a2018', dark:'#2a0a05'},         // yanmış kırmızı
+    nightcity:{body:'#1a1a3a', dark:'#08081a'},       // gece mavi
+    tropical:{body:'#3a7a5a', dark:'#1a4a2a'},        // tropikal yeşil
+    skyislands:{body:'#5a8aba', dark:'#2a4a7a'},      // gökyüzü mavi
+    cloudy:{body:'#5a6a78', dark:'#2a3848'},          // sis gri
+    rainy:{body:'#3a4a5a', dark:'#1a2a3a'},           // yağmur lacivert
+    snowyweather:{body:'#a0b0c0', dark:'#506070'}     // kar beyaz
+  };
+  var tp = TANK_PALETTE[theme] || TANK_PALETTE.valley;
+  // Tank gövde renklerini güncelle (yan tabaka + üst kule + namlu çubuğu)
+  var tankSvg = document.getElementById('lm-hero-tank');
+  if(tankSvg){
+    var bodyPaths = tankSvg.querySelectorAll('path[fill="#5a6a3a"], path[fill="' + (tankSvg.getAttribute('data-cur-body')||'') + '"]');
+    bodyPaths.forEach(function(p){ p.setAttribute('fill', tp.body); });
+    var darkPaths = tankSvg.querySelectorAll('path[fill="#3a3024"], path[fill="' + (tankSvg.getAttribute('data-cur-dark')||'') + '"]');
+    darkPaths.forEach(function(p){ p.setAttribute('fill', tp.dark); });
+    // Namlu çizgisi (stroke ile)
+    var barrelLines = tankSvg.querySelectorAll('line[stroke="#5a6a3a"], line[stroke="' + (tankSvg.getAttribute('data-cur-body')||'') + '"]');
+    barrelLines.forEach(function(l){ l.setAttribute('stroke', tp.body); });
+    tankSvg.setAttribute('data-cur-body', tp.body);
+    tankSvg.setAttribute('data-cur-dark', tp.dark);
+  }
+
+  // ─── Tema-spesifik dekorlar (ağaç, kaktüs, kar, vs.) ──────────
+  _drawHeroExtras(theme);
+
   var n = (typeof lvd.id === 'number' ? lvd.id : (nextIdx+1));
   var numEl = document.getElementById('lm-hero-num');
   if(numEl) numEl.textContent = ('0'+n).slice(-2);
@@ -13691,6 +13774,137 @@ function updateNextLevelHero(){
 
   var hero = document.getElementById('lm-next-hero');
   if(hero) hero.setAttribute('data-level-idx', nextIdx);
+}
+
+// ─── Tema-spesifik hero dekorları (ağaç/kaktüs/kar/yağmur vb.) ──
+function _drawHeroExtras(theme){
+  var x = document.getElementById('lm-hero-extras');
+  if(!x) return;
+  var svg = '';
+  function pine(cx, by, h, col, col2){
+    var w = h*0.45;
+    return '<path d="M '+cx+' '+(by-h)+' L '+(cx-w)+' '+by+' L '+(cx+w)+' '+by+' Z" fill="'+col+'"/>'
+         + '<path d="M '+cx+' '+(by-h*0.7)+' L '+(cx-w*0.7)+' '+(by-h*0.05)+' L '+(cx+w*0.7)+' '+(by-h*0.05)+' Z" fill="'+col2+'"/>'
+         + '<rect x="'+(cx-1.5)+'" y="'+by+'" width="3" height="4" fill="#3a1a06"/>';
+  }
+  function cactus(cx, by){
+    return '<rect x="'+(cx-3)+'" y="'+(by-18)+'" width="6" height="22" rx="2" fill="#3a7a2a"/>'
+         + '<rect x="'+(cx+3)+'" y="'+(by-12)+'" width="3" height="8" rx="1" fill="#3a7a2a"/>'
+         + '<rect x="'+(cx-6)+'" y="'+(by-10)+'" width="3" height="6" rx="1" fill="#3a7a2a"/>';
+  }
+  function palm(cx, by){
+    return '<rect x="'+(cx-1.5)+'" y="'+(by-26)+'" width="3" height="28" fill="#7a5a2a"/>'
+         + '<path d="M '+cx+' '+(by-26)+' Q '+(cx-12)+' '+(by-30)+' '+(cx-14)+' '+(by-22)+'" stroke="#2a8a20" stroke-width="3" fill="none" stroke-linecap="round"/>'
+         + '<path d="M '+cx+' '+(by-26)+' Q '+(cx+12)+' '+(by-30)+' '+(cx+14)+' '+(by-22)+'" stroke="#2a8a20" stroke-width="3" fill="none" stroke-linecap="round"/>'
+         + '<path d="M '+cx+' '+(by-26)+' Q '+(cx-2)+' '+(by-36)+' '+(cx+8)+' '+(by-34)+'" stroke="#2a8a20" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  }
+  function dune(cx, by, w, h){
+    return '<ellipse cx="'+cx+'" cy="'+(by+h*0.5)+'" rx="'+w+'" ry="'+h+'" fill="#c4a060" opacity="0.55"/>';
+  }
+  function rock(cx, by, w){
+    return '<ellipse cx="'+cx+'" cy="'+by+'" rx="'+w+'" ry="'+(w*0.55)+'" fill="#5a4a3a"/>';
+  }
+  function flake(cx, cy, r){ return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#fff" opacity="0.85"/>'; }
+  function star(cx, cy){ return '<circle cx="'+cx+'" cy="'+cy+'" r="0.8" fill="#fff" opacity="0.9"/>'; }
+  function rain(cx, cy){ return '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx-1.5)+'" y2="'+(cy+6)+'" stroke="#9cb7d9" stroke-width="1" opacity="0.6"/>'; }
+  function ember(cx, cy){ return '<circle cx="'+cx+'" cy="'+cy+'" r="1.4" fill="#ff5a0a" opacity="0.85"/>'; }
+  function bird(cx, cy){ return '<path d="M '+cx+' '+cy+' L '+(cx-4)+' '+(cy-2)+' M '+cx+' '+cy+' L '+(cx+4)+' '+(cy-2)+'" stroke="#1a1a1a" stroke-width="1.4" fill="none" stroke-linecap="round"/>'; }
+
+  var GY = 124; // ground line in preview viewBox (0..132)
+
+  if(theme === 'valley'){
+    svg += pine(40, GY-2, 26, '#1e6b1e', '#0d4010');
+    svg += pine(58, GY-2, 22, '#2a7a2a', '#1a5a10');
+    svg += pine(330, GY-2, 28, '#1e6b1e', '#0d4010');
+    svg += pine(348, GY-2, 20, '#2a7a2a', '#1a5a10');
+    svg += '<path d="M 100 '+GY+' Q 102 '+(GY-4)+' 104 '+GY+'" stroke="#3a7a2a" stroke-width="1.2" fill="none"/>';
+    svg += '<path d="M 280 '+GY+' Q 282 '+(GY-4)+' 284 '+GY+'" stroke="#3a7a2a" stroke-width="1.2" fill="none"/>';
+    svg += bird(200, 30);
+    svg += bird(240, 22);
+  } else if(theme === 'desert'){
+    svg += dune(30, GY, 50, 7);
+    svg += dune(340, GY, 55, 8);
+    svg += cactus(45, GY);
+    svg += cactus(330, GY-2);
+    svg += rock(80, GY+2, 4);
+    svg += rock(310, GY+1, 5);
+  } else if(theme === 'snow' || theme === 'snowyweather'){
+    svg += pine(40, GY-2, 26, '#1a4428', '#0d2a18');
+    svg += pine(60, GY-2, 22, '#2a5a3a', '#1a3a20');
+    svg += pine(330, GY-2, 28, '#1a4428', '#0d2a18');
+    svg += pine(348, GY-2, 20, '#2a5a3a', '#1a3a20');
+    svg += '<rect x="0" y="'+(GY-1)+'" width="384" height="8" fill="#fff" opacity="0.55"/>';
+    for(var i=0;i<14;i++){
+      svg += flake(8 + i*28 + (i%2)*12, 12 + (i*13)%70, 1.6 + (i%3)*0.5);
+    }
+  } else if(theme === 'forest'){
+    svg += pine(20, GY-2, 30, '#0d4010', '#072808');
+    svg += pine(38, GY-2, 24, '#1a5a1a', '#0d3010');
+    svg += pine(55, GY-2, 28, '#0d4010', '#072808');
+    svg += pine(72, GY-2, 22, '#1a5a1a', '#0d3010');
+    svg += pine(310, GY-2, 26, '#0d4010', '#072808');
+    svg += pine(328, GY-2, 30, '#1a5a1a', '#072808');
+    svg += pine(348, GY-2, 24, '#0d4010', '#072808');
+    svg += '<rect x="0" y="'+(GY-22)+'" width="384" height="22" fill="#fff" opacity="0.06"/>';
+  } else if(theme === 'rocky'){
+    svg += rock(35, GY+1, 10);
+    svg += rock(55, GY+2, 6);
+    svg += rock(75, GY, 8);
+    svg += rock(320, GY+1, 9);
+    svg += rock(340, GY, 11);
+    svg += rock(360, GY+2, 7);
+    svg += '<path d="M 25 '+GY+' L 28 '+(GY-6)+' L 32 '+(GY-3)+' L 36 '+GY+' Z" fill="#5a4a5a"/>';
+  } else if(theme === 'meadow'){
+    for(var m=0; m<8; m++){
+      var mx = 30 + m*42;
+      svg += '<line x1="'+mx+'" y1="'+GY+'" x2="'+(mx-2)+'" y2="'+(GY-8)+'" stroke="#c4a060" stroke-width="1.2"/>';
+      svg += '<line x1="'+(mx+2)+'" y1="'+GY+'" x2="'+(mx+1)+'" y2="'+(GY-7)+'" stroke="#c4a060" stroke-width="1.2"/>';
+      svg += '<line x1="'+(mx-2)+'" y1="'+GY+'" x2="'+(mx-3)+'" y2="'+(GY-7)+'" stroke="#a08040" stroke-width="1.2"/>';
+    }
+  } else if(theme === 'volcano'){
+    svg += '<rect x="0" y="'+(GY-1)+'" width="384" height="3" fill="#7a2010" opacity="0.7"/>';
+    for(var v=0; v<8; v++){
+      svg += ember(20 + v*48, GY - 4 - (v%3)*3);
+    }
+    svg += rock(50, GY+1, 8);
+    svg += rock(330, GY+1, 9);
+    svg += '<rect x="0" y="0" width="384" height="20" fill="#000" opacity="0.25"/>';
+  } else if(theme === 'nightcity'){
+    for(var st=0; st<22; st++){
+      svg += star(15 + (st*17)%370, 8 + (st*13)%50);
+    }
+    svg += '<rect x="20" y="'+(GY-32)+'" width="14" height="32" fill="#1a1a30"/>';
+    svg += '<rect x="36" y="'+(GY-26)+'" width="10" height="26" fill="#1a1a30"/>';
+    svg += '<rect x="348" y="'+(GY-36)+'" width="16" height="36" fill="#1a1a30"/>';
+    svg += '<rect x="366" y="'+(GY-22)+'" width="12" height="22" fill="#1a1a30"/>';
+    svg += '<rect x="24" y="'+(GY-26)+'" width="2" height="2" fill="#FFD700"/>';
+    svg += '<rect x="28" y="'+(GY-20)+'" width="2" height="2" fill="#FFD700"/>';
+    svg += '<rect x="354" y="'+(GY-30)+'" width="2" height="2" fill="#FFD700"/>';
+    svg += '<rect x="358" y="'+(GY-22)+'" width="2" height="2" fill="#FFD700"/>';
+  } else if(theme === 'tropical'){
+    svg += palm(40, GY);
+    svg += palm(60, GY-2);
+    svg += palm(330, GY);
+    svg += palm(355, GY-2);
+    svg += '<rect x="0" y="'+(GY-1)+'" width="384" height="6" fill="#f0c878" opacity="0.55"/>';
+  } else if(theme === 'skyislands'){
+    svg += '<ellipse cx="50" cy="'+(GY-15)+'" rx="22" ry="6" fill="#3a6a8a" opacity="0.85"/>';
+    svg += '<ellipse cx="340" cy="'+(GY-10)+'" rx="26" ry="7" fill="#3a6a8a" opacity="0.85"/>';
+    svg += '<ellipse cx="100" cy="40" rx="20" ry="6" fill="#fff" opacity="0.4"/>';
+    svg += '<ellipse cx="280" cy="50" rx="22" ry="7" fill="#fff" opacity="0.4"/>';
+  } else if(theme === 'cloudy'){
+    svg += '<ellipse cx="80" cy="25" rx="32" ry="8" fill="#fff" opacity="0.5"/>';
+    svg += '<ellipse cx="180" cy="35" rx="36" ry="9" fill="#fff" opacity="0.45"/>';
+    svg += '<ellipse cx="280" cy="22" rx="30" ry="7" fill="#fff" opacity="0.5"/>';
+    svg += pine(330, GY-2, 22, '#2a5028', '#1a3018');
+  } else if(theme === 'rainy'){
+    for(var r=0; r<28; r++){
+      svg += rain(6 + r*14 + (r*7)%5, 5 + (r*11)%80);
+    }
+    svg += '<rect x="0" y="'+(GY-1)+'" width="384" height="3" fill="#1a3a1a" opacity="0.55"/>';
+  }
+
+  x.innerHTML = svg;
 }
 
 function onNextLevelHeroClick(){
@@ -15194,6 +15408,9 @@ function openTacticalInfo(){
         <circle cx="50" cy="50" r="10" fill="#f5f1e6"/>
         <circle cx="50" cy="50" r="5" fill="#1a1a1a"/>
       </svg>
+      <!-- Theme-specific decorations (trees, dunes, rain, snow, stars, etc.) -->
+      <svg id="lm-hero-extras" viewBox="0 0 384 132" preserveAspectRatio="none"
+        style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></svg>
       <!-- Trajectory arc -->
       <svg id="lm-hero-arc" viewBox="0 0 384 132" preserveAspectRatio="none">
         <path d="M 70 100 Q 192 -10 320 90" fill="none" stroke="#FFD700" stroke-opacity="0.7" stroke-width="1.8" stroke-dasharray="3 5"/>
@@ -16598,6 +16815,12 @@ const Quests = (function(){
     { id:'combo',   icon:'🔥', target:1,  event:'combo',        reward:80 },
     { id:'cave',    icon:'🕳️', target:1,  event:'cave',         reward:100 },
     { id:'buried',  icon:'⛏️', target:1,  event:'buried',       reward:100 },
+    // Hayvan görevleri
+    { id:'hunt3',   icon:'🐾', target:3,  event:'animal',       reward:50  },
+    { id:'hunt8',   icon:'🐾', target:8,  event:'animal',       reward:100 },
+    { id:'bird1',   icon:'🐦', target:1,  event:'bird',         reward:60  },
+    { id:'bird3',   icon:'🦅', target:3,  event:'bird',         reward:120 },
+    { id:'safari',  icon:'🦁', target:5,  event:'animal',       reward:80  },
   ];
   // i18n title helper — fallback olarak ID kullanır
   function _qTitle(q){
