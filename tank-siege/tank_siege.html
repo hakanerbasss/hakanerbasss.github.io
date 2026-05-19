@@ -97,6 +97,27 @@ html,body{
 }
 #btn-gallery-open:active{transform:translateY(2px);box-shadow:0 1px 0 #b32200;}
 
+/* Map button — sea/teal gradient, matching gallery-open style */
+#btn-level-map{
+  background:linear-gradient(180deg,#2bb6cc,#0a8ca5);
+  border:none;color:white;border-radius:14px;
+  width:38px;height:32px;padding:0;
+  font-size:18px;line-height:1;
+  cursor:pointer;pointer-events:auto;
+  -webkit-tap-highlight-color:transparent;
+  box-shadow:
+    0 3px 0 #075c70,
+    0 4px 10px rgba(10,140,165,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  transition:transform 0.08s, box-shadow 0.08s;
+  display:inline-flex;align-items:center;justify-content:center;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,0.4));
+}
+#btn-level-map:active{
+  transform:translateY(2px);
+  box-shadow:0 1px 0 #075c70, inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
 /* Mermi slotları — sağ altta eski yerinde */
 .ammo-slot.slot-active{border-color:#FFD700;background:rgba(255,215,0,0.15);}
 .ammo-slot.slot-dim{opacity:0.4;}
@@ -1236,7 +1257,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
     <span id="tank-badge-name">Basic</span>
     <span id="tank-badge-level"></span>
   </div>
-  <button onclick="showLevelMap()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🗺️</button>
+  <button id="btn-level-map" onclick="showLevelMap()" data-i18n-title="map_title" title="Harita">🗺️</button>
   <button id="btn-gallery-open" onclick="openGallery(curLevel)" data-i18n="inventory">⚔️ Inventory</button>
   <div style="flex:1;"></div>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
@@ -1492,7 +1513,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.120';
+const APP_VERSION      = '1.0.121';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1510,8 +1531,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.19 22:05';
-const APP_VERSION_NOTE = 'kapatma butonkari degisti levrl onizleme geldi';
+const APP_VERSION_DATE = '2026.05.19 22:21';
+const APP_VERSION_NOTE = 'rota hakki duzeltildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -1867,6 +1888,10 @@ let tempAmmo    = JSON.parse(lsGet('temp_ammo')||'null');
 // Bunker Buster patlama animasyonu
 let _bunkerBlastAnim = null; // {x, y, tipX, tipY, startTime, duration}
 let tempTactical  = JSON.parse(lsGet('temp_tactical')||'null');
+// Defansif: bozulmuş expiresAtLevel — başlangıçta da clamp (cloud restore koruması)
+if(tempTactical && (typeof tempTactical.expiresAtLevel !== 'number' || tempTactical.expiresAtLevel < 0)){
+  tempTactical = null; lsRemove('temp_tactical');
+}
 let tempGuided    = JSON.parse(lsGet('temp_guided')||'null');
 let guidedHintShown = lsGet('guided_hint')==='1';
 let tacticalHintShown = lsGet('tactical_hint')==='1';
@@ -1896,6 +1921,10 @@ let dragStartPower = 60;
 let wind = 0;
 let shieldActive = false; // rüzgar kalkanı
 let windBlock = JSON.parse(lsGet('wind_block')||'null'); // {expiresAtLevel:N}
+// Defansif: bozulmuş expiresAtLevel — başlangıçta clamp
+if(windBlock && (typeof windBlock.expiresAtLevel !== 'number' || windBlock.expiresAtLevel < 0)){
+  windBlock = null; lsRemove('wind_block');
+}
 let clouds = [];
 let currentTheme = null; // aktif tema objesi
 let decorations = []; // ağaç, kaktüs vs
@@ -7716,101 +7745,222 @@ function drawPath(){
   const rad = angle*Math.PI/180;
   const bx0 = tankX+Math.cos(-rad)*td.barrelL;
   const by0 = tankY-td.h-4+Math.sin(-rad)*td.barrelL;
-  const pathTd=TANK_DEF[selectedTank]||TANK_DEF[lv.tankType]||TANK_DEF.basic;
   const pwr = MIN_POWER + (power/100)*(tankEffectivePower(selectedTank||lv.tankType)-MIN_POWER);
-  const darkThemes=['snow','forest','rocky'];
-  const pathCol=darkThemes.includes(lv&&lv.theme?lv.theme:'valley')
-    ?'rgba(255,214,10,0.80)':'rgba(40,60,200,0.85)';
+
+  // Tema bazlı renk paleti — modern HUD görünümü
+  const darkThemes=['snow','forest','rocky','volcano','nightcity','rainy','snowyweather'];
+  const isDark = darkThemes.includes(lv&&lv.theme?lv.theme:'valley');
+  const isTac  = isTacticalActive();
+  // Tactical: cyan, normal+light: indigo, normal+dark: amber
+  const palette = isTac
+    ? {core:'#00E5FF', glow:'rgba(0,229,255,0.65)', soft:'rgba(0,229,255,0.18)', accent:'#00FFD0'}
+    : (isDark
+      ? {core:'#FFD60A', glow:'rgba(255,214,10,0.55)', soft:'rgba(255,214,10,0.15)', accent:'#FF8C00'}
+      : {core:'#5A7BFF', glow:'rgba(80,110,255,0.55)', soft:'rgba(80,110,255,0.16)', accent:'#FF6B35'});
+
+  // Yörünge hesabı — sub-step fizik
+  let vx=pwr*Math.cos(-rad), vy=pwr*Math.sin(-rad);
+  let px=bx0, py=by0;
+  const sampleEvery = isTac ? 3 : 4;
+  const maxIter = isTac ? 120 : Math.max(60, (lv.pathDots||30)*3);
+  const pts=[{x:px,y:py,v:pwr}];
+  let hitPt = null;
+  for(let i=0;i<maxIter;i++){
+    const speed=Math.sqrt(vx*vx+vy*vy);
+    const steps=Math.max(3,Math.min(16,Math.ceil(speed/4)));
+    let hit=false;
+    for(let s=0;s<steps;s++){
+      vx+=(shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank||lv.tankType)/steps;
+      vy+=GRAVITY/steps;
+      px+=vx/steps; py+=vy/steps;
+      const xi=Math.floor(px);
+      if(xi>=0&&xi<W&&py>=terrain[xi]){
+        hitPt={x:px,y:terrain[Math.max(0,Math.min(W-1,xi))]};
+        hit=true; break;
+      }
+      if(px<-30||px>W+30||py>H+80){hit=true;break;}
+    }
+    if(i%sampleEvery===0) pts.push({x:px,y:py,v:Math.sqrt(vx*vx+vy*vy)});
+    if(hit) break;
+  }
+  if(pts.length<2) return;
+  const ep = hitPt || pts[pts.length-1];
 
   ctx.save();
-  ctx.setLineDash([6,8]);
-  ctx.strokeStyle=pathCol;
-  ctx.lineWidth=2;
-  ctx.lineCap='round';
 
-  if(isTacticalActive()){
-    // ── TAKTİK MOD: sub-step fizik, halka, mesafe, rüzgar oku ──
-    let vx=pwr*Math.cos(-rad), vy=pwr*Math.sin(-rad);
-    let px=bx0, py=by0;
-    const dots=40;
-    const pts=[{x:px,y:py}];
-    let hitPt=null;
-    for(let i=0;i<dots*3;i++){
-      const speed=Math.sqrt(vx*vx+vy*vy);
-      const steps=Math.max(3,Math.min(16,Math.ceil(speed/4)));
-      let hit=false;
-      for(let s=0;s<steps;s++){
-        vx+=(shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank||lv.tankType)/steps;
-        vy+=GRAVITY/steps;
-        px+=vx/steps;
-        py+=vy/steps;
-        const xi=Math.floor(px);
-        if(xi>=0&&xi<W&&py>=terrain[xi]){hitPt={x:px,y:terrain[Math.max(0,Math.min(W-1,xi))]};hit=true;break;}
-        if(px<-30||px>W+30||py>H+80){hit=true;break;}
-      }
-      if(i%3===0) pts.push({x:px,y:py});
-      if(hit) break;
-    }
-    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
-    ctx.stroke();
-    const ep=hitPt||pts[pts.length-1];
-    ctx.setLineDash([]);
-    const isDark=darkThemes.includes(lv&&lv.theme?lv.theme:'valley');
-    const epCol=isDark?'rgba(255,214,10,0.9)':'rgba(40,60,200,0.95)';
-    ctx.strokeStyle=epCol; ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(ep.x,ep.y,14,0,Math.PI*2);ctx.stroke();
-    ctx.fillStyle=epCol;
-    ctx.beginPath();ctx.arc(ep.x,ep.y,6,0,Math.PI*2);ctx.fill();
-    const distToTarget=Math.sqrt((ep.x-targetX)**2+(ep.y-(targetY-targetH/2))**2);
-    const distM=Math.round(distToTarget/4);
-    const distLabel=distM===0?'🎯':(distM<8?'~'+distM+'m':'~'+distM+'m');
-    const distColor=distM<8?'#00E676':distM<20?'#FFD700':'#FF6B6B';
-    ctx.font='bold 12px Rajdhani,sans-serif';
-    ctx.fillStyle=distColor;
-    ctx.strokeStyle='rgba(0,0,0,0.8)';ctx.lineWidth=3;
-    ctx.textAlign='center';
-    ctx.strokeText(distLabel,ep.x,ep.y-22);
-    ctx.fillText(distLabel,ep.x,ep.y-22);
-    if(Math.abs(wind)>0.2&&pts.length>4){
-      const mp=pts[Math.floor(pts.length/2)];
-      const arrowDir=wind>0?1:-1;
-      ctx.save();ctx.translate(mp.x,mp.y);
-      ctx.strokeStyle=Math.abs(wind)>0.8?'#FF6B35':'rgba(255,255,255,0.7)';
-      ctx.lineWidth=2;ctx.lineCap='round';
-      ctx.beginPath();ctx.moveTo(-12*arrowDir,0);ctx.lineTo(12*arrowDir,0);
-      ctx.lineTo(6*arrowDir,-6);ctx.moveTo(12*arrowDir,0);ctx.lineTo(6*arrowDir,6);
-      ctx.stroke();ctx.restore();
-    }
-  } else {
-    // ── BASİT MOD: doğru fizik ama sade görünüm — halka/mesafe/rüzgar oku yok ──
-    let vx=pwr*Math.cos(-rad), vy=pwr*Math.sin(-rad);
-    let px=bx0, py=by0;
-    const dots=lv.pathDots;
-    const pts=[{x:px,y:py}];
-    for(let i=0;i<dots*3;i++){
-      const speed=Math.sqrt(vx*vx+vy*vy);
-      const steps=Math.max(3,Math.min(16,Math.ceil(speed/4)));
-      let hit=false;
-      for(let s=0;s<steps;s++){
-        vx+=(shieldActive?0:wind)*0.012*tankEffectiveWindRes(selectedTank||lv.tankType)/steps;
-        vy+=GRAVITY/steps;
-        px+=vx/steps; py+=vy/steps;
-        const xi=Math.floor(px);
-        if(xi>=0&&xi<W&&py>=terrain[xi]){hit=true;break;}
-        if(px<-30||px>W+30||py>H+80){hit=true;break;}
-      }
-      if(i%3===0) pts.push({x:px,y:py});
-      if(hit) break;
-    }
-    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    const ep=pts[pts.length-1];
-    ctx.fillStyle=darkThemes.includes(lv&&lv.theme?lv.theme:'valley')?'rgba(255,214,10,0.9)':'rgba(40,60,200,0.95)';
-    ctx.beginPath();ctx.arc(ep.x,ep.y,5,0,Math.PI*2);ctx.fill();
+  // ── KATMAN 1: Geniş yumuşak halo (en alta) ──────────────────────
+  ctx.strokeStyle = palette.soft;
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length;i++){
+    // Smooth bezier through quadratic — kontrol noktası önceki+sonraki ortası
+    const p = pts[i], pp = pts[i-1];
+    const cx = (p.x+pp.x)/2, cy = (p.y+pp.y)/2;
+    ctx.quadraticCurveTo(pp.x, pp.y, cx, cy);
   }
+  ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
+  ctx.stroke();
+
+  // ── KATMAN 2: Orta glow ────────────────────────────────────────
+  ctx.strokeStyle = palette.glow;
+  ctx.lineWidth = 5;
+  ctx.shadowColor = palette.core;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length;i++){
+    const p = pts[i], pp = pts[i-1];
+    const cx = (p.x+pp.x)/2, cy = (p.y+pp.y)/2;
+    ctx.quadraticCurveTo(pp.x, pp.y, cx, cy);
+  }
+  ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // ── KATMAN 3: Çekirdek dashed line ─────────────────────────────
+  const t = (Date.now()/1000) % 1;
+  ctx.setLineDash([8, 9]);
+  ctx.lineDashOffset = -t * 17;  // akan çizgi animasyonu
+  ctx.strokeStyle = palette.core;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length;i++){
+    const p = pts[i], pp = pts[i-1];
+    const cx = (p.x+pp.x)/2, cy = (p.y+pp.y)/2;
+    ctx.quadraticCurveTo(pp.x, pp.y, cx, cy);
+  }
+  ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
+
+  // ── KATMAN 4: Akan parlak noktalar (tactical modda daha sık) ───
+  const flowSpeed = isTac ? 0.45 : 0.30;
+  const dotCount = isTac ? 6 : 4;
+  for(let d=0; d<dotCount; d++){
+    const tphase = ((Date.now()/1000)*flowSpeed + d/dotCount) % 1;
+    const idx = Math.floor(tphase * (pts.length-1));
+    const sub = tphase * (pts.length-1) - idx;
+    const p0 = pts[idx], p1 = pts[idx+1] || pts[idx];
+    const dx = p0.x + (p1.x-p0.x)*sub;
+    const dy = p0.y + (p1.y-p0.y)*sub;
+    // Outer halo
+    ctx.fillStyle = palette.glow;
+    ctx.beginPath(); ctx.arc(dx, dy, 4.5, 0, Math.PI*2); ctx.fill();
+    // Core
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(dx, dy, 1.8, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── ENDPOINT: pulse halkası + iç hedef ─────────────────────────
+  const pulse = 0.5 + Math.sin(Date.now()/220)*0.5;
+  // Soft outer ring
+  ctx.strokeStyle = palette.soft;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(ep.x, ep.y, 18 + pulse*4, 0, Math.PI*2);
+  ctx.stroke();
+  // Inner ring
+  ctx.strokeStyle = palette.glow;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(ep.x, ep.y, 10, 0, Math.PI*2);
+  ctx.stroke();
+  // Crosshair
+  ctx.strokeStyle = palette.core;
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(ep.x-7, ep.y); ctx.lineTo(ep.x-3, ep.y);
+  ctx.moveTo(ep.x+3, ep.y); ctx.lineTo(ep.x+7, ep.y);
+  ctx.moveTo(ep.x, ep.y-7); ctx.lineTo(ep.x, ep.y-3);
+  ctx.moveTo(ep.x, ep.y+3); ctx.lineTo(ep.x, ep.y+7);
+  ctx.stroke();
+  // Center dot
+  ctx.fillStyle = palette.core;
+  ctx.beginPath(); ctx.arc(ep.x, ep.y, 2.5, 0, Math.PI*2); ctx.fill();
+
+  // ── BARREL CHEVRON: namlu ucundan çıkan üçgen ok ───────────────
+  const cdx = pts[1].x - pts[0].x, cdy = pts[1].y - pts[0].y;
+  const cmag = Math.sqrt(cdx*cdx+cdy*cdy)||1;
+  const cnx = cdx/cmag, cny = cdy/cmag;
+  const cstart = {x: pts[0].x + cnx*4, y: pts[0].y + cny*4};
+  ctx.fillStyle = palette.core;
+  ctx.beginPath();
+  ctx.moveTo(cstart.x + cnx*7, cstart.y + cny*7);
+  ctx.lineTo(cstart.x - cny*3.5, cstart.y + cnx*3.5);
+  ctx.lineTo(cstart.x + cny*3.5, cstart.y - cnx*3.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // ── HIZ + MESAFE etiketi (endpoint üstünde) ────────────────────
+  const distToTarget = Math.sqrt((ep.x-targetX)**2 + (ep.y-(targetY-targetH/2))**2);
+  const distM = Math.round(distToTarget/4);
+  const exitSpeed = Math.round(pwr * 10) / 10; // namlu çıkış hızı
+  const labelParts = [];
+  labelParts.push((distM<8?'🎯 ':'') + (distM===0?'0m':distM+'m'));
+  labelParts.push(exitSpeed.toFixed(1)+'×');
+  const labelText = labelParts.join('  •  ');
+
+  // Pill arka plan
+  ctx.font = 'bold 12px Rajdhani,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const labelW = ctx.measureText(labelText).width;
+  const padX = 9, padY = 5;
+  const pillW = labelW + padX*2;
+  const pillH = 22;
+  const pillX = ep.x - pillW/2;
+  const pillY = ep.y - 36;
+  // Pill bg
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeStyle = palette.core;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  if(ctx.roundRect) ctx.roundRect(pillX, pillY, pillW, pillH, 11);
+  else ctx.rect(pillX, pillY, pillW, pillH);
+  ctx.fill(); ctx.stroke();
+  // Pill connector to endpoint
+  ctx.strokeStyle = palette.core;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(ep.x, pillY + pillH);
+  ctx.lineTo(ep.x, ep.y - 18);
+  ctx.stroke();
+  // Text
+  const distColor = distM<8 ? '#00E676' : distM<20 ? palette.core : '#FF8A6A';
+  ctx.fillStyle = distColor;
+  ctx.fillText(labelText, ep.x, pillY + pillH/2);
+
+  // ── RÜZGAR OKU (orta noktada) ──────────────────────────────────
+  if(Math.abs(wind) > 0.2 && pts.length > 4){
+    const mp = pts[Math.floor(pts.length/2)];
+    const arrowDir = wind > 0 ? 1 : -1;
+    const wMag = Math.min(1.6, Math.abs(wind));
+    const arrowLen = 10 + wMag*6;
+    const arrowCol = Math.abs(wind) > 0.8 ? '#FF6B35' : 'rgba(255,255,255,0.85)';
+    ctx.save();
+    ctx.translate(mp.x, mp.y);
+    // Halo
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath(); ctx.arc(0, 0, arrowLen+4, 0, Math.PI*2); ctx.fill();
+    // Shaft
+    ctx.strokeStyle = arrowCol;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-arrowLen*arrowDir, 0);
+    ctx.lineTo(arrowLen*arrowDir, 0);
+    ctx.lineTo((arrowLen-6)*arrowDir, -6);
+    ctx.moveTo(arrowLen*arrowDir, 0);
+    ctx.lineTo((arrowLen-6)*arrowDir, 6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
@@ -13300,9 +13450,29 @@ function isTacticalActive(){
 }
 
 function checkTacticalExpiry(){
-  if(tempTactical && tempTactical.expiresAtLevel <= curLevel){
-    tempTactical = null;
-    lsRemove('temp_tactical');
+  // tempTactical defansif clamp + expire
+  if(tempTactical){
+    if(typeof tempTactical.expiresAtLevel !== 'number' ||
+       tempTactical.expiresAtLevel > curLevel + 3){
+      tempTactical.expiresAtLevel = curLevel + 3;
+      lsSet('temp_tactical', JSON.stringify(tempTactical));
+    }
+    if(tempTactical.expiresAtLevel <= curLevel){
+      tempTactical = null;
+      lsRemove('temp_tactical');
+    }
+  }
+  // windBlock için aynı defansif clamp
+  if(windBlock){
+    if(typeof windBlock.expiresAtLevel !== 'number' ||
+       windBlock.expiresAtLevel > curLevel + 3){
+      windBlock.expiresAtLevel = curLevel + 3;
+      lsSet('wind_block', JSON.stringify(windBlock));
+    }
+    if(windBlock.expiresAtLevel <= curLevel){
+      windBlock = null;
+      lsRemove('wind_block');
+    }
   }
   updateTacticalBadge(); updateWindBlockBadge();
 }
@@ -13535,7 +13705,7 @@ function renderBoostGallery(cont){
   const tacAvail = lv && !lv.showPath; // sadece level 15+ işe yarar
   let tacBadge, tacBtn;
   if(isTemp){
-    const kalan = tempTactical.expiresAtLevel - curLevel;
+    const kalan = Math.max(0, Math.min(3, tempTactical.expiresAtLevel - curLevel));
     tacBadge=`<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left',{n:kalan})}</span>`;
     tacBtn=tacAdLeft>0
       ?`<button class="gc-btn btn-ad" onclick="adTactical()">${t('boost_btn_ad_3lvl')}<br><span style="font-size:10px;opacity:0.7;">${tFmt('boost_btn_ad_rights',{n:tacAdLeft})}</span></button>`
@@ -13571,7 +13741,7 @@ function renderBoostGallery(cont){
   const wbHasWind = lv && lv.wind > 0; // rüzgarsız levelde işe yaramaz
   let wbBadge, wbBtn;
   if(wbActive){
-    wbBadge=`<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left',{n:(windBlock.expiresAtLevel-curLevel)})}</span>`;
+    wbBadge=`<span class="gc-badge temp-badge">${tFmt('boost_badge_levels_left',{n:Math.max(0,Math.min(3,windBlock.expiresAtLevel-curLevel))})}</span>`;
     wbBtn=wbAdLeft>0
       ?`<button class="gc-btn btn-ad" onclick="adWindBlock()">${t('boost_btn_ad_3lvl')}<br><span style="font-size:10px;opacity:0.7;">${tFmt('boost_btn_ad_rights',{n:wbAdLeft})}</span></button>`
       :`<span style="font-size:11px;color:#888;text-align:center;">${t('boost_limit_full')}</span>`;
