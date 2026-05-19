@@ -1571,7 +1571,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.128';
+const APP_VERSION      = '1.0.129';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1589,8 +1589,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 01:54';
-const APP_VERSION_NOTE = 'Leaderboard duzeltildi. daily quest duzeltildi';
+const APP_VERSION_DATE = '2026.05.20 02:24';
+const APP_VERSION_NOTE = 'Play game sahte veriker silindi.onboardinge gunkuk girev karti eklendi.';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -12383,6 +12383,14 @@ const LANG = {
     q_combo_title:         'Combo Yap (arka arkaya)',
     q_cave_title:          '1 Mağara Levelı Bitir',
     q_buried_title:        '1 Gömülü Hedef Bitir',
+    tslb_empty_title:      '🌐 Online Sıralama',
+    tslb_empty_body:       'Tam sıralamayı görmek için aşağıdaki butona dokun. Skorların otomatik olarak Google Play Games’e gönderiliyor.',
+    tslb_empty_title_off:  '🔒 Henüz Bağlı Değilsin',
+    tslb_empty_body_off:   'Sıralamada yer almak için Google Play Games’e giriş yap. Aşağıdaki butonla tam sıralamayı açabilirsin.',
+    tslb_tab_weekly:       'Haftalık',
+    tslb_tab_monthly:      'Aylık',
+    tslb_tab_yearly:       'Yıllık',
+    tslb_tab_alltime:      'Tümü',
   },
   en: {
     fire:           'FIRE!',
@@ -12908,6 +12916,14 @@ const LANG = {
     q_combo_title:         'Land a Combo Hit',
     q_cave_title:          'Beat 1 Cave Level',
     q_buried_title:        'Beat 1 Buried Target',
+    tslb_empty_title:      '🌐 Online Leaderboard',
+    tslb_empty_body:       'Tap the button below to see the full rankings. Your scores are submitted to Google Play Games automatically.',
+    tslb_empty_title_off:  '🔒 Not Connected Yet',
+    tslb_empty_body_off:   'Sign in to Google Play Games to appear on the leaderboard. Open the full leaderboard with the button below.',
+    tslb_tab_weekly:       'Weekly',
+    tslb_tab_monthly:      'Monthly',
+    tslb_tab_yearly:       'Yearly',
+    tslb_tab_alltime:      'All Time',
   },
 };
 
@@ -17131,6 +17147,7 @@ var OB_STEPS = [
   // Level 2 (curLevel=1)
   { level:1, target:'#wind-display',  title:'Rüzgar',       body:'Yön ve şiddete dikkat — atışın yönünü etkiler. Sayı yüksekse atış arkasında uçar.', pos:'left' },
   { level:1, target:'#ammo-bar',      title:'Mühimmat',     body:'Sağ altta mermi slotları. Üzerine basarak farklı mühimmat seç.', pos:'left' },
+  { level:1, target:'#quests-badge',  title:'Günlük Görevler', body:'<b style="color:#00E676">📋 Günlük görevler</b> burada — tamamlayınca <b style="color:#FFD700">bonus puan</b> kazanırsın. Her gün yenilenir.', pos:'bottom' },
   // Level 3 (curLevel=2)
   { level:2, target:'.tip-target',    title:'Karargah',     body:'Düşman karargahı. Üstüne tıkla — HP, en iyi mühimmat ve tankı gör.', pos:'top', rectOverride:'target' },
   { level:2, target:'#btn-level-map', title:'Harita',       body:'Buradan diğer levellere atla, ilerlemeni gör.', pos:'bottom' },
@@ -17349,7 +17366,7 @@ window.addEventListener('resize', function(){
   position:absolute;top:9px;left:14px;
   font-size:9px;letter-spacing:2.5px;color:rgba(255,215,0,0.65);font-weight:800;
 }
-#tslb-head-right{
+#tslb-head-period{
   position:absolute;top:9px;right:14px;
   font-size:9px;letter-spacing:2px;color:rgba(255,215,0,0.55);font-weight:700;
 }
@@ -17381,17 +17398,25 @@ window.addEventListener('resize', function(){
   flex-shrink:0;
 }
 .tslb-tab{
-  flex:1;padding:8px 4px;cursor:pointer;
+  flex:1 1 0;min-width:0;padding:8px 4px;cursor:pointer;
   background:rgba(255,255,255,0.04);
   border:1.5px solid rgba(255,255,255,0.08);
   color:rgba(255,255,255,0.55);
   border-radius:11px 11px 4px 4px;
   font-family:'Rajdhani',sans-serif;font-weight:800;font-size:11px;
   letter-spacing:0.3px;-webkit-tap-highlight-color:transparent;
-  display:flex;flex-direction:column;align-items:center;gap:1px;
-  transition:all 0.15s;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  transition:background 0.15s, color 0.15s, border-color 0.15s;
+  min-height:42px;box-sizing:border-box;
+  overflow:hidden;
 }
-.tslb-tab .em{font-size:14px;line-height:1;}
+.tslb-tab > span:not(.em){
+  font-size:10px;line-height:1.1;
+  max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:block;text-align:center;
+}
+.tslb-tab .em{font-size:14px;line-height:1;flex-shrink:0;}
 .tslb-tab.active{
   background:linear-gradient(180deg,rgba(255,215,0,0.30),rgba(255,215,0,0.10));
   border-color:rgba(255,215,0,0.55);color:#FFD700;
@@ -17557,16 +17582,16 @@ window.addEventListener('resize', function(){
 
     <div id="tslb-tabs">
       <div class="tslb-tab active" data-kind="weekly" onclick="TSLB.tab('weekly')">
-        <span class="em">⚡</span><span>Haftalık</span>
+        <span class="em">⚡</span><span data-i18n="tslb_tab_weekly">Haftalık</span>
       </div>
       <div class="tslb-tab" data-kind="monthly" onclick="TSLB.tab('monthly')">
-        <span class="em">🌙</span><span>Aylık</span>
+        <span class="em">🌙</span><span data-i18n="tslb_tab_monthly">Aylık</span>
       </div>
       <div class="tslb-tab" data-kind="yearly" onclick="TSLB.tab('yearly')">
-        <span class="em">☀️</span><span>Yıllık</span>
+        <span class="em">☀️</span><span data-i18n="tslb_tab_yearly">Yıllık</span>
       </div>
       <div class="tslb-tab" data-kind="alltime" onclick="TSLB.tab('alltime')">
-        <span class="em">🏆</span><span>Tüm Zamanlar</span>
+        <span class="em">🏆</span><span data-i18n="tslb_tab_alltime">Tümü</span>
       </div>
     </div>
 
@@ -17593,50 +17618,10 @@ window.addEventListener('resize', function(){
 window.TSLB = (function(){
   var currentKind = 'weekly';
 
-  // Demo / placeholder oyuncu listesi — her tab için biraz farklı
-  // (Gerçek skorlar Google'da; bu sadece görsel preview)
-  var DEMO_DATA = {
-    weekly: [
-      {name:'DragonKing',  avatar:'🐉', score:48200},
-      {name:'TankMaster',  avatar:'🦁', score:42100},
-      {name:'Ayşe',        avatar:'🦊', score:36800},
-      {name:'Komutan_42',  avatar:'🐺', score:31500},
-      {name:'SniperPro',   avatar:'🦅', score:28400},
-      {name:'TigerTank',   avatar:'🐯', score:24200},
-      {name:'Hızlı_Atış',  avatar:'🦊', score:21800},
-      {name:'BeeWarrior',  avatar:'🐝', score:19500},
-    ],
-    monthly: [
-      {name:'IronFist',    avatar:'🦾', score:184500},
-      {name:'DragonKing',  avatar:'🐉', score:172000},
-      {name:'StealthOp',   avatar:'🦇', score:158200},
-      {name:'TankMaster',  avatar:'🦁', score:142800},
-      {name:'PhoenixGen',  avatar:'🔥', score:128600},
-      {name:'Ayşe',        avatar:'🦊', score:115400},
-      {name:'Komutan_42',  avatar:'🐺', score:104300},
-      {name:'TigerTank',   avatar:'🐯', score:92800},
-    ],
-    yearly: [
-      {name:'LegendXX',    avatar:'👑', score:1280000},
-      {name:'IronFist',    avatar:'🦾', score:1156000},
-      {name:'DragonKing',  avatar:'🐉', score:1042500},
-      {name:'StealthOp',   avatar:'🦇', score:920400},
-      {name:'TankMaster',  avatar:'🦁', score:847200},
-      {name:'PhoenixGen',  avatar:'🔥', score:782300},
-      {name:'Ayşe',        avatar:'🦊', score:698500},
-      {name:'Komutan_42',  avatar:'🐺', score:621800},
-    ],
-    alltime: [
-      {name:'LegendXX',    avatar:'👑', score:4280000},
-      {name:'TitanKing',   avatar:'⚔️', score:3856000},
-      {name:'IronFist',    avatar:'🦾', score:3422100},
-      {name:'DragonKing',  avatar:'🐉', score:2980500},
-      {name:'StealthOp',   avatar:'🦇', score:2654200},
-      {name:'TankMaster',  avatar:'🦁', score:2380800},
-      {name:'PhoenixGen',  avatar:'🔥', score:2104600},
-      {name:'Ayşe',        avatar:'🦊', score:1842500},
-    ],
-  };
+  // Gerçek leaderboard verisi Google Play Games tarafında — bu UI sadece
+  // önizleme/giriş noktası. Demo veriler kaldırıldı; oyuncu sıralamasını
+  // görmek için "Tam Sıralamayı Aç" butonu ile native ekrana yönlendiriyoruz.
+  var DEMO_DATA = { weekly:[], monthly:[], yearly:[], alltime:[] };
 
   var PERIOD_LABEL = {
     weekly:  'HAFTALIK',
@@ -17669,7 +17654,7 @@ window.TSLB = (function(){
       var k = tb.getAttribute('data-kind');
       var sp = tb.querySelector('span:not(.em)');
       if(sp){
-        var keyMap = {weekly:'lb_weekly',monthly:'lb_monthly',yearly:'lb_yearly',alltime:'lb_alltime'};
+        var keyMap = {weekly:'tslb_tab_weekly',monthly:'tslb_tab_monthly',yearly:'tslb_tab_yearly',alltime:'tslb_tab_alltime'};
         sp.textContent = _t(keyMap[k], sp.textContent);
       }
     });
@@ -17720,37 +17705,54 @@ window.TSLB = (function(){
     // Oyuncunun skorunu al
     var myScore = 0;
     try { myScore = parseInt((typeof lsGet==='function'?lsGet('total_score'):localStorage.getItem('ts_total_score'))||'0') || 0; } catch(_) {}
-    var myName  = (typeof _cloudUserName !== 'undefined' && _cloudUserName) ? _cloudUserName : 'SEN';
+    var myName  = (typeof _cloudUserName !== 'undefined' && _cloudUserName) ? _cloudUserName : (signedIn ? 'Oyuncu' : ((typeof t==='function'?t('tslb_me'):null) || 'SEN'));
 
-    // Demo data — top 8
-    var data = (DEMO_DATA[currentKind] || []).slice();
-    // Oyuncunun yerini hesapla: skoruna göre listeye sokarak rank bul
-    var combined = data.slice();
-    combined.push({name: myName, avatar: '⚔️', score: myScore, isMe: true});
-    combined.sort(function(a,b){ return b.score - a.score; });
-    var myRank = -1;
-    for(var i=0;i<combined.length;i++){
-      if(combined[i].isMe){ myRank = i+1; break; }
-    }
+    function _t(k, fb){ try { return (typeof t==='function')?(t(k)||fb):fb; } catch(_) { return fb; } }
 
-    // Render podium (top 3 from combined)
-    var p1 = combined[0], p2 = combined[1], p3 = combined[2];
-    var html = '<div class="tslb-podium">';
-    if(p2) html += _podHtml(p2, 2, 'second');
-    if(p1) html += _podHtml(p1, 1, 'first');
-    if(p3) html += _podHtml(p3, 3, 'third');
-    html += '</div>';
+    // Demo veri yok — her tab boş. UI:
+    //  1) Oyuncunun kendi skor kartı (highlight) en üstte
+    //  2) "Sıralama görmek için aç" ipucu kutusu
+    var html = '';
 
-    // Rows 4–10
-    for(var k=3;k<Math.min(10, combined.length); k++){
-      html += _rowHtml(combined[k], k+1);
-    }
+    // Oyuncu kartı — büyük, "SEN" highlight
+    html += ''
+      + '<div style="background:linear-gradient(180deg,rgba(0,229,255,0.15),rgba(0,229,255,0.04));'
+      +   'border:1.5px solid rgba(0,229,255,0.50);border-radius:16px;'
+      +   'box-shadow:0 0 18px rgba(0,229,255,0.18), inset 0 1px 0 rgba(255,255,255,0.06);'
+      +   'padding:14px 16px;margin-bottom:14px;'
+      +   'display:flex;align-items:center;gap:14px;">'
+      +   '<div style="width:54px;height:54px;border-radius:50%;'
+      +     'background:radial-gradient(circle at 35% 30%,#3a5a8a,#0a1530);'
+      +     'border:2px solid #00E5FF;display:flex;align-items:center;justify-content:center;'
+      +     'font-size:24px;flex-shrink:0;box-shadow:0 0 14px rgba(0,229,255,0.4);">⚔️</div>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div style="color:#00E5FF;font-size:9px;font-weight:800;letter-spacing:2px;">'+_t('tslb_me','SEN')+'</div>'
+      +     '<div style="color:#fff;font-size:17px;font-weight:800;line-height:1.1;margin-top:2px;'
+      +       'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(myName)+'</div>'
+      +     '<div style="color:rgba(255,255,255,0.55);font-size:10px;letter-spacing:1px;margin-top:2px;font-weight:700;">'
+      +       '🏆 '+_fmtNum(myScore)+'</div>'
+      +   '</div>'
+      + '</div>';
 
-    // If player is below rank 10, show separator + player row pinned
-    if(myRank > 10){
-      html += '<div style="text-align:center;color:rgba(255,255,255,0.25);font-size:14px;margin:6px 0;letter-spacing:3px;">⋯</div>';
-      html += _rowHtml({name: myName, avatar:'⚔️', score: myScore, isMe:true}, myRank);
-    }
+    // Boş durum açıklaması — neden burada veri yok?
+    var emptyTitle = signedIn
+      ? _t('tslb_empty_title', '🌐 Online Sıralama')
+      : _t('tslb_empty_title_off', '🔒 Henüz Bağlı Değilsin');
+    var emptyBody = signedIn
+      ? _t('tslb_empty_body', 'Tam sıralamayı görmek için aşağıdaki butona dokun. Skorların otomatik olarak Google Play Games’e gönderiliyor.')
+      : _t('tslb_empty_body_off', 'Sıralamada yer almak için Google Play Games’e giriş yap. Aşağıdaki butonla tam sıralamayı açabilirsin.');
+
+    html += ''
+      + '<div style="text-align:center;padding:22px 18px 18px;'
+      +   'background:rgba(255,255,255,0.03);border:1.5px dashed rgba(255,255,255,0.12);'
+      +   'border-radius:16px;margin-bottom:4px;">'
+      +   '<div style="font-size:46px;line-height:1;margin-bottom:8px;'
+      +     'filter:drop-shadow(0 0 18px rgba(255,215,0,0.4));">🏆</div>'
+      +   '<div style="color:#FFD700;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:800;'
+      +     'letter-spacing:0.5px;margin-bottom:6px;">'+emptyTitle+'</div>'
+      +   '<div style="color:rgba(255,255,255,0.65);font-size:12px;line-height:1.5;'
+      +     'max-width:260px;margin:0 auto;">'+emptyBody+'</div>'
+      + '</div>';
 
     cont.innerHTML = html;
   }
