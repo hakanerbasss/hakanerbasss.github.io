@@ -1439,6 +1439,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="tactical-badge" onclick="onTacticalBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="boost-badge" onclick="onDmgBoostBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="windblock-badge" onclick="onWindBlockTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
+  <button id="quests-badge" onclick="Quests.open()" style="background:linear-gradient(180deg,rgba(0,150,80,0.85),rgba(0,80,40,0.92));border:2px solid rgba(0,230,120,0.55);border-radius:10px;padding:5px 10px;color:#00E676;font-size:13px;font-weight:800;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5),0 0 12px rgba(0,200,80,0.25);min-width:52px;text-align:center;">📋 <span id="quests-badge-count">0/3</span></button>
 </div>
 
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
@@ -1570,7 +1571,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.126';
+const APP_VERSION      = '1.0.127';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1588,8 +1589,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 00:10';
-const APP_VERSION_NOTE = 'Bildirim testi icin zamanlama 1 dk yapildi.';
+const APP_VERSION_DATE = '2026.05.20 00:57';
+const APP_VERSION_NOTE = 'Daily quest eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -2284,6 +2285,8 @@ function loadLevel(idx){
         updateHUD2();
         // Loading overlay gizle
         if(_ll) _ll.style.display='none';
+        // Onboarding turunu kontrol et (yeni kullanıcı)
+        if(typeof Tutorial !== 'undefined') setTimeout(()=>Tutorial.maybeStart(curLevel), 300);
       });
     });
   });
@@ -8987,6 +8990,7 @@ function shiftWind(){
 
 function fire(){
   if(phase!=='aim'||shotsLeft<=0) return;
+  try{ if(typeof Quests!=='undefined'){ Quests.track('shot'); Quests.track('hit', selectedAmmo); } }catch(_){}
   // Can kontrolu
   if(typeof _livesNow === 'function' && _livesNow() <= 0){
     if(typeof openLivesCard === 'function') openLivesCard();
@@ -9198,6 +9202,7 @@ function onTerrainHit(){
 }
 
 function onTargetHit(){
+  try{ if(typeof Quests!=='undefined') Quests.track('hit', selectedAmmo); }catch(_){}
   SFX.explosion(selectedAmmo);
   const ad=AMMO_DEF[selectedAmmo];
   const matRes={wood:1.0, iron:0.6, steel:0.35, concrete:0.20};
@@ -10807,6 +10812,24 @@ function onJoyUp(e){
 // ═══════════════════════════════════════
 function onWin(){
   phase='done';
+  try{
+    if(typeof Quests!=='undefined'){
+      Quests.track('win');
+      if(typeof stars!=='undefined' || true){
+        // 3 yıldız kontrolü onWin sonunda hesaplanıyor — gecikmeli track
+        setTimeout(function(){
+          try{
+            var _s = parseInt(lsGet('stars_'+(lv&&lv.id))||'0');
+            if(_s>=3) Quests.track('star3');
+            if(lv && lv.cave) Quests.track('cave');
+            if(lv && lv.buried) Quests.track('buried');
+            if(typeof currentTheme!=='undefined' && currentTheme && currentTheme.name) Quests.track('theme');
+            if(typeof _comboCount!=='undefined' && _comboCount>=2) Quests.track('combo');
+          }catch(_){}
+        }, 100);
+      }
+    }
+  }catch(_){}
   SFX.win();
   // Güdümlü başlık harcandı — level geçildi
   if(tempGuided && tempGuided.usedAtLevel === curLevel){
@@ -11785,7 +11808,7 @@ function _scheduleLifeNotifIfNeeded(){
   if(typeof Android === 'undefined' || !Android.scheduleLifeNotification) return;
   var lives    = parseInt(localStorage.getItem('lives_count')||'5');
   var maxL     = 5;
-  var regenMs  = 1*60*1000; // TEST
+  var regenMs  = 20*60*1000;
   if(lives >= maxL){
     try{ Android.cancelLifeNotification(); }catch(_){}
     return;
@@ -15328,6 +15351,12 @@ function openTacticalInfo(){
       font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
       🏆 +1.000.000 Puan
     </button>
+    <button onclick="if(typeof Tutorial!=='undefined'){Tutorial.reset();showToast('Onboarding sıfırlandı — L1 başlat');closeDevMode();}"
+      style="width:100%;padding:9px;border-radius:10px;border:1.5px solid rgba(0,200,255,0.3);
+      background:rgba(0,200,255,0.08);color:#00C9FF;font-size:13px;font-weight:700;
+      font-family:'Rajdhani',sans-serif;cursor:pointer;margin-bottom:8px;">
+      🎓 Onboarding Sıfırla
+    </button>
     <button onclick="devAddLives()"
       style="width:100%;padding:9px;border-radius:10px;border:1.5px solid rgba(255,80,80,0.3);
       background:rgba(255,80,80,0.08);color:#FF5555;font-size:13px;font-weight:700;
@@ -16433,6 +16462,382 @@ function closeLivesCard(){
   document.getElementById("lives-card").style.display="none";
 }
 setInterval(updateLivesBadge,30000);
+
+// ════════════════════════════════════════════════════════════════════
+// DAILY QUESTS
+// ════════════════════════════════════════════════════════════════════
+const Quests = (function(){
+  // Görev havuzu — günlük 3'ü deterministik seçilir
+  const POOL = [
+    { id:'win3',    icon:'🎯', title:'3 Hedef Yok Et',         target:3,  event:'win',   reward:60 },
+    { id:'win5',    icon:'🎯', title:'5 Hedef Yok Et',         target:5,  event:'win',   reward:100 },
+    { id:'star',    icon:'⭐', title:'3 Yıldızlı Level Bitir', target:1,  event:'star3', reward:80 },
+    { id:'star2',   icon:'⭐', title:'2 Tane 3 Yıldız Level',  target:2,  event:'star3', reward:140 },
+    { id:'shot',    icon:'💥', title:'15 Atış Yap',            target:15, event:'shot',  reward:50 },
+    { id:'shot30',  icon:'💥', title:'30 Atış Yap',            target:30, event:'shot',  reward:100 },
+    { id:'nuke',    icon:'☢️', title:'1 Nükleer Mermi Kullan', target:1,  event:'ammo:nuclear', reward:80 },
+    { id:'bunker',  icon:'🪛', title:'2 Bunker Buster Kullan',  target:2,  event:'ammo:bunker',  reward:90 },
+    { id:'piercer', icon:'🪓', title:'3 Delici Mermi At',       target:3,  event:'ammo:piercer', reward:70 },
+    { id:'cluster', icon:'💣', title:'2 Küme Mermisi',          target:2,  event:'ammo:cluster', reward:60 },
+    { id:'tac',     icon:'🎯', title:'Taktik Görüş Kullan',     target:1,  event:'tactical',     reward:60 },
+    { id:'wb',      icon:'💨', title:'Rüzgar Engelle Kullan',   target:1,  event:'windblock',    reward:60 },
+    { id:'theme',   icon:'🗺️', title:'Farklı 2 Tema Oyna',     target:2,  event:'theme',        reward:120 },
+    { id:'combo',   icon:'🔥', title:'Combo Yap (arka arkaya)', target:1,  event:'combo',        reward:80 },
+    { id:'cave',    icon:'🕳️', title:'1 Mağara Levelı Bitir',   target:1,  event:'cave',         reward:100 },
+    { id:'buried',  icon:'⛏️', title:'1 Gömülü Hedef Bitir',    target:1,  event:'buried',       reward:100 },
+  ];
+
+  function _today(){
+    const d = new Date();
+    return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  }
+  function _seed(str){
+    let h = 0;
+    for(let i=0;i<str.length;i++){ h = ((h<<5)-h) + str.charCodeAt(i); h|=0; }
+    return Math.abs(h);
+  }
+  function _todayQuestIds(){
+    const seed = _seed(_today());
+    const ids = POOL.map(q=>q.id);
+    // Fisher-Yates with seeded random
+    let r = seed;
+    const rnd = () => { r = (r*9301+49297)%233280; return r/233280; };
+    for(let i=ids.length-1;i>0;i--){
+      const j = Math.floor(rnd()*(i+1));
+      [ids[i],ids[j]] = [ids[j],ids[i]];
+    }
+    return ids.slice(0,3);
+  }
+
+  function _key(suf){ return 'quests_'+_today()+'_'+suf; }
+  function _getCount(qid){ return parseInt(lsGet(_key('c_'+qid))||'0'); }
+  function _setCount(qid,v){ lsSet(_key('c_'+qid), String(v)); }
+  function _isClaimed(qid){ return lsGet(_key('cl_'+qid))==='1'; }
+  function _setClaimed(qid){ lsSet(_key('cl_'+qid),'1'); }
+
+  function _list(){
+    return _todayQuestIds().map(id => POOL.find(q=>q.id===id)).filter(Boolean);
+  }
+
+  function track(event, data){
+    _list().forEach(q=>{
+      let match = false;
+      if(q.event === event) match = true;
+      if(event === 'hit' && data && q.event === 'ammo:'+data) match = true;
+      if(event === 'shot' && q.event === 'shot') match = true;
+      if(match){
+        const cur = _getCount(q.id);
+        if(cur < q.target){
+          _setCount(q.id, cur+1);
+        }
+      }
+    });
+    _updateBadge();
+  }
+
+  function _doneCount(){
+    return _list().filter(q => _getCount(q.id) >= q.target).length;
+  }
+  function _updateBadge(){
+    const el = document.getElementById('quests-badge-count');
+    if(el) el.textContent = _doneCount()+'/3';
+  }
+
+  function open(){
+    const card = document.getElementById('quests-card');
+    const bg = document.getElementById('quests-card-bg');
+    if(!card || !bg) return;
+    bg.style.display='block';
+    card.style.display='block';
+    render();
+  }
+  function close(){
+    document.getElementById('quests-card-bg').style.display='none';
+    document.getElementById('quests-card').style.display='none';
+  }
+
+  function render(){
+    const list = _list();
+    const cont = document.getElementById('quests-list');
+    if(!cont) return;
+    cont.innerHTML = '';
+    list.forEach(q=>{
+      const cur = Math.min(q.target, _getCount(q.id));
+      const done = cur >= q.target;
+      const claimed = _isClaimed(q.id);
+      const pct = Math.round((cur/q.target)*100);
+      const div = document.createElement('div');
+      div.style.cssText = 'background:'+(claimed?'rgba(0,200,80,0.08)':'rgba(255,255,255,0.04)')+';border:1.5px solid '+(claimed?'rgba(0,230,120,0.35)':done?'rgba(255,215,0,0.45)':'rgba(255,255,255,0.10)')+';border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:7px;';
+      div.innerHTML = ''+
+        '<div style="display:flex;align-items:center;gap:9px;">'+
+          '<div style="width:36px;height:36px;border-radius:10px;background:'+(claimed?'rgba(0,200,80,0.15)':done?'rgba(255,215,0,0.15)':'rgba(255,255,255,0.06)')+';border:1px solid '+(claimed?'rgba(0,230,120,0.35)':done?'rgba(255,215,0,0.35)':'rgba(255,255,255,0.10)')+';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+(claimed?'✓':q.icon)+'</div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="color:#fff;font-size:13.5px;font-weight:800;line-height:1.2;">'+q.title+'</div>'+
+            '<div style="color:'+(claimed?'#00E676':'#FFD700')+';font-size:11px;font-weight:700;margin-top:1px;">+'+q.reward+' 🏆 puan</div>'+
+          '</div>'+
+          (claimed
+            ? '<span style="color:#00E676;font-size:10px;font-weight:800;letter-spacing:1px;padding:4px 9px;border-radius:8px;background:rgba(0,230,120,0.10);border:1px solid rgba(0,230,120,0.35);">ALINDI</span>'
+            : done
+              ? '<button onclick="Quests.claim(\''+q.id+'\')" style="background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);color:#1a0800;border:none;border-radius:11px;padding:7px 13px;font-family:\'Rajdhani\',sans-serif;font-size:12.5px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 0 #a85a00,inset 0 1px 0 rgba(255,255,255,0.4);text-shadow:0 1px 0 rgba(255,255,255,0.3);">AL</button>'
+              : '<span style="color:rgba(255,255,255,0.55);font-size:13px;font-weight:800;">'+cur+'/'+q.target+'</span>')+
+        '</div>'+
+        (claimed?''
+          :'<div style="height:6px;background:rgba(0,0,0,0.40);border-radius:3px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);">'+
+            '<div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,'+(done?'#FFD700,#FF8C00':'#00E676,#00C9B1')+');box-shadow:0 0 6px currentColor;transition:width 0.3s;"></div>'+
+          '</div>');
+      cont.appendChild(div);
+    });
+
+    // Bonus banner — 3/3 olduğunda
+    const allDone = list.every(q=>_isClaimed(q.id));
+    const banner = document.getElementById('quests-banner');
+    if(banner){
+      if(allDone){
+        banner.style.display='flex';
+        banner.innerHTML='🎁 <span style="margin-left:6px;">Bugünün tüm görevleri tamamlandı! Yarın yenilenir.</span>';
+      } else {
+        banner.style.display='none';
+      }
+    }
+  }
+
+  function claim(qid){
+    const q = POOL.find(x=>x.id===qid);
+    if(!q) return;
+    const cur = _getCount(q.id);
+    if(cur < q.target || _isClaimed(q.id)) return;
+    _setClaimed(q.id);
+    if(typeof score!=='undefined'){
+      score += q.reward;
+      lsSet('total_score', score);
+    }
+    if(typeof updateUI==='function') updateUI();
+    if(typeof showToast==='function') showToast('+'+q.reward+' puan kazandın!');
+    if(typeof SFX!=='undefined' && SFX.upgrade) SFX.upgrade();
+    render();
+    _updateBadge();
+  }
+
+  return { open, close, render, track, claim, _updateBadge };
+})();
+
+// Sayfa açılınca badge'i güncelle
+setTimeout(()=>{ try{ Quests._updateBadge(); }catch(_){} }, 500);
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- ONBOARDING TUR (TUTORIAL)                                            -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<div id="tut-overlay" style="display:none;position:fixed;inset:0;z-index:1000;pointer-events:auto;">
+  <svg id="tut-svg" width="100%" height="100%" style="position:absolute;inset:0;display:block;">
+    <defs>
+      <mask id="tut-mask">
+        <rect x="0" y="0" width="100%" height="100%" fill="white"/>
+        <rect id="tut-hole" x="0" y="0" width="0" height="0" rx="14" ry="14" fill="black"/>
+      </mask>
+    </defs>
+    <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.72)" mask="url(#tut-mask)"/>
+    <rect id="tut-ring" x="0" y="0" width="0" height="0" rx="14" ry="14" fill="none" stroke="#FFD700" stroke-width="2.5" stroke-dasharray="8 6"/>
+  </svg>
+  <div id="tut-tip" style="position:absolute;background:linear-gradient(180deg,#1f2940 0%,#0e1322 100%);border:1.5px solid rgba(255,215,0,0.40);border-radius:18px;padding:14px 16px;width:260px;max-width:calc(100vw - 32px);box-shadow:0 14px 44px rgba(0,0,0,0.85),0 0 0 1px rgba(255,215,0,0.12),0 0 28px rgba(255,180,40,0.18),inset 0 1px 0 rgba(255,255,255,0.06);font-family:'Rajdhani',sans-serif;color:white;animation:tutTipIn 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:7px;">
+        <span style="font-size:9px;letter-spacing:2px;color:rgba(255,215,0,0.65);font-weight:800;">REHBER</span>
+        <span id="tut-progress" style="font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,0.45);font-weight:800;"></span>
+      </div>
+      <button onclick="Tutorial.skip()" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.55);border-radius:8px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px;">ATLA</button>
+    </div>
+    <div id="tut-title" style="font-size:16px;font-weight:800;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;line-height:1.2;"></div>
+    <div id="tut-body" style="font-size:12.5px;color:rgba(255,255,255,0.78);line-height:1.5;font-weight:600;margin-bottom:11px;"></div>
+    <button id="tut-next" onclick="Tutorial.next()" style="width:100%;padding:10px;border:none;border-radius:12px;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);color:#1a0800;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:13px;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 0 #a85a00,0 4px 12px rgba(255,140,0,0.4),inset 0 1px 0 rgba(255,255,255,0.5);text-shadow:0 1px 0 rgba(255,255,255,0.3);">▶ ANLADIM</button>
+  </div>
+</div>
+<style>
+@keyframes tutTipIn{
+  0%{transform:translateY(10px) scale(0.92);opacity:0;}
+  100%{transform:translateY(0) scale(1);opacity:1;}
+}
+</style>
+
+<script>
+const Tutorial = (function(){
+  let _stepIdx = 0;
+  let _steps = [];
+  let _active = false;
+
+  function _isDone(){
+    try { return lsGet('onboarding_done') === '1'; } catch(_) { return true; }
+  }
+  function _markDone(){
+    try { lsSet('onboarding_done', '1'); } catch(_) {}
+  }
+
+  const STEPS_BY_LEVEL = {
+    0: [
+      { target: '#joystick-zone', title: 'Sürükle ile Nişan Al', body: 'Tank tarafından parmağını basılı tut ve ileri doğru sürükle. Yön ve gücü tek hareketle belirlersin.', pos: 'center' },
+      { target: '#power-wrap',    title: 'Güç Çubuğu', body: 'Sürükledikçe güç artar. Yüksek güç = uzak mesafe, düşük güç = yakın.', pos: 'right' },
+      { target: '#btn-fire',      title: 'ATEŞ Butonu', body: 'Nişan aldıktan sonra ATEŞ butonuna basarak mermini fırlat.', pos: 'top' },
+    ],
+    1: [
+      { target: '#wind-display',  title: 'Rüzgar', body: 'Rüzgar mermini iter. Yönü ve şiddetine göre nişanını ayarla.', pos: 'left' },
+      { target: '#ammo-bar',      title: 'Mühimmat Slotları', body: 'Farklı mühimmatlar farklı hedeflere etkili. Tıkla değiştir.', pos: 'left' },
+      { target: '.ammo-btn',      title: 'Slot Değiştir', body: 'Bir slota basılı tutarak özelliklerini öğren. Tekrar bas → bilgi kartı ile değiştirebilirsin.', pos: 'left' },
+      { target: '#tank-badge',    title: 'Tank Bilgisi', body: 'Üst sol köşedeki tank rozetine bas — tank özelliklerini gör ve değiştir.', pos: 'bottom' },
+    ],
+    2: [
+      { target: '#btn-gallery-open', title: 'Envanter / Galeri', body: 'Buradan yeni mühimmat, tank ve güçlendirme satın alabilirsin. Reklam izleyerek bedava da kazanırsın.', pos: 'bottom' },
+      { target: '#btn-level-map',    title: 'Level Haritası', body: 'Tüm levellere bu butondan ulaş. Yıldızlar topla — yeni temalar açılır!', pos: 'bottom' },
+      { target: '#hud-stars',        title: 'Yıldız ve Puan', body: 'Üstteki barda yıldızını, puanını ve seviyeni takip et. Her başarılı atış puan getirir.', pos: 'bottom' },
+    ],
+  };
+
+  function _overlaysOpen(){
+    const lm = document.getElementById('level-map');
+    if(lm && lm.style.visibility !== 'hidden' && lm.style.opacity !== '0') return true;
+    const gal = document.getElementById('gallery-overlay');
+    if(gal && gal.classList && gal.classList.contains('show')) return true;
+    const lb = document.getElementById('login-bonus-popup');
+    if(lb && lb.style.display && lb.style.display !== 'none') return true;
+    const pgFirst = document.getElementById('pg-firstlaunch-card');
+    if(pgFirst && pgFirst.style.display && pgFirst.style.display !== 'none') return true;
+    return false;
+  }
+
+  let _retryTimer = null;
+  function maybeStart(levelIdx){
+    if(_isDone()) return;
+    if(typeof phase !== 'undefined' && phase !== 'aim') return;
+    const steps = STEPS_BY_LEVEL[levelIdx];
+    if(!steps || !steps.length) return;
+    try {
+      const lastSeen = parseInt(lsGet('onboarding_last_lvl') || '-1');
+      if(lastSeen >= levelIdx) return;
+    } catch(_) {}
+    // Bir overlay açıksa retry — kullanıcı kapatınca dene
+    if(_overlaysOpen()){
+      if(_retryTimer) clearTimeout(_retryTimer);
+      _retryTimer = setTimeout(()=>maybeStart(levelIdx), 1000);
+      return;
+    }
+    _steps = steps.slice();
+    _stepIdx = 0;
+    _active = true;
+    _show();
+    // Flag'i ANCAK gerçekten gösterdikten sonra yaz
+    try { lsSet('onboarding_last_lvl', String(levelIdx)); } catch(_) {}
+  }
+
+  // Test/debug: localStorage'tan tutorial'ı sıfırla
+  function reset(){
+    try {
+      lsRemove('onboarding_done');
+      lsRemove('onboarding_last_lvl');
+    } catch(_) {}
+  }
+
+  function _show(){
+    if(_stepIdx >= _steps.length){ _hide(); return; }
+    const s = _steps[_stepIdx];
+    const overlay = document.getElementById('tut-overlay');
+    if(!overlay) return;
+    overlay.style.display = 'block';
+
+    document.getElementById('tut-title').textContent = s.title;
+    document.getElementById('tut-body').textContent  = s.body;
+    document.getElementById('tut-progress').textContent = (_stepIdx+1)+'/'+_steps.length;
+
+    const target = s.target ? document.querySelector(s.target) : null;
+    const hole = document.getElementById('tut-hole');
+    const ring = document.getElementById('tut-ring');
+    const tip  = document.getElementById('tut-tip');
+
+    if(target){
+      const r = target.getBoundingClientRect();
+      const pad = 10;
+      const hx = Math.max(0, r.left - pad);
+      const hy = Math.max(0, r.top - pad);
+      const hw = r.width + pad*2;
+      const hh = r.height + pad*2;
+      hole.setAttribute('x', hx); hole.setAttribute('y', hy);
+      hole.setAttribute('width', hw); hole.setAttribute('height', hh);
+      ring.setAttribute('x', hx); ring.setAttribute('y', hy);
+      ring.setAttribute('width', hw); ring.setAttribute('height', hh);
+
+      tip.style.transform = '';
+      tip.style.visibility = 'hidden';
+      tip.style.left = '0px'; tip.style.top = '0px';
+      requestAnimationFrame(()=>{
+        const tw = tip.offsetWidth;
+        const th = tip.offsetHeight;
+        const margin = 14;
+        let tx, ty;
+        const pos = s.pos || 'top';
+        if(pos === 'top'){
+          tx = hx + hw/2 - tw/2;
+          ty = hy - th - margin;
+          if(ty < 8) { ty = hy + hh + margin; }
+        } else if(pos === 'bottom'){
+          tx = hx + hw/2 - tw/2;
+          ty = hy + hh + margin;
+        } else if(pos === 'left'){
+          tx = hx - tw - margin;
+          ty = hy + hh/2 - th/2;
+          if(tx < 8){ tx = hx + hw + margin; }
+        } else if(pos === 'right'){
+          tx = hx + hw + margin;
+          ty = hy + hh/2 - th/2;
+          if(tx + tw > window.innerWidth - 8){ tx = hx - tw - margin; }
+        } else {
+          tx = window.innerWidth/2 - tw/2;
+          ty = window.innerHeight/2 - th/2;
+        }
+        tx = Math.max(8, Math.min(window.innerWidth - tw - 8, tx));
+        ty = Math.max(8, Math.min(window.innerHeight - th - 8, ty));
+        tip.style.left = tx + 'px';
+        tip.style.top  = ty + 'px';
+        tip.style.visibility = '';
+      });
+    } else {
+      hole.setAttribute('width', '0'); hole.setAttribute('height', '0');
+      ring.setAttribute('width', '0'); ring.setAttribute('height', '0');
+      tip.style.left = '50%'; tip.style.top = '50%';
+      tip.style.transform = 'translate(-50%,-50%)';
+    }
+  }
+
+  function next(){
+    if(!_active) return;
+    _stepIdx++;
+    if(_stepIdx >= _steps.length){
+      // Son level setini bitirdiyse tamamlanmış say
+      try {
+        const lastSeen = parseInt(lsGet('onboarding_last_lvl') || '-1');
+        if(lastSeen >= 2) _markDone();
+      } catch(_) {}
+      _hide(); return;
+    }
+    _show();
+  }
+
+  function skip(){ _markDone(); _hide(); }
+  function _hide(){
+    _active = false;
+    const o = document.getElementById('tut-overlay');
+    if(o) o.style.display = 'none';
+  }
+
+  return { maybeStart, next, skip, reset };
+})();
+
+// Eski sürümden gelen yarım kalmış onboarding state'i temizle —
+// kullanıcı turu görmeden last_lvl set edilmiş olabilir
+(function(){
+  try {
+    if(lsGet('onboarding_done') !== '1' && lsGet('onboarding_last_lvl')){
+      lsRemove('onboarding_last_lvl');
+    }
+  } catch(_) {}
+})();
 </script>
 <div id="lives-card-bg" onclick="closeLivesCard()" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);"></div>
 <div id="lives-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;
@@ -16479,5 +16884,230 @@ setInterval(updateLivesBadge,30000);
   </div>
 </div>
 
-</body>
-</html>
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- ONBOARDING TUR — yeni kullanıcı için adım adım tanıtım              -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<div id="ob-overlay" style="display:none;position:fixed;inset:0;z-index:1000;pointer-events:none;">
+  <!-- Karanlık dim katmanı (spotlight'ı kesen mask) -->
+  <svg id="ob-mask-svg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;" preserveAspectRatio="none">
+    <defs>
+      <mask id="ob-spot-mask">
+        <rect x="0" y="0" width="100%" height="100%" fill="white"/>
+        <rect id="ob-spot-rect" x="0" y="0" width="0" height="0" rx="14" fill="black"/>
+      </mask>
+    </defs>
+    <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.72)" mask="url(#ob-spot-mask)"/>
+  </svg>
+  <!-- Pulse halkası spotlight kenarında -->
+  <div id="ob-pulse" style="position:absolute;border-radius:18px;border:2px solid rgba(255,215,0,0.85);box-shadow:0 0 24px rgba(255,180,40,0.5),inset 0 0 12px rgba(255,180,40,0.15);pointer-events:none;animation:obPulse 1.4s ease-in-out infinite;"></div>
+  <!-- Tooltip kartı -->
+  <div id="ob-tip" style="position:absolute;background:linear-gradient(180deg,#1f2940 0%,#0e1322 100%);border:1.5px solid rgba(255,215,0,0.45);border-radius:18px;padding:0;width:260px;max-width:calc(100vw - 24px);overflow:hidden;box-shadow:0 14px 44px rgba(0,0,0,0.85),0 0 0 1px rgba(255,215,0,0.18),0 0 30px rgba(255,140,0,0.20),inset 0 1px 0 rgba(255,255,255,0.06);font-family:'Rajdhani',sans-serif;pointer-events:auto;animation:obTipIn 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+    <!-- Header -->
+    <div style="position:relative;padding:11px 14px 8px;border-bottom:1px solid rgba(255,215,0,0.18);display:flex;align-items:center;gap:8px;">
+      <span id="ob-step-num" style="background:linear-gradient(135deg,#FFD700,#FF8C00);color:#1a0800;font-size:11px;font-weight:800;letter-spacing:0.5px;padding:3px 9px;border-radius:8px;line-height:1;">1/7</span>
+      <span style="flex:1;font-size:9px;letter-spacing:2px;color:rgba(255,215,0,0.55);font-weight:800;" data-i18n="ob_label">REHBER</span>
+      <button onclick="obSkip()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.55);font-size:10px;font-weight:800;letter-spacing:0.5px;padding:4px 8px;border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;font-family:'Rajdhani',sans-serif;" data-i18n="ob_skip">ATLA</button>
+    </div>
+    <!-- Body -->
+    <div style="padding:12px 14px 13px;">
+      <div id="ob-title" style="background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:17px;font-weight:800;letter-spacing:0.4px;margin-bottom:5px;line-height:1.15;"></div>
+      <div id="ob-body" style="color:rgba(255,255,255,0.78);font-size:12.5px;font-weight:600;line-height:1.55;margin-bottom:11px;"></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <div id="ob-dots" style="flex:1;display:flex;gap:4px;"></div>
+        <button id="ob-next" onclick="obNext()" style="height:34px;padding:0 16px;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);border:none;color:#1a0800;border-radius:10px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 0 #a85a00,inset 0 1px 0 rgba(255,255,255,0.4);text-shadow:0 1px 0 rgba(255,255,255,0.3);transition:transform 0.08s,box-shadow 0.08s;line-height:1;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 #a85a00,inset 0 1px 0 rgba(255,255,255,0.3)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="ob_next">İLERİ ▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes obPulse{
+  0%,100%{box-shadow:0 0 24px rgba(255,180,40,0.5),inset 0 0 12px rgba(255,180,40,0.15);}
+  50%{box-shadow:0 0 40px rgba(255,180,40,0.8),inset 0 0 18px rgba(255,180,40,0.30);}
+}
+@keyframes obTipIn{
+  0%{transform:translateY(10px) scale(0.92);opacity:0;}
+  100%{transform:translateY(0) scale(1);opacity:1;}
+}
+.ob-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.18);}
+.ob-dot.active{background:#FFD700;box-shadow:0 0 6px rgba(255,215,0,0.6);}
+</style>
+<script>
+// ── Onboarding Tur sistemi ─────────────────────────────────────────────
+var OB_STEPS = [
+  // Level 1 (curLevel=0)
+  { level:0, target:'#joystick-zone', title:'Nişan al',     body:'Tank alanına basıp sürükleyerek <b style="color:#FFD700">açıyı ve gücü</b> ayarla.', pos:'top', pad:0, rectOverride:'tank' },
+  { level:0, target:'#power-wrap',    title:'Güç çubuğu',   body:'Sürüklerken bu çubuk dolar. Daha yüksek güç = daha uzun atış.', pos:'right' },
+  { level:0, target:'#btn-fire',      title:'ATEŞ!',        body:'Hazır olunca <b style="color:#FFD700">ATEŞ</b> butonuna bas. Hedefe vur, levelı kazan.', pos:'top' },
+  // Level 2 (curLevel=1)
+  { level:1, target:'#wind-display',  title:'Rüzgar',       body:'Yön ve şiddete dikkat — atışın yönünü etkiler. Sayı yüksekse atış arkasında uçar.', pos:'left' },
+  { level:1, target:'#ammo-bar',      title:'Mühimmat',     body:'Sağ altta mermi slotları. Üzerine basarak farklı mühimmat seç.', pos:'left' },
+  // Level 3 (curLevel=2)
+  { level:2, target:'.tip-target',    title:'Karargah',     body:'Düşman karargahı. Üstüne tıkla — HP, en iyi mühimmat ve tankı gör.', pos:'top', rectOverride:'target' },
+  { level:2, target:'#btn-level-map', title:'Harita',       body:'Buradan diğer levellere atla, ilerlemeni gör.', pos:'bottom' },
+];
+var _obIdx = 0;
+var _obActive = false;
+
+function obIsDone(){ return lsGet('onboarding_done') === '1'; }
+function obSetDone(){ lsSet('onboarding_done','1'); }
+
+function obMaybeStart(){
+  if(obIsDone()) return;
+  // İlk 3 level dışındaysa kapat
+  if(typeof curLevel !== 'number' || curLevel > 2) return;
+  // Adımları o leveldekilere indirgemiş ilkini bul
+  var idx = -1;
+  for(var i=0;i<OB_STEPS.length;i++){
+    if(OB_STEPS[i].level === curLevel){ idx = i; break; }
+  }
+  if(idx === -1) return;
+  // Daha önce bu level adımları tamam mı? lsGet ile gerçek ilerleme
+  var savedIdx = parseInt(lsGet('onboarding_step')||'0');
+  if(savedIdx > idx) idx = savedIdx;
+  if(idx >= OB_STEPS.length){ obSetDone(); return; }
+  if(OB_STEPS[idx].level !== curLevel) return; // başka levele kaymış
+  _obIdx = idx;
+  _obActive = true;
+  setTimeout(obShowStep, 600);
+}
+
+function obShowStep(){
+  if(!_obActive) return;
+  var step = OB_STEPS[_obIdx];
+  if(!step){ obFinish(); return; }
+  var overlay = document.getElementById('ob-overlay');
+  if(!overlay) return;
+  overlay.style.display = 'block';
+
+  // Hedef bbox
+  var rect = null;
+  if(step.rectOverride === 'tank'){
+    rect = { left: 8, top: window.innerHeight*0.55, width: window.innerWidth*0.32, height: window.innerHeight*0.35 };
+  } else if(step.rectOverride === 'target'){
+    var scaleX = window.innerWidth / W, scaleY = window.innerHeight / H;
+    var embedDepth = targetH * 0.35;
+    rect = {
+      left: (targetX - targetW/2 - 6) * scaleX,
+      top:  (targetY - targetH + embedDepth - 6) * scaleY,
+      width:  (targetW + 12) * scaleX,
+      height: (targetH + 12) * scaleY,
+    };
+  } else {
+    var el = document.querySelector(step.target);
+    if(!el || el.offsetParent === null){
+      // Element görünmüyor — bu adımı atla
+      _obIdx++; obShowStep(); return;
+    }
+    var b = el.getBoundingClientRect();
+    var pad = (step.pad != null) ? step.pad : 6;
+    rect = { left: b.left-pad, top: b.top-pad, width: b.width+pad*2, height: b.height+pad*2 };
+  }
+  // Spotlight rect SVG
+  var spot = document.getElementById('ob-spot-rect');
+  if(spot){
+    spot.setAttribute('x', rect.left);
+    spot.setAttribute('y', rect.top);
+    spot.setAttribute('width', rect.width);
+    spot.setAttribute('height', rect.height);
+  }
+  // Pulse halkası
+  var pulse = document.getElementById('ob-pulse');
+  if(pulse){
+    pulse.style.left = (rect.left-3) + 'px';
+    pulse.style.top  = (rect.top-3)  + 'px';
+    pulse.style.width  = (rect.width+6)  + 'px';
+    pulse.style.height = (rect.height+6) + 'px';
+  }
+  // Tooltip
+  document.getElementById('ob-step-num').textContent = (_obIdx+1) + '/' + OB_STEPS.length;
+  document.getElementById('ob-title').textContent = step.title;
+  document.getElementById('ob-body').innerHTML = step.body;
+  // Dots
+  var dotsHtml = '';
+  for(var d=0; d<OB_STEPS.length; d++){
+    dotsHtml += '<span class="ob-dot'+(d===_obIdx?' active':'')+'"></span>';
+  }
+  document.getElementById('ob-dots').innerHTML = dotsHtml;
+
+  // Tooltip pozisyonu
+  var tip = document.getElementById('ob-tip');
+  tip.style.left = '-9999px'; // önce ölç
+  var tw = tip.offsetWidth || 260;
+  var th2 = tip.offsetHeight || 160;
+  var x, y;
+  var gap = 14;
+  if(step.pos === 'top'){
+    x = rect.left + rect.width/2 - tw/2;
+    y = rect.top - th2 - gap;
+    if(y < 12) { y = rect.top + rect.height + gap; }
+  } else if(step.pos === 'bottom'){
+    x = rect.left + rect.width/2 - tw/2;
+    y = rect.top + rect.height + gap;
+    if(y + th2 > window.innerHeight - 12){ y = rect.top - th2 - gap; }
+  } else if(step.pos === 'left'){
+    x = rect.left - tw - gap;
+    y = rect.top + rect.height/2 - th2/2;
+    if(x < 8){ x = rect.left + rect.width + gap; }
+  } else { // right
+    x = rect.left + rect.width + gap;
+    y = rect.top + rect.height/2 - th2/2;
+    if(x + tw > window.innerWidth - 8){ x = rect.left - tw - gap; }
+  }
+  // Ekran içinde tut
+  x = Math.max(8, Math.min(window.innerWidth - tw - 8, x));
+  y = Math.max(8, Math.min(window.innerHeight - th2 - 8, y));
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+}
+
+function obNext(){
+  if(!_obActive) return;
+  _obIdx++;
+  lsSet('onboarding_step', String(_obIdx));
+  // Sonraki adım bu levelde mi?
+  var nextStep = OB_STEPS[_obIdx];
+  if(!nextStep){ obFinish(); return; }
+  if(nextStep.level !== curLevel){
+    // Sonraki adım başka levelde — overlay'i kapat, level değişince tekrar başlar
+    document.getElementById('ob-overlay').style.display = 'none';
+    _obActive = false;
+    return;
+  }
+  obShowStep();
+}
+
+function obSkip(){
+  obFinish();
+}
+
+function obFinish(){
+  _obActive = false;
+  obSetDone();
+  document.getElementById('ob-overlay').style.display = 'none';
+  if(typeof showToast === 'function') showToast('🎓 Rehber tamamlandı');
+}
+
+// Pencere boyutu değişince yeniden hizala
+window.addEventListener('resize', function(){
+  if(_obActive) setTimeout(obShowStep, 100);
+});
+</script>
+
+<!-- Daily Quests Card -->
+<div id="quests-card-bg" onclick="Quests.close()" style="display:none;position:fixed;inset:0;z-index:910;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);"></div>
+<div id="quests-card" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:911;background:linear-gradient(180deg,#0e2418 0%,#04100a 100%);border:1.5px solid rgba(0,230,120,0.35);border-radius:22px;padding:0;width:320px;max-width:calc(100vw - 32px);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(0,230,120,0.10),0 0 30px rgba(0,200,80,0.15),inset 0 1px 0 rgba(255,255,255,0.05);font-family:'Rajdhani',sans-serif;animation:livesCardIn 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+  <div style="position:relative;height:64px;background:radial-gradient(ellipse at 50% 110%,rgba(0,230,120,0.30),transparent 60%),linear-gradient(180deg,#0a3a20 0%,#02180c 100%);border-bottom:1px solid rgba(0,230,120,0.22);overflow:hidden;flex-shrink:0;">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(0,230,120,0.04) 8px,rgba(0,230,120,0.04) 16px);"></div>
+    <div style="position:absolute;top:9px;left:14px;font-size:9px;letter-spacing:2.5px;color:rgba(0,230,120,0.65);font-weight:800;">DAILY</div>
+    <div style="position:absolute;top:9px;right:14px;font-size:9px;letter-spacing:2.5px;color:rgba(0,230,120,0.65);font-weight:800;">RESETS 00:00</div>
+    <button onclick="Quests.close()" style="position:absolute;top:32px;right:10px;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1;">✕</button>
+    <div style="position:absolute;left:16px;bottom:7px;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:22px;filter:drop-shadow(0 2px 8px rgba(0,230,120,0.5));line-height:1;">📋</span>
+      <span style="background:linear-gradient(180deg,#80FFB0,#00E676 50%,#008040 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:19px;font-weight:800;letter-spacing:0.5px;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.5));">Günlük Görevler</span>
+    </div>
+  </div>
+  <div style="padding:14px;overflow-y:auto;flex:1;">
+    <div id="quests-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="quests-banner" style="display:none;margin-top:12px;padding:10px;border-radius:11px;background:rgba(255,215,0,0.10);border:1px solid rgba(255,215,0,0.30);color:#FFD700;font-size:12px;font-weight:700;align-items:center;justify-content:center;text-align:center;"></div>
+  </div>
+</div>
