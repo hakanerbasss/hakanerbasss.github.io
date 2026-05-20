@@ -926,6 +926,23 @@ button:active{opacity:0.75;transform:scale(0.96);}
 .lm-card-footer{display:flex;align-items:center;justify-content:space-between;}
 .lm-card-stars{font-size:13px;letter-spacing:1px;}
 .lm-card-mat{font-size:11px;color:rgba(255,255,255,0.45);font-family:'Rajdhani',sans-serif;}
+.lm-bonus-badge{
+  position:absolute;top:-8px;right:-4px;
+  background:linear-gradient(180deg,#FFD700,#FF8C00);
+  color:#1a0800;font-family:'Rajdhani',sans-serif;
+  font-size:9px;font-weight:800;letter-spacing:0.6px;
+  padding:3px 8px;border-radius:9px;
+  border:1.5px solid #1a1408;
+  box-shadow:0 3px 0 #6a4a00, 0 4px 12px rgba(255,140,0,0.45);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  z-index:3;
+  animation:lmBonusPulse 2s ease-in-out infinite;
+}
+.lm-bonus-badge:active{transform:translateY(2px);box-shadow:0 1px 0 #6a4a00;}
+@keyframes lmBonusPulse{
+  0%,100%{box-shadow:0 3px 0 #6a4a00, 0 4px 12px rgba(255,140,0,0.45);}
+  50%{box-shadow:0 3px 0 #6a4a00, 0 4px 20px rgba(255,215,0,0.7);}
+}
 .lm-lock-icon{position:absolute;top:7px;right:7px;font-size:13px;opacity:0.6;}
 .lm-theme-gate-bar{
   padding:8px;background:rgba(255,80,30,0.07);
@@ -1571,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.130';
+const APP_VERSION      = '1.0.131';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1589,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 02:56';
-const APP_VERSION_NOTE = 'Hayvan avı puan/quest sistemi · Tema tracking fix · Hero kart dinamik tema dekorları"';
+const APP_VERSION_DATE = '2026.05.20 03:26';
+const APP_VERSION_NOTE = 'kus modu eklendi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -12427,6 +12444,25 @@ const LANG = {
     q_bird1_title:         '1 Kuş Düşür',
     q_bird3_title:         '3 Kuş Düşür',
     q_safari_title:        'Safari: 5 Hayvan Avla',
+    bh_title:              'KUŞ AVI!',
+    bh_subtitle:           'Sınırlı sürede gökyüzündeki kuşları vur, puan topla.',
+    bh_rule_time:          '45 saniye + 15 mermi hakkın var',
+    bh_rule_pts:           'Her kuş +25 puan',
+    bh_rule_combo:         'Üst üste vuruşlarda combo çarpanı',
+    bh_rule_ammo:          'Sadece standart mermi — özel ammo yok',
+    bh_start:              '▶ BAŞLA',
+    bh_triple_ad:          '📺 Reklam İzle → ×3 Mermi (45 atış)',
+    bh_aim_hint:           'SOL · BASIP SÜRÜKLEYEREK NİŞAN AL',
+    bh_fire:               'ATEŞ!',
+    bh_finish:             '▶ BİTİR',
+    bh_stat_kills:         'KUŞ',
+    bh_stat_combo:         'COMBO',
+    bh_stat_pts:           'PUAN',
+    bh_daily_full:         '🔒 Bugün kuş avı limitin doldu! Yarın tekrar dene.',
+    bh_triple_active:      '🎯 ×3 Mermi aktif! 45 atış hakkın var.',
+    bh_res_time:           'SÜRE BİTTİ!',
+    bh_res_ammo:           'MERMİ BİTTİ!',
+    bh_res_quit:           'AV BİTTİ!',
     tslb_empty_title:      '🌐 Online Sıralama',
     tslb_empty_body:       'Tam sıralamayı görmek için aşağıdaki butona dokun. Skorların otomatik olarak Google Play Games’e gönderiliyor.',
     tslb_empty_title_off:  '🔒 Henüz Bağlı Değilsin',
@@ -12965,6 +13001,25 @@ const LANG = {
     q_bird1_title:         'Down 1 Bird',
     q_bird3_title:         'Down 3 Birds',
     q_safari_title:        'Safari: Hunt 5 Animals',
+    bh_title:              'BIRD HUNT!',
+    bh_subtitle:           'Shoot the birds in limited time, earn points.',
+    bh_rule_time:          '45 seconds + 15 shots',
+    bh_rule_pts:           'Each bird +25 points',
+    bh_rule_combo:         'Combo multiplier for consecutive hits',
+    bh_rule_ammo:          'Standard ammo only — no specials',
+    bh_start:              '▶ START',
+    bh_triple_ad:          '📺 Watch Ad → ×3 Ammo (45 shots)',
+    bh_aim_hint:           'LEFT · DRAG TO AIM',
+    bh_fire:               'FIRE!',
+    bh_finish:             '▶ FINISH',
+    bh_stat_kills:         'BIRDS',
+    bh_stat_combo:         'COMBO',
+    bh_stat_pts:           'POINTS',
+    bh_daily_full:         '🔒 Daily Bird Hunt limit reached! Try again tomorrow.',
+    bh_triple_active:      '🎯 ×3 Ammo active! 45 shots available.',
+    bh_res_time:           'TIME UP!',
+    bh_res_ammo:           'AMMO OUT!',
+    bh_res_quit:           'HUNT ENDED!',
     tslb_empty_title:      '🌐 Online Leaderboard',
     tslb_empty_body:       'Tap the button below to see the full rankings. Your scores are submitted to Google Play Games automatically.',
     tslb_empty_title_off:  '🔒 Not Connected Yet',
@@ -14028,13 +14083,33 @@ function renderLevelMap(){
         +'<span class="lm-card-stars">'+_sh+'</span>'
         +'<span class="lm-card-mat">'+(MAT_BADGE[_lvd.targetMat]||'')+'</span>'
         +'</div>'
-        +(!_ulk?'<div class="lm-lock-icon">\U0001f512</div>':'');
+        +(!_ulk?'<div class="lm-lock-icon">\U0001f512</div>':'')
+        // 🐦 BONUS — her 5'in katı levelda kuş avı bonus
+        +(_ulk && (_lvd.id % 5 === 0) ? '<div class="lm-bonus-badge" data-bonus="1">🐦 KUŞ AVI</div>' : '');
       if(_ulk){
         (function(_c,_i){
+          // Bonus badge — kuş avı modunu açar (regular level değil)
+          var _bb = _c.querySelector('.lm-bonus-badge');
+          if(_bb){
+            _bb.onclick = function(e){
+              e.stopPropagation();
+              if(typeof BirdHunt!=='undefined'){
+                if(BirdHunt.todayCount() >= BirdHunt.dailyLimit()){
+                  if(typeof showToast==='function') showToast('🔒 Bugün kuş avı limitin doldu! Yarın tekrar dene.');
+                } else {
+                  var _m=document.getElementById('level-map');
+                  if(_m){ _m.style.visibility='hidden'; _m.style.pointerEvents='none'; _m.style.opacity='0'; }
+                  BirdHunt.open();
+                }
+              }
+            };
+          }
           _c.ontouchstart=function(){ _c.style.transform='scale(0.93)'; _c.style.background='rgba(255,255,255,0.12)'; };
           _c.ontouchend=function(e){
             _c.style.transform=''; _c.style.background='';
             if(!_lmScrolling&&!_lmNavigating){
+              // Bonus badge'e dokunulduysa atlat
+              if(e.target && e.target.classList && e.target.classList.contains('lm-bonus-badge')) return;
               _lmNavigating=true; e.preventDefault();
               var _m=document.getElementById('level-map');
               _m.style.visibility='hidden'; _m.style.pointerEvents='none'; _m.style.opacity='0';
@@ -18021,3 +18096,922 @@ window.TSLB = (function(){
   };
 })();
 </script>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     KUŞ AVI BONUS LEVEL — özel oyun modu
+     Mevcut oyun motoru/seviyelerinden bağımsız; kendi canvas + tank + topu.
+     Skor ts_total_score'a eklenir. Günlük 3 oynama limiti var.
+     ═══════════════════════════════════════════════════════════════ -->
+<style>
+#bh-overlay{
+  display:none;position:fixed;inset:0;z-index:950;
+  background:linear-gradient(180deg,#0a1530 0%,#1a2540 60%,#0a1020 100%);
+  font-family:'Rajdhani',sans-serif;color:#fff;
+  flex-direction:column;
+  overflow:hidden;
+}
+#bh-canvas{
+  width:100%;flex:1;display:block;
+  background:linear-gradient(180deg,#5db5d6 0%,#9cdce8 60%,#8aaa5a 100%);
+  touch-action:none;
+}
+#bh-hud{
+  position:absolute;top:0;left:0;right:0;height:54px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.85),transparent);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;z-index:5;pointer-events:none;
+}
+.bh-stat{
+  background:rgba(0,0,0,0.55);border:1px solid rgba(255,255,255,0.15);
+  border-radius:12px;padding:5px 11px;
+  font-weight:800;font-size:14px;letter-spacing:0.3px;line-height:1;
+  display:inline-flex;align-items:center;gap:5px;pointer-events:auto;
+  backdrop-filter:blur(6px);
+  box-shadow:0 2px 8px rgba(0,0,0,0.35);
+}
+#bh-score{color:#FFD700;border-color:rgba(255,215,0,0.45);background:rgba(40,30,5,0.6);}
+#bh-ammo{color:#FF8A5A;border-color:rgba(255,107,53,0.45);}
+#bh-time{color:#00E5FF;border-color:rgba(0,229,255,0.45);}
+#bh-close{
+  background:rgba(0,0,0,0.55);border:1px solid rgba(255,255,255,0.2);
+  color:#fff;border-radius:10px;width:32px;height:32px;font-size:14px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;pointer-events:auto;
+}
+
+/* Bottom control: tank + power + fire */
+#bh-bottom{
+  position:absolute;left:0;right:0;bottom:0;
+  height:160px;z-index:4;pointer-events:none;
+  background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.5) 60%,rgba(0,0,0,0.85) 100%);
+}
+#bh-tank-wrap{
+  position:absolute;left:50%;bottom:36px;transform:translateX(-50%);
+  width:120px;height:80px;pointer-events:none;
+}
+#bh-tank-svg{ width:100%;height:100%;display:block; }
+#bh-power-wrap{
+  position:absolute;left:12px;bottom:16px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  pointer-events:auto;
+}
+#bh-power-label{ color:#FFD700;font-size:9px;letter-spacing:1.5px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,0.6); }
+#bh-power-bar-bg{
+  width:14px;height:78px;background:rgba(0,0,0,0.65);
+  border-radius:8px;border:1.5px solid rgba(255,255,255,0.18);
+  overflow:hidden;display:flex;flex-direction:column-reverse;
+  box-shadow:0 2px 8px rgba(0,0,0,0.4), inset 0 0 4px rgba(0,0,0,0.5);
+}
+#bh-power-fill{
+  width:100%;height:0%;border-radius:6px;
+  background:linear-gradient(0deg,#ff3d00,#FFD700 50%,#00e676);
+  box-shadow:0 0 8px currentColor;transition:height 0.05s;
+}
+#bh-power-pct{
+  color:#fff;font-size:11px;font-weight:800;
+  background:rgba(0,0,0,0.6);padding:1px 6px;border-radius:6px;
+  border:1px solid rgba(255,255,255,0.12);min-width:30px;text-align:center;
+}
+#bh-angle-display{
+  position:absolute;left:44px;bottom:84px;
+  color:#fff;font-size:11px;font-weight:700;
+  background:rgba(0,0,0,0.7);padding:4px 8px;border-radius:8px;
+  border:1px solid rgba(255,255,255,0.12);pointer-events:none;
+}
+#bh-fire-btn{
+  position:absolute;right:12px;bottom:18px;
+  background:linear-gradient(180deg,#FF6B35,#ff3d00);color:#fff;
+  border:none;border-radius:28px;padding:14px 38px;
+  font-family:'Fredoka One',sans-serif;font-size:22px;letter-spacing:2px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;pointer-events:auto;
+  box-shadow:0 5px 0 #b32200, 0 6px 24px rgba(255,107,53,0.55), inset 0 1px 0 rgba(255,255,255,0.25);
+  text-shadow:0 2px 0 rgba(0,0,0,0.2);
+}
+#bh-fire-btn:active{transform:translateY(4px);box-shadow:0 1px 0 #b32200;}
+#bh-fire-btn:disabled{opacity:0.4;pointer-events:none;}
+#bh-hint{
+  position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
+  color:rgba(255,255,255,0.55);font-size:11px;font-weight:700;letter-spacing:1.5px;
+  text-shadow:0 1px 2px rgba(0,0,0,0.6);pointer-events:none;
+}
+
+/* Intro splash */
+#bh-intro{
+  position:absolute;inset:0;z-index:10;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,rgba(20,40,80,0.85) 0%,rgba(0,0,0,0.95) 100%);
+  text-align:center;padding:24px;
+  animation:bhIntroIn 0.4s ease-out;
+}
+@keyframes bhIntroIn{from{opacity:0;}to{opacity:1;}}
+#bh-intro .bird-icon{
+  font-size:80px;line-height:1;margin-bottom:14px;
+  filter:drop-shadow(0 0 22px rgba(255,215,0,0.5));
+  animation:bhBirdBob 1.4s ease-in-out infinite;
+}
+@keyframes bhBirdBob{
+  0%,100%{transform:translateY(0) rotate(-3deg);}
+  50%{transform:translateY(-10px) rotate(3deg);}
+}
+#bh-intro .title{
+  font-family:'Fredoka One',sans-serif;font-size:42px;letter-spacing:2px;
+  background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 4px 14px rgba(255,215,0,0.4));
+  margin-bottom:10px;
+}
+#bh-intro .subtitle{
+  font-size:15px;color:rgba(255,255,255,0.75);font-weight:700;
+  max-width:280px;line-height:1.5;margin-bottom:22px;
+}
+#bh-intro .rules{
+  background:rgba(0,0,0,0.5);border:1.5px solid rgba(255,215,0,0.35);
+  border-radius:14px;padding:14px 18px;margin-bottom:22px;max-width:300px;
+}
+#bh-intro .rule{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;color:rgba(255,255,255,0.85);font-weight:600;
+  text-align:left;line-height:1.4;
+}
+#bh-intro .rule + .rule{margin-top:6px;}
+#bh-intro .rule .em{font-size:18px;flex-shrink:0;width:24px;text-align:center;}
+#bh-intro .start-btn{
+  background:linear-gradient(180deg,#FFD700,#FF8C00);color:#1a0800;
+  border:none;border-radius:18px;padding:14px 40px;
+  font-family:'Fredoka One',sans-serif;font-size:20px;letter-spacing:1.5px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  box-shadow:0 6px 0 #a85a00, 0 8px 22px rgba(255,140,0,0.4);
+}
+#bh-intro .start-btn:active{transform:translateY(2px);box-shadow:0 4px 0 #a85a00;}
+
+/* Result */
+#bh-result{
+  position:absolute;inset:0;z-index:11;display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,rgba(20,40,80,0.85) 0%,rgba(0,0,0,0.95) 100%);
+  text-align:center;padding:20px;
+}
+#bh-result.show{display:flex;}
+#bh-result .res-emoji{font-size:64px;margin-bottom:8px;
+  filter:drop-shadow(0 0 22px rgba(255,215,0,0.5));
+  animation:bhBirdBob 1.4s ease-in-out infinite;
+}
+#bh-result .res-title{
+  font-family:'Fredoka One',sans-serif;font-size:34px;letter-spacing:1.5px;
+  background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 22px rgba(255,215,0,0.45));
+  margin-bottom:14px;
+  animation:bhPop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes bhPop{from{transform:scale(0.5);opacity:0;}60%{transform:scale(1.15);}to{transform:scale(1);opacity:1;}}
+#bh-result .stats{display:flex;gap:10px;margin-bottom:14px;}
+#bh-result .stat{
+  background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);
+  border-radius:14px;padding:10px 14px;min-width:78px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+#bh-result .stat-label{font-size:10px;letter-spacing:1.2px;color:rgba(255,255,255,0.55);font-weight:800;}
+#bh-result .stat-value{font-family:'Fredoka One',sans-serif;font-size:22px;line-height:1;color:#FFD700;text-shadow:0 0 14px rgba(255,215,0,0.4);}
+#bh-result .stat.cyan .stat-value{color:#00E5FF;text-shadow:0 0 12px rgba(0,229,255,0.4);}
+#bh-result .stat.orange .stat-value{color:#FF8A5A;text-shadow:0 0 12px rgba(255,107,53,0.4);}
+#bh-result button{
+  background:linear-gradient(180deg,#FF6B35,#ff3d00);color:#fff;
+  border:none;border-radius:24px;padding:13px 32px;
+  font-family:'Rajdhani',sans-serif;font-weight:800;font-size:17px;letter-spacing:1px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;margin-top:6px;
+  box-shadow:0 5px 0 #b32200, 0 6px 18px rgba(255,107,53,0.4);
+}
+
+/* Locked state (daily limit reached) */
+.bh-locked-badge{
+  position:absolute;top:6px;right:6px;
+  background:rgba(0,0,0,0.7);color:#FF8A5A;
+  border:1px solid rgba(255,107,53,0.5);
+  border-radius:8px;padding:2px 6px;
+  font-size:9px;font-weight:800;letter-spacing:0.5px;
+  font-family:'Rajdhani',sans-serif;
+}
+</style>
+
+<div id="bh-overlay">
+  <canvas id="bh-canvas"></canvas>
+  <div id="bh-hud">
+    <div class="bh-stat" id="bh-score">🏆 <span id="bh-score-val">0</span></div>
+    <div class="bh-stat" id="bh-time">⏱ <span id="bh-time-val">45</span></div>
+    <div class="bh-stat" id="bh-ammo">💣 <span id="bh-ammo-val">15</span></div>
+    <button id="bh-close" onclick="BirdHunt.quit()">✕</button>
+  </div>
+  <div id="bh-bottom">
+    <div id="bh-tank-wrap"><svg id="bh-tank-svg" viewBox="0 0 200 120"></svg></div>
+    <div id="bh-angle-display">📐 45°</div>
+    <div id="bh-power-wrap">
+      <div id="bh-power-label">PWR</div>
+      <div id="bh-power-bar-bg"><div id="bh-power-fill"></div></div>
+      <div id="bh-power-pct">50%</div>
+    </div>
+    <button id="bh-fire-btn" onclick="BirdHunt.fire()">ATEŞ!</button>
+    <div id="bh-hint"><span id="bh-hint-text">SOL · BASIP SÜRÜKLEYEREK NİŞAN AL</span></div>
+  </div>
+
+  <!-- Intro splash -->
+  <div id="bh-intro">
+    <div class="bird-icon">🦅</div>
+    <div class="title" id="bh-intro-title">KUŞ AVI!</div>
+    <div class="subtitle" id="bh-intro-sub">Sınırlı sürede gökyüzündeki kuşları vur, puan topla.</div>
+    <div class="rules">
+      <div class="rule"><span class="em">⏱</span><span id="bh-rule-time">45 saniye + 15 mermi hakkın var</span></div>
+      <div class="rule"><span class="em">🐦</span><span id="bh-rule-pts">Her kuş +25 puan</span></div>
+      <div class="rule"><span class="em">🔥</span><span id="bh-rule-combo">Üst üste vuruşlarda combo çarpanı</span></div>
+      <div class="rule"><span class="em">📋</span><span id="bh-rule-ammo">Sadece standart mermi — özel ammo yok</span></div>
+    </div>
+    <button class="start-btn" id="bh-start-btn" onclick="BirdHunt.start()">▶ BAŞLA</button>
+    <button id="bh-triple-btn" onclick="BirdHunt.watchAdTriple()" style="margin-top:10px;background:linear-gradient(180deg,#FFB347,#FF8C00);color:#1a0800;border:none;border-radius:14px;padding:10px 22px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #6a3a00, 0 5px 14px rgba(255,140,0,0.4);">📺 Reklam İzle → ×3 Mermi (45 atış)</button>
+  </div>
+
+  <!-- Result -->
+  <div id="bh-result">
+    <div class="res-emoji">🏆</div>
+    <div class="res-title" id="bh-res-title">SÜRE BİTTİ!</div>
+    <div class="stats">
+      <div class="stat"><span class="stat-label" id="bh-res-kills-label">KUŞ</span><span class="stat-value" id="bh-res-kills">0</span></div>
+      <div class="stat orange"><span class="stat-label" id="bh-res-combo-label">COMBO</span><span class="stat-value" id="bh-res-combo">×1</span></div>
+      <div class="stat cyan"><span class="stat-label" id="bh-res-pts-label">PUAN</span><span class="stat-value" id="bh-res-pts">0</span></div>
+    </div>
+    <button id="bh-result-finish" onclick="BirdHunt.close()">▶ BİTİR</button>
+  </div>
+</div>
+
+<script>
+window.BirdHunt = (function(){
+  // ── Daily limit ─────────────────────────────────────────────
+  var DAILY_LIMIT = 3;
+  // ── Background sound — APK içinde değiştirilebilir ─────────
+  // BirdHunt.setBgSound(url) ile veya doğrudan _bgAudio.src ile değiştir
+  var _bgAudio = null;
+  var BG_SOUND_URL = ''; // Boş bırakıldı — APK içinde dosya yolu ver
+
+  function _initBgAudio(){
+    if(_bgAudio) return _bgAudio;
+    if(!BG_SOUND_URL) return null;
+    try {
+      _bgAudio = new Audio(BG_SOUND_URL);
+      _bgAudio.loop = true;
+      _bgAudio.volume = 0.45;
+    } catch(_) { _bgAudio = null; }
+    return _bgAudio;
+  }
+  function _playBgSound(){
+    var a = _initBgAudio();
+    if(!a) return;
+    // SFX kapalıysa müzik de kapalı
+    try {
+      if(typeof SFX !== 'undefined' && SFX._musicOn === false) return;
+    } catch(_) {}
+    try { a.currentTime = 0; var p = a.play(); if(p && p.catch) p.catch(function(){}); } catch(_) {}
+  }
+  function _stopBgSound(){
+    if(_bgAudio){ try { _bgAudio.pause(); _bgAudio.currentTime = 0; } catch(_) {} }
+  }
+
+  // Kuş vurma sesi — Android bridge varsa onu kullan, yoksa SFX.explosion
+  function _playBirdHitSound(){
+    try {
+      if(typeof Android !== 'undefined' && Android.playBirdHit){
+        Android.playBirdHit();
+        return;
+      }
+    } catch(_) {}
+    try { if(typeof SFX!=='undefined' && SFX.explosion) SFX.explosion('normal'); } catch(_) {}
+  }
+  function _today(){
+    var d = new Date();
+    return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  }
+  function _todayKey(){ return 'bh_count_'+_today(); }
+  function _todayCount(){ return parseInt(lsGet(_todayKey())||'0') || 0; }
+  function _incToday(){ lsSet(_todayKey(), String(_todayCount()+1)); }
+
+  // ── Eligible level check ─────────────────────────────────────
+  // Bonus level her temada 5'in katlarında açılır (level id 5, 10, 15...)
+  function _isLevelEligible(levelId){
+    if(typeof levelId !== 'number') return false;
+    return levelId > 0 && (levelId % 5 === 0);
+  }
+
+  // ── State ────────────────────────────────────────────────────
+  var S = null; // active game state
+  var raf = null;
+
+  function _resetState(){
+    S = {
+      W: 0, H: 0, // canvas size
+      angle: 45, power: 55,
+      bullets: [],
+      birds: [],
+      kills: 0, ammo: 15, ammoMax: 15,
+      score: 0,
+      timer: 45*60, timerMax: 45*60, // 60fps
+      tStart: 0,
+      combo: 0, comboTimer: 0,
+      running: false,
+      ended: false,
+      // particles for hits
+      pop: [],
+      // drag state for aim
+      dragging: false, dragSX:0, dragSY:0,
+    };
+  }
+
+  function _open(){
+    if(_todayCount() >= DAILY_LIMIT){
+      if(typeof showToast==='function'){
+        var t = (typeof window.t==='function') ? window.t('bh_daily_full') : null;
+        showToast(t || '🔒 Bugün kuş avı limitin doldu! Yarın tekrar dene.');
+      }
+      return;
+    }
+    _resetState();
+    var ov = document.getElementById('bh-overlay');
+    if(!ov) return;
+    if(ov.parentNode !== document.body) document.body.appendChild(ov);
+    // Hangi context'ten geldik? Level map açıksa kaydet, kapanışta geri açacağız
+    var _lm = document.getElementById('level-map');
+    S.cameFromLevelMap = !!(_lm && _lm.style.visibility !== 'hidden' && _lm.style.opacity !== '0');
+    // Eğer level map'i biz gizlediysek (badge tıklamasıyla geldiyse), o da true sayılır
+    if(!S.cameFromLevelMap && _lm && _lm.style.opacity === '0'){
+      S.cameFromLevelMap = true;
+    }
+    ov.style.display = 'flex';
+    // Reset UI + i18n
+    document.getElementById('bh-intro').style.display = 'flex';
+    document.getElementById('bh-result').classList.remove('show');
+    _applyI18n();
+    _renderTank();
+    _resizeCanvas();
+    _updateHUD();
+    // Triple ammo butonunu sıfırla
+    var tb = document.getElementById('bh-triple-btn');
+    if(tb){ tb.style.display = ''; tb.disabled = false; }
+  }
+
+  function _close(){
+    var ov = document.getElementById('bh-overlay');
+    if(ov) ov.style.display = 'none';
+    if(raf){ cancelAnimationFrame(raf); raf = null; }
+    // Arka plan ses durdur
+    if(_bgAudio){ try { _bgAudio.pause(); _bgAudio.currentTime = 0; } catch(_) {} }
+    // Ana oyuna / level map'e dönüş — KRİTİK FIX
+    var came = S && S.cameFromLevelMap;
+    S = null;
+    if(came){
+      var _m = document.getElementById('level-map');
+      if(_m){
+        _m.style.visibility = 'visible';
+        _m.style.pointerEvents = 'auto';
+        _m.style.opacity = '1';
+      }
+    } else {
+      // Direkt çağrıldıysa: oyun ekranını geri yükle
+      if(typeof restoreGameLayers === 'function'){
+        try { restoreGameLayers(); } catch(_) {}
+      }
+    }
+  }
+
+  // i18n: tüm overlay metinlerini güncelle
+  function _applyI18n(){
+    function _t(k, fb){ try { return (typeof window.t==='function')?(window.t(k)||fb):fb; } catch(_) { return fb; } }
+    var setText = function(id, key, fb){
+      var e = document.getElementById(id); if(e) e.textContent = _t(key, fb);
+    };
+    setText('bh-intro-title',    'bh_title',           'KUŞ AVI!');
+    setText('bh-intro-sub',      'bh_subtitle',        'Sınırlı sürede gökyüzündeki kuşları vur, puan topla.');
+    setText('bh-rule-time',      'bh_rule_time',       '45 saniye + 15 mermi hakkın var');
+    setText('bh-rule-pts',       'bh_rule_pts',        'Her kuş +25 puan');
+    setText('bh-rule-combo',     'bh_rule_combo',      'Üst üste vuruşlarda combo çarpanı');
+    setText('bh-rule-ammo',      'bh_rule_ammo',       'Sadece standart mermi — özel ammo yok');
+    setText('bh-start-btn',      'bh_start',           '▶ BAŞLA');
+    setText('bh-triple-btn',     'bh_triple_ad',       '📺 Reklam İzle → ×3 Mermi (45 atış)');
+    setText('bh-hint-text',      'bh_aim_hint',        'SOL · BASIP SÜRÜKLEYEREK NİŞAN AL');
+    setText('bh-fire-btn',       'bh_fire',            'ATEŞ!');
+    setText('bh-result-finish',  'bh_finish',          '▶ BİTİR');
+    var rk = document.getElementById('bh-res-kills-label'); if(rk) rk.textContent = _t('bh_stat_kills','KUŞ');
+    var rc = document.getElementById('bh-res-combo-label'); if(rc) rc.textContent = _t('bh_stat_combo','COMBO');
+    var rp = document.getElementById('bh-res-pts-label');   if(rp) rp.textContent = _t('bh_stat_pts','PUAN');
+  }
+
+  // Kullanıcı X ile çıkmak isteyince — başlamadıysa skipsiz kapat
+  function _quit(){
+    if(S && S.running && !S.ended){
+      // Yarıda kesmek ödül sayar mı? Hayır — sadece kazanılanı topla
+      _endGame('quit');
+    } else {
+      _close();
+    }
+  }
+
+  function _start(){
+    document.getElementById('bh-intro').style.display = 'none';
+    S.running = true;
+    S.tStart = performance.now();
+    _incToday();
+    _playBgSound();
+    // Spawn birds
+    for(var i=0; i<3; i++) _spawnBird(true);
+    _loop();
+  }
+
+  // Reklam izleyerek triple ammo (45 mermi)
+  function _watchAdTriple(){
+    var fn = function(){
+      if(!S) return;
+      S.ammoMax = 45; S.ammo = 45;
+      _updateHUD();
+      var tb = document.getElementById('bh-triple-btn');
+      if(tb){ tb.style.display = 'none'; }
+      // Otomatik başlat
+      _start();
+      if(typeof showToast==='function'){
+        var msg = (typeof window.t==='function') ? window.t('bh_triple_active') : null;
+        showToast(msg || '🎯 ×3 Mermi aktif! 45 atış hakkın var.');
+      }
+    };
+    try {
+      if(typeof Android !== 'undefined' && Android.showRewardedAd){
+        // Sonradan onAdRewardComplete() callback bekleniyor — APK side
+        window.__bhAdCb = fn;
+        Android.showRewardedAd('bh_triple');
+        // Eğer callback gelmezse 5sn sonra otomatik (simülasyon)
+        setTimeout(function(){ if(window.__bhAdCb){ window.__bhAdCb(); window.__bhAdCb=null; } }, 5000);
+      } else {
+        // Simülasyon — 1.5s sonra otomatik
+        setTimeout(fn, 1500);
+      }
+    } catch(_) { setTimeout(fn, 1500); }
+  }
+  // APK reklam callback'i
+  window.onBirdHuntAdReward = function(){
+    if(window.__bhAdCb){ window.__bhAdCb(); window.__bhAdCb = null; }
+  };
+
+  function _resizeCanvas(){
+    var c = document.getElementById('bh-canvas');
+    var rect = c.getBoundingClientRect();
+    var dpr = Math.min(2, window.devicePixelRatio||1);
+    c.width  = Math.max(320, Math.floor(rect.width  * dpr));
+    c.height = Math.max(400, Math.floor(rect.height * dpr));
+    S.W = c.width; S.H = c.height;
+    S.dpr = dpr;
+  }
+
+  // ── Tank SVG (alt-merkez, namlu açıya göre döner) ─────────────
+  function _renderTank(){
+    var svg = document.getElementById('bh-tank-svg');
+    if(!svg) return;
+    var rad = (S ? S.angle : 45) * Math.PI/180;
+    // barrel base at (90, 56), tip at distance 56
+    var bx0 = 92, by0 = 56;
+    var L = 56;
+    var bx1 = bx0 + Math.cos(-rad)*L;
+    var by1 = by0 + Math.sin(-rad)*L;
+    svg.innerHTML = ''
+      + '<ellipse cx="100" cy="118" rx="78" ry="4" fill="#000" opacity="0.4"/>'
+      + '<rect x="14" y="86" width="172" height="22" rx="11" fill="#1a1a1a"/>'
+      + '<circle cx="26" cy="97" r="10" fill="#2a2a2a" stroke="#000" stroke-width="1"/>'
+      + '<circle cx="174" cy="97" r="10" fill="#2a2a2a" stroke="#000" stroke-width="1"/>'
+      + '<circle cx="60" cy="97" r="8" fill="#2a2a2a"/>'
+      + '<circle cx="100" cy="97" r="8" fill="#2a2a2a"/>'
+      + '<circle cx="140" cy="97" r="8" fill="#2a2a2a"/>'
+      + '<path d="M 18 86 L 26 70 L 178 70 L 188 86 Z" fill="#3a3024"/>'
+      + '<path d="M 22 70 L 36 50 L 174 50 L 188 70 Z" fill="#5a6a3a" stroke="#000" stroke-width="1.2"/>'
+      + '<ellipse cx="92" cy="50" rx="22" ry="14" fill="#5a6a3a" stroke="#000" stroke-width="1.2"/>'
+      + '<line x1="'+bx0+'" y1="'+by0+'" x2="'+bx1+'" y2="'+by1+'" stroke="#1a1a1a" stroke-width="9" stroke-linecap="round"/>'
+      + '<line x1="'+bx0+'" y1="'+by0+'" x2="'+bx1+'" y2="'+by1+'" stroke="#5a6a3a" stroke-width="6" stroke-linecap="round"/>'
+      + '<circle cx="'+bx1+'" cy="'+by1+'" r="4" fill="#1a1a1a"/>'
+      + '<circle cx="86" cy="44" r="2.5" fill="#1a1a1a"/>';
+  }
+
+  // ── Birds ──────────────────────────────────────────────────
+  var BIRD_TYPES = [
+    {kind:'small', size:14, speed:[2.2, 3.4], pts:25, color:'#3a2a1a'},
+    {kind:'med',   size:18, speed:[1.6, 2.6], pts:40, color:'#5a3a2a'},
+    {kind:'eagle', size:24, speed:[1.2, 2.0], pts:80, color:'#3a3025'},
+  ];
+  function _spawnBird(initial){
+    if(!S || !S.running && !initial) return;
+    var T = BIRD_TYPES[Math.floor(Math.random()*BIRD_TYPES.length)];
+    var dir = Math.random()<0.5 ? 1 : -1;
+    var x = dir>0 ? -40 : S.W+40;
+    var y = 40 + Math.random()*(S.H*0.45);
+    var sp = T.speed[0] + Math.random()*(T.speed[1]-T.speed[0]);
+    S.birds.push({
+      type:T.kind, size:T.size*S.dpr, color:T.color, pts:T.pts,
+      x:x, y:y, vx:dir*sp*S.dpr, vy: (Math.random()-0.5)*0.4*S.dpr,
+      flap: Math.random()*Math.PI*2,
+      hit: false, hitT: 0,
+    });
+  }
+  function _updateBirds(){
+    var spawnRate = 0.018 + Math.min(0.025, S.kills*0.002);
+    if(Math.random() < spawnRate && S.birds.length < 7) _spawnBird();
+    for(var i=S.birds.length-1; i>=0; i--){
+      var b = S.birds[i];
+      if(b.hit){
+        b.hitT++;
+        b.vy += 0.4 * S.dpr; // fall
+        b.y += b.vy;
+        if(b.hitT > 80){ S.birds.splice(i,1); continue; }
+        continue;
+      }
+      b.x += b.vx; b.y += b.vy;
+      b.flap += 0.18;
+      // Hafif yukarı-aşağı dalga
+      b.vy += (Math.random()-0.5)*0.05;
+      b.vy = Math.max(-0.4, Math.min(0.4, b.vy));
+      // Out of bounds
+      if(b.x < -60 || b.x > S.W+60){ S.birds.splice(i,1); }
+    }
+  }
+  function _drawBird(ctx, b){
+    var alpha = b.hit ? Math.max(0, 1 - b.hitT/80) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(b.x, b.y);
+    if(b.vx < 0) ctx.scale(-1, 1);
+    if(b.hit){
+      ctx.rotate(b.hitT * 0.1);
+    }
+    var sz = b.size;
+    var wingY = Math.sin(b.flap) * sz*0.4;
+    // body
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, sz*0.5, sz*0.32, 0, 0, Math.PI*2);
+    ctx.fill();
+    // wings
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-sz*0.5, -sz*0.6 - wingY, -sz*0.9, -sz*0.2);
+    ctx.lineTo(0, sz*0.05);
+    ctx.closePath();
+    ctx.fillStyle = b.color;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(sz*0.5, -sz*0.5 - wingY*0.8, sz*0.9, -sz*0.1);
+    ctx.lineTo(0, sz*0.05);
+    ctx.closePath();
+    ctx.fill();
+    // head
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(sz*0.5, -sz*0.05, sz*0.18, 0, Math.PI*2);
+    ctx.fill();
+    // beak
+    ctx.fillStyle = '#FFA500';
+    ctx.beginPath();
+    ctx.moveTo(sz*0.65, -sz*0.05);
+    ctx.lineTo(sz*0.85, -sz*0.0);
+    ctx.lineTo(sz*0.65, sz*0.05);
+    ctx.closePath();
+    ctx.fill();
+    // eye
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(sz*0.55, -sz*0.1, sz*0.05, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Bullet ────────────────────────────────────────────────
+  function _fire(){
+    if(!S || !S.running || S.ended) return;
+    if(S.ammo <= 0) return;
+    S.ammo--;
+    var rad = S.angle * Math.PI/180;
+    var pwr = (10 + (S.power/100)*22) * S.dpr;
+    // Bullet start at tank's barrel tip (approx center bottom of canvas)
+    var sx = S.W * 0.5;
+    var sy = S.H - 90 * S.dpr;
+    S.bullets.push({
+      x:sx, y:sy,
+      vx: Math.cos(-rad)*pwr,
+      vy: Math.sin(-rad)*pwr,
+      life: 0,
+    });
+    _updateHUD();
+    // Tiny SFX
+    try { if(typeof SFX!=='undefined' && SFX.fire) SFX.fire(); } catch(_) {}
+  }
+
+  function _updateBullets(){
+    var grav = 0.18 * S.dpr;
+    for(var i=S.bullets.length-1; i>=0; i--){
+      var bu = S.bullets[i];
+      bu.vy += grav;
+      bu.x += bu.vx;
+      bu.y += bu.vy;
+      bu.life++;
+      // Bird collisions
+      for(var j=0; j<S.birds.length; j++){
+        var b = S.birds[j];
+        if(b.hit) continue;
+        var dx = bu.x - b.x, dy = bu.y - b.y;
+        if(dx*dx + dy*dy < (b.size*0.7)*(b.size*0.7)){
+          b.hit = true; b.hitT = 0; b.vx *= 0.3; b.vy = -2*S.dpr;
+          S.bullets.splice(i,1);
+          _onBirdKill(b);
+          break;
+        }
+      }
+      if(!S.bullets[i]) continue;
+      // Out of bounds
+      if(bu.y > S.H+60 || bu.x < -80 || bu.x > S.W+80 || bu.life > 300){
+        S.bullets.splice(i,1);
+      }
+    }
+  }
+
+  function _onBirdKill(b){
+    S.kills++;
+    S.combo++;
+    S.comboTimer = 90; // ~1.5s combo window
+    var comboMult = S.combo>=5 ? 2.0 : S.combo>=3 ? 1.5 : S.combo>=2 ? 1.25 : 1.0;
+    var pts = Math.round(b.pts * comboMult);
+    S.score += pts;
+    // Pop floating text
+    S.pop.push({
+      x:b.x, y:b.y, text:'+'+pts, color: S.combo>=3?'#FF8A5A':'#FFD700',
+      life:0, vy:-1.5*S.dpr,
+    });
+    if(S.combo>=2){
+      S.pop.push({
+        x:b.x, y:b.y-24*S.dpr, text:'×'+comboMult.toFixed(2).replace(/\.00$/,''), color:'#00E5FF',
+        life:0, vy:-1.2*S.dpr,
+      });
+    }
+    _updateHUD();
+    try { _playBirdHitSound(); } catch(_) {}
+    try { if(typeof Quests!=='undefined'){ Quests.track('animal','bird'); Quests.track('bird','bird'); } } catch(_) {}
+  }
+
+  // ── HUD ──────────────────────────────────────────────────
+  function _updateHUD(){
+    if(!S) return;
+    var s = document.getElementById('bh-score-val'); if(s) s.textContent = S.score.toLocaleString();
+    var a = document.getElementById('bh-ammo-val');  if(a) a.textContent = S.ammo;
+    var ti = document.getElementById('bh-time-val'); if(ti) ti.textContent = Math.max(0, Math.ceil(S.timer/60));
+    var pf = document.getElementById('bh-power-fill'); if(pf) pf.style.height = S.power+'%';
+    var pp = document.getElementById('bh-power-pct'); if(pp) pp.textContent = Math.round(S.power)+'%';
+    var ad = document.getElementById('bh-angle-display'); if(ad) ad.textContent = '📐 '+Math.round(S.angle)+'°';
+  }
+
+  // ── Pop text ─────────────────────────────────────────────
+  function _updatePop(ctx){
+    for(var i=S.pop.length-1; i>=0; i--){
+      var p = S.pop[i];
+      p.life++;
+      p.y += p.vy;
+      p.vy *= 0.97;
+      if(p.life > 70){ S.pop.splice(i,1); continue; }
+      var alpha = p.life < 20 ? p.life/20 : (1 - (p.life-50)/20);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      ctx.font = 'bold '+(18*S.dpr)+'px "Fredoka One", sans-serif';
+      ctx.fillStyle = p.color;
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 4;
+      ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillText(p.text, p.x, p.y);
+      ctx.restore();
+    }
+  }
+
+  // ── Background scene ─────────────────────────────────────
+  function _drawBackground(ctx){
+    var sky = ctx.createLinearGradient(0,0,0,S.H);
+    sky.addColorStop(0, '#5db5d6');
+    sky.addColorStop(0.55, '#9cdce8');
+    sky.addColorStop(0.65, '#a8d878');
+    sky.addColorStop(1, '#5a8438');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0,0,S.W,S.H);
+    // Sun
+    ctx.fillStyle = '#fff5d8';
+    ctx.beginPath();
+    ctx.arc(S.W*0.78, S.H*0.18, 28*S.dpr, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(S.W*0.78, S.H*0.18, 44*S.dpr, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // Distant hills
+    ctx.fillStyle = '#6a8a4a';
+    ctx.beginPath();
+    ctx.moveTo(0, S.H*0.7);
+    ctx.quadraticCurveTo(S.W*0.2, S.H*0.6, S.W*0.4, S.H*0.7);
+    ctx.quadraticCurveTo(S.W*0.6, S.H*0.62, S.W*0.85, S.H*0.7);
+    ctx.lineTo(S.W, S.H*0.7);
+    ctx.lineTo(S.W, S.H);
+    ctx.lineTo(0, S.H);
+    ctx.closePath();
+    ctx.fill();
+    // Bushes silhouettes near ground
+    ctx.fillStyle = '#3a6a28';
+    var bushW = 60*S.dpr, bushH = 20*S.dpr;
+    for(var bx=0; bx<S.W; bx+=bushW*1.4){
+      ctx.beginPath();
+      ctx.arc(bx + bushW*0.4, S.H - bushH*0.7, bushH*0.7, 0, Math.PI*2);
+      ctx.arc(bx + bushW*0.8, S.H - bushH*0.9, bushH*0.9, 0, Math.PI*2);
+      ctx.arc(bx + bushW*1.2, S.H - bushH*0.7, bushH*0.6, 0, Math.PI*2);
+      ctx.fill();
+    }
+    // Trees scattered
+    ctx.fillStyle = '#1a4a1a';
+    for(var t=0; t<4; t++){
+      var tx = S.W*(0.05 + t*0.28) + (t%2?S.W*0.04:0);
+      var ty = S.H*0.78;
+      // Trunk
+      ctx.fillStyle = '#3a1a06';
+      ctx.fillRect(tx-3*S.dpr, ty, 6*S.dpr, 30*S.dpr);
+      // Leaves
+      ctx.fillStyle = '#1e6b1e';
+      ctx.beginPath();
+      ctx.arc(tx, ty-6*S.dpr, 18*S.dpr, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#2a7a2a';
+      ctx.beginPath();
+      ctx.arc(tx-8*S.dpr, ty-12*S.dpr, 14*S.dpr, 0, Math.PI*2);
+      ctx.arc(tx+8*S.dpr, ty-10*S.dpr, 13*S.dpr, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function _drawBullets(ctx){
+    S.bullets.forEach(function(bu){
+      ctx.save();
+      ctx.translate(bu.x, bu.y);
+      ctx.rotate(Math.atan2(bu.vy, bu.vx));
+      var gg = ctx.createRadialGradient(0,0,0,0,0,10);
+      gg.addColorStop(0,'rgba(255,255,200,0.8)');
+      gg.addColorStop(1,'rgba(255,200,0,0)');
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(0,0,10*S.dpr,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.roundRect(-7*S.dpr, -3*S.dpr, 14*S.dpr, 6*S.dpr, 3*S.dpr);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  // ── Main loop ────────────────────────────────────────────
+  function _loop(){
+    var c = document.getElementById('bh-canvas');
+    if(!c || !S || !S.running) return;
+    var ctx = c.getContext('2d');
+    _drawBackground(ctx);
+    // 1) Bulutları kuşlardan ÖNCE çiz (kuşlar üstte görünsün)
+    _drawClouds(ctx);
+    _updateBirds();
+    S.birds.forEach(function(b){ _drawBird(ctx, b); });
+    _updateBullets();
+    _drawBullets(ctx);
+    _updatePop(ctx);
+    if(S.comboTimer > 0){
+      S.comboTimer--;
+      if(S.comboTimer === 0){ S.combo = 0; _updateHUD(); }
+    }
+    // Timer
+    S.timer--;
+    if(S.timer % 60 === 0) _updateHUD();
+    if(S.timer <= 0){ _endGame('time'); return; }
+    if(S.ammo <= 0 && S.bullets.length === 0){
+      setTimeout(function(){ if(S && S.running) _endGame('ammo'); }, 1000);
+    }
+    raf = requestAnimationFrame(_loop);
+  }
+
+  // Bulut çizimi — yumuşak gradient küme bulutlar, yavaşça hareket eder
+  function _drawClouds(ctx){
+    if(!S.clouds){
+      S.clouds = [];
+      for(var i=0; i<5; i++){
+        S.clouds.push({
+          x: Math.random()*S.W,
+          y: 30 + Math.random()*(S.H*0.35),
+          scale: 0.7 + Math.random()*0.8,
+          speed: (0.15 + Math.random()*0.35) * S.dpr,
+          opacity: 0.55 + Math.random()*0.35,
+        });
+      }
+    }
+    S.clouds.forEach(function(cl){
+      cl.x += cl.speed;
+      if(cl.x > S.W + 100*S.dpr) cl.x = -100*S.dpr;
+      ctx.save();
+      ctx.globalAlpha = cl.opacity;
+      ctx.fillStyle = '#fff';
+      var s = cl.scale * S.dpr;
+      // Birkaç üst üste daire — küme bulut
+      ctx.beginPath();
+      ctx.arc(cl.x,      cl.y,      26*s, 0, Math.PI*2);
+      ctx.arc(cl.x+28*s, cl.y-6*s,  22*s, 0, Math.PI*2);
+      ctx.arc(cl.x-26*s, cl.y-2*s,  20*s, 0, Math.PI*2);
+      ctx.arc(cl.x+12*s, cl.y+10*s, 18*s, 0, Math.PI*2);
+      ctx.arc(cl.x-14*s, cl.y+8*s,  18*s, 0, Math.PI*2);
+      ctx.fill();
+      // Alt gölge — derinlik
+      ctx.globalAlpha = cl.opacity * 0.25;
+      ctx.fillStyle = '#9bb5d0';
+      ctx.beginPath();
+      ctx.arc(cl.x, cl.y+12*s, 24*s, 0, Math.PI*2);
+      ctx.arc(cl.x+24*s, cl.y+10*s, 20*s, 0, Math.PI*2);
+      ctx.arc(cl.x-22*s, cl.y+10*s, 18*s, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  // ── End game ─────────────────────────────────────────────
+  function _endGame(reason){
+    if(!S || S.ended) return;
+    S.ended = true;
+    S.running = false;
+    if(raf){ cancelAnimationFrame(raf); raf = null; }
+    // Skoru ana oyuncuya ekle
+    if(typeof score !== 'undefined' && S.score > 0){
+      score += S.score;
+      lsSet('total_score', score);
+      if(typeof updateUI === 'function') updateUI();
+      if(typeof updateGalleryScore === 'function') updateGalleryScore();
+    }
+    // Cloud submit
+    try { if(typeof submitAllLeaderboards === 'function') submitAllLeaderboards(); } catch(_) {}
+    // Result UI
+    document.getElementById('bh-res-kills').textContent = S.kills;
+    var maxComboMult = S.kills >= 5 ? 2.0 : S.kills >= 3 ? 1.5 : S.kills >= 2 ? 1.25 : 1.0;
+    document.getElementById('bh-res-combo').textContent = '×'+maxComboMult.toFixed(2).replace(/\.00$/,'');
+    document.getElementById('bh-res-pts').textContent = '+'+S.score.toLocaleString();
+    var titleEl = document.getElementById('bh-res-title');
+    if(titleEl){
+      function _t(k,fb){ try { return (typeof window.t==='function')?(window.t(k)||fb):fb; } catch(_){ return fb; } }
+      titleEl.textContent = reason==='time' ? _t('bh_res_time','SÜRE BİTTİ!')
+                          : reason==='ammo' ? _t('bh_res_ammo','MERMİ BİTTİ!')
+                          : _t('bh_res_quit','AV BİTTİ!');
+    }
+    document.getElementById('bh-result').classList.add('show');
+  }
+
+  // ── Aim drag ─────────────────────────────────────────────
+  function _setupInput(){
+    var c = document.getElementById('bh-canvas');
+    if(!c || c._bhBound) return;
+    c._bhBound = true;
+    c.addEventListener('pointerdown', function(e){
+      if(!S || !S.running) return;
+      // Sadece sol yarıdaki sürükleme → aim
+      if(e.clientX > window.innerWidth*0.55) return;
+      S.dragging = true;
+      S.dragSX = e.clientX; S.dragSY = e.clientY;
+      e.preventDefault();
+    });
+    window.addEventListener('pointermove', function(e){
+      if(!S || !S.dragging) return;
+      var dx = e.clientX - S.dragSX;
+      var dy = e.clientY - S.dragSY;
+      S.angle = Math.max(5, Math.min(89, 45 - dx*0.5));
+      S.power = Math.max(10, Math.min(100, 55 - dy*0.7));
+      _renderTank();
+      _updateHUD();
+    });
+    window.addEventListener('pointerup', function(){
+      if(S) S.dragging = false;
+    });
+    window.addEventListener('resize', function(){
+      var ov = document.getElementById('bh-overlay');
+      if(ov && ov.style.display === 'flex' && S){
+        _resizeCanvas();
+      }
+    });
+  }
+  _setupInput();
+
+  return {
+    open: _open,
+    start: _start,
+    fire: _fire,
+    close: _close,
+    quit: _quit,
+    watchAdTriple: _watchAdTriple,
+    setBgSound: function(url){ BG_SOUND_URL = url || ''; _bgAudio = null; },
+    todayCount: _todayCount,
+    isLevelEligible: _isLevelEligible,
+    dailyLimit: function(){ return DAILY_LIMIT; },
+  };
+})();
+</script>
+
