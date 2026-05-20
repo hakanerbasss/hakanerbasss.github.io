@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.140';
+const APP_VERSION      = '1.0.141';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 19:05';
-const APP_VERSION_NOTE = 'Duzeltme yapdi can kazanma 20 dk yerine 5 dakika bekleme';
+const APP_VERSION_DATE = '2026.05.20 19:40';
+const APP_VERSION_NOTE = 'Tactical rota kullan gunluk gorev duzeltildi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -9012,6 +9012,7 @@ function fire(){
     if(typeof Quests!=='undefined'){
       Quests.track('shot');
       Quests.track('ammo', selectedAmmo);
+      if(isTacticalActive()) Quests.track('tactical');
     }
   }catch(_){}
   // Can kontrolu
