@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.138';
+const APP_VERSION      = '1.0.139';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 14:08';
-const APP_VERSION_NOTE = 'level map duzeltmeden once';
+const APP_VERSION_DATE = '2026.05.20 18:48';
+const APP_VERSION_NOTE = 'Tank ve hedef kartlari aciliyir';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -10769,8 +10769,19 @@ function onJoyDown(e){
   // Sağ taraf ammo butonları için boşluk bırak
   if(e.clientX > window.innerWidth*0.90) return;
 
-  // Sol %18 ve alt %35 — tank alanı — kart aç
-  // tank card acma joystick icinden kaldirildi
+  // Sol %18 ve alt %35 — tank alanı — kart aç (sadece tap, sürükleme değil)
+  if(phase==='aim'){
+    const scaleX=window.innerWidth/W, scaleY=window.innerHeight/H;
+    const cx=e.clientX/scaleX, cy=e.clientY/scaleY;
+    const td=TANK_DEF[selectedTank]||TANK_DEF.basic;
+    const tankLeft  = tankX - td.w/2 - 14;
+    const tankRight = tankX + td.w/2 + 14;
+    const tankTop   = tankY - td.h - 14;
+    const tankBot   = tankY + 14;
+    if(cx >= tankLeft && cx <= tankRight && cy >= tankTop && cy <= tankBot){
+      openTankCard(); return;
+    }
+  }
   // Hedef üstüne tıklama — bilgi popup
   if(phase==='aim' && targetHP>0){
     const scaleX=window.innerWidth/W, scaleY=window.innerHeight/H;
