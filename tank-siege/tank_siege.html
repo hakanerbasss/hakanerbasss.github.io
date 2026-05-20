@@ -927,11 +927,11 @@ button:active{opacity:0.75;transform:scale(0.96);}
 .lm-card-stars{font-size:13px;letter-spacing:1px;}
 .lm-card-mat{font-size:11px;color:rgba(255,255,255,0.45);font-family:'Rajdhani',sans-serif;}
 .lm-bonus-badge{
-  position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+  position:absolute;top:4px;right:4px;
   background:linear-gradient(180deg,#FFD700,#FF8C00);
   color:#1a0800;font-family:'Rajdhani',sans-serif;
   font-size:11px;font-weight:800;letter-spacing:0.6px;
-  padding:5px 14px;border-radius:9px;
+  padding:5px 12px;border-radius:10px;
   border:1.5px solid #1a1408;
   box-shadow:0 3px 0 #6a4a00, 0 4px 12px rgba(255,140,0,0.45);
   cursor:pointer;-webkit-tap-highlight-color:transparent;
@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.135';
+const APP_VERSION      = '1.0.136';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 11:17';
-const APP_VERSION_NOTE = 'update 11:17';
+const APP_VERSION_DATE = '2026.05.20 11:30';
+const APP_VERSION_NOTE = 'update 11:30';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -12444,9 +12444,9 @@ const LANG = {
     q_bird1_title:         '1 Kuş Düşür',
     q_bird3_title:         '3 Kuş Düşür',
     q_safari_title:        'Safari: 5 Hayvan Avla',
-    bh_title:              'KUŞ AVI!',
-    bh_subtitle:           'Sınırlı sürede gökyüzündeki kuşları vur, puan topla.',
-    bh_rule_time:          '45 saniye + 15 mermi hakkın var',
+    bh_title:              'KUS AVI!',
+    bh_subtitle:           'Sinirli surede gokyuzundeki kuslari vur, puan topla.',
+    bh_rule_time:          '45 saniye + 15 mermi hakkin var',
     bh_rule_pts:           'Her kuş +25 puan',
     bh_rule_combo:         'Üst üste vuruşlarda combo çarpanı',
     bh_rule_ammo:          'Sadece standart mermi — özel ammo yok',
@@ -12458,8 +12458,8 @@ const LANG = {
     bh_stat_kills:         'KUŞ',
     bh_stat_combo:         'COMBO',
     bh_stat_pts:           'PUAN',
-    bh_daily_full:         '🔒 Bugün kuş avı limitin doldu! Yarın tekrar dene.',
-    bh_triple_active:      '🎯 ×3 Mermi aktif! 45 atış hakkın var.',
+    bh_daily_full:         '🔒 Bugun kus avi limitin doldu! Yarin tekrar dene.',
+    bh_triple_active:      '🎯 x3 Mermi aktif! 45 atis hakkin var.',
     bh_res_time:           'SÜRE BİTTİ!',
     bh_res_ammo:           'MERMİ BİTTİ!',
     bh_res_quit:           'AV BİTTİ!',
@@ -18218,7 +18218,7 @@ window.TSLB = (function(){
   50%{transform:translateY(-10px) rotate(3deg);}
 }
 #bh-intro .title{
-  font-family:'Fredoka One',sans-serif;font-size:42px;letter-spacing:2px;
+  font-family:'Rajdhani',sans-serif;font-size:42px;font-weight:800;letter-spacing:2px;
   background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 4px 14px rgba(255,215,0,0.4));
@@ -18261,7 +18261,7 @@ window.TSLB = (function(){
   animation:bhBirdBob 1.4s ease-in-out infinite;
 }
 #bh-result .res-title{
-  font-family:'Fredoka One',sans-serif;font-size:34px;letter-spacing:1.5px;
+  font-family:'Rajdhani',sans-serif;font-size:34px;font-weight:800;letter-spacing:1.5px;
   background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 0 22px rgba(255,215,0,0.45));
@@ -18380,10 +18380,10 @@ window.BirdHunt = (function(){
 
   // Kuş vurma sesi — kuş türüne göre farklı ses
   function _playBirdHitSound(birdKind){
-    var sfxKey = (birdKind === 'eagle') ? 'animal_eagle' : 'animal_bird';
+    var sfxKey = (birdKind === 'eagle') ? 'eagle' : 'bird';
     try {
-      if(typeof SFX !== 'undefined' && SFX.play){
-        SFX.play(sfxKey);
+      if(typeof SFX !== 'undefined' && SFX.animalSound){
+        SFX.animalSound(sfxKey);
         return;
       }
     } catch(_) {}
@@ -18393,7 +18393,6 @@ window.BirdHunt = (function(){
         return;
       }
     } catch(_) {}
-    try { if(typeof SFX!=='undefined' && SFX.explosion) SFX.explosion('normal'); } catch(_) {}
   }
 
   // Ana oyun müziğini pause/resume — bonus moddayken çakışmasın
@@ -18522,6 +18521,7 @@ window.BirdHunt = (function(){
         _m.style.pointerEvents = 'auto';
         _m.style.opacity = '1';
       }
+      try { if(typeof SFX!=='undefined' && SFX.openMap) SFX.openMap(); } catch(_mm) {}
     } else {
       // Direkt çağrıldıysa: oyun ekranını geri yükle
       if(typeof restoreGameLayers === 'function'){
