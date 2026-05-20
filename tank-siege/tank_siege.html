@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.132';
+const APP_VERSION      = '1.0.133';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 03:59';
-const APP_VERSION_NOTE = 'kus modu fix devam ediyir ama soeun olabilir';
+const APP_VERSION_DATE = '2026.05.20 04:31';
+const APP_VERSION_NOTE = 'arka plan sedi kus modu';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -18349,7 +18349,7 @@ window.BirdHunt = (function(){
   // ── Background sound — APK içinde değiştirilebilir ─────────
   // BirdHunt.setBgSound(url) ile veya doğrudan _bgAudio.src ile değiştir
   var _bgAudio = null;
-  var BG_SOUND_URL = 'file:///android_asset/sounds/noises_from_a_residential_road.mp3';
+  var BG_SOUND_URL = (typeof Android !== 'undefined') ? 'https://appassets.androidplatform.net/assets/sounds/noises_from_a_residential_road.mp3' : '';
 
   function _initBgAudio(){
     if(_bgAudio) return _bgAudio;
