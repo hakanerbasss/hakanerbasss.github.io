@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.136';
+const APP_VERSION      = '1.0.137';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 11:30';
-const APP_VERSION_NOTE = 'update 11:30';
+const APP_VERSION_DATE = '2026.05.20 12:08';
+const APP_VERSION_NOTE = 'Tank acisi degisti';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -9997,7 +9997,7 @@ function spawnDestruction(){
 // CONTROLS
 // ═══════════════════════════════════════
 function adjustAngle(delta){
-  angle = Math.max(5, Math.min(89, angle+delta));
+  angle = Math.max(5, Math.min(175, angle+delta));
   updateUI();
 }
 
@@ -10767,12 +10767,10 @@ function onJoyDown(e){
 
   e.preventDefault();
   // Sağ taraf ammo butonları için boşluk bırak
-  if(e.clientX > window.innerWidth*0.78) return;
+  if(e.clientX > window.innerWidth*0.90) return;
 
   // Sol %18 ve alt %35 — tank alanı — kart aç
-  if(e.clientX < window.innerWidth*0.18 && e.clientY > window.innerHeight*0.65){
-    openTankCard(); return;
-  }
+  // tank card acma joystick icinden kaldirildi
   // Hedef üstüne tıklama — bilgi popup
   if(phase==='aim' && targetHP>0){
     const scaleX=window.innerWidth/W, scaleY=window.innerHeight/H;
@@ -10818,7 +10816,7 @@ function onJoyMove(e){
   dot.style.top=(joyStartY+Math.sin(ang2)*dist)+'px';
   // X axis -> angle: drag right=lower angle, drag left=higher
   // Map dx from -JOY_R..+JOY_R to angle 75..10
-  angle=Math.max(5,Math.min(89,45-dx*0.5));
+  angle=Math.max(5,Math.min(175,45-dx*0.5));
   // Y axis -> power: drag up=more power
   power=Math.max(10,Math.min(100,50-dy*0.7));
   updatePowerBarOnly(); // DOM'a sadece power bar yaz, tam updateUI() değil
@@ -12447,22 +12445,22 @@ const LANG = {
     bh_title:              'KUS AVI!',
     bh_subtitle:           'Sinirli surede gokyuzundeki kuslari vur, puan topla.',
     bh_rule_time:          '45 saniye + 15 mermi hakkin var',
-    bh_rule_pts:           'Her kuş +25 puan',
-    bh_rule_combo:         'Üst üste vuruşlarda combo çarpanı',
-    bh_rule_ammo:          'Sadece standart mermi — özel ammo yok',
-    bh_start:              '▶ BAŞLA',
+    bh_rule_pts:           'Her kus +25 puan',
+    bh_rule_combo:         'Ust uste vuruslarda combo carpani',
+    bh_rule_ammo:          'Sadece standart mermi - ozel ammo yok',
+    bh_start:              '▶ BASLA',
     bh_triple_ad:          '📺 Reklam İzle → ×3 Mermi (45 atış)',
     bh_aim_hint:           'SOL · BASIP SÜRÜKLEYEREK NİŞAN AL',
-    bh_fire:               'ATEŞ!',
+    bh_fire:               'ATES!',
     bh_finish:             '▶ BİTİR',
-    bh_stat_kills:         'KUŞ',
+    bh_stat_kills:         'KUS',
     bh_stat_combo:         'COMBO',
     bh_stat_pts:           'PUAN',
     bh_daily_full:         '🔒 Bugun kus avi limitin doldu! Yarin tekrar dene.',
     bh_triple_active:      '🎯 x3 Mermi aktif! 45 atis hakkin var.',
-    bh_res_time:           'SÜRE BİTTİ!',
-    bh_res_ammo:           'MERMİ BİTTİ!',
-    bh_res_quit:           'AV BİTTİ!',
+    bh_res_time:           'SURE BITTI!',
+    bh_res_ammo:           'MERMI BITTI!',
+    bh_res_quit:           'AV BITTI!',
     tslb_empty_title:      '🌐 Online Sıralama',
     tslb_empty_body:       'Tam sıralamayı görmek için aşağıdaki butona dokun. Skorların otomatik olarak Google Play Games’e gönderiliyor.',
     tslb_empty_title_off:  '🔒 Henüz Bağlı Değilsin',
@@ -17445,7 +17443,7 @@ var OB_STEPS = [
   // Level 1 (curLevel=0)
   { level:0, target:'#joystick-zone', title:'Nişan al',     body:'Tank alanına basıp sürükleyerek <b style="color:#FFD700">açıyı ve gücü</b> ayarla.', pos:'top', pad:0, rectOverride:'tank' },
   { level:0, target:'#power-wrap',    title:'Güç çubuğu',   body:'Sürüklerken bu çubuk dolar. Daha yüksek güç = daha uzun atış.', pos:'right' },
-  { level:0, target:'#btn-fire',      title:'ATEŞ!',        body:'Hazır olunca <b style="color:#FFD700">ATEŞ</b> butonuna bas. Hedefe vur, levelı kazan.', pos:'top' },
+  { level:0, target:'#btn-fire',      title:'ATES!',        body:'Hazır olunca <b style="color:#FFD700">ATEŞ</b> butonuna bas. Hedefe vur, levelı kazan.', pos:'top' },
   // Level 2 (curLevel=1)
   { level:1, target:'#wind-display',  title:'Rüzgar',       body:'Yön ve şiddete dikkat — atışın yönünü etkiler. Sayı yüksekse atış arkasında uçar.', pos:'left' },
   { level:1, target:'#ammo-bar',      title:'Mühimmat',     body:'Sağ altta mermi slotları. Üzerine basarak farklı mühimmat seç.', pos:'left' },
@@ -18186,7 +18184,7 @@ window.TSLB = (function(){
   position:absolute;right:12px;bottom:18px;
   background:linear-gradient(180deg,#FF6B35,#ff3d00);color:#fff;
   border:none;border-radius:28px;padding:14px 38px;
-  font-family:'Fredoka One',sans-serif;font-size:22px;letter-spacing:2px;
+  font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:800;letter-spacing:2px;
   cursor:pointer;-webkit-tap-highlight-color:transparent;pointer-events:auto;
   box-shadow:0 5px 0 #b32200, 0 6px 24px rgba(255,107,53,0.55), inset 0 1px 0 rgba(255,255,255,0.25);
   text-shadow:0 2px 0 rgba(0,0,0,0.2);
@@ -18242,7 +18240,7 @@ window.TSLB = (function(){
 #bh-intro .start-btn{
   background:linear-gradient(180deg,#FFD700,#FF8C00);color:#1a0800;
   border:none;border-radius:18px;padding:14px 40px;
-  font-family:'Fredoka One',sans-serif;font-size:20px;letter-spacing:1.5px;
+  font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:800;letter-spacing:1.5px;
   cursor:pointer;-webkit-tap-highlight-color:transparent;
   box-shadow:0 6px 0 #a85a00, 0 8px 22px rgba(255,140,0,0.4);
 }
@@ -18314,14 +18312,14 @@ window.TSLB = (function(){
       <div id="bh-power-bar-bg"><div id="bh-power-fill"></div></div>
       <div id="bh-power-pct">50%</div>
     </div>
-    <button id="bh-fire-btn" onclick="BirdHunt.fire()">ATEŞ!</button>
+    <button id="bh-fire-btn" onclick="BirdHunt.fire()">ATES!</button>
     <div id="bh-hint"><span id="bh-hint-text">SOL · BASIP SÜRÜKLEYEREK NİŞAN AL</span></div>
   </div>
 
   <!-- Intro splash -->
   <div id="bh-intro">
     <div class="bird-icon">🦅</div>
-    <div class="title" id="bh-intro-title">KUŞ AVI!</div>
+    <div class="title" id="bh-intro-title">KUS AVI!</div>
     <div class="subtitle" id="bh-intro-sub">Sınırlı sürede gökyüzündeki kuşları vur, puan topla.</div>
     <div class="rules">
       <div class="rule"><span class="em">⏱</span><span id="bh-rule-time">45 saniye + 15 mermi hakkın var</span></div>
@@ -18329,7 +18327,7 @@ window.TSLB = (function(){
       <div class="rule"><span class="em">🔥</span><span id="bh-rule-combo">Üst üste vuruşlarda combo çarpanı</span></div>
       <div class="rule"><span class="em">📋</span><span id="bh-rule-ammo">Sadece standart mermi — özel ammo yok</span></div>
     </div>
-    <button class="start-btn" id="bh-start-btn" onclick="BirdHunt.start()">▶ BAŞLA</button>
+    <button class="start-btn" id="bh-start-btn" onclick="BirdHunt.start()">▶ BASLA</button>
     <button id="bh-triple-btn" onclick="BirdHunt.watchAdTriple()" style="margin-top:10px;background:linear-gradient(180deg,#FFB347,#FF8C00);color:#1a0800;border:none;border-radius:14px;padding:10px 22px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #6a3a00, 0 5px 14px rgba(255,140,0,0.4);">📺 Reklam İzle → ×3 Mermi (45 atış)</button>
   </div>
 
@@ -18536,16 +18534,16 @@ window.BirdHunt = (function(){
     var setText = function(id, key, fb){
       var e = document.getElementById(id); if(e) e.textContent = _t(key, fb);
     };
-    setText('bh-intro-title',    'bh_title',           'KUŞ AVI!');
+    setText('bh-intro-title',    'bh_title',           'KUS AVI!');
     setText('bh-intro-sub',      'bh_subtitle',        'Sınırlı sürede gökyüzündeki kuşları vur, puan topla.');
     setText('bh-rule-time',      'bh_rule_time',       '45 saniye + 15 mermi hakkın var');
     setText('bh-rule-pts',       'bh_rule_pts',        'Her kuş +25 puan');
     setText('bh-rule-combo',     'bh_rule_combo',      'Üst üste vuruşlarda combo çarpanı');
     setText('bh-rule-ammo',      'bh_rule_ammo',       'Sadece standart mermi — özel ammo yok');
-    setText('bh-start-btn',      'bh_start',           '▶ BAŞLA');
+    setText('bh-start-btn',      'bh_start',           '▶ BASLA');
     setText('bh-triple-btn',     'bh_triple_ad',       '📺 Reklam İzle → ×3 Mermi (45 atış)');
     setText('bh-hint-text',      'bh_aim_hint',        'SOL · BASIP SÜRÜKLEYEREK NİŞAN AL');
-    setText('bh-fire-btn',       'bh_fire',            'ATEŞ!');
+    setText('bh-fire-btn',       'bh_fire',            'ATES!');
     setText('bh-result-finish',  'bh_finish',          '▶ BİTİR');
     var rk = document.getElementById('bh-res-kills-label'); if(rk) rk.textContent = _t('bh_stat_kills','KUŞ');
     var rc = document.getElementById('bh-res-combo-label'); if(rc) rc.textContent = _t('bh_stat_combo','COMBO');
@@ -19042,7 +19040,7 @@ window.BirdHunt = (function(){
       if(!S || !S.dragging) return;
       var dx = e.clientX - S.dragSX;
       var dy = e.clientY - S.dragSY;
-      S.angle = Math.max(5, Math.min(89, 45 - dx*0.5));
+      S.angle = Math.max(5, Math.min(175, 45 - dx*0.5));
       S.power = Math.max(10, Math.min(100, 55 - dy*0.7));
       _renderTank();
       _updateHUD();
