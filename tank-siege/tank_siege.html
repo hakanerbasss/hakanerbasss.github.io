@@ -22,21 +22,23 @@ html,body{
 
 /* HUD — top stats bar */
 #hud{
-  position:fixed;top:0;left:0;right:0;height:52px;
+  position:fixed;top:0;left:0;right:0;height:54px;
   background:linear-gradient(180deg,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 60%,transparent 100%);
   display:flex;align-items:center;justify-content:space-between;
-  padding:0 8px;z-index:100;pointer-events:none;
+  padding:8px 10px 0;z-index:100;pointer-events:none;
+  gap:6px;
 }
 /* Each top-HUD stat becomes its own pill */
 #hud-shots, #hud-level, #hud-score, #hud-stars{
-  display:inline-flex;align-items:center;gap:3px;
-  padding:4px 8px;border-radius:10px;
+  display:inline-flex;align-items:center;gap:4px;
+  padding:5px 11px;border-radius:12px;
   background:rgba(0,0,0,0.55);
   border:1px solid rgba(255,255,255,0.10);
-  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:800;
+  font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:800;
   letter-spacing:0.3px;line-height:1;
   pointer-events:none;
   box-shadow:0 2px 8px rgba(0,0,0,0.35);
+  backdrop-filter:blur(6px);
 }
 #hud-shots{color:#fff;border-color:rgba(255,107,53,0.35);}
 #hud-level{
@@ -49,8 +51,7 @@ html,body{
     inset 0 1px 0 rgba(255,215,0,0.20) !important;
   cursor:pointer;pointer-events:auto !important;
   transition:transform 0.08s, box-shadow 0.12s;
-  display:inline-flex;align-items:center;gap:4px;
-  font-size:12px !important;padding:4px 8px !important;
+  display:inline-flex;align-items:center;gap:5px;
 }
 #hud-level:active{transform:scale(0.93);}
 #hud-level::before{
@@ -65,45 +66,52 @@ html,body{
 #hud-score{color:#00E5FF;border-color:rgba(0,229,255,0.35);}
 #hud-stars{color:#FFD700;border-color:rgba(255,215,0,0.45);background:rgba(40,30,5,0.55);}
 
-/* HUD2 — hud ile birlesti, artik kullanilmiyor */
-#hud2{ display:none; }
+/* HUD2 — tank badge + map + inventory */
+#hud2{
+  position:fixed;top:58px;left:10px;right:10px;
+  display:flex;align-items:center;gap:6px;
+  z-index:100;pointer-events:none;
+}
 #tank-badge{
-  display:inline-flex;align-items:center;gap:4px;
+  display:flex;align-items:center;gap:6px;
   background:linear-gradient(180deg,rgba(60,80,40,0.85),rgba(30,40,20,0.85));
   border:1.5px solid rgba(255,215,0,0.4);
-  border-radius:10px;padding:4px 8px;
+  border-radius:14px;padding:5px 10px;
   cursor:pointer;pointer-events:auto;
   -webkit-tap-highlight-color:transparent;
   box-shadow:0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
   transition:transform 0.08s;
 }
 #tank-badge:active{transform:scale(0.95);}
-#tank-badge-icon{font-size:14px;line-height:1;}
-#tank-badge-name{color:white;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:800;}
-#tank-badge-level{color:#FFD700;font-size:10px;font-weight:800;margin-left:1px;}
+#tank-badge-icon{font-size:15px;line-height:1;}
+#tank-badge-name{color:white;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:800;}
+#tank-badge-level{color:#FFD700;font-size:11px;font-weight:800;margin-left:2px;}
 #btn-gallery-open{
   background:linear-gradient(180deg,#FF6B35,#ff3d00);
-  border:none;color:white;border-radius:10px;
-  width:30px;height:28px;padding:0;font-size:15px;line-height:1;
+  border:none;color:white;border-radius:14px;padding:6px 12px;
+  font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:800;letter-spacing:0.3px;
   cursor:pointer;pointer-events:auto;
   -webkit-tap-highlight-color:transparent;
-  box-shadow:0 3px 0 #b32200, 0 4px 10px rgba(255,107,53,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow:0 3px 0 #b32200, 0 4px 10px rgba(255,107,53,0.35);
   transition:transform 0.08s, box-shadow 0.08s;
-  display:inline-flex;align-items:center;justify-content:center;
 }
 #btn-gallery-open:active{transform:translateY(2px);box-shadow:0 1px 0 #b32200;}
 
-/* Map button */
+/* Map button — sea/teal gradient, matching gallery-open style */
 #btn-level-map{
   background:linear-gradient(180deg,#2bb6cc,#0a8ca5);
-  border:none;color:white;border-radius:10px;
-  width:30px;height:28px;padding:0;
-  font-size:15px;line-height:1;
+  border:none;color:white;border-radius:14px;
+  width:38px;height:32px;padding:0;
+  font-size:18px;line-height:1;
   cursor:pointer;pointer-events:auto;
   -webkit-tap-highlight-color:transparent;
-  box-shadow:0 3px 0 #075c70, 0 4px 10px rgba(10,140,165,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow:
+    0 3px 0 #075c70,
+    0 4px 10px rgba(10,140,165,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.25);
   transition:transform 0.08s, box-shadow 0.08s;
   display:inline-flex;align-items:center;justify-content:center;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,0.4));
 }
 #btn-level-map:active{
   transform:translateY(2px);
@@ -343,27 +351,25 @@ button:active{opacity:0.75;transform:scale(0.96);}
 #lives-badge{
   background:linear-gradient(180deg,rgba(80,20,20,0.85),rgba(40,10,10,0.85)) !important;
   border:1.5px solid rgba(255,80,80,0.55) !important;
-  border-radius:10px !important;padding:4px 7px !important;
-  color:#FF6B6B !important;font-size:12px !important;font-weight:800 !important;
+  border-radius:12px !important;padding:5px 12px !important;
+  color:#FF6B6B !important;font-size:13px !important;font-weight:800 !important;
   font-family:'Rajdhani',sans-serif !important;
-  box-shadow:0 2px 8px rgba(0,0,0,0.4), 0 0 10px rgba(255,80,80,0.18), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  box-shadow:0 2px 8px rgba(0,0,0,0.4), 0 0 12px rgba(255,80,80,0.18), inset 0 1px 0 rgba(255,255,255,0.06) !important;
   -webkit-tap-highlight-color:transparent !important;
-  cursor:pointer !important;pointer-events:auto !important;
+  cursor:pointer !important;
   transition:transform 0.08s !important;
-  line-height:1 !important;
 }
 #lives-badge:active{transform:scale(0.93) !important;}
 #streak-badge{
   background:linear-gradient(180deg,rgba(80,50,10,0.9),rgba(50,30,5,0.9)) !important;
   border:1.5px solid rgba(255,140,0,0.6) !important;
-  border-radius:10px !important;padding:4px 7px !important;
-  color:#FFB347 !important;font-size:12px !important;font-weight:800 !important;
+  border-radius:12px !important;padding:5px 12px !important;
+  color:#FFB347 !important;font-size:13px !important;font-weight:800 !important;
   font-family:'Rajdhani',sans-serif !important;
-  box-shadow:0 2px 8px rgba(0,0,0,0.4), 0 0 12px rgba(255,140,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  box-shadow:0 2px 8px rgba(0,0,0,0.4), 0 0 14px rgba(255,140,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08) !important;
   -webkit-tap-highlight-color:transparent !important;
-  cursor:pointer !important;pointer-events:auto !important;
+  cursor:pointer !important;
   transition:transform 0.08s !important;
-  line-height:1 !important;
 }
 #streak-badge:active{transform:scale(0.93) !important;}
 #cloud-games-btn{
@@ -1255,30 +1261,25 @@ button:active{opacity:0.75;transform:scale(0.96);}
 
 
 <div id="hud">
-  <!-- Sol: navigasyon -->
-  <div style="display:inline-flex;align-items:center;gap:4px;pointer-events:auto;">
-    <div id="tank-badge" onclick="openTankCard()">
-      <span id="tank-badge-icon">🚗</span>
-      <span id="tank-badge-name">Basic</span>
-      <span id="tank-badge-level"></span>
-    </div>
-    <button id="btn-level-map" onclick="showLevelMap()" data-i18n-title="map_title" title="Harita">🗺️</button>
-    <button id="btn-gallery-open" onclick="openGallery(curLevel)" title="Inventory">⚔️</button>
-  </div>
-  <!-- Orta: level -->
+  <span id="hud-shots">💣 3</span>
   <span id="hud-level" onclick="openLevelPreview()">LEVEL 1</span>
-  <!-- Sag: stats + can + ayarlar -->
-  <div style="display:inline-flex;align-items:center;gap:4px;pointer-events:auto;">
-    <span id="hud-shots">💣 3</span>
-    <span id="hud-score">🏆 0</span>
-    <span id="hud-stars" style="display:none;">⭐ 0</span>
-    <button id="lives-badge" onclick="openLivesCard()">❤️ 5/5</button>
-    <button id="streak-badge" onclick="openStreakCard()" style="display:none;">🔥 1</button>
-    <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.25);color:white;border-radius:10px;width:28px;height:28px;padding:0;font-size:14px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;">⚙️</button>
-  </div>
+  <span id="hud-score">🏆 0</span>
+  <span id="hud-stars" style="color:#FFD700;font-size:15px;font-weight:700;padding:4px 8px;border-radius:10px;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);">⭐ 0</span>
 </div>
 
-<div id="hud2" style="display:none;"></div>
+<!-- Tank badge üstte küçük -->
+<div id="hud2">
+  <div id="tank-badge" onclick="openTankCard()">
+    <span id="tank-badge-icon">🚗</span>
+    <span id="tank-badge-name">Basic</span>
+    <span id="tank-badge-level"></span>
+  </div>
+  <button id="btn-level-map" onclick="showLevelMap()" data-i18n-title="map_title" title="Harita">🗺️</button>
+  <button id="btn-gallery-open" onclick="openGallery(curLevel)" data-i18n="inventory">⚔️ Inventory</button>
+  <div style="flex:1;"></div>
+  <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
+  <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
+</div>
 
 <!-- Mermi slotları — sağ altta eski yerinde -->
 <!-- Slot bilgi kartı -->
@@ -1450,7 +1451,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 </div>
 
 <div id="angle-display">📐 45°</div>
-<div id="boost-wrap" style="position:fixed;top:60px;left:12px;z-index:200;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:auto;">
+<div id="boost-wrap" style="position:fixed;top:108px;left:12px;z-index:200;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:auto;">
 
   <button id="tactical-badge" onclick="onTacticalBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="boost-badge" onclick="onDmgBoostBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
@@ -1458,15 +1459,17 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="quests-badge" onclick="Quests.open()" style="background:linear-gradient(180deg,rgba(0,150,80,0.85),rgba(0,80,40,0.92));border:2px solid rgba(0,230,120,0.55);border-radius:10px;padding:5px 10px;color:#00E676;font-size:13px;font-weight:800;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5),0 0 12px rgba(0,200,80,0.25);min-width:52px;text-align:center;">📋 <span id="quests-badge-count">0/3</span></button>
 </div>
 
-<div id="wind-wrap" style="position:fixed;top:60px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:5px;pointer-events:none;">
+<div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
   <div style="display:flex;flex-direction:row;align-items:center;gap:5px;">
-    <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:14px;padding:4px 8px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayıt"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">☁️</span></button>
-    <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:12px;background:rgba(0,0,0,0.55);padding:4px 9px;border-radius:8px;pointer-events:none;border:1px solid rgba(120,180,255,0.25);">💨 Calm</div>
+    <button id="cloud-games-btn" onclick="openCloudSettings()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;" title="Bulut Kayıt"><span id="cloud-badge-text" style="color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">☁️</span></button>
+    <button id="lives-badge" onclick="openLivesCard()" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,80,80,0.5);border-radius:14px;padding:4px 10px;color:#FF5555;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">❤️ 5/5</button>
+    <div id="wind-display" style="color:rgba(255,255,255,0.8);font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;pointer-events:none;">💨 Calm</div>
   </div>
+
 </div>
 
 <!-- Kalkan + Bunker — sağa yaslanmış, kalkan üstte bunker altta -->
-<div id="right-action-wrap" style="position:fixed;top:100px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
+<div id="right-action-wrap" style="position:fixed;top:148px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
   <button id="shield-btn" onclick="onShieldTap()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 8px;color:white;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🛡️</button>
   <div id="buried-unlock-btn" onclick="showBuriedInfo()" style="display:none;width:48px;height:48px;border-radius:14px;cursor:pointer;pointer-events:auto;align-items:center;justify-content:center;position:relative;-webkit-tap-highlight-color:transparent;background:linear-gradient(180deg,#3a2008,#0e0602);border:1.5px solid #FFD700;box-shadow:0 3px 0 #5a3800,0 4px 14px rgba(255,180,40,0.45),inset 0 1px 0 rgba(255,215,0,0.35),inset 0 0 12px rgba(255,180,40,0.18);overflow:visible;transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 0 #5a3800,0 2px 8px rgba(255,180,40,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''">
     <span style="position:absolute;inset:-3px;border-radius:16px;border:1.5px solid rgba(255,215,0,0.4);animation:nukePulse 1.4s ease-in-out infinite;pointer-events:none;"></span>
@@ -1586,7 +1589,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.145';
+const APP_VERSION      = '1.0.144';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1604,8 +1607,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 01:20';
-const APP_VERSION_NOTE = 'HUD yeniden tasarimi: tek satir bar, can badge eklendi, hud2 kaldirildi';
+const APP_VERSION_DATE = '2026.05.21 00:50';
+const APP_VERSION_NOTE = 'Android WebView performans: CSS blur kaldirildi, shadow korundu, gradient cache, parcacik limiti';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
