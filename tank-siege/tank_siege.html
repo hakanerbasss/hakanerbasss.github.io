@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.139';
+const APP_VERSION      = '1.0.140';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 18:48';
-const APP_VERSION_NOTE = 'Tank ve hedef kartlari aciliyir';
+const APP_VERSION_DATE = '2026.05.20 19:05';
+const APP_VERSION_NOTE = 'Duzeltme yapdi can kazanma 20 dk yerine 5 dakika bekleme';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -11881,7 +11881,7 @@ function _scheduleLifeNotifIfNeeded(){
   if(typeof Android === 'undefined' || !Android.scheduleLifeNotification) return;
   var lives    = parseInt(localStorage.getItem('lives_count')||'5');
   var maxL     = 5;
-  var regenMs  = 20*60*1000;
+  var regenMs  = 5*60*1000;
   if(lives >= maxL){
     try{ Android.cancelLifeNotification(); }catch(_){}
     return;
@@ -12190,8 +12190,8 @@ const LANG = {
     lives_next:         'Sonraki can:',
     lives_minutes:      'dakika',
     lives_full:         'Canlar dolu!',
-    lives_info:         'Her 20 dakikada 1 can dolar. Maksimum 5 can.',
-    lives_ad_info:      'Reklam ile günlük 3 can kazanabilirsin.',
+    lives_info:         'Her 5 dakikada 1 can dolar. Maksimum 5 can.',
+    lives_ad_info:      'Reklam ile günlük 15 can kazanabilirsin.',
     toast_2x_expired:   '2x Hasar geçici süresi bitti.',
     toast_self_hit:     '💥 Kendi tankını vurdun! {n} can kaldı',
     toast_ap_won:       '🔩 AP Mühimmat kazandın!',
@@ -12223,7 +12223,7 @@ const LANG = {
     toast_reward_got:   'Ödül alındı!',
     toast_ad_not_ready: '📵 Reklam şu an hazır değil, biraz bekleyip tekrar dene.',
     toast_lives_full:   '❤️ Canlar zaten dolu!',
-    toast_life_won:     '❤️ +1 Can kazandın! Devam ediliyor...',
+    toast_life_won:     '❤️ +5 Can kazandın! Devam ediliyor...',
     toast_cloud_app_only:'Bulut kayıt sadece uygulamada çalışır.',
     toast_cloud_load_app_only:'Bulut yükleme sadece uygulamada çalışır.',
     toast_cloud_signin_first:'Önce Google Play Games girişini yap.',
@@ -12247,7 +12247,7 @@ const LANG = {
     toast_dmg_active:   'Hasar Sv{lv} aktif! (x{mult})',
     toast_app_only:     'Sadece uygulamada çalışır.',
     toast_daily_3_ad:   'Günlük 3 reklam limitine ulaştınız!',
-    ad_life_btn:        '📺 Reklam izle → +1 Can ({n}/3)',
+    ad_life_btn:        '📺 Reklam izle → +5 Can ({n}/3)',
     lives_count_label:  '{n} / {max} can',
     lives_full_status:  '❤️ Canlar dolu!',
     lives_next_in:      'Sonraki can: {min} dakika',
@@ -12749,8 +12749,8 @@ const LANG = {
     lives_next:         'Next life:',
     lives_minutes:      'minutes',
     lives_full:         'Lives are full!',
-    lives_info:         '1 life regenerates every 20 minutes. Max 5 lives.',
-    lives_ad_info:      'You can earn 3 lives per day from ads.',
+    lives_info:         '1 life regenerates every 5 minutes. Max 5 lives.',
+    lives_ad_info:      'You can earn 15 lives per day from ads.',
     toast_2x_expired:   '2x Damage boost expired.',
     toast_self_hit:     '💥 You hit your own tank! {n} HP left',
     toast_ap_won:       '🔩 AP Ammo earned!',
@@ -12782,7 +12782,7 @@ const LANG = {
     toast_reward_got:   'Reward claimed!',
     toast_ad_not_ready: '📵 Ad is not ready right now — wait a moment and try again.',
     toast_lives_full:   '❤️ Lives are already full!',
-    toast_life_won:     '❤️ +1 Life earned! Continuing...',
+    toast_life_won:     '❤️ +5 Lives earned! Continuing...',
     toast_cloud_app_only:'Cloud save only works in the app.',
     toast_cloud_load_app_only:'Cloud load only works in the app.',
     toast_cloud_signin_first:'Sign in with Google Play Games first.',
@@ -12806,7 +12806,7 @@ const LANG = {
     toast_dmg_active:   'Damage Lv{lv} active! (x{mult})',
     toast_app_only:     'Only works in the app.',
     toast_daily_3_ad:   'Daily limit of 3 ads reached!',
-    ad_life_btn:        '📺 Watch ad → +1 Life ({n}/3)',
+    ad_life_btn:        '📺 Watch ad → +5 Lives ({n}/3)',
     lives_count_label:  '{n} / {max} lives',
     lives_full_status:  '❤️ Lives are full!',
     lives_next_in:      'Next life: {min} minutes',
@@ -16779,7 +16779,7 @@ function _lvlPreviewPlay(){
 
 <script>
 var MAX_LIVES=5;
-var LIVES_REGEN_MS=20*60*1000;
+var LIVES_REGEN_MS=5*60*1000;
 function _livesNow(){
   var stored=parseInt(lsGet("lives_count")||"5");
   var lastTime=parseInt(lsGet("lives_time")||"0");
@@ -16861,7 +16861,7 @@ function watchAdForLife(){
 function giveLifeFromAd(){
   var cur=_livesNow();
   if(cur>=MAX_LIVES){showToast(t('toast_lives_full'));return;}
-  var newL = cur+1;
+  var newL = Math.min(MAX_LIVES, cur+5);
   lsSet("lives_count",String(newL));
   lsSet("ad_life_count",String(_adLifeCountToday()+1));
   updateLivesBadge();
@@ -17394,7 +17394,7 @@ const Tutorial = (function(){
 
     <div style="padding:9px 11px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
       <div style="font-size:10.5px;color:rgba(255,255,255,0.55);line-height:1.55;text-align:center;font-weight:600;">
-        <span data-i18n="lives_info">Her 20 dakikada 1 can dolar. Maksimum 5 can.</span><br>
+        <span data-i18n="lives_info">Her 5 dakikada 1 can dolar. Maksimum 5 can.</span><br>
         <span data-i18n="lives_ad_info">Reklam ile günlük 3 can kazanabilirsin.</span>
       </div>
     </div>
