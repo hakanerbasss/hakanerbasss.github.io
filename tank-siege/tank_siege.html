@@ -275,7 +275,7 @@ button:active{opacity:0.75;transform:scale(0.96);}
 #toast{
   position:fixed;top:60px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,0.92);color:white;padding:9px 22px;
-  border-radius:22px;font-size:14px;font-weight:700;z-index:400;
+  border-radius:22px;font-size:14px;font-weight:700;z-index:99999;
   border:1px solid rgba(255,255,255,0.12);
   box-shadow:0 4px 16px rgba(0,0,0,0.5);
   opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;
@@ -927,11 +927,11 @@ button:active{opacity:0.75;transform:scale(0.96);}
 .lm-card-stars{font-size:13px;letter-spacing:1px;}
 .lm-card-mat{font-size:11px;color:rgba(255,255,255,0.45);font-family:'Rajdhani',sans-serif;}
 .lm-bonus-badge{
-  position:absolute;top:6px;right:6px;
+  position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
   background:linear-gradient(180deg,#FFD700,#FF8C00);
   color:#1a0800;font-family:'Rajdhani',sans-serif;
-  font-size:9px;font-weight:800;letter-spacing:0.6px;
-  padding:3px 8px;border-radius:9px;
+  font-size:11px;font-weight:800;letter-spacing:0.6px;
+  padding:5px 14px;border-radius:9px;
   border:1.5px solid #1a1408;
   box-shadow:0 3px 0 #6a4a00, 0 4px 12px rgba(255,140,0,0.45);
   cursor:pointer;-webkit-tap-highlight-color:transparent;
@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.134';
+const APP_VERSION      = '1.0.135';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 11:05';
-const APP_VERSION_NOTE = 'Kus modu';
+const APP_VERSION_DATE = '2026.05.20 11:17';
+const APP_VERSION_NOTE = 'update 11:17';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -15375,6 +15375,9 @@ function debugResetAds(){
   lsRemove('last_ad');
   lsSet('daily_ads', '0');
   lsRemove('daily_reset');
+  // Kus avi gunluk sayacini da sifirla
+  var _bhToday='bh_count_'+new Date().getFullYear()+'-'+(new Date().getMonth()+1)+'-'+new Date().getDate();
+  localStorage.removeItem((typeof isSandbox!=='undefined'&&isSandbox?'sb_':'ts_')+_bhToday);
   lastAdTime=0;
   dailyAdCount=0;
   updateTacticalBadge(); updateWindBlockBadge();
