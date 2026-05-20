@@ -1568,7 +1568,8 @@ const MIN_POWER = 6;
 // ═══════════════════════════════════════
 // LEVELS
 // ── Sandbox Mod Detect ──────────────────────────────────────────
-const isSandbox = window.location.hash === '#sandbox';
+const isSandbox  = window.location.hash === '#sandbox';
+const _isAndroid = typeof Android !== 'undefined';
 
 // ── localStorage Namespace Helpers ──────────────────────────────────────────
 // Sandbox → 'sb_' prefix, Gerçek mod → 'ts_' prefix
@@ -1588,7 +1589,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.142';
+const APP_VERSION      = '1.0.143';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1607,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 00:10';
-const APP_VERSION_NOTE = 'AlarmManager bildirim duzeltildi - localStorage namespace hatasi giderildi';
+const APP_VERSION_DATE = '2026.05.21 00:30';
+const APP_VERSION_NOTE = 'Android WebView performans: blur filter ve shadowBlur APK icinde devre disi';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -6304,22 +6305,24 @@ function drawCloudsOn(c){
   clouds.forEach(cl=>{
     c.save();
     const gx=cl.x, gy=cl.y;
-    // Zemin gölgesi — ağır bulutlarda daha belirgin
-    c.globalAlpha=0.05+weight*0.10;
-    c.filter='blur(14px)';
-    c.fillStyle='rgba(80,100,130,1)';
-    c.beginPath();
-    cl.lobes.forEach(l=>c.ellipse(gx+l.dx,gy+l.dy+(cl.bh||30)*0.6,l.rx*0.9,l.ry*0.5,l.rot,0,Math.PI*2));
-    c.fill();
-    c.filter='none';
-    // Soft glow
-    c.globalAlpha=0.08+weight*0.04;
-    c.filter='blur(18px)';
-    c.fillStyle='rgba(255,255,255,0.7)';
-    c.beginPath();
-    cl.lobes.forEach(l=>c.ellipse(gx+l.dx,gy+l.dy,l.rx*1.15,l.ry*1.15,l.rot,0,Math.PI*2));
-    c.fill();
-    c.filter='none';
+    // Zemin gölgesi — ağır bulutlarda daha belirgin (blur WebView'da CPU'ya biner, atla)
+    if(!_isAndroid){
+      c.globalAlpha=0.05+weight*0.10;
+      c.filter='blur(14px)';
+      c.fillStyle='rgba(80,100,130,1)';
+      c.beginPath();
+      cl.lobes.forEach(l=>c.ellipse(gx+l.dx,gy+l.dy+(cl.bh||30)*0.6,l.rx*0.9,l.ry*0.5,l.rot,0,Math.PI*2));
+      c.fill();
+      c.filter='none';
+      // Soft glow
+      c.globalAlpha=0.08+weight*0.04;
+      c.filter='blur(18px)';
+      c.fillStyle='rgba(255,255,255,0.7)';
+      c.beginPath();
+      cl.lobes.forEach(l=>c.ellipse(gx+l.dx,gy+l.dy,l.rx*1.15,l.ry*1.15,l.rot,0,Math.PI*2));
+      c.fill();
+      c.filter='none';
+    }
     // Hacim alt katman — tema renginde, ağır bulutlarda daha koyu
     c.globalAlpha=cl.opacity*(0.70+weight*0.25);
     c.fillStyle=darkCol;
@@ -7840,10 +7843,9 @@ function drawBuriedIndicator(bx, surfY){
   ctx.textBaseline = 'middle';
   ctx.globalAlpha = 0.7 + pulse * 0.3;
   // Gölge parlaması
-  ctx.shadowColor = frozen ? '#ff2200' : '#FFD700';
-  ctx.shadowBlur  = 10 + pulse * 8;
+  if(!_isAndroid){ ctx.shadowColor = frozen ? '#ff2200' : '#FFD700'; ctx.shadowBlur = 10 + pulse * 8; }
   ctx.fillText('☢️', 0, 0);
-  ctx.shadowBlur = 0;
+  if(!_isAndroid) ctx.shadowBlur = 0;
   ctx.restore();
 
   // Frozen ise kırmızı "!" uyarı
@@ -7853,9 +7855,9 @@ function drawBuriedIndicator(bx, surfY){
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = `rgba(255,80,80,${0.7+pulse*0.3})`;
-    ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 6;
+    if(!_isAndroid){ ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 6; }
     ctx.fillText('!', bx, surfY - beamH - 10);
-    ctx.shadowBlur = 0;
+    if(!_isAndroid) ctx.shadowBlur = 0;
     ctx.restore();
   }
 }
@@ -8396,8 +8398,7 @@ function drawPath(){
   // ── KATMAN 2: Orta glow ────────────────────────────────────────
   ctx.strokeStyle = palette.glow;
   ctx.lineWidth = 5;
-  ctx.shadowColor = palette.core;
-  ctx.shadowBlur = 8;
+  if(!_isAndroid){ ctx.shadowColor = palette.core; ctx.shadowBlur = 8; }
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for(let i=1;i<pts.length;i++){
@@ -8407,7 +8408,7 @@ function drawPath(){
   }
   ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
   ctx.stroke();
-  ctx.shadowBlur = 0;
+  if(!_isAndroid) ctx.shadowBlur = 0;
 
   // ── KATMAN 3: Çekirdek dashed line ─────────────────────────────
   const t = (Date.now()/1000) % 1;
