@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.131';
+const APP_VERSION      = '1.0.132';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1606,8 +1606,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.20 03:26';
-const APP_VERSION_NOTE = 'kus modu eklendi';
+const APP_VERSION_DATE = '2026.05.20 03:59';
+const APP_VERSION_NOTE = 'kus modu fix devam ediyir ama soeun olabilir';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -18349,7 +18349,7 @@ window.BirdHunt = (function(){
   // ── Background sound — APK içinde değiştirilebilir ─────────
   // BirdHunt.setBgSound(url) ile veya doğrudan _bgAudio.src ile değiştir
   var _bgAudio = null;
-  var BG_SOUND_URL = ''; // Boş bırakıldı — APK içinde dosya yolu ver
+  var BG_SOUND_URL = 'file:///android_asset/sounds/noises_from_a_residential_road.mp3';
 
   function _initBgAudio(){
     if(_bgAudio) return _bgAudio;
@@ -18374,15 +18374,59 @@ window.BirdHunt = (function(){
     if(_bgAudio){ try { _bgAudio.pause(); _bgAudio.currentTime = 0; } catch(_) {} }
   }
 
-  // Kuş vurma sesi — Android bridge varsa onu kullan, yoksa SFX.explosion
-  function _playBirdHitSound(){
+  // Kuş vurma sesi — kuş türüne göre farklı ses
+  function _playBirdHitSound(birdKind){
+    var sfxKey = (birdKind === 'eagle') ? 'animal_eagle' : 'animal_bird';
+    try {
+      if(typeof SFX !== 'undefined' && SFX.play){
+        SFX.play(sfxKey);
+        return;
+      }
+    } catch(_) {}
     try {
       if(typeof Android !== 'undefined' && Android.playBirdHit){
-        Android.playBirdHit();
+        Android.playBirdHit(sfxKey);
         return;
       }
     } catch(_) {}
     try { if(typeof SFX!=='undefined' && SFX.explosion) SFX.explosion('normal'); } catch(_) {}
+  }
+
+  // Ana oyun müziğini pause/resume — bonus moddayken çakışmasın
+  function _pauseMainMusic(){
+    try {
+      if(typeof SFX !== 'undefined'){
+        // Önce APK Android bridge dene
+        if(typeof Android !== 'undefined' && Android.pauseBgMusic){
+          Android.pauseBgMusic(); return;
+        }
+        // SFX modülünde varsa
+        if(SFX.pauseMusic){ SFX.pauseMusic(); return; }
+        if(SFX.stopMusic){ SFX.stopMusic(); return; }
+        // Toggle ile manuel — durumu hatırla
+        if(typeof SFX._musicOn !== 'undefined' && SFX._musicOn && SFX.toggleMusic){
+          window._bhMusicWasOn = true;
+          SFX.toggleMusic();
+        }
+        // Rüzgar sesini de durdur (loop çalıyorsa)
+        if(SFX.setWind){ SFX.setWind(0); }
+      }
+    } catch(_) {}
+  }
+  function _resumeMainMusic(){
+    try {
+      if(typeof SFX !== 'undefined'){
+        if(typeof Android !== 'undefined' && Android.resumeBgMusic){
+          Android.resumeBgMusic(); return;
+        }
+        if(SFX.resumeMusic){ SFX.resumeMusic(); return; }
+        if(SFX.startMusic){ SFX.startMusic(); return; }
+        if(window._bhMusicWasOn && SFX.toggleMusic){
+          SFX.toggleMusic();
+          window._bhMusicWasOn = false;
+        }
+      }
+    } catch(_) {}
   }
   function _today(){
     var d = new Date();
@@ -18425,11 +18469,11 @@ window.BirdHunt = (function(){
 
   function _open(){
     if(_todayCount() >= DAILY_LIMIT){
-      if(typeof showToast==='function'){
-        var t = (typeof window.t==='function') ? window.t('bh_daily_full') : null;
-        showToast(t || '🔒 Bugün kuş avı limitin doldu! Yarın tekrar dene.');
-      }
-      return;
+      var msg = '🔒 Bugün kuş avı limitin doldu! Yarın tekrar dene.';
+      try { if(typeof window.t==='function'){ msg = window.t('bh_daily_full') || msg; } } catch(_) {}
+      if(typeof showToast==='function') showToast(msg);
+      else if(typeof window.alert==='function') alert(msg);
+      return false;
     }
     _resetState();
     var ov = document.getElementById('bh-overlay');
@@ -18459,8 +18503,10 @@ window.BirdHunt = (function(){
     var ov = document.getElementById('bh-overlay');
     if(ov) ov.style.display = 'none';
     if(raf){ cancelAnimationFrame(raf); raf = null; }
-    // Arka plan ses durdur
-    if(_bgAudio){ try { _bgAudio.pause(); _bgAudio.currentTime = 0; } catch(_) {} }
+    // Bonus arka plan ses durdur
+    _stopBgSound();
+    // Ana oyun müziğini geri başlat
+    _resumeMainMusic();
     // Ana oyuna / level map'e dönüş — KRİTİK FIX
     var came = S && S.cameFromLevelMap;
     S = null;
@@ -18516,7 +18562,8 @@ window.BirdHunt = (function(){
     S.running = true;
     S.tStart = performance.now();
     _incToday();
-    _playBgSound();
+    _pauseMainMusic();    // Ana oyun müziği dursun
+    _playBgSound();       // Bonus arka plan ses başlasın
     // Spawn birds
     for(var i=0; i<3; i++) _spawnBird(true);
     _loop();
@@ -18530,22 +18577,28 @@ window.BirdHunt = (function(){
       _updateHUD();
       var tb = document.getElementById('bh-triple-btn');
       if(tb){ tb.style.display = 'none'; }
-      // Otomatik başlat
-      _start();
       if(typeof showToast==='function'){
-        var msg = (typeof window.t==='function') ? window.t('bh_triple_active') : null;
-        showToast(msg || '🎯 ×3 Mermi aktif! 45 atış hakkın var.');
+        var msg = '🎯 ×3 Mermi aktif! 45 atış hakkın var.';
+        try { if(typeof window.t==='function') msg = window.t('bh_triple_active') || msg; } catch(_) {}
+        showToast(msg);
       }
+      // Toast'ın görünmesi için kısa bekleme, sonra başlat
+      setTimeout(_start, 800);
     };
+    // Buton görsel feedback — "Reklam yükleniyor..."
+    var btn = document.getElementById('bh-triple-btn');
+    if(btn){
+      btn.disabled = true;
+      btn.textContent = '📺 Reklam yükleniyor…';
+      btn.style.opacity = '0.7';
+    }
     try {
       if(typeof Android !== 'undefined' && Android.showRewardedAd){
-        // Sonradan onAdRewardComplete() callback bekleniyor — APK side
         window.__bhAdCb = fn;
         Android.showRewardedAd('bh_triple');
-        // Eğer callback gelmezse 5sn sonra otomatik (simülasyon)
-        setTimeout(function(){ if(window.__bhAdCb){ window.__bhAdCb(); window.__bhAdCb=null; } }, 5000);
+        // Eğer callback gelmezse 8sn sonra otomatik (timeout fallback)
+        setTimeout(function(){ if(window.__bhAdCb){ window.__bhAdCb(); window.__bhAdCb=null; } }, 8000);
       } else {
-        // Simülasyon — 1.5s sonra otomatik
         setTimeout(fn, 1500);
       }
     } catch(_) { setTimeout(fn, 1500); }
@@ -18752,8 +18805,8 @@ window.BirdHunt = (function(){
       });
     }
     _updateHUD();
-    try { _playBirdHitSound(); } catch(_) {}
-    try { if(typeof Quests!=='undefined'){ Quests.track('animal','bird'); Quests.track('bird','bird'); } } catch(_) {}
+    try { _playBirdHitSound(b.type); } catch(_) {}
+    try { if(typeof Quests!=='undefined'){ Quests.track('animal','bird'); Quests.track('bird', b.type||'bird'); } } catch(_) {}
   }
 
   // ── HUD ──────────────────────────────────────────────────
@@ -18874,10 +18927,11 @@ window.BirdHunt = (function(){
     if(!c || !S || !S.running) return;
     var ctx = c.getContext('2d');
     _drawBackground(ctx);
-    // 1) Bulutları kuşlardan ÖNCE çiz (kuşlar üstte görünsün)
-    _drawClouds(ctx);
+    // 1) Kuşları ÖNCE çiz (bulutlar üstte olsun, kuşlar geçerken arkada kaybolsun)
     _updateBirds();
     S.birds.forEach(function(b){ _drawBird(ctx, b); });
+    // 2) Bulutlar kuşların ÜSTÜNDE çizilir (kuş bulutun arkasında kaybolur)
+    _drawClouds(ctx);
     _updateBullets();
     _drawBullets(ctx);
     _updatePop(ctx);
@@ -18885,7 +18939,6 @@ window.BirdHunt = (function(){
       S.comboTimer--;
       if(S.comboTimer === 0){ S.combo = 0; _updateHUD(); }
     }
-    // Timer
     S.timer--;
     if(S.timer % 60 === 0) _updateHUD();
     if(S.timer <= 0){ _endGame('time'); return; }
