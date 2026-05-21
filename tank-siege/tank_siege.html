@@ -1628,7 +1628,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.162';
+const APP_VERSION      = '1.0.163';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1646,8 +1646,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 20:00';
-const APP_VERSION_NOTE = 'Guncelle butonu CDN cache atlatir — aninda iner [Claude]';
+const APP_VERSION_DATE = '2026.05.21 22:00';
+const APP_VERSION_NOTE = 'BirdHunt Part1: secili tank SVG render (renk+detay) [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -18473,31 +18473,96 @@ window.BirdHunt = (function(){
     S.dpr = dpr;
   }
 
-  // ── Tank SVG (alt-merkez, namlu açıya göre döner) ─────────────
+  // ── Tank SVG — seçili tanka göre render ─────────────────────
   function _renderTank(){
     var svg = document.getElementById('bh-tank-svg');
     if(!svg) return;
-    var rad = (S ? S.angle : 45) * Math.PI/180;
-    // barrel base at (90, 56), tip at distance 56
-    var bx0 = 92, by0 = 56;
-    var L = 56;
-    var bx1 = bx0 + Math.cos(-rad)*L;
-    var by1 = by0 + Math.sin(-rad)*L;
-    svg.innerHTML = ''
-      + '<ellipse cx="100" cy="118" rx="78" ry="4" fill="#000" opacity="0.4"/>'
-      + '<rect x="14" y="86" width="172" height="22" rx="11" fill="#1a1a1a"/>'
-      + '<circle cx="26" cy="97" r="10" fill="#2a2a2a" stroke="#000" stroke-width="1"/>'
-      + '<circle cx="174" cy="97" r="10" fill="#2a2a2a" stroke="#000" stroke-width="1"/>'
-      + '<circle cx="60" cy="97" r="8" fill="#2a2a2a"/>'
-      + '<circle cx="100" cy="97" r="8" fill="#2a2a2a"/>'
-      + '<circle cx="140" cy="97" r="8" fill="#2a2a2a"/>'
-      + '<path d="M 18 86 L 26 70 L 178 70 L 188 86 Z" fill="#3a3024"/>'
-      + '<path d="M 22 70 L 36 50 L 174 50 L 188 70 Z" fill="#5a6a3a" stroke="#000" stroke-width="1.2"/>'
-      + '<ellipse cx="92" cy="50" rx="22" ry="14" fill="#5a6a3a" stroke="#000" stroke-width="1.2"/>'
-      + '<line x1="'+bx0+'" y1="'+by0+'" x2="'+bx1+'" y2="'+by1+'" stroke="#1a1a1a" stroke-width="9" stroke-linecap="round"/>'
-      + '<line x1="'+bx0+'" y1="'+by0+'" x2="'+bx1+'" y2="'+by1+'" stroke="#5a6a3a" stroke-width="6" stroke-linecap="round"/>'
-      + '<circle cx="'+bx1+'" cy="'+by1+'" r="4" fill="#1a1a1a"/>'
-      + '<circle cx="86" cy="44" r="2.5" fill="#1a1a1a"/>';
+    var ang = S ? S.angle : 45;
+    var rad = ang * Math.PI / 180;
+
+    // Seçili tank tanımı
+    var td = (typeof TANK_DEF !== 'undefined' && typeof selectedTank !== 'undefined')
+      ? (TANK_DEF[selectedTank] || TANK_DEF.basic)
+      : {color:'#4E6B2E', barrelColor:'#3D5226', armor:false, antenna:false, chrome:false};
+    var tKey = (typeof selectedTank !== 'undefined') ? selectedTank : 'basic';
+
+    var hullC    = td.color;
+    var barrelC  = td.barrelColor;
+    // Gövde rengi biraz koyulaştır
+    var hullDark = _blendHex(hullC, '#000000', 0.35);
+    var trackC   = '#1c1c1c';
+    var wheelC   = '#2a2a2a';
+
+    // Namlu: base nokta (turret merkezi), uzunluk
+    var bx0 = 92, by0 = 54;
+    var L = tKey === 'titan' ? 62 : tKey === 'elite' ? 58 : tKey === 'upgraded' ? 54 : 50;
+    var bx1 = bx0 + Math.cos(-rad) * L;
+    var by1 = by0 + Math.sin(-rad) * L;
+    var bW  = tKey === 'titan' ? 8 : tKey === 'elite' ? 7 : 6;
+
+    var parts = '';
+    // Gölge
+    parts += '<ellipse cx="100" cy="118" rx="78" ry="4" fill="#000" opacity="0.35"/>';
+    // Palet
+    parts += '<rect x="12" y="86" width="176" height="24" rx="12" fill="'+trackC+'"/>';
+    // Tekerlekler
+    var wheels = [24, 60, 100, 140, 176];
+    for(var i=0;i<wheels.length;i++){
+      var isEnd = (i===0||i===4);
+      var wr = isEnd ? 11 : 9;
+      parts += '<circle cx="'+wheels[i]+'" cy="98" r="'+wr+'" fill="'+wheelC+'" stroke="#000" stroke-width="1"/>';
+      if(isEnd) parts += '<circle cx="'+wheels[i]+'" cy="98" r="5" fill="#3a3a3a"/>';
+    }
+    // Palet üstü bandı
+    parts += '<rect x="12" y="86" width="176" height="6" rx="3" fill="'+hullDark+'" opacity="0.7"/>';
+    // Zırh etek (upgraded/elite/titan)
+    if(td.armor){
+      parts += '<rect x="8" y="78" width="184" height="12" rx="4" fill="'+hullDark+'" opacity="0.85"/>';
+    }
+    // Alt gövde
+    parts += '<path d="M 16 86 L 26 68 L 174 68 L 184 86 Z" fill="'+hullDark+'"/>';
+    // Üst gövde
+    parts += '<path d="M 22 68 L 38 48 L 172 48 L 184 68 Z" fill="'+hullC+'" stroke="#000" stroke-width="1"/>';
+    // Chrome trim (titan)
+    if(td.chrome){
+      parts += '<rect x="22" y="62" width="158" height="4" rx="2" fill="rgba(255,255,255,0.18)"/>';
+    }
+    // Turret
+    var turretRx = tKey==='titan'?25:tKey==='elite'?23:tKey==='upgraded'?21:19;
+    var turretRy = tKey==='titan'?17:tKey==='elite'?16:tKey==='upgraded'?15:14;
+    parts += '<ellipse cx="92" cy="50" rx="'+turretRx+'" ry="'+turretRy+'" fill="'+hullC+'" stroke="#000" stroke-width="1.2"/>';
+    // Turret chrome şerit (titan/elite)
+    if(td.chrome||tKey==='elite'){
+      parts += '<ellipse cx="92" cy="46" rx="'+(turretRx-4)+'" ry="4" fill="rgba(255,255,255,0.14)"/>';
+    }
+    // Namlu (dış + iç)
+    parts += '<line x1="'+bx0+'" y1="'+by0+'" x2="'+bx1+'" y2="'+by1+'" stroke="#000" stroke-width="'+(bW+3)+'" stroke-linecap="round"/>';
+    parts += '<line x1="'+bx0+'" y1="'+by0+'" x2="'+bx1+'" y2="'+by1+'" stroke="'+barrelC+'" stroke-width="'+bW+'" stroke-linecap="round"/>';
+    // Chrome namlu ucu (titan)
+    if(td.chrome){
+      parts += '<circle cx="'+Math.round(bx1)+'" cy="'+Math.round(by1)+'" r="'+(bW/2+1)+'" fill="#aaaaaa"/>';
+    } else {
+      parts += '<circle cx="'+Math.round(bx1)+'" cy="'+Math.round(by1)+'" r="'+(bW/2)+'" fill="#111"/>';
+    }
+    // Anten (elite/titan)
+    if(td.antenna){
+      parts += '<line x1="112" y1="48" x2="116" y2="18" stroke="#222" stroke-width="1.5" stroke-linecap="round"/>';
+      parts += '<circle cx="116" cy="17" r="2.5" fill="#ff3333"/>';
+    }
+    // Gözlem deliği
+    parts += '<circle cx="86" cy="43" r="3" fill="#000" opacity="0.5"/>';
+
+    svg.innerHTML = parts;
+  }
+
+  // Hex renk karıştırma yardımcısı (BirdHunt içinde)
+  function _blendHex(hex1, hex2, t){
+    var p=function(h){ return parseInt(h.slice(1),16); };
+    var a=p(hex1), b=p(hex2);
+    var r=Math.round(((a>>16)&255)*(1-t)+((b>>16)&255)*t);
+    var g=Math.round(((a>>8)&255)*(1-t)+((b>>8)&255)*t);
+    var bl=Math.round((a&255)*(1-t)+(b&255)*t);
+    return '#'+(r<16?'0':'')+r.toString(16)+(g<16?'0':'')+g.toString(16)+(bl<16?'0':'')+bl.toString(16);
   }
 
   // ── Birds ──────────────────────────────────────────────────
