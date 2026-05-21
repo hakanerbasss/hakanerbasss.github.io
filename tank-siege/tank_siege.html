@@ -1591,7 +1591,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.146';
+const APP_VERSION      = '1.0.147';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1609,8 +1609,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 02:00';
-const APP_VERSION_NOTE = 'Leaderboard oyun ici: gercek veri, podium, SEN highlight';
+const APP_VERSION_DATE = '2026.05.21 03:41';
+const APP_VERSION_NOTE = 'Eski lraderbord yikleme';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -17938,192 +17938,180 @@ window.addEventListener('resize', function(){
 
 <script>
 // ── Custom Leaderboard UI ───────────────────────────────────────
+// Native Google Play Games sistemini bozmadan üstüne giydirilen şık önyüz.
 window.TSLB = (function(){
-  var currentKind = ‘weekly’;
-  var _data = { weekly:null, monthly:null, yearly:null, alltime:null };
+  var currentKind = 'weekly';
+
+  // Gerçek leaderboard verisi Google Play Games tarafında — bu UI sadece
+  // önizleme/giriş noktası. Demo veriler kaldırıldı; oyuncu sıralamasını
+  // görmek için "Tam Sıralamayı Aç" butonu ile native ekrana yönlendiriyoruz.
+  var DEMO_DATA = { weekly:[], monthly:[], yearly:[], alltime:[] };
 
   var PERIOD_LABEL = {
-    weekly:’HAFTALIK’, monthly:’AYLIK’, yearly:’YILLIK’, alltime:’TÜM ZAMANLAR’,
+    weekly:  'HAFTALIK',
+    monthly: 'AYLIK',
+    yearly:  'YILLIK',
+    alltime: 'TÜM ZAMANLAR',
   };
 
-  // ── Fetch ───────────────────────────────────────────────────────
-  function _fetch(kind){
-    if(typeof Android === ‘undefined’) { _render(); return; }
-    if(!_cloudSignedIn) { _render(); return; }
-    var id = (typeof LEADERBOARD_IDS !== ‘undefined’) ? LEADERBOARD_IDS[kind] : null;
-    if(!id) { _render(); return; }
-    // Loading state
-    var cont = document.getElementById(‘tslb-content’);
-    if(cont) cont.innerHTML = ‘<div style="text-align:center;padding:48px 0;color:rgba(255,255,255,0.4);font-size:22px;">⏳</div>’;
-    try { Android.loadLeaderboard(id, kind); } catch(e) { _render(); }
-  }
-
-  // ── Called from Kotlin via evaluateJavascript ───────────────────
-  function _receiveData(kind, scores, err){
-    if(scores && Array.isArray(scores)) _data[kind] = scores;
-    if(kind === currentKind) _render();
-  }
-
-  // ── Open ────────────────────────────────────────────────────────
   function _open(kind){
-    currentKind = kind || ‘weekly’;
-    var ov = document.getElementById(‘tslb-overlay’);
+    currentKind = kind || 'weekly';
+    var ov = document.getElementById('tslb-overlay');
     if(!ov) return;
-    if(ov.parentNode !== document.body) document.body.appendChild(ov);
-    ov.style.display = ‘block’;
+    // Cloud settings veya başka transform'lu parent içinde kalmasını engelle:
+    // overlay'i her zaman body'nin doğrudan çocuğu olarak yeniden konumlandır
+    if(ov.parentNode !== document.body){
+      document.body.appendChild(ov);
+    }
+    ov.style.display = 'block';
     _applyI18n();
     _setActiveTab(currentKind);
-    if(_data[currentKind] !== null) _render();
-    else _fetch(currentKind);
+    _render();
   }
-
   function _applyI18n(){
-    function _t(k,fb){ try{return(typeof t===’function’)?(t(k)||fb):fb;}catch(_){return fb;} }
+    function _t(k, fb){ try { return (typeof t==='function')?(t(k)||fb):fb; } catch(_) { return fb; } }
     var el;
-    el=document.getElementById(‘tslb-head-label’);     if(el) el.textContent=_t(‘tslb_ranking_label’,’RANKING · LIVE’);
-    el=document.getElementById(‘tslb-head-title-text’);if(el) el.textContent=(_t(‘tslb_title’,’🏆 Leaderboards’)||’’).replace(/^[^\w]+/,’’);
-    document.querySelectorAll(‘.tslb-tab’).forEach(function(tb){
-      var k=tb.getAttribute(‘data-kind’);
-      var sp=tb.querySelector(‘span:not(.em)’);
-      if(sp){var km={weekly:’tslb_tab_weekly’,monthly:’tslb_tab_monthly’,yearly:’tslb_tab_yearly’,alltime:’tslb_tab_alltime’};sp.textContent=_t(km[k],sp.textContent);}
+    el = document.getElementById('tslb-head-label');     if(el) el.textContent = _t('tslb_ranking_label','RANKING · LIVE');
+    el = document.getElementById('tslb-head-title-text');if(el) el.textContent = (_t('tslb_title','🏆 Leaderboards')||'').replace(/^[^\w]+/,'');
+    // Tabs
+    document.querySelectorAll('.tslb-tab').forEach(function(tb){
+      var k = tb.getAttribute('data-kind');
+      var sp = tb.querySelector('span:not(.em)');
+      if(sp){
+        var keyMap = {weekly:'tslb_tab_weekly',monthly:'tslb_tab_monthly',yearly:'tslb_tab_yearly',alltime:'tslb_tab_alltime'};
+        sp.textContent = _t(keyMap[k], sp.textContent);
+      }
     });
-    el=document.getElementById(‘tslb-signin-title’);   if(el) el.textContent=_t(‘tslb_signin_title’,’🔗 Google Play Games ile Bağlan’);
-    el=document.getElementById(‘tslb-signin-body’);    if(el) el.textContent=_t(‘tslb_signin_body’,’Diğer oyuncularla yarışmak için giriş yap.’);
-    el=document.getElementById(‘tslb-open-native’);    if(el) el.textContent=_t(‘tslb_open_native’,’📱 Google Play\’de Tam Sıralamayı Aç →’);
-    el=document.getElementById(‘tslb-info-line’);      if(el) el.textContent=_t(‘tslb_score_auto’,’Skorların otomatik gönderilir’);
+    el = document.getElementById('tslb-signin-title');   if(el) el.textContent = _t('tslb_signin_title','🔗 Connect with Google Play Games');
+    el = document.getElementById('tslb-signin-body');    if(el) el.textContent = _t('tslb_signin_body','Compete with other players and see your rank on the world leaderboard.');
+    el = document.getElementById('tslb-open-native');    if(el) el.textContent = _t('tslb_open_native','📱 Open Full Leaderboard on Google Play →');
+    el = document.getElementById('tslb-info-line');      if(el) el.textContent = _t('tslb_score_auto','Scores are submitted automatically');
   }
-
   function _close(){
-    var ov=document.getElementById(‘tslb-overlay’);
-    if(ov) ov.style.display=’none’;
+    var ov = document.getElementById('tslb-overlay');
+    if(ov) ov.style.display = 'none';
   }
-
   function _tab(kind){
-    currentKind=kind;
+    currentKind = kind;
     _setActiveTab(kind);
-    if(_data[kind] !== null) _render();
-    else _fetch(kind);
+    _render();
   }
-
   function _setActiveTab(kind){
-    document.querySelectorAll(‘.tslb-tab’).forEach(function(t){
-      t.classList.toggle(‘active’, t.getAttribute(‘data-kind’)===kind);
+    var tabs = document.querySelectorAll('.tslb-tab');
+    tabs.forEach(function(t){
+      t.classList.toggle('active', t.getAttribute('data-kind')===kind);
     });
-    var p=document.getElementById(‘tslb-head-period’);
-    if(p){ try{ var lbl=(typeof t===’function’)?t(‘tslb_period_’+kind):null; p.textContent=lbl||(PERIOD_LABEL[kind]||kind.toUpperCase()); }catch(_){ p.textContent=PERIOD_LABEL[kind]||kind.toUpperCase(); } }
+    var p = document.getElementById('tslb-head-period');
+    if(p){
+      try {
+        var key = 'tslb_period_' + kind;
+        var label = (typeof t==='function') ? t(key) : null;
+        p.textContent = label || (PERIOD_LABEL[kind] || kind.toUpperCase());
+      } catch(_) {
+        p.textContent = PERIOD_LABEL[kind] || kind.toUpperCase();
+      }
+    }
   }
 
   function _esc(s){
-    return String(s||’’).replace(/[<>&"]/g,function(c){return{‘<’:’&lt;’,’>’:’&gt;’,’&’:’&amp;’,’"’:’&quot;’}[c];});
+    return String(s||'').replace(/[<>&"]/g, function(c){
+      return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];
+    });
   }
 
-  // ── Render ──────────────────────────────────────────────────────
   function _render(){
-    var cont=document.getElementById(‘tslb-content’);
+    var cont = document.getElementById('tslb-content');
     if(!cont) return;
-    var hint=document.getElementById(‘tslb-signin-hint’);
-    var signedIn=(typeof _cloudSignedIn!==’undefined’)&&_cloudSignedIn;
-    if(hint) hint.style.display=signedIn?’none’:’block’;
+    var hint = document.getElementById('tslb-signin-hint');
+    var signedIn = (typeof _cloudSignedIn !== 'undefined') && _cloudSignedIn;
+    if(hint) hint.style.display = signedIn ? 'none' : 'block';
 
-    function _t(k,fb){ try{return(typeof t===’function’)?(t(k)||fb):fb;}catch(_){return fb;} }
-    var myScore=0;
-    try{ myScore=parseInt((typeof lsGet===’function’?lsGet(‘total_score’):localStorage.getItem(‘ts_total_score’))||’0’)||0; }catch(_){}
-    var myName=(typeof _cloudUserName!==’undefined’&&_cloudUserName)?_cloudUserName:null;
-    var meLabel=_t(‘tslb_me’,’SEN’);
+    // Oyuncunun skorunu al
+    var myScore = 0;
+    try { myScore = parseInt((typeof lsGet==='function'?lsGet('total_score'):localStorage.getItem('ts_total_score'))||'0') || 0; } catch(_) {}
+    var myName  = (typeof _cloudUserName !== 'undefined' && _cloudUserName) ? _cloudUserName : (signedIn ? 'Oyuncu' : ((typeof t==='function'?t('tslb_me'):null) || 'SEN'));
 
-    var scores=_data[currentKind];
-    var html=’’;
+    function _t(k, fb){ try { return (typeof t==='function')?(t(k)||fb):fb; } catch(_) { return fb; } }
 
-    if(scores && scores.length>0){
-      // İsim eşleşmesiyle "ben" satırını bul
-      scores.forEach(function(s){ s.isMe = myName && (s.name===myName); });
-      var meInList=scores.some(function(s){return s.isMe;});
+    // Demo veri yok — her tab boş. UI:
+    //  1) Oyuncunun kendi skor kartı (highlight) en üstte
+    //  2) "Sıralama görmek için aç" ipucu kutusu
+    var html = '';
 
-      // Podium (ilk 3)
-      if(scores.length>=3){
-        html+=’<div class="tslb-podium">’
-          +_podHtml(scores[1],2,’second’)
-          +_podHtml(scores[0],1,’first’)
-          +_podHtml(scores[2],3,’third’)
-          +’</div>’;
-      }
-      // Liste (4+)
-      var startIdx=scores.length>=3?3:0;
-      for(var i=startIdx;i<scores.length;i++){
-        html+=_rowHtml(scores[i],scores[i].rank);
-      }
-      // Oyuncu listede yoksa en altta göster
-      if(!meInList && myName){
-        html+=’<div style="height:1px;background:rgba(255,255,255,0.08);margin:6px 0;"></div>’;
-        html+=_rowHtml({name:myName,score:myScore,isMe:true,rank:’···’},’···’);
-      }
+    // Oyuncu kartı — büyük, "SEN" highlight
+    html += ''
+      + '<div style="background:linear-gradient(180deg,rgba(0,229,255,0.15),rgba(0,229,255,0.04));'
+      +   'border:1.5px solid rgba(0,229,255,0.50);border-radius:16px;'
+      +   'box-shadow:0 0 18px rgba(0,229,255,0.18), inset 0 1px 0 rgba(255,255,255,0.06);'
+      +   'padding:14px 16px;margin-bottom:14px;'
+      +   'display:flex;align-items:center;gap:14px;">'
+      +   '<div style="width:54px;height:54px;border-radius:50%;'
+      +     'background:radial-gradient(circle at 35% 30%,#3a5a8a,#0a1530);'
+      +     'border:2px solid #00E5FF;display:flex;align-items:center;justify-content:center;'
+      +     'font-size:24px;flex-shrink:0;box-shadow:0 0 14px rgba(0,229,255,0.4);">⚔️</div>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div style="color:#00E5FF;font-size:9px;font-weight:800;letter-spacing:2px;">'+_t('tslb_me','SEN')+'</div>'
+      +     '<div style="color:#fff;font-size:17px;font-weight:800;line-height:1.1;margin-top:2px;'
+      +       'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(myName)+'</div>'
+      +     '<div style="color:rgba(255,255,255,0.55);font-size:10px;letter-spacing:1px;margin-top:2px;font-weight:700;">'
+      +       '🏆 '+_fmtNum(myScore)+'</div>'
+      +   '</div>'
+      + '</div>';
 
-    } else if(scores && scores.length===0){
-      // Skor yok
-      html+=’<div style="text-align:center;padding:32px;color:rgba(255,255,255,0.45);font-size:13px;font-weight:700;">Henüz skor yok</div>’;
-      if(myName){
-        html+=’<div style="height:1px;background:rgba(255,255,255,0.08);margin:6px 0;"></div>’;
-        html+=_rowHtml({name:myName,score:myScore,isMe:true,rank:’···’},’···’);
-      }
+    // Boş durum açıklaması — neden burada veri yok?
+    var emptyTitle = signedIn
+      ? _t('tslb_empty_title', '🌐 Online Sıralama')
+      : _t('tslb_empty_title_off', '🔒 Henüz Bağlı Değilsin');
+    var emptyBody = signedIn
+      ? _t('tslb_empty_body', 'Tam sıralamayı görmek için aşağıdaki butona dokun. Skorların otomatik olarak Google Play Games’e gönderiliyor.')
+      : _t('tslb_empty_body_off', 'Sıralamada yer almak için Google Play Games’e giriş yap. Aşağıdaki butonla tam sıralamayı açabilirsin.');
 
-    } else {
-      // Veri yok / giriş yapılmamış — kendi skor kartı + hint
-      if(myName){
-        html+=’’
-          +’<div style="background:linear-gradient(180deg,rgba(0,229,255,0.15),rgba(0,229,255,0.04));’
-          +’border:1.5px solid rgba(0,229,255,0.50);border-radius:16px;’
-          +’box-shadow:0 0 18px rgba(0,229,255,0.18);padding:14px 16px;margin-bottom:14px;’
-          +’display:flex;align-items:center;gap:14px;">’
-          +’<div style="width:48px;height:48px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3a5a8a,#0a1530);’
-          +’border:2px solid #00E5FF;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">⚔️</div>’
-          +’<div style="flex:1;min-width:0;">’
-          +’<div style="color:#00E5FF;font-size:9px;font-weight:800;letter-spacing:2px;">’+meLabel+’</div>’
-          +’<div style="color:#fff;font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">’+_esc(myName)+’</div>’
-          +’<div style="color:rgba(255,255,255,0.5);font-size:10px;margin-top:2px;font-weight:700;">🏆 ‘+_fmtNum(myScore)+’</div>’
-          +’</div></div>’;
-      }
-      var emptyTitle=signedIn?_t(‘tslb_empty_title’,’🌐 Online Sıralama’):_t(‘tslb_empty_title_off’,’🔒 Henüz Bağlı Değilsin’);
-      var emptyBody=signedIn
-        ?_t(‘tslb_empty_body’,’Sıralama yüklenemedi. Aşağıdan Play Games\’i açarak görebilirsin.’)
-        :_t(‘tslb_empty_body_off’,’Sıralamada yer almak için Google Play Games\’e giriş yap.’);
-      html+=’’
-        +’<div style="text-align:center;padding:20px 16px;background:rgba(255,255,255,0.03);’
-        +’border:1.5px dashed rgba(255,255,255,0.12);border-radius:16px;">’
-        +’<div style="font-size:40px;margin-bottom:8px;">🏆</div>’
-        +’<div style="color:#FFD700;font-size:14px;font-weight:800;margin-bottom:5px;">’+emptyTitle+’</div>’
-        +’<div style="color:rgba(255,255,255,0.6);font-size:11px;line-height:1.5;">’+emptyBody+’</div>’
-        +’</div>’;
-    }
+    html += ''
+      + '<div style="text-align:center;padding:22px 18px 18px;'
+      +   'background:rgba(255,255,255,0.03);border:1.5px dashed rgba(255,255,255,0.12);'
+      +   'border-radius:16px;margin-bottom:4px;">'
+      +   '<div style="font-size:46px;line-height:1;margin-bottom:8px;'
+      +     'filter:drop-shadow(0 0 18px rgba(255,215,0,0.4));">🏆</div>'
+      +   '<div style="color:#FFD700;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:800;'
+      +     'letter-spacing:0.5px;margin-bottom:6px;">'+emptyTitle+'</div>'
+      +   '<div style="color:rgba(255,255,255,0.65);font-size:12px;line-height:1.5;'
+      +     'max-width:260px;margin:0 auto;">'+emptyBody+'</div>'
+      + '</div>';
 
-    cont.innerHTML=html;
+    cont.innerHTML = html;
   }
 
-  function _podHtml(p,rank,cls){
-    return ‘<div class="tslb-pod-item ‘+cls+’">’
-      +’<div class="tslb-pod-rank">’+rank+’</div>’
-      +’<div class="tslb-pod-avatar">’+(p.isMe?’⚔️’:’👤’)+’</div>’
-      +’<div class="tslb-pod-name">’+(p.isMe?’<span style="color:#00E5FF">’+_esc(p.name)+’</span>’:_esc(p.name))+’</div>’
-      +’<div class="tslb-pod-score">⭐’+_fmtNum(p.score)+’</div>’
-      +’</div>’;
+  function _podHtml(p, rank, cls){
+    var meCls = p.isMe ? ' me' : '';
+    return '<div class="tslb-pod-item '+cls+'">'
+      + '<div class="tslb-pod-rank">'+rank+'</div>'
+      + '<div class="tslb-pod-avatar">'+(_esc(p.avatar)||'👤')+'</div>'
+      + '<div class="tslb-pod-name">'+(p.isMe?'<span style="color:#00E5FF">'+_esc(p.name)+'</span>':_esc(p.name))+'</div>'
+      + '<div class="tslb-pod-score">'+_fmtNum(p.score)+'</div>'
+      + '</div>';
   }
-  function _rowHtml(p,rank){
-    return ‘<div class="tslb-row’+(p.isMe?’ me’:’’)+’">’
-      +’<div class="tslb-rank">’+rank+’</div>’
-      +’<div class="tslb-avatar">’+(p.isMe?’⚔️’:’👤’)+’</div>’
-      +’<div class="tslb-name">’+(p.isMe?_esc(p.name)+’ <span style="color:#00E5FF;font-size:10px;font-weight:800;">’+meLabel+’</span>’:_esc(p.name))+’</div>’
-      +’<div class="tslb-score">⭐’+_fmtNum(p.score)+’</div>’
-      +’</div>’;
+  function _rowHtml(p, rank){
+    return '<div class="tslb-row'+(p.isMe?' me':'')+'">'
+      + '<div class="tslb-rank">'+rank+'</div>'
+      + '<div class="tslb-avatar">'+(_esc(p.avatar)||'👤')+'</div>'
+      + '<div class="tslb-name">'+(p.isMe?_esc(p.name)+' <span style="color:#00E5FF;font-size:10px;font-weight:800;">'+((typeof t==='function'&&t('tslb_me'))||'YOU')+'</span>':_esc(p.name))+'</div>'
+      + '<div class="tslb-score">'+_fmtNum(p.score)+'</div>'
+      + '</div>';
   }
   function _fmtNum(n){
-    n=n|0;
-    if(n>=1000000) return (n/1000000).toFixed(1).replace(/\.0$/,’’)+’M’;
-    if(n>=1000)    return (n/1000).toFixed(1).replace(/\.0$/,’’)+’K’;
+    n = n|0;
+    if(n>=1000000) return (n/1000000).toFixed(1).replace(/\.0$/,'')+'M';
+    if(n>=1000)    return (n/1000).toFixed(1).replace(/\.0$/,'')+'K';
     return n.toLocaleString();
   }
 
   function _openNative(){
-    if(typeof openLeaderboard===’function’) openLeaderboard(currentKind);
-    else if(typeof showToast===’function’) showToast(‘Sıralama açılamadı’);
+    // Mevcut openLeaderboard() fonksiyonunu çağır — Android.showLeaderboard kullanır
+    if(typeof openLeaderboard === 'function'){
+      openLeaderboard(currentKind);
+    } else if(typeof showToast === 'function'){
+      showToast('Sıralama açılamadı');
+    }
   }
 
   return {
@@ -18131,7 +18119,6 @@ window.TSLB = (function(){
     close: _close,
     tab: _tab,
     openNative: _openNative,
-    receiveData: _receiveData,
   };
 })();
 </script>
