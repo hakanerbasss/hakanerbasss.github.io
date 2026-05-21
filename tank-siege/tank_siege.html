@@ -1591,7 +1591,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.153';
+const APP_VERSION      = '1.0.154';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1609,8 +1609,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 09:00';
-const APP_VERSION_NOTE = 'TSLB overlay kaldirildi: native openLeaderboard butonu + kendi skor karti [Claude]';
+const APP_VERSION_DATE = '2026.05.21 10:00';
+const APP_VERSION_NOTE = 'Quest fix: giveWindBlock Quests.track(windblock) eksikti; TSLB overlay kaldirildi [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -14660,6 +14660,7 @@ function giveWindBlock(){
   SFX.buy();
   updateUI();
   showToast(t('toast_wb_on'));
+  try{ if(typeof Quests!=='undefined') Quests.track('windblock'); }catch(_){}
 }
 
 function giveTactical(){
