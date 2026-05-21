@@ -620,6 +620,16 @@ button:active{opacity:0.75;transform:scale(0.96);}
   background:linear-gradient(135deg,rgba(255,107,53,0.12) 0%,rgba(255,107,53,0.03) 100%);
   box-shadow:0 4px 14px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,107,53,0.25);
 }
+.gallery-card.gc-highlight{
+  border-color:rgba(255,107,53,1) !important;
+  background:linear-gradient(135deg,rgba(255,107,53,0.22) 0%,rgba(255,80,0,0.08) 100%) !important;
+  box-shadow:0 0 0 3px rgba(255,107,53,0.5), 0 0 28px rgba(255,80,0,0.5) !important;
+  animation:gcHighlightPulse 0.55s ease-in-out 4;
+}
+@keyframes gcHighlightPulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.025);}
+}
 /* Icon: now a rounded box with a glowy colored background per state */
 .gc-icon{
   flex-shrink:0;width:56px;height:56px;
@@ -1591,7 +1601,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.158';
+const APP_VERSION      = '1.0.159';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1609,8 +1619,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 15:00';
-const APP_VERSION_NOTE = 'Gomulu kart TR Signak Kirici fix + muhimmat butonu eklendi [Claude]';
+const APP_VERSION_DATE = '2026.05.21 16:00';
+const APP_VERSION_NOTE = 'Guided hint kart: boost tab fix + kart highlight [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -14708,6 +14718,15 @@ function closeGuidedHint(){
   const bg = document.getElementById('guided-hint-bg');
   if(bg) bg.style.display = 'none';
 }
+function _highlightGuidedCard(){
+  setTimeout(function(){
+    var card = document.getElementById('gc-guided-card');
+    if(!card) return;
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+    card.classList.add('gc-highlight');
+    setTimeout(function(){ card.classList.remove('gc-highlight'); }, 2200);
+  }, 220);
+}
 
 function guidedHintAd(){
   closeGuidedHint();
@@ -14853,6 +14872,7 @@ function renderBoostGallery(cont){
     gdBtn   = `<button class="gc-btn btn-ad" onclick="closeGuidedHint();guidedHintAd()">${t('boost_btn_ad_only')}<br><span style='font-size:10px;opacity:0.7;'>${t('boost_btn_1lvl_valid')}</span></button>`;
   }
   const gdCard = document.createElement('div');
+  gdCard.id = 'gc-guided-card';
   gdCard.className = 'gallery-card' + (isGuided ? ' owned' : '');
   gdCard.innerHTML = `
     <div class="gc-icon" style="font-size:36px;">🔥</div>
@@ -16110,7 +16130,7 @@ function openTacticalInfo(){
       </div>
 
       <button onclick="guidedHintAd()" style="width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(180deg,#FF8E5A,#FF6B35 50%,#ff3d00 100%);color:#fff;font-size:14px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a02500,0 5px 14px rgba(255,107,53,0.4),inset 0 1px 0 rgba(255,255,255,0.25);text-shadow:0 1px 0 rgba(0,0,0,0.3);margin-bottom:8px;transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a02500,inset 0 1px 0 rgba(255,255,255,0.18)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="guided_ad_btn">📺 Reklam İzle → 1 Level Aç</button>
-      <button onclick="closeGuidedHint();switchTab('boost');openGallery(curLevel);" style="width:100%;padding:11px;border-radius:13px;border:1.5px solid rgba(255,107,53,0.35);background:rgba(255,107,53,0.08);color:#FFB874;font-size:12.5px;font-weight:800;letter-spacing:0.3px;cursor:pointer;font-family:'Rajdhani',sans-serif;-webkit-tap-highlight-color:transparent;margin-bottom:6px;" data-i18n="guided_perm_btn">⚡ Güçlendirmeler'den Al</button>
+      <button onclick="closeGuidedHint();openGallery(curLevel,'boost');_highlightGuidedCard();" style="width:100%;padding:11px;border-radius:13px;border:1.5px solid rgba(255,107,53,0.35);background:rgba(255,107,53,0.08);color:#FFB874;font-size:12.5px;font-weight:800;letter-spacing:0.3px;cursor:pointer;font-family:'Rajdhani',sans-serif;-webkit-tap-highlight-color:transparent;margin-bottom:6px;" data-i18n="guided_perm_btn">⚡ Güçlendirmeler'den Al</button>
       <button onclick="closeGuidedHint()" style="width:100%;padding:7px;border:none;background:none;color:rgba(255,255,255,0.4);font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;-webkit-tap-highlight-color:transparent;" data-i18n="piercer_skip">ŞİMDİ DEĞİL</button>
     </div>
   </div>
