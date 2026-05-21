@@ -1591,7 +1591,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.156';
+const APP_VERSION      = '1.0.157';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1609,8 +1609,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 13:00';
-const APP_VERSION_NOTE = 'Cloud yuklemede temp item tasimasin fix (wind/tactical badge sorunu) [Claude]';
+const APP_VERSION_DATE = '2026.05.21 14:00';
+const APP_VERSION_NOTE = 'Sifirla kartlari EN modda Turkce kaliyordu duzeltildi [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -11953,6 +11953,10 @@ const LANG = {
     lang_label:     'DİL',
     reset_slots:    '🔧 Slotları Sıfırla',
     reset_all:      '🗑️ Tüm Veriyi Sıfırla',
+    confirm_slots_title: 'Slotları Sıfırla',
+    confirm_slots_desc:  'Tüm slot ayarları ve geçici mühimmatlar silinecek.',
+    confirm_all_title:   'Tüm Veriyi Sıfırla',
+    confirm_all_desc:    'Puan, tank, mühimmat, tüm ilerleme silinecek. Bu işlem geri alınamaz.',
     cloud:          '☁️ Bulut Kayıt',
     dev_mode:       '⚙️ Geliştirici Modu',
     detail:         'detay için dokun',
@@ -12512,6 +12516,10 @@ const LANG = {
     lang_label:     'LANGUAGE',
     reset_slots:    '🔧 Reset Slots',
     reset_all:      '🗑️ Reset All Data',
+    confirm_slots_title: 'Reset Slots',
+    confirm_slots_desc:  'All slot settings and temporary ammo will be deleted.',
+    confirm_all_title:   'Reset All Data',
+    confirm_all_desc:    'Points, tanks, ammo, all progress will be deleted. This cannot be undone.',
     cloud:          '☁️ Cloud Save',
     dev_mode:       '⚙️ Developer Mode',
     detail:         'tap for details',
@@ -13595,6 +13603,7 @@ function closeTargetInfo(){
 
 // ── Ayarlar ──────────────────────────────────────────────────────────────────
 function openSettings(){
+  applyLang();
   // Aktif dil butonunu vurgula
   ['tr','en'].forEach(l=>{
     const b=document.getElementById('lang-btn-'+l);
@@ -13626,15 +13635,15 @@ function confirmReset(type){
   const desc=document.getElementById('confirm-desc');
   const okBtn=document.getElementById('confirm-ok-btn');
   if(type==='slots'){
-    title.textContent='Slotları Sıfırla';
-    desc.textContent='Tüm slot ayarları ve geçici mühimmatlar silinecek.';
+    title.textContent=t('confirm_slots_title');
+    desc.textContent=t('confirm_slots_desc');
     _confirmAction=()=>{
       ['slots','slot_custom','owned_ammo','temp_ammo','sel_ammo'].forEach(k=>lsRemove(k));
       location.reload();
     };
   } else {
-    title.textContent='Tüm Veriyi Sıfırla';
-    desc.textContent='Puan, tank, mühimmat, tüm ilerleme silinecek. Bu işlem geri alınamaz.';
+    title.textContent=t('confirm_all_title');
+    desc.textContent=t('confirm_all_desc');
     _confirmAction=()=>{
       ['slots','slot_custom','owned_ammo','temp_ammo','sel_ammo',
        'owned_tanks','sel_tank','temp_tank','total_score','bonus_stars',
