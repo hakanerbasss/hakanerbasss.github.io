@@ -620,6 +620,16 @@ button:active{opacity:0.75;transform:scale(0.96);}
   background:linear-gradient(135deg,rgba(255,107,53,0.12) 0%,rgba(255,107,53,0.03) 100%);
   box-shadow:0 4px 14px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,107,53,0.25);
 }
+.gallery-card.gc-highlight{
+  border-color:rgba(255,107,53,1) !important;
+  background:linear-gradient(135deg,rgba(255,107,53,0.22) 0%,rgba(255,80,0,0.08) 100%) !important;
+  box-shadow:0 0 0 3px rgba(255,107,53,0.5), 0 0 28px rgba(255,80,0,0.5) !important;
+  animation:gcHighlightPulse 0.55s ease-in-out 4;
+}
+@keyframes gcHighlightPulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.025);}
+}
 /* Icon: now a rounded box with a glowy colored background per state */
 .gc-icon{
   flex-shrink:0;width:56px;height:56px;
@@ -1591,7 +1601,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.151';
+const APP_VERSION      = '1.0.159';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1609,8 +1619,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 04:53';
-const APP_VERSION_NOTE = 'TSLB gercek veri: _fetch + receiveData + podium render [Claude]';
+const APP_VERSION_DATE = '2026.05.21 16:00';
+const APP_VERSION_NOTE = 'Guided hint kart: boost tab fix + kart highlight [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -2192,6 +2202,9 @@ function init(){
     try{ if(typeof tryAutoSignIn === 'function') tryAutoSignIn(); }catch(_){}
     try{ if(typeof _maybeShowFirstLaunchPgPrompt === 'function') _maybeShowFirstLaunchPgPrompt(); }catch(_){}
   }, 600);
+
+  // İlk hafta hediye kontrolü — login bonus gösterildikten sonra
+  setTimeout(function(){ try{ if(typeof checkWeekGift==='function') checkWeekGift(); }catch(_){} }, 1500);
 
   requestAnimationFrame(loop);
 }
@@ -10876,6 +10889,7 @@ function onWin(){
               Quests.track('theme', _themeKey);
             }
             // combo zaten onTargetHit'te track edildi — burada tekrarlama (zamanlamada kayıp olur)
+            try{ if(typeof checkTutorialReward==='function') checkTutorialReward(curLevel); }catch(_){}
           }catch(_){}
         }, 100);
       }
@@ -11949,6 +11963,10 @@ const LANG = {
     lang_label:     'DİL',
     reset_slots:    '🔧 Slotları Sıfırla',
     reset_all:      '🗑️ Tüm Veriyi Sıfırla',
+    confirm_slots_title: 'Slotları Sıfırla',
+    confirm_slots_desc:  'Tüm slot ayarları ve geçici mühimmatlar silinecek.',
+    confirm_all_title:   'Tüm Veriyi Sıfırla',
+    confirm_all_desc:    'Puan, tank, mühimmat, tüm ilerleme silinecek. Bu işlem geri alınamaz.',
     cloud:          '☁️ Bulut Kayıt',
     dev_mode:       '⚙️ Geliştirici Modu',
     detail:         'detay için dokun',
@@ -12164,8 +12182,9 @@ const LANG = {
     buried_body:        'Bu hedef toprak altında gizli.<br><br>Normal silahlar <b style="color:#FFB74D;">az hasar</b> verir.<br><br>⚡ <b style="color:#FF6B35;">Bunker Buster</b> ile toprağı delerek tam hasar ver.<br><br>💥 Güçlü patlamalar terreni <b style="color:#FFD700;">sarsarak</b> hedefi açığa çıkarabilir.',
     buried_ok:          'Anladım',
     buried_chip_low:    'Normal silahlar toprağa karşı <b style="color:#FF8A5A">az hasar</b> verir',
-    buried_chip_bunker: '<b style="color:#80CBC4">Bunker Buster</b> toprağı delerek tam hasar verir',
+    buried_chip_bunker: '<b style="color:#80CBC4">Sığınak Kırıcı</b> toprağı delerek tam hasar verir',
     buried_chip_shake:  'Güçlü patlamalar zemini <b style="color:#A5D6A7">sarsar</b> ve hedefi açığa çıkarır',
+    buried_ammo_btn:    '🛒 Sığınak Kırıcı\'yı Gör',
     guided_body_short:  'Hedef mağara içinde gizli. <b style="color:#FFB874">Isıya Güdümlü Başlık</b> mermin ısı kaynağına otomatik yönelir.',
     guided_chip_scope:  'Sadece bu level için geçerli',
     cloud_title:        '🎮 Play Games',
@@ -12508,6 +12527,10 @@ const LANG = {
     lang_label:     'LANGUAGE',
     reset_slots:    '🔧 Reset Slots',
     reset_all:      '🗑️ Reset All Data',
+    confirm_slots_title: 'Reset Slots',
+    confirm_slots_desc:  'All slot settings and temporary ammo will be deleted.',
+    confirm_all_title:   'Reset All Data',
+    confirm_all_desc:    'Points, tanks, ammo, all progress will be deleted. This cannot be undone.',
     cloud:          '☁️ Cloud Save',
     dev_mode:       '⚙️ Developer Mode',
     detail:         'tap for details',
@@ -12725,6 +12748,7 @@ const LANG = {
     buried_chip_low:    'Regular weapons deal <b style="color:#FF8A5A">low damage</b> against earth',
     buried_chip_bunker: '<b style="color:#80CBC4">Bunker Buster</b> drills through ground for full damage',
     buried_chip_shake:  'Strong explosions <b style="color:#A5D6A7">shake</b> the ground and expose the target',
+    buried_ammo_btn:    '🛒 View Bunker Buster',
     guided_body_short:  'The target is hidden inside the cave. <b style="color:#FFB874">Heat-Seeking Warhead</b> auto-tracks the heat source.',
     guided_chip_scope:  'Only valid for this level',
     cloud_title:        '🎮 Play Games',
@@ -13591,6 +13615,7 @@ function closeTargetInfo(){
 
 // ── Ayarlar ──────────────────────────────────────────────────────────────────
 function openSettings(){
+  applyLang();
   // Aktif dil butonunu vurgula
   ['tr','en'].forEach(l=>{
     const b=document.getElementById('lang-btn-'+l);
@@ -13622,15 +13647,15 @@ function confirmReset(type){
   const desc=document.getElementById('confirm-desc');
   const okBtn=document.getElementById('confirm-ok-btn');
   if(type==='slots'){
-    title.textContent='Slotları Sıfırla';
-    desc.textContent='Tüm slot ayarları ve geçici mühimmatlar silinecek.';
+    title.textContent=t('confirm_slots_title');
+    desc.textContent=t('confirm_slots_desc');
     _confirmAction=()=>{
       ['slots','slot_custom','owned_ammo','temp_ammo','sel_ammo'].forEach(k=>lsRemove(k));
       location.reload();
     };
   } else {
-    title.textContent='Tüm Veriyi Sıfırla';
-    desc.textContent='Puan, tank, mühimmat, tüm ilerleme silinecek. Bu işlem geri alınamaz.';
+    title.textContent=t('confirm_all_title');
+    desc.textContent=t('confirm_all_desc');
     _confirmAction=()=>{
       ['slots','slot_custom','owned_ammo','temp_ammo','sel_ammo',
        'owned_tanks','sel_tank','temp_tank','total_score','bonus_stars',
@@ -14660,6 +14685,7 @@ function giveWindBlock(){
   SFX.buy();
   updateUI();
   showToast(t('toast_wb_on'));
+  try{ if(typeof Quests!=='undefined') Quests.track('windblock'); }catch(_){}
 }
 
 function giveTactical(){
@@ -14691,6 +14717,15 @@ function showGuidedHint(){
 function closeGuidedHint(){
   const bg = document.getElementById('guided-hint-bg');
   if(bg) bg.style.display = 'none';
+}
+function _highlightGuidedCard(){
+  setTimeout(function(){
+    var card = document.getElementById('gc-guided-card');
+    if(!card) return;
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+    card.classList.add('gc-highlight');
+    setTimeout(function(){ card.classList.remove('gc-highlight'); }, 2200);
+  }, 220);
 }
 
 function guidedHintAd(){
@@ -14837,6 +14872,7 @@ function renderBoostGallery(cont){
     gdBtn   = `<button class="gc-btn btn-ad" onclick="closeGuidedHint();guidedHintAd()">${t('boost_btn_ad_only')}<br><span style='font-size:10px;opacity:0.7;'>${t('boost_btn_1lvl_valid')}</span></button>`;
   }
   const gdCard = document.createElement('div');
+  gdCard.id = 'gc-guided-card';
   gdCard.className = 'gallery-card' + (isGuided ? ' owned' : '');
   gdCard.innerHTML = `
     <div class="gc-icon" style="font-size:36px;">🔥</div>
@@ -16094,7 +16130,7 @@ function openTacticalInfo(){
       </div>
 
       <button onclick="guidedHintAd()" style="width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(180deg,#FF8E5A,#FF6B35 50%,#ff3d00 100%);color:#fff;font-size:14px;font-weight:800;letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a02500,0 5px 14px rgba(255,107,53,0.4),inset 0 1px 0 rgba(255,255,255,0.25);text-shadow:0 1px 0 rgba(0,0,0,0.3);margin-bottom:8px;transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a02500,inset 0 1px 0 rgba(255,255,255,0.18)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="guided_ad_btn">📺 Reklam İzle → 1 Level Aç</button>
-      <button onclick="closeGuidedHint();switchTab('boost');openGallery(curLevel);" style="width:100%;padding:11px;border-radius:13px;border:1.5px solid rgba(255,107,53,0.35);background:rgba(255,107,53,0.08);color:#FFB874;font-size:12.5px;font-weight:800;letter-spacing:0.3px;cursor:pointer;font-family:'Rajdhani',sans-serif;-webkit-tap-highlight-color:transparent;margin-bottom:6px;" data-i18n="guided_perm_btn">⚡ Güçlendirmeler'den Al</button>
+      <button onclick="closeGuidedHint();openGallery(curLevel,'boost');_highlightGuidedCard();" style="width:100%;padding:11px;border-radius:13px;border:1.5px solid rgba(255,107,53,0.35);background:rgba(255,107,53,0.08);color:#FFB874;font-size:12.5px;font-weight:800;letter-spacing:0.3px;cursor:pointer;font-family:'Rajdhani',sans-serif;-webkit-tap-highlight-color:transparent;margin-bottom:6px;" data-i18n="guided_perm_btn">⚡ Güçlendirmeler'den Al</button>
       <button onclick="closeGuidedHint()" style="width:100%;padding:7px;border:none;background:none;color:rgba(255,255,255,0.4);font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;-webkit-tap-highlight-color:transparent;" data-i18n="piercer_skip">ŞİMDİ DEĞİL</button>
     </div>
   </div>
@@ -16131,7 +16167,31 @@ function openTacticalInfo(){
   </div>
 </div>
 
-<!-- Buried info popup — modern redesigned card -->
+<!-- ── First Week Gift & Tutorial Reward Popup ─────────────────── -->
+<div id="gift-overlay" onclick="if(event.target.id==='gift-overlay')_giftClose()"
+  style="display:none;position:fixed;inset:0;z-index:970;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;">
+  <div id="gift-card" style="width:300px;max-width:calc(100vw - 32px);
+    background:linear-gradient(180deg,#1a2238 0%,#0a0f1c 100%);
+    border:1.5px solid rgba(255,215,0,0.45);border-radius:22px;padding:28px 22px;
+    text-align:center;font-family:'Rajdhani',sans-serif;
+    box-shadow:0 20px 60px rgba(0,0,0,0.85),0 0 40px rgba(255,215,0,0.15),inset 0 1px 0 rgba(255,255,255,0.06);">
+    <div id="gift-icon" style="font-size:54px;line-height:1;margin-bottom:12px;filter:drop-shadow(0 0 18px rgba(255,215,0,0.5));">🎁</div>
+    <div id="gift-badge" style="color:rgba(255,215,0,0.65);font-size:10px;font-weight:800;letter-spacing:2.5px;margin-bottom:4px;"></div>
+    <div id="gift-title" style="color:#fff;font-size:21px;font-weight:800;letter-spacing:0.3px;margin-bottom:10px;"></div>
+    <div id="gift-reward-box" style="background:rgba(255,215,0,0.10);border:1.5px solid rgba(255,215,0,0.30);
+      border-radius:14px;padding:12px;margin-bottom:10px;
+      color:#FFD700;font-size:19px;font-weight:800;"></div>
+    <div id="gift-desc" style="color:rgba(255,255,255,0.5);font-size:11px;line-height:1.5;margin-bottom:20px;"></div>
+    <button id="gift-btn" onclick="_giftClaim()"
+      style="width:100%;padding:14px;border-radius:14px;border:none;
+      background:linear-gradient(180deg,#FFE066,#FFD700 45%,#a87900 100%);
+      color:#1a1408;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:17px;letter-spacing:0.3px;
+      cursor:pointer;-webkit-tap-highlight-color:transparent;
+      box-shadow:0 4px 0 #6d5000,0 5px 14px rgba(255,215,0,0.4);">AL! 🎁</button>
+  </div>
+</div>
+
+
 <div id="buried-info-pop" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.78);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="closeBuriedInfo()">
   <div style="background:linear-gradient(180deg,#241a08 0%,#0e0a02 100%);border:1.5px solid rgba(255,180,40,0.35);border-radius:24px;padding:0;width:300px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(255,215,0,0.22),0 0 40px rgba(255,140,40,0.18),inset 0 1px 0 rgba(255,255,255,0.06);overflow:hidden;animation:buriedCardIn 0.35s cubic-bezier(0.34,1.56,0.64,1);" onclick="event.stopPropagation()">
     <!-- Hero band with rotating radiation icon -->
@@ -16163,7 +16223,8 @@ function openTacticalInfo(){
         </div>
       </div>
 
-      <button onclick="closeBuriedInfo()" style="width:100%;padding:12px;border:none;border-radius:14px;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);color:#1a0800;font-size:14px;font-weight:800;letter-spacing:1px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a85a00,0 5px 14px rgba(255,140,0,0.35),inset 0 1px 0 rgba(255,255,255,0.5);text-shadow:0 1px 0 rgba(255,255,255,0.3);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a85a00,inset 0 1px 0 rgba(255,255,255,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="buried_ok">ANLADIM</button>
+      <button onclick="closeBuriedInfo();switchTab('ammo');openGallery(curLevel);" style="width:100%;padding:12px;border:none;border-radius:14px;background:linear-gradient(180deg,#FFE066,#FFD700 50%,#FF8C00 100%);color:#1a0800;font-size:14px;font-weight:800;letter-spacing:1px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #a85a00,0 5px 14px rgba(255,140,0,0.35),inset 0 1px 0 rgba(255,255,255,0.5);text-shadow:0 1px 0 rgba(255,255,255,0.3);transition:transform 0.08s,box-shadow 0.08s;" ontouchstart="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 0 #a85a00,inset 0 1px 0 rgba(255,255,255,0.4)'" ontouchend="this.style.transform='';this.style.boxShadow=''" data-i18n="buried_ammo_btn">🛒 Sığınak Kırıcı'yı Gör</button>
+      <button onclick="closeBuriedInfo()" style="width:100%;margin-top:8px;padding:10px;border:1.5px solid rgba(255,180,40,0.3);border-radius:14px;background:rgba(255,180,40,0.07);color:rgba(255,215,0,0.8);font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;font-family:'Rajdhani',sans-serif;" data-i18n="buried_ok">ANLADIM</button>
     </div>
   </div>
 </div>
@@ -16465,8 +16526,10 @@ function onCloudLoadResult(success, b64data, error) {
     var json = atob(b64data);
     var data = JSON.parse(json);
     var count = 0;
+    var _skipKeys = ['cur_level','wind_block','temp_tactical','temp_ammo','temp_tank','temp_dmg_boost','temp_guided'];
     for (var k in data) {
-      if (k === 'cur_level') continue;
+      if (_skipKeys.indexOf(k) !== -1) continue;
+      if (k.indexOf('wb_ad_') === 0) continue; // günlük reklam sayacı — cihaza özel
       localStorage.setItem(k, data[k]);
       count++;
     }
@@ -16507,6 +16570,17 @@ function openCloudSettings() {
   document.getElementById('cloud-settings-bg').style.display = 'block';
   document.getElementById('cloud-settings-card').style.display = 'block';
   _refreshCloudSettingsUI();
+  _refreshLbMyCard();
+}
+function _refreshLbMyCard() {
+  var nameEl  = document.getElementById('cloud-lb-myname');
+  var scoreEl = document.getElementById('cloud-lb-myscore');
+  if(!nameEl || !scoreEl) return;
+  var nm = (typeof _cloudUserName !== 'undefined' && _cloudUserName) ? _cloudUserName : 'Sen';
+  var sc = 0;
+  try { sc = parseInt((typeof lsGet==='function' ? lsGet('total_score') : localStorage.getItem('ts_total_score')) || '0') || 0; } catch(_){}
+  nameEl.textContent  = nm;
+  scoreEl.textContent = '🏆 ' + sc.toLocaleString();
 }
 
 function _refreshCloudSettingsUI() {
@@ -16582,31 +16656,21 @@ function closeCloudSettings() {
     <span>🏆</span><span data-i18n="lb_title">Skor Tabloları</span>
   </div>
 
-  <!-- Yeni: tek büyük "Sıralamaları Gör" butonu — pretty UI açar -->
-  <button onclick="TSLB.open('weekly')" style="width:100%;padding:13px;border-radius:14px;border:none;background:linear-gradient(180deg,#FFE066,#FFD700 45%,#a87900 100%);color:#1a1408;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.4px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #6d5000,0 5px 14px rgba(255,215,0,0.35),inset 0 1px 0 rgba(255,255,255,0.4);margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform 0.08s,box-shadow 0.08s;" onmousedown="this.style.transform='translateY(2px)';this.style.boxShadow='0 2px 0 #6d5000,0 3px 10px rgba(255,215,0,0.3)';" onmouseup="this.style.transform='';this.style.boxShadow='';" onmouseout="this.style.transform='';this.style.boxShadow='';" ontouchstart="this.style.transform='translateY(2px)';this.style.boxShadow='0 2px 0 #6d5000,0 3px 10px rgba(255,215,0,0.3)';" ontouchend="this.style.transform='';this.style.boxShadow='';">
-    <span style="font-size:20px;">🏆</span>
-    <span data-i18n="tslb_main_btn">SIRALAMALARI GÖR</span>
-  </button>
-
-  <!-- Hızlı erişim: 4 küçük tab butonu da kalsın — TSLB.open(kind)'e yönlendir -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:14px;">
-    <button onclick="TSLB.open('weekly')" class="pg-lb-btn" style="padding:7px 4px;border-radius:9px;border:1px solid rgba(255,215,0,0.25);background:rgba(255,215,0,0.05);color:rgba(255,255,255,0.75);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1;transition:transform 0.08s;">
-      <span style="font-size:14px;">⚡</span>
-      <span data-i18n="lb_weekly">Haftalık</span>
-    </button>
-    <button onclick="TSLB.open('monthly')" class="pg-lb-btn" style="padding:7px 4px;border-radius:9px;border:1px solid rgba(0,201,177,0.25);background:rgba(0,201,177,0.05);color:rgba(255,255,255,0.75);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1;transition:transform 0.08s;">
-      <span style="font-size:14px;">🌙</span>
-      <span data-i18n="lb_monthly">Aylık</span>
-    </button>
-    <button onclick="TSLB.open('yearly')" class="pg-lb-btn" style="padding:7px 4px;border-radius:9px;border:1px solid rgba(156,100,255,0.27);background:rgba(156,100,255,0.05);color:rgba(255,255,255,0.75);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1;transition:transform 0.08s;">
-      <span style="font-size:14px;">☀️</span>
-      <span data-i18n="lb_yearly">Yıllık</span>
-    </button>
-    <button onclick="TSLB.open('alltime')" class="pg-lb-btn" style="padding:7px 4px;border-radius:9px;border:1px solid rgba(255,107,53,0.27);background:rgba(255,107,53,0.05);color:rgba(255,255,255,0.75);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1;transition:transform 0.08s;">
-      <span style="font-size:14px;">🏆</span>
-      <span data-i18n="lb_alltime">Tüm Zamanlar</span>
-    </button>
+  <!-- Benim skorumun kartı -->
+  <div id="cloud-lb-mycard" style="background:linear-gradient(135deg,rgba(0,229,255,0.15),rgba(0,229,255,0.04));border:1.5px solid rgba(0,229,255,0.45);border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;">
+    <div style="width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3a5a8a,#0a1530);border:2px solid #00E5FF;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">⚔️</div>
+    <div style="flex:1;min-width:0;">
+      <div style="color:#00E5FF;font-size:9px;font-weight:800;letter-spacing:2px;" data-i18n="tslb_me">BENİM SKORUM</div>
+      <div id="cloud-lb-myname" style="color:#fff;font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">-</div>
+      <div id="cloud-lb-myscore" style="color:rgba(255,255,255,0.55);font-size:11px;font-weight:700;margin-top:1px;">🏆 0</div>
+    </div>
   </div>
+
+  <!-- Native Google Play butonu -->
+  <button onclick="openLeaderboard('alltime')" style="width:100%;padding:13px;border-radius:14px;border:none;background:linear-gradient(180deg,#4285F4,#2a6acc);color:#fff;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.3px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #1a4a8f,0 5px 14px rgba(66,133,244,0.35);margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;">
+    <span style="font-size:18px;">📊</span>
+    <span data-i18n="tslb_open_native">Gerçek Sıralamayı Gör (Google Play)</span>
+  </button>
 
   <!-- CLOUD SAVE SECTION -->
   <div style="color:#7eb0ff;font-size:10px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;margin:4px 2px 8px;display:flex;align-items:center;gap:6px;">
@@ -17643,527 +17707,6 @@ window.addEventListener('resize', function(){
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     CUSTOM LEADERBOARD OVERLAY — Google Play Games üstüne giydirme
-     Native sistem aynen çalışıyor; bu UI sadece şık bir önyüz.
-     Her tab'da "Tam Sıralamayı Aç" butonu openLeaderboard(kind)'i çağırır.
-     ═══════════════════════════════════════════════════════════════ -->
-<style>
-#tslb-overlay{
-  display:none;position:fixed;left:0;top:0;right:0;bottom:0;z-index:920;
-  background:rgba(0,0,0,0.78);backdrop-filter:blur(10px);
-  font-family:'Rajdhani',sans-serif;
-  animation:tslbFadeIn 0.25s ease-out;
-}
-@keyframes tslbFadeIn{ from{opacity:0;} to{opacity:1;} }
-#tslb-card{
-  position:absolute !important;
-  left:50% !important;
-  top:50% !important;
-  transform:translate(-50%,-50%) !important;
-  width:340px !important;
-  max-width:calc(100vw - 24px) !important;
-  max-height:92vh;
-  background:linear-gradient(180deg,#1a2238 0%,#0a0f1c 100%);
-  border:1.5px solid rgba(255,215,0,0.40);
-  border-radius:22px;
-  overflow:hidden;display:flex;flex-direction:column;
-  box-shadow:0 18px 50px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,215,0,0.10), 0 0 32px rgba(255,215,0,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
-  animation:tslbPop 0.32s cubic-bezier(0.34,1.56,0.64,1);
-}
-@keyframes tslbPop{
-  from{transform:translate(-50%,-50%) scale(0.85);opacity:0;}
-  to{transform:translate(-50%,-50%) scale(1);opacity:1;}
-}
-/* Header */
-#tslb-head{
-  position:relative;height:62px;flex-shrink:0;
-  background:radial-gradient(ellipse at 50% 110%,rgba(255,215,0,0.30),transparent 60%),linear-gradient(180deg,#3a2a06 0%,#1a1408 100%);
-  border-bottom:1px solid rgba(255,215,0,0.25);
-  overflow:hidden;
-}
-#tslb-head::before{
-  content:'';position:absolute;inset:0;
-  background:repeating-linear-gradient(45deg,transparent 0,transparent 8px,rgba(255,215,0,0.04) 8px,rgba(255,215,0,0.04) 16px);
-}
-#tslb-head-label{
-  position:absolute;top:9px;left:14px;
-  font-size:9px;letter-spacing:2.5px;color:rgba(255,215,0,0.65);font-weight:800;
-}
-#tslb-head-period{
-  position:absolute;top:9px;right:14px;
-  font-size:9px;letter-spacing:2px;color:rgba(255,215,0,0.55);font-weight:700;
-}
-#tslb-head-title{
-  position:absolute;left:16px;bottom:7px;
-  display:flex;align-items:center;gap:8px;
-}
-#tslb-head-title .emj{
-  font-size:22px;line-height:1;
-  filter:drop-shadow(0 2px 8px rgba(255,215,0,0.5));
-}
-#tslb-head-title .txt{
-  font-size:19px;font-weight:800;letter-spacing:0.5px;
-  background:linear-gradient(180deg,#FFE066,#FFD700 50%,#a87900 100%);
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 1px 0 rgba(0,0,0,0.5));
-}
-#tslb-close{
-  position:absolute;top:30px;right:10px;
-  width:26px;height:26px;border-radius:8px;
-  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);
-  color:rgba(255,255,255,0.7);font-size:13px;cursor:pointer;
-  -webkit-tap-highlight-color:transparent;line-height:1;
-}
-
-/* Tabs */
-#tslb-tabs{
-  display:flex;gap:3px;padding:10px 10px 0;
-  flex-shrink:0;
-}
-.tslb-tab{
-  flex:1 1 0;min-width:0;padding:8px 4px;cursor:pointer;
-  background:rgba(255,255,255,0.04);
-  border:1.5px solid rgba(255,255,255,0.08);
-  color:rgba(255,255,255,0.55);
-  border-radius:11px 11px 4px 4px;
-  font-family:'Rajdhani',sans-serif;font-weight:800;font-size:11px;
-  letter-spacing:0.3px;-webkit-tap-highlight-color:transparent;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-  transition:background 0.15s, color 0.15s, border-color 0.15s;
-  min-height:42px;box-sizing:border-box;
-  overflow:hidden;
-}
-.tslb-tab > span:not(.em){
-  font-size:10px;line-height:1.1;
-  max-width:100%;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  display:block;text-align:center;
-}
-.tslb-tab .em{font-size:14px;line-height:1;flex-shrink:0;}
-.tslb-tab.active{
-  background:linear-gradient(180deg,rgba(255,215,0,0.30),rgba(255,215,0,0.10));
-  border-color:rgba(255,215,0,0.55);color:#FFD700;
-  box-shadow:0 0 12px rgba(255,215,0,0.18);
-}
-.tslb-tab[data-kind="monthly"].active{
-  background:linear-gradient(180deg,rgba(0,201,177,0.30),rgba(0,201,177,0.10));
-  border-color:rgba(0,201,177,0.55);color:#00E5C7;
-  box-shadow:0 0 12px rgba(0,201,177,0.18);
-}
-.tslb-tab[data-kind="yearly"].active{
-  background:linear-gradient(180deg,rgba(156,100,255,0.30),rgba(156,100,255,0.10));
-  border-color:rgba(156,100,255,0.55);color:#C8A6FF;
-  box-shadow:0 0 12px rgba(156,100,255,0.18);
-}
-.tslb-tab[data-kind="alltime"].active{
-  background:linear-gradient(180deg,rgba(255,107,53,0.30),rgba(255,107,53,0.10));
-  border-color:rgba(255,107,53,0.55);color:#FF8A5A;
-  box-shadow:0 0 12px rgba(255,107,53,0.18);
-}
-
-#tslb-body{
-  padding:14px;overflow-y:auto;flex:1;
-}
-#tslb-body::-webkit-scrollbar{display:none;}
-
-/* Podium */
-.tslb-podium{
-  display:flex;align-items:flex-end;justify-content:center;
-  gap:8px;margin:6px 0 14px;
-}
-.tslb-pod-item{
-  flex:1;display:flex;flex-direction:column;align-items:center;
-  background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));
-  border:1.5px solid rgba(255,255,255,0.12);
-  border-radius:14px;padding:12px 6px 8px;
-  position:relative;
-}
-.tslb-pod-item.first{
-  border-color:rgba(255,215,0,0.55);
-  background:linear-gradient(180deg,rgba(255,215,0,0.18),rgba(255,107,53,0.05));
-  box-shadow:0 0 18px rgba(255,215,0,0.25);
-  transform:translateY(-8px);
-}
-.tslb-pod-rank{
-  position:absolute;top:-12px;
-  width:24px;height:24px;border-radius:50%;
-  background:linear-gradient(180deg,#cdd5db,#8a96a0);color:#15110a;
-  display:flex;align-items:center;justify-content:center;
-  font-family:'Fredoka One',sans-serif;font-size:12px;
-  border:2px solid #fff;
-  box-shadow:0 2px 6px rgba(0,0,0,0.4);
-}
-.tslb-pod-item.first .tslb-pod-rank{background:linear-gradient(180deg,#FFD700,#c9a800);}
-.tslb-pod-item.third .tslb-pod-rank{background:linear-gradient(180deg,#cd7f32,#8b5a23);}
-.tslb-pod-avatar{
-  width:46px;height:46px;border-radius:50%;
-  background:linear-gradient(135deg,#3a4a6a,#1a2030);
-  border:2px solid rgba(255,255,255,0.2);
-  display:flex;align-items:center;justify-content:center;
-  margin:2px 0 6px;font-size:20px;
-}
-.tslb-pod-item.first .tslb-pod-avatar{
-  border-color:#FFD700;
-  font-size:24px;
-}
-.tslb-pod-name{
-  font-size:11px;font-weight:800;color:#fff;text-align:center;
-  max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.tslb-pod-score{
-  font-size:10px;color:#FFD700;font-weight:700;margin-top:1px;
-  font-family:'Rajdhani',sans-serif;
-}
-
-/* Rows */
-.tslb-row{
-  display:flex;align-items:center;gap:10px;
-  padding:8px 10px;
-  background:rgba(255,255,255,0.04);
-  border:1.5px solid rgba(255,255,255,0.08);
-  border-radius:11px;margin-bottom:5px;
-}
-.tslb-row.me{
-  border-color:#00E5FF;
-  background:linear-gradient(135deg,rgba(0,229,255,0.18),rgba(0,229,255,0.04));
-  box-shadow:0 0 14px rgba(0,229,255,0.18);
-}
-.tslb-rank{
-  width:26px;text-align:center;flex-shrink:0;
-  color:rgba(255,255,255,0.5);font-weight:800;font-size:12px;
-}
-.tslb-row.me .tslb-rank{color:#00E5FF;}
-.tslb-avatar{
-  width:30px;height:30px;border-radius:50%;
-  background:linear-gradient(135deg,#3a4a6a,#1a2030);
-  border:1.5px solid rgba(255,255,255,0.15);
-  display:flex;align-items:center;justify-content:center;
-  font-size:14px;flex-shrink:0;
-}
-.tslb-row.me .tslb-avatar{border-color:#00E5FF;}
-.tslb-name{
-  flex:1;font-size:12px;font-weight:700;color:#fff;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.tslb-score{
-  color:#FFD700;font-weight:800;font-size:13px;
-  font-family:'Rajdhani',sans-serif;
-}
-
-/* CTA Footer */
-#tslb-footer{
-  padding:10px 14px 14px;flex-shrink:0;
-  border-top:1px solid rgba(255,255,255,0.06);
-  background:rgba(0,0,0,0.3);
-}
-#tslb-open-native{
-  width:100%;padding:13px;
-  background:linear-gradient(180deg,#4285F4,#2a6acc);color:#fff;
-  border:none;border-radius:14px;
-  font-family:'Rajdhani',sans-serif;font-weight:800;font-size:14px;
-  letter-spacing:0.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;
-  display:flex;align-items:center;justify-content:center;gap:6px;
-  box-shadow:0 4px 0 #1a4a8f, 0 5px 14px rgba(66,133,244,0.35);
-  transition:transform 0.08s, box-shadow 0.08s;
-}
-#tslb-open-native:active{
-  transform:translateY(2px);
-  box-shadow:0 2px 0 #1a4a8f, 0 3px 8px rgba(66,133,244,0.35);
-}
-#tslb-info-line{
-  text-align:center;color:rgba(255,255,255,0.45);
-  font-size:10px;margin-top:7px;font-weight:600;letter-spacing:0.3px;
-}
-
-/* "Sign in needed" hint */
-#tslb-signin-hint{
-  display:none;padding:14px;margin:6px 0 14px;
-  background:linear-gradient(135deg,rgba(66,133,244,0.18),rgba(66,133,244,0.06));
-  border:1.5px solid rgba(66,133,244,0.40);
-  border-radius:14px;
-  text-align:center;
-}
-#tslb-signin-hint .title{
-  color:#7eb0ff;font-weight:800;font-size:14px;margin-bottom:4px;
-}
-#tslb-signin-hint .body{
-  color:rgba(255,255,255,0.6);font-size:11px;line-height:1.5;
-}
-</style>
-
-<div id="tslb-overlay" onclick="if(event.target.id==='tslb-overlay') TSLB.close()">
-  <div id="tslb-card">
-    <div id="tslb-head">
-      <div id="tslb-head-label">RANKING · LIVE</div>
-      <div id="tslb-head-period">HAFTALIK</div>
-      <div id="tslb-head-title">
-        <span class="emj">🏆</span>
-        <span class="txt" id="tslb-head-title-text">Sıralamalar</span>
-      </div>
-      <button id="tslb-close" onclick="TSLB.close()">✕</button>
-    </div>
-
-    <div id="tslb-tabs">
-      <div class="tslb-tab active" data-kind="weekly" onclick="TSLB.tab('weekly')">
-        <span class="em">⚡</span><span data-i18n="tslb_tab_weekly">Haftalık</span>
-      </div>
-      <div class="tslb-tab" data-kind="monthly" onclick="TSLB.tab('monthly')">
-        <span class="em">🌙</span><span data-i18n="tslb_tab_monthly">Aylık</span>
-      </div>
-      <div class="tslb-tab" data-kind="yearly" onclick="TSLB.tab('yearly')">
-        <span class="em">☀️</span><span data-i18n="tslb_tab_yearly">Yıllık</span>
-      </div>
-      <div class="tslb-tab" data-kind="alltime" onclick="TSLB.tab('alltime')">
-        <span class="em">🏆</span><span data-i18n="tslb_tab_alltime">Tümü</span>
-      </div>
-    </div>
-
-    <div id="tslb-body">
-      <!-- Sign-in needed (hidden when signed in) -->
-      <div id="tslb-signin-hint">
-        <div class="title" id="tslb-signin-title">🔗 Google Play Games ile Bağlan</div>
-        <div class="body" id="tslb-signin-body">Diğer oyuncularla yarışmak ve dünya sıralamasında yerini görmek için Play Games'e giriş yap.</div>
-      </div>
-      <!-- Podium + rows are dynamically rendered -->
-      <div id="tslb-content"></div>
-    </div>
-
-    <div id="tslb-footer">
-      <button id="tslb-open-native" onclick="TSLB.openNative()">📱 Google Play'de Tam Sıralamayı Aç →</button>
-      <div id="tslb-info-line">Skorların otomatik gönderilir</div>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── Custom Leaderboard UI ───────────────────────────────────────
-// Native Google Play Games sistemini bozmadan üstüne giydirilen şık önyüz.
-window.TSLB = (function(){
-  var currentKind = 'weekly';
-
-  // Gerçek leaderboard verisi Google Play Games tarafında — bu UI sadece
-  // önizleme/giriş noktası. Demo veriler kaldırıldı; oyuncu sıralamasını
-  // görmek için "Tam Sıralamayı Aç" butonu ile native ekrana yönlendiriyoruz.
-  var _data = { weekly:null, monthly:null, yearly:null, alltime:null };
-
-  var PERIOD_LABEL = {
-    weekly:  'HAFTALIK',
-    monthly: 'AYLIK',
-    yearly:  'YILLIK',
-    alltime: 'TÜM ZAMANLAR',
-  };
-
-  function _open(kind){
-    currentKind = kind || 'weekly';
-    var ov = document.getElementById('tslb-overlay');
-    if(!ov) return;
-    // Cloud settings veya başka transform'lu parent içinde kalmasını engelle:
-    // overlay'i her zaman body'nin doğrudan çocuğu olarak yeniden konumlandır
-    if(ov.parentNode !== document.body){
-      document.body.appendChild(ov);
-    }
-    ov.style.display = 'block';
-    _applyI18n();
-    _setActiveTab(currentKind);
-    if(_data[currentKind] !== null) _render();
-    else _fetch(currentKind);
-  }
-  function _fetch(kind){
-    if(typeof Android === 'undefined'){ _render(); return; }
-    if(!_cloudSignedIn){ _render(); return; }
-    var id = (typeof LEADERBOARD_IDS !== 'undefined') ? LEADERBOARD_IDS[kind] : null;
-    if(!id){ _render(); return; }
-    var cont = document.getElementById('tslb-content');
-    if(cont) cont.innerHTML = '<div style="text-align:center;padding:48px 0;color:rgba(255,255,255,0.4);font-size:24px;">⏳</div>';
-    try { Android.loadLeaderboard(id, kind); } catch(e){ _render(); }
-  }
-  function _receiveData(kind, scores, err){
-    _data[kind] = (scores && Array.isArray(scores)) ? scores : [];
-    if(kind === currentKind) _render();
-  }
-  function _applyI18n(){
-    function _t(k, fb){ try { return (typeof t==='function')?(t(k)||fb):fb; } catch(_) { return fb; } }
-    var el;
-    el = document.getElementById('tslb-head-label');     if(el) el.textContent = _t('tslb_ranking_label','RANKING · LIVE');
-    el = document.getElementById('tslb-head-title-text');if(el) el.textContent = (_t('tslb_title','🏆 Leaderboards')||'').replace(/^[^\w]+/,'');
-    // Tabs
-    document.querySelectorAll('.tslb-tab').forEach(function(tb){
-      var k = tb.getAttribute('data-kind');
-      var sp = tb.querySelector('span:not(.em)');
-      if(sp){
-        var keyMap = {weekly:'tslb_tab_weekly',monthly:'tslb_tab_monthly',yearly:'tslb_tab_yearly',alltime:'tslb_tab_alltime'};
-        sp.textContent = _t(keyMap[k], sp.textContent);
-      }
-    });
-    el = document.getElementById('tslb-signin-title');   if(el) el.textContent = _t('tslb_signin_title','🔗 Connect with Google Play Games');
-    el = document.getElementById('tslb-signin-body');    if(el) el.textContent = _t('tslb_signin_body','Compete with other players and see your rank on the world leaderboard.');
-    el = document.getElementById('tslb-open-native');    if(el) el.textContent = _t('tslb_open_native','📱 Open Full Leaderboard on Google Play →');
-    el = document.getElementById('tslb-info-line');      if(el) el.textContent = _t('tslb_score_auto','Scores are submitted automatically');
-  }
-  function _close(){
-    var ov = document.getElementById('tslb-overlay');
-    if(ov) ov.style.display = 'none';
-  }
-  function _tab(kind){
-    currentKind = kind;
-    _setActiveTab(kind);
-    if(_data[kind] !== null) _render();
-    else _fetch(kind);
-  }
-  function _setActiveTab(kind){
-    var tabs = document.querySelectorAll('.tslb-tab');
-    tabs.forEach(function(t){
-      t.classList.toggle('active', t.getAttribute('data-kind')===kind);
-    });
-    var p = document.getElementById('tslb-head-period');
-    if(p){
-      try {
-        var key = 'tslb_period_' + kind;
-        var label = (typeof t==='function') ? t(key) : null;
-        p.textContent = label || (PERIOD_LABEL[kind] || kind.toUpperCase());
-      } catch(_) {
-        p.textContent = PERIOD_LABEL[kind] || kind.toUpperCase();
-      }
-    }
-  }
-
-  function _esc(s){
-    return String(s||'').replace(/[<>&"]/g, function(c){
-      return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];
-    });
-  }
-
-  function _render(){
-    var cont = document.getElementById(‘tslb-content’);
-    if(!cont) return;
-    var hint = document.getElementById(‘tslb-signin-hint’);
-    var signedIn = (typeof _cloudSignedIn !== ‘undefined’) && _cloudSignedIn;
-    if(hint) hint.style.display = signedIn ? ‘none’ : ‘block’;
-
-    var myScore = 0;
-    try { myScore = parseInt((typeof lsGet===’function’?lsGet(‘total_score’):localStorage.getItem(‘ts_total_score’))||’0’) || 0; } catch(_) {}
-    var myName = (typeof _cloudUserName !== ‘undefined’ && _cloudUserName) ? _cloudUserName : (signedIn ? ‘Oyuncu’ : ‘SEN’);
-    function _t(k,fb){ try{return(typeof t===’function’)?(t(k)||fb):fb;}catch(_){return fb;} }
-    var meLabel = _t(‘tslb_me’,’SEN’);
-
-    var scores = _data[currentKind];
-    var html = ‘’;
-
-    if(scores && scores.length > 0){
-      // Gerçek veri var — podium + liste
-      scores.forEach(function(s){ if(s.name===myName) s.isMe=true; });
-      var myEntry = null;
-      scores.forEach(function(s){ if(s.isMe) myEntry=s; });
-
-      // Podium (ilk 3)
-      var top = scores.slice(0,3);
-      var order  = top.length>=3?[top[1],top[0],top[2]]:top.length===2?[null,top[0],top[1]]:[null,top[0]||null,null];
-      var cls    = [‘second’,’first’,’third’];
-      var ranks  = [‘2’,’1’,’3’];
-      html += ‘<div class="tslb-podium">’;
-      for(var pi=0;pi<3;pi++){
-        html += order[pi] ? _podHtml(order[pi],ranks[pi],cls[pi])
-                          : ‘<div class="tslb-pod-item ‘+cls[pi]+’"></div>’;
-      }
-      html += ‘</div>’;
-
-      // Liste (4. ve sonrası)
-      for(var i=3;i<scores.length;i++){
-        html += _rowHtml(scores[i], scores[i].rank||(i+1));
-      }
-      // Oyuncunun kendi satırı listede görünmüyorsa alta ekle
-      if(myEntry){
-        var inList = scores.slice(0,scores.length).some(function(s){return s.isMe;});
-        if(!inList){
-          html += ‘<div style="height:1px;background:rgba(255,255,255,0.08);margin:6px 0;"></div>’;
-          html += _rowHtml(myEntry, myEntry.rank||’···’);
-        }
-      }
-
-    } else if(scores && scores.length === 0){
-      // Skor yok
-      html += ‘<div style="text-align:center;padding:32px;color:rgba(255,255,255,0.45);font-size:13px;font-weight:700;">’
-        + _t(‘tslb_no_scores’,’Henüz bu tabloda skor yok’) + ‘</div>’;
-      if(myName){
-        html += ‘<div style="height:1px;background:rgba(255,255,255,0.08);margin:6px 0;"></div>’;
-        html += _rowHtml({name:myName,score:myScore,isMe:true,rank:’···’},’···’);
-      }
-
-    } else {
-      // Yüklenmedi / giriş yapılmamış — oyuncu kartı + hint
-      html += ‘<div style="background:linear-gradient(180deg,rgba(0,229,255,0.15),rgba(0,229,255,0.04));’
-        +’border:1.5px solid rgba(0,229,255,0.50);border-radius:16px;’
-        +’box-shadow:0 0 18px rgba(0,229,255,0.18);padding:14px 16px;margin-bottom:14px;’
-        +’display:flex;align-items:center;gap:14px;">’
-        +’<div style="width:54px;height:54px;border-radius:50%;’
-        +’background:radial-gradient(circle at 35% 30%,#3a5a8a,#0a1530);’
-        +’border:2px solid #00E5FF;display:flex;align-items:center;justify-content:center;’
-        +’font-size:24px;flex-shrink:0;box-shadow:0 0 14px rgba(0,229,255,0.4);">⚔️</div>’
-        +’<div style="flex:1;min-width:0;">’
-        +’<div style="color:#00E5FF;font-size:9px;font-weight:800;letter-spacing:2px;">’+meLabel+’</div>’
-        +’<div style="color:#fff;font-size:17px;font-weight:800;line-height:1.1;margin-top:2px;’
-        +’white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">’+_esc(myName)+’</div>’
-        +’<div style="color:rgba(255,255,255,0.55);font-size:10px;letter-spacing:1px;margin-top:2px;font-weight:700;">’
-        +’🏆 ‘+_fmtNum(myScore)+’</div>’
-        +’</div></div>’;
-      var emptyTitle = signedIn?_t(‘tslb_empty_title’,’🌐 Online Sıralama’):_t(‘tslb_empty_title_off’,’🔒 Henüz Bağlı Değilsin’);
-      var emptyBody  = signedIn
-        ?_t(‘tslb_empty_body’,’Sıralama yüklenemedi. Aşağıdan Play Games\’i açarak görebilirsin.’)
-        :_t(‘tslb_empty_body_off’,’Sıralamada yer almak için Google Play Games\’e giriş yap.’);
-      html += ‘<div style="text-align:center;padding:20px 16px;background:rgba(255,255,255,0.03);’
-        +’border:1.5px dashed rgba(255,255,255,0.12);border-radius:16px;">’
-        +’<div style="font-size:40px;margin-bottom:8px;">🏆</div>’
-        +’<div style="color:#FFD700;font-size:14px;font-weight:800;margin-bottom:5px;">’+emptyTitle+’</div>’
-        +’<div style="color:rgba(255,255,255,0.6);font-size:11px;line-height:1.5;">’+emptyBody+’</div>’
-        +’</div>’;
-    }
-
-    cont.innerHTML = html;
-  }
-
-  function _podHtml(p, rank, cls){
-    var meCls = p.isMe ? ' me' : '';
-    return '<div class="tslb-pod-item '+cls+'">'
-      + '<div class="tslb-pod-rank">'+rank+'</div>'
-      + '<div class="tslb-pod-avatar">'+(_esc(p.avatar)||'👤')+'</div>'
-      + '<div class="tslb-pod-name">'+(p.isMe?'<span style="color:#00E5FF">'+_esc(p.name)+'</span>':_esc(p.name))+'</div>'
-      + '<div class="tslb-pod-score">'+_fmtNum(p.score)+'</div>'
-      + '</div>';
-  }
-  function _rowHtml(p, rank){
-    return '<div class="tslb-row'+(p.isMe?' me':'')+'">'
-      + '<div class="tslb-rank">'+rank+'</div>'
-      + '<div class="tslb-avatar">'+(_esc(p.avatar)||'👤')+'</div>'
-      + '<div class="tslb-name">'+(p.isMe?_esc(p.name)+' <span style="color:#00E5FF;font-size:10px;font-weight:800;">'+((typeof t==='function'&&t('tslb_me'))||'YOU')+'</span>':_esc(p.name))+'</div>'
-      + '<div class="tslb-score">'+_fmtNum(p.score)+'</div>'
-      + '</div>';
-  }
-  function _fmtNum(n){
-    n = n|0;
-    if(n>=1000000) return (n/1000000).toFixed(1).replace(/\.0$/,'')+'M';
-    if(n>=1000)    return (n/1000).toFixed(1).replace(/\.0$/,'')+'K';
-    return n.toLocaleString();
-  }
-
-  function _openNative(){
-    // Mevcut openLeaderboard() fonksiyonunu çağır — Android.showLeaderboard kullanır
-    if(typeof openLeaderboard === 'function'){
-      openLeaderboard(currentKind);
-    } else if(typeof showToast === 'function'){
-      showToast('Sıralama açılamadı');
-    }
-  }
-
-  return {
-    open: _open,
-    close: _close,
-    tab: _tab,
-    openNative: _openNative,
-    receiveData: _receiveData,
-  };
-})();
-</script>
 
 
 <!-- ═══════════════════════════════════════════════════════════════
@@ -18409,6 +17952,106 @@ window.TSLB = (function(){
     <button id="bh-result-finish" onclick="BirdHunt.close()">▶ BİTİR</button>
   </div>
 </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// İlk Hafta Hediye Programı (#16) + Tutorial Reward (#22)
+// ═══════════════════════════════════════════════════════════════
+(function(){
+
+var WEEK_GIFTS = [
+  { day:1, icon:'🎉', badge:'GÜN 1 · HOŞ GELDİN',  title:'Aramıza Hoş Geldin!',     reward:'score',  value:100,  rewardTxt:'+100 Puan',          desc:'Tank Siege\'e hoş geldin! Hazır ol.' },
+  { day:2, icon:'💰', badge:'GÜN 2',                title:'Gün 2 Hediyesi',           reward:'score',  value:150,  rewardTxt:'+150 Puan',          desc:'Devam ediyorsun, harika!' },
+  { day:3, icon:'❤️', badge:'GÜN 3',                title:'Ekstra Can!',              reward:'life',   value:2,    rewardTxt:'+2 Can',             desc:'2 can hediye — zorlu levellerde işine yarar.' },
+  { day:4, icon:'🎁', badge:'GÜN 4',                title:'Gün 4 Hediyesi',           reward:'score',  value:200,  rewardTxt:'+200 Puan',          desc:'4 gün üst üste — azimlisin!' },
+  { day:5, icon:'💎', badge:'GÜN 5 · BONUS',        title:'Büyük Bonus!',             reward:'score',  value:500,  rewardTxt:'+500 Puan',          desc:'Yarı yoldasın, büyük ödül sende!' },
+  { day:6, icon:'💨', badge:'GÜN 6 · ÖZEL ITEM',    title:'Rüzgar Kalkanı!',          reward:'wblock', value:1,    rewardTxt:'💨 Rüzgar Kalkanı',  desc:'Rüzgarlı levellerde işe yarar özel item.' },
+  { day:7, icon:'🏆', badge:'GÜN 7 · BÜYÜK ÖDÜL',  title:'7 Gün Tamamlandı!',        reward:'score',  value:1000, rewardTxt:'+1000 Puan',         desc:'Bir haftayı tamamladın! Büyük ödülün sende.' },
+];
+
+var _pendingGift = null;
+
+window.checkWeekGift = function(){
+  var fpt = lsGet('first_play_ts');
+  if(!fpt){ lsSet('first_play_ts', String(Date.now())); fpt = lsGet('first_play_ts'); }
+  var daysPassed = Math.floor((Date.now() - parseInt(fpt||Date.now())) / 86400000);
+  var idx = Math.min(daysPassed, 6);
+  var claimed = (lsGet('week_gifts_claimed')||'').split(',').filter(Boolean);
+  var gift = WEEK_GIFTS[idx];
+  if(!gift || claimed.indexOf(String(gift.day)) !== -1) return;
+  _pendingGift = { type:'week', gift:gift, claimed:claimed };
+  _showGiftPopup(gift, 'AL! 🎁');
+};
+
+function _applyWeekGift(gift){
+  if(gift.reward === 'score'){
+    score += gift.value;
+    lsSet('total_score', score);
+    try{ updateUI(); }catch(_){}
+  } else if(gift.reward === 'life'){
+    var cur = _livesNow();
+    lsSet('lives_count', String(Math.min(MAX_LIVES, cur + gift.value)));
+    try{ updateLivesBadge(); }catch(_){}
+  } else if(gift.reward === 'wblock'){
+    try{ giveWindBlock(); }catch(_){}
+  }
+}
+
+window.checkTutorialReward = function(level){
+  if(parseInt(lsGet('tutorial_reward_done')||'0') >= 1) return;
+  if(level < 4) return;
+  lsSet('tutorial_reward_done', '1');
+  var gift = {
+    icon:'🎓', badge:'EĞİTİM TAMAMLANDI',
+    title:'İlk 5 Leveli Bitirdin!',
+    reward:'tut', value:0,
+    rewardTxt:'+200 Puan + ❤️ +1 Can',
+    desc:'Tank kullanmayı öğrendin! Harika bir başlangıç.'
+  };
+  _pendingGift = { type:'tutorial', gift:gift };
+  setTimeout(function(){ _showGiftPopup(gift, 'DEVAM ET! 🚀'); }, 1500);
+};
+
+function _showGiftPopup(gift, btnLabel){
+  var ov = document.getElementById('gift-overlay');
+  if(!ov) return;
+  document.getElementById('gift-icon').textContent       = gift.icon;
+  document.getElementById('gift-badge').textContent      = gift.badge;
+  document.getElementById('gift-title').textContent      = gift.title;
+  document.getElementById('gift-reward-box').textContent = gift.rewardTxt;
+  document.getElementById('gift-desc').textContent       = gift.desc || '';
+  document.getElementById('gift-btn').textContent        = btnLabel || 'AL! 🎁';
+  ov.style.display = 'flex';
+}
+
+window._giftClaim = function(){
+  var pd = _pendingGift; _pendingGift = null;
+  if(!pd) return;
+  if(pd.type === 'week'){
+    pd.claimed.push(String(pd.gift.day));
+    lsSet('week_gifts_claimed', pd.claimed.join(','));
+    _applyWeekGift(pd.gift);
+    try{ showToast(pd.gift.rewardTxt + ' kazanıldı! 🎉'); }catch(_){}
+  } else if(pd.type === 'tutorial'){
+    score += 200;
+    lsSet('total_score', score);
+    var cur = _livesNow();
+    lsSet('lives_count', String(Math.min(MAX_LIVES, cur + 1)));
+    try{ updateUI(); }catch(_){}
+    try{ updateLivesBadge(); }catch(_){}
+    try{ showToast('+200 puan + ❤️ +1 can kazanıldı! 🎉'); }catch(_){}
+  }
+  var ov = document.getElementById('gift-overlay');
+  if(ov) ov.style.display = 'none';
+};
+
+window._giftClose = function(){
+  var ov = document.getElementById('gift-overlay');
+  if(ov) ov.style.display = 'none';
+};
+
+})();
+</script>
 
 <script>
 window.BirdHunt = (function(){
