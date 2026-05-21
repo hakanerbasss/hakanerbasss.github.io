@@ -1628,7 +1628,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.163';
+const APP_VERSION      = '1.0.164';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1646,8 +1646,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 22:00';
-const APP_VERSION_NOTE = 'BirdHunt Part1: secili tank SVG render (renk+detay) [Claude]';
+const APP_VERSION_DATE = '2026.05.22 01:00';
+const APP_VERSION_NOTE = 'BirdHunt Part2: 14 tema gokyuzu+zemin+hava (kar/yagmur/lav/sehir/sis) [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -18200,9 +18200,37 @@ window.BirdHunt = (function(){
   // ── Daily limit ─────────────────────────────────────────────
   var DAILY_LIMIT = 3;
   // ── Background sound — APK içinde değiştirilebilir ─────────
-  // BirdHunt.setBgSound(url) ile veya doğrudan _bgAudio.src ile değiştir
   var _bgAudio = null;
   var BG_SOUND_URL = (typeof Android !== 'undefined') ? 'https://appassets.androidplatform.net/assets/sounds/noises_from_a_residential_road.mp3' : '';
+
+  // ── Aktif tema ───────────────────────────────────────────────
+  var _bhTheme = 'valley';
+
+  // ── Tema config — gökyüzü/zemin/hava/özel elementler ────────
+  var BH_THEME = {
+    valley:       {s0:'#5db5d6',s1:'#9cdce8',s2:'#b0d878',s3:'#4a7828', gr:'#4a7828', h0:'#6a8a4a',h1:'#4a7232', sun:true,  sunC:'#fff5d8', clouds:true,  snow:false,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    meadow:       {s0:'#6ac8e8',s1:'#aee8f0',s2:'#c0f0a8',s3:'#5a8838', gr:'#5a8838', h0:'#7aa05a',h1:'#5a8a3a', sun:true,  sunC:'#fff5d8', clouds:true,  snow:false,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    desert:       {s0:'#f0a830',s1:'#f8cc60',s2:'#e89020',s3:'#b06818', gr:'#c08838', h0:'#c08030',h1:'#a86820', sun:true,  sunC:'#ffee80', clouds:false, snow:false,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    forest:       {s0:'#1a4818',s1:'#285828',s2:'#508040',s3:'#183810', gr:'#183810', h0:'#104010',h1:'#184818', sun:false, sunC:null,       clouds:false, snow:false,rain:false,fog:true, lava:false,city:false,stars:false,moon:false},
+    rocky:        {s0:'#7090a8',s1:'#90aac0',s2:'#7a8a70',s3:'#505a48', gr:'#505a48', h0:'#686a58',h1:'#485040', sun:true,  sunC:'#dde8ff', clouds:true,  snow:false,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    snow:         {s0:'#b8cce8',s1:'#d8e8ff',s2:'#c8d8f0',s3:'#d0ddf0', gr:'#e0ecff', h0:'#c8d8f0',h1:'#b0c4e0', sun:true,  sunC:'#fff8ee', clouds:true,  snow:true, rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    snowyweather: {s0:'#485870',s1:'#687890',s2:'#7888a0',s3:'#9aaab8', gr:'#b0c0d8', h0:'#8898b0',h1:'#7888a0', sun:false, sunC:null,       clouds:true,  snow:true, heavy:true,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    rainy:        {s0:'#304050',s1:'#485868',s2:'#586878',s3:'#404e40', gr:'#384838', h0:'#404e40',h1:'#303c30', sun:false, sunC:null,       clouds:true,  snow:false,rain:true, fog:false,lava:false,city:false,stars:false,moon:false},
+    cloudy:       {s0:'#606878',s1:'#808898',s2:'#9098a8',s3:'#606858', gr:'#506050', h0:'#585858',h1:'#484848', sun:false, sunC:null,       clouds:true,  snow:false,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    volcano:      {s0:'#200800',s1:'#501808',s2:'#882018',s3:'#c04018', gr:'#180600', h0:'#301008',h1:'#200808', sun:false, sunC:null,       clouds:false, snow:false,rain:false,fog:false,lava:true, city:false,stars:false,moon:false},
+    nightcity:    {s0:'#020510',s1:'#060c20',s2:'#0a1228',s3:'#060c18', gr:'#06080e', h0:'#10182c',h1:'#0c1020', sun:false, sunC:null,       clouds:false, snow:false,rain:false,fog:false,lava:false,city:true, stars:true, moon:true},
+    tropical:     {s0:'#20a8e0',s1:'#58c8f0',s2:'#a8f080',s3:'#30b860', gr:'#30b860', h0:'#28a040',h1:'#208030', sun:true,  sunC:'#fff060', clouds:true,  snow:false,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+    skyislands:   {s0:'#58a8f0',s1:'#80c8ff',s2:'#a8d8ff',s3:'#58a8f0', gr:'#90c0e8', h0:'#7098c8',h1:'#5880b0', sun:true,  sunC:'#fff8e0', clouds:true,  snow:false,rain:false,fog:false,lava:false,city:false,stars:false,moon:false},
+  };
+
+  // Hex rengi koyulaştır
+  function _darkenHex(hex, amt){
+    var v=parseInt((hex||'#888888').slice(1),16);
+    var r=Math.max(0,((v>>16)&255)-Math.round(255*amt));
+    var g=Math.max(0,((v>>8)&255)-Math.round(255*amt));
+    var b=Math.max(0,(v&255)-Math.round(255*amt));
+    return '#'+(r<16?'0':'')+r.toString(16)+(g<16?'0':'')+g.toString(16)+(b<16?'0':'')+b.toString(16);
+  }
 
   function _initBgAudio(){
     if(_bgAudio) return _bgAudio;
@@ -18329,6 +18357,8 @@ window.BirdHunt = (function(){
       return false;
     }
     _resetState();
+    // Mevcut temayı yakala
+    _bhTheme = (typeof lv !== 'undefined' && lv && lv.theme && BH_THEME[lv.theme]) ? lv.theme : 'valley';
     var ov = document.getElementById('bh-overlay');
     if(!ov) return;
     if(ov.parentNode !== document.body) document.body.appendChild(ov);
@@ -18416,11 +18446,57 @@ window.BirdHunt = (function(){
     S.running = true;
     S.tStart = performance.now();
     _incToday();
-    _pauseMainMusic();    // Ana oyun müziği dursun
-    _playBgSound();       // Bonus arka plan ses başlasın
-    // Spawn birds
+    _pauseMainMusic();
+    _playBgSound();
+    // Tema partikülleri ve özel elementleri init et (canvas boyutu burada hazır)
+    _initThemeElements();
     for(var i=0; i<3; i++) _spawnBird(true);
     _loop();
+  }
+
+  function _initThemeElements(){
+    var th = BH_THEME[_bhTheme] || BH_THEME.valley;
+    var W = S.W, H = S.H, dpr = S.dpr;
+    S.bhParticles = [];
+    S.bhStars     = [];
+    S.bhCity      = [];
+    // Kar / yağmur partikülleri
+    if(th.snow || th.rain){
+      var cnt = th.heavy ? 90 : th.snow ? 55 : 70;
+      for(var i=0;i<cnt;i++){
+        if(th.snow){
+          S.bhParticles.push({x:Math.random()*W, y:Math.random()*H,
+            vy:(0.8+Math.random()*1.8)*dpr, vx:(Math.random()-0.5)*0.6*dpr,
+            r:(1.2+Math.random()*2.2)*dpr, alpha:0.5+Math.random()*0.4});
+        } else {
+          S.bhParticles.push({x:Math.random()*W, y:Math.random()*H-100,
+            vy:(5+Math.random()*4)*dpr, vx:-1.5*dpr, alpha:0.4+Math.random()*0.35});
+        }
+      }
+    }
+    // Yıldızlar (nightcity)
+    if(th.stars){
+      for(var si=0;si<90;si++){
+        S.bhStars.push({x:Math.random()*W, y:Math.random()*H*0.55,
+          r:(0.5+Math.random()*1.5)*dpr, alpha:0.3+Math.random()*0.7});
+      }
+    }
+    // Şehir binaları (nightcity) — pencereler sabit
+    if(th.city){
+      var cx2=0;
+      while(cx2<W){
+        var bw=(28+Math.random()*44)*dpr;
+        var bh=(55+Math.random()*130)*dpr;
+        var wins=[];
+        for(var wy=H*0.6-bh+8*dpr; wy<H*0.6-6*dpr; wy+=11*dpr){
+          for(var wx2=cx2+4*dpr; wx2<cx2+bw-8*dpr; wx2+=8*dpr){
+            if(Math.random()>0.45) wins.push({x:wx2,y:wy});
+          }
+        }
+        S.bhCity.push({x:cx2, w:bw, h:bh, wins:wins});
+        cx2 += bw+2*dpr;
+      }
+    }
   }
 
   // Reklam izleyerek triple ammo (45 mermi)
@@ -18764,62 +18840,113 @@ window.BirdHunt = (function(){
 
   // ── Background scene ─────────────────────────────────────
   function _drawBackground(ctx){
-    var sky = ctx.createLinearGradient(0,0,0,S.H);
-    sky.addColorStop(0, '#5db5d6');
-    sky.addColorStop(0.55, '#9cdce8');
-    sky.addColorStop(0.65, '#a8d878');
-    sky.addColorStop(1, '#5a8438');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0,0,S.W,S.H);
-    // Sun
-    ctx.fillStyle = '#fff5d8';
-    ctx.beginPath();
-    ctx.arc(S.W*0.78, S.H*0.18, 28*S.dpr, 0, Math.PI*2);
-    ctx.fill();
-    ctx.globalAlpha = 0.3;
-    ctx.beginPath();
-    ctx.arc(S.W*0.78, S.H*0.18, 44*S.dpr, 0, Math.PI*2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    // Distant hills
-    ctx.fillStyle = '#6a8a4a';
-    ctx.beginPath();
-    ctx.moveTo(0, S.H*0.7);
-    ctx.quadraticCurveTo(S.W*0.2, S.H*0.6, S.W*0.4, S.H*0.7);
-    ctx.quadraticCurveTo(S.W*0.6, S.H*0.62, S.W*0.85, S.H*0.7);
-    ctx.lineTo(S.W, S.H*0.7);
-    ctx.lineTo(S.W, S.H);
-    ctx.lineTo(0, S.H);
-    ctx.closePath();
-    ctx.fill();
-    // Bushes silhouettes near ground
-    ctx.fillStyle = '#3a6a28';
-    var bushW = 60*S.dpr, bushH = 20*S.dpr;
-    for(var bx=0; bx<S.W; bx+=bushW*1.4){
-      ctx.beginPath();
-      ctx.arc(bx + bushW*0.4, S.H - bushH*0.7, bushH*0.7, 0, Math.PI*2);
-      ctx.arc(bx + bushW*0.8, S.H - bushH*0.9, bushH*0.9, 0, Math.PI*2);
-      ctx.arc(bx + bushW*1.2, S.H - bushH*0.7, bushH*0.6, 0, Math.PI*2);
-      ctx.fill();
+    var th = BH_THEME[_bhTheme] || BH_THEME.valley;
+    var W=S.W, H=S.H, dpr=S.dpr;
+    // ── Gökyüzü ──
+    var sky=ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,   th.s0);
+    sky.addColorStop(0.45,th.s1);
+    sky.addColorStop(0.65,th.s2);
+    sky.addColorStop(1,   th.s3);
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    // ── Yıldızlar (nightcity) ──
+    if(th.stars && S.bhStars && S.bhStars.length){
+      S.bhStars.forEach(function(st){
+        ctx.globalAlpha=st.alpha; ctx.fillStyle='#ffffff';
+        ctx.beginPath(); ctx.arc(st.x,st.y,st.r,0,Math.PI*2); ctx.fill();
+      });
+      ctx.globalAlpha=1;
     }
-    // Trees scattered
-    ctx.fillStyle = '#1a4a1a';
-    for(var t=0; t<4; t++){
-      var tx = S.W*(0.05 + t*0.28) + (t%2?S.W*0.04:0);
-      var ty = S.H*0.78;
-      // Trunk
-      ctx.fillStyle = '#3a1a06';
-      ctx.fillRect(tx-3*S.dpr, ty, 6*S.dpr, 30*S.dpr);
-      // Leaves
-      ctx.fillStyle = '#1e6b1e';
+    // ── Ay (nightcity) ──
+    if(th.moon){
+      ctx.fillStyle='#f0e8c0';
+      ctx.beginPath(); ctx.arc(W*0.75,H*0.14,24*dpr,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=th.s1; // gece göğü rengiyle hilal gölgesi
+      ctx.beginPath(); ctx.arc(W*0.75+9*dpr,H*0.14-3*dpr,22*dpr,0,Math.PI*2); ctx.fill();
+    }
+    // ── Güneş ──
+    if(th.sun){
+      ctx.fillStyle=th.sunC||'#fff5d8';
+      ctx.beginPath(); ctx.arc(W*0.78,H*0.18,28*dpr,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=0.28;
+      ctx.beginPath(); ctx.arc(W*0.78,H*0.18,44*dpr,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    // ── Lav parıltısı (volcano) ──
+    if(th.lava){
+      var lg=ctx.createRadialGradient(W*0.5,H,0,W*0.5,H,H*0.5);
+      lg.addColorStop(0,'rgba(255,90,0,0.65)'); lg.addColorStop(1,'rgba(255,90,0,0)');
+      ctx.fillStyle=lg; ctx.fillRect(0,H*0.55,W,H*0.45);
+    }
+    // ── Uzak tepeler ──
+    ctx.fillStyle=th.h0;
+    ctx.beginPath();
+    ctx.moveTo(0,H*0.7);
+    ctx.quadraticCurveTo(W*0.22,H*0.58,W*0.42,H*0.7);
+    ctx.quadraticCurveTo(W*0.62,H*0.6,W*0.84,H*0.68);
+    ctx.lineTo(W,H*0.7); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+    // Ön tepeler
+    ctx.fillStyle=th.h1;
+    ctx.beginPath();
+    ctx.moveTo(0,H*0.78);
+    ctx.quadraticCurveTo(W*0.28,H*0.68,W*0.52,H*0.78);
+    ctx.quadraticCurveTo(W*0.74,H*0.72,W,H*0.77);
+    ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+    // ── Zemin ──
+    var gr=ctx.createLinearGradient(0,H*0.84,0,H);
+    gr.addColorStop(0,th.gr); gr.addColorStop(1,_darkenHex(th.gr,0.18));
+    ctx.fillStyle=gr; ctx.fillRect(0,H*0.84,W,H*0.16);
+    // Kar örtüsü (snow temalar)
+    if(th.snow||th.heavy){
+      ctx.fillStyle='rgba(225,238,255,0.88)';
       ctx.beginPath();
-      ctx.arc(tx, ty-6*S.dpr, 18*S.dpr, 0, Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle = '#2a7a2a';
-      ctx.beginPath();
-      ctx.arc(tx-8*S.dpr, ty-12*S.dpr, 14*S.dpr, 0, Math.PI*2);
-      ctx.arc(tx+8*S.dpr, ty-10*S.dpr, 13*S.dpr, 0, Math.PI*2);
-      ctx.fill();
+      ctx.ellipse(W*0.5,H*0.84,W*0.65,14*dpr,0,0,Math.PI*2); ctx.fill();
+    }
+    // ── Sis (forest) ──
+    if(th.fog){
+      var fg=ctx.createLinearGradient(0,H*0.52,0,H*0.78);
+      fg.addColorStop(0,'rgba(80,120,60,0)'); fg.addColorStop(1,'rgba(80,120,60,0.32)');
+      ctx.fillStyle=fg; ctx.fillRect(0,H*0.52,W,H*0.26);
+    }
+    // ── Şehir silueti (nightcity) ──
+    if(th.city && S.bhCity && S.bhCity.length){
+      ctx.fillStyle='#0c1828';
+      S.bhCity.forEach(function(b){
+        ctx.fillRect(b.x, H*0.6-b.h, b.w, b.h+H*0.5);
+      });
+      // Sabit pencereler
+      ctx.fillStyle='rgba(255,220,80,0.65)';
+      S.bhCity.forEach(function(b){
+        b.wins.forEach(function(w){ ctx.fillRect(w.x,w.y,4*dpr,5*dpr); });
+      });
+    }
+  }
+
+  // ── Hava olayları (kar/yağmur) — loop içinde çağrılır ───────
+  function _drawWeather(ctx){
+    if(!S.bhParticles||!S.bhParticles.length) return;
+    var th=BH_THEME[_bhTheme]||BH_THEME.valley;
+    var dpr=S.dpr, H=S.H, W=S.W;
+    if(th.snow){
+      ctx.fillStyle='rgba(235,245,255,0.85)';
+      S.bhParticles.forEach(function(p){
+        p.y+=p.vy; p.x+=p.vx;
+        if(p.y>H){p.y=-10;p.x=Math.random()*W;}
+        if(p.x>W)p.x=0; if(p.x<0)p.x=W;
+        ctx.globalAlpha=p.alpha;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+      });
+      ctx.globalAlpha=1;
+    } else if(th.rain){
+      ctx.strokeStyle='rgba(160,200,235,0.55)';
+      ctx.lineWidth=1.2*dpr;
+      S.bhParticles.forEach(function(p){
+        p.y+=p.vy; p.x+=p.vx;
+        if(p.y>H){p.y=-(5+Math.random()*80);p.x=Math.random()*W;}
+        ctx.globalAlpha=p.alpha;
+        ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-2*dpr,p.y+11*dpr); ctx.stroke();
+      });
+      ctx.globalAlpha=1;
     }
   }
 
@@ -18847,11 +18974,11 @@ window.BirdHunt = (function(){
     if(!c || !S || !S.running) return;
     var ctx = c.getContext('2d');
     _drawBackground(ctx);
-    // 1) Kuşları ÖNCE çiz (bulutlar üstte olsun, kuşlar geçerken arkada kaybolsun)
     _updateBirds();
     S.birds.forEach(function(b){ _drawBird(ctx, b); });
-    // 2) Bulutlar kuşların ÜSTÜNDE çizilir (kuş bulutun arkasında kaybolur)
-    _drawClouds(ctx);
+    var _th=BH_THEME[_bhTheme]||BH_THEME.valley;
+    if(_th.clouds) _drawClouds(ctx);
+    _drawWeather(ctx);
     _updateBullets();
     _drawBullets(ctx);
     _updatePop(ctx);
@@ -18886,8 +19013,10 @@ window.BirdHunt = (function(){
       cl.x += cl.speed;
       if(cl.x > S.W + 100*S.dpr) cl.x = -100*S.dpr;
       ctx.save();
-      ctx.globalAlpha = cl.opacity;
-      ctx.fillStyle = '#fff';
+      var _cth=BH_THEME[_bhTheme]||BH_THEME.valley;
+      var _cloudCol=(_cth.rain||_cth.heavy)?'#9aabb8':(_cth.cloudy?'#b0b8c0':'#ffffff');
+      ctx.globalAlpha = cl.opacity * (_cth.heavy?0.9:1);
+      ctx.fillStyle = _cloudCol;
       var s = cl.scale * S.dpr;
       // Birkaç üst üste daire — küme bulut
       ctx.beginPath();
