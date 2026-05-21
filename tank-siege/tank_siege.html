@@ -630,6 +630,30 @@ button:active{opacity:0.75;transform:scale(0.96);}
   0%,100%{transform:scale(1);}
   50%{transform:scale(1.025);}
 }
+/* Version update badge on settings button */
+#settings-update-badge{
+  display:none;position:absolute;top:-5px;right:-5px;
+  background:linear-gradient(135deg,#FF6B35,#ff3d00);
+  color:#fff;border-radius:8px;font-size:9px;font-weight:900;
+  padding:2px 5px;pointer-events:none;letter-spacing:0.3px;
+  box-shadow:0 2px 6px rgba(255,80,0,0.6);
+  animation:updBadgePulse 1.1s ease-in-out infinite;
+}
+@keyframes updBadgePulse{
+  0%,100%{transform:scale(1);box-shadow:0 2px 6px rgba(255,80,0,0.5);}
+  50%{transform:scale(1.18);box-shadow:0 2px 12px rgba(255,80,0,0.9);}
+}
+/* Update card in settings panel */
+#settings-update-card{
+  display:none;margin-bottom:12px;padding:13px 14px;
+  border-radius:14px;border:1.5px solid rgba(255,107,53,0.7);
+  background:linear-gradient(135deg,rgba(255,107,53,0.16),rgba(255,60,0,0.06));
+  animation:updCardGlow 1.6s ease-in-out infinite;
+}
+@keyframes updCardGlow{
+  0%,100%{box-shadow:0 0 8px rgba(255,107,53,0.25);}
+  50%{box-shadow:0 0 22px rgba(255,107,53,0.65);}
+}
 /* Icon: now a rounded box with a glowy colored background per state */
 .gc-icon{
   flex-shrink:0;width:56px;height:56px;
@@ -1290,7 +1314,10 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="btn-gallery-open" onclick="openGallery(curLevel)" title="Inventory">⚔️</button>
   <div style="flex:1;"></div>
   <button id="streak-badge" onclick="openStreakCard()" style="display:none;background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,140,0,0.5);border-radius:14px;padding:4px 10px;color:#FF8C00;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">🔥 1</button>
-  <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
+  <div style="position:relative;display:inline-block;">
+    <button onclick="openSettings()" style="background:rgba(0,0,0,0.45);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:4px 10px;font-size:16px;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;">⚙️</button>
+    <span id="settings-update-badge">NEW</span>
+  </div>
 </div>
 
 <!-- Mermi slotları — sağ altta eski yerinde -->
@@ -1601,7 +1628,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.159';
+const APP_VERSION      = '1.0.160';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1619,8 +1646,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 16:00';
-const APP_VERSION_NOTE = 'Guided hint kart: boost tab fix + kart highlight [Claude]';
+const APP_VERSION_DATE = '2026.05.21 18:00';
+const APP_VERSION_NOTE = 'Surumu kontrol et + otomatik guncelle sistemi eklendi [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -12146,6 +12173,12 @@ const LANG = {
     streak_title:       '🔥 Giriş Serisi',
     confirm_cancel:     'İptal',
     confirm_reset:      'Sıfırla',
+    ver_check_btn:      '🔄 Güncelleme Kontrol Et',
+    ver_checking:       '🔄 Kontrol ediliyor...',
+    ver_up_to_date:     '✓ Güncel — yeni sürüm yok',
+    ver_new_found:      '🆕 Yeni Sürüm Mevcut!',
+    ver_update_btn:     '⬇️ Şimdi Güncelle',
+    ver_net_err:        '⚠️ Bağlanamadı',
     tgo_completed:      'TEMA TAMAMLANDI!',
     tgo_ad_btn:         '📺 Reklam İzle → +2 ⭐',
     tgo_buy_star:       '⭐ Puan ile Yıldız Al',
@@ -12710,6 +12743,12 @@ const LANG = {
     streak_title:       '🔥 Login Streak',
     confirm_cancel:     'Cancel',
     confirm_reset:      'Reset',
+    ver_check_btn:      '🔄 Check for Updates',
+    ver_checking:       '🔄 Checking...',
+    ver_up_to_date:     '✓ Up to date — no new version',
+    ver_new_found:      '🆕 New Version Available!',
+    ver_update_btn:     '⬇️ Update Now',
+    ver_net_err:        '⚠️ Connection failed',
     tgo_completed:      'THEME COMPLETED!',
     tgo_ad_btn:         '📺 Watch Ad → +2 ⭐',
     tgo_buy_star:       '⭐ Buy Star with Points',
@@ -15741,6 +15780,15 @@ function openTacticalInfo(){
       font-weight:700;cursor:pointer;">EN 🇺🇸</button>
   </div>
 
+  <!-- Versiyon güncelleme kartı (yeni sürüm varsa görünür) -->
+  <div id="settings-update-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="color:#FFB874;font-size:13px;font-weight:800;font-family:'Rajdhani',sans-serif;" data-i18n="ver_new_found">🆕 Yeni Sürüm Mevcut!</div>
+      <div id="settings-update-ver" style="color:rgba(255,255,255,0.45);font-size:11px;font-family:'Rajdhani',sans-serif;"></div>
+    </div>
+    <button onclick="_doAppUpdate()" style="width:100%;padding:10px;border:none;border-radius:11px;background:linear-gradient(180deg,#FF8E5A,#FF6B35 50%,#ff3d00 100%);color:#fff;font-size:13px;font-weight:800;letter-spacing:0.4px;cursor:pointer;font-family:'Rajdhani',sans-serif;box-shadow:0 3px 0 #a02500,0 4px 12px rgba(255,107,53,0.4);" data-i18n="ver_update_btn">⬇️ Şimdi Güncelle</button>
+  </div>
+
   <!-- Versiyon -->
   <div onclick="showVersionNote()"
     style="margin-top:14px;padding:10px;border-radius:10px;border:1px solid rgba(255,215,0,0.2);
@@ -15751,6 +15799,14 @@ function openTacticalInfo(){
     <div style="color:rgba(255,255,255,0.4);font-size:10px;margin-top:2px;" id="settings-version-date"></div>
     <div style="color:rgba(255,215,0,0.4);font-size:9px;margin-top:2px;" data-i18n="detail">detay için dokun</div>
   </div>
+
+  <!-- Manuel güncelleme kontrol butonu -->
+  <button id="settings-check-btn" onclick="_checkVersionManual()"
+    style="width:100%;margin-top:8px;padding:9px;border-radius:11px;
+    border:1.5px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);
+    color:rgba(255,255,255,0.55);font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;"
+    data-i18n="ver_check_btn">🔄 Güncelleme Kontrol Et</button>
 </div>
 
 <!-- Geliştirici Modu Paneli -->
@@ -17957,6 +18013,79 @@ window.addEventListener('resize', function(){
 // ═══════════════════════════════════════════════════════════════
 // İlk Hafta Hediye Programı (#16) + Tutorial Reward (#22)
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// VERSION CHECK — arka plan güncelleme kontrolü
+// ═══════════════════════════════════════════════════════════
+(function(){
+  var _checking = false;
+  var _newVerFound = false;
+
+  function _parseVer(s){
+    return (s||'0.0.0').split('.').map(function(n){ return parseInt(n,10)||0; });
+  }
+  function _isNewer(remote, local){
+    var r=_parseVer(remote), l=_parseVer(local);
+    for(var i=0;i<3;i++){
+      if(r[i]>l[i]) return true;
+      if(r[i]<l[i]) return false;
+    }
+    return false;
+  }
+  function _setCheckBtn(state, ver){
+    var btn=document.getElementById('settings-check-btn');
+    if(!btn) return;
+    btn.disabled = (state==='checking');
+    if(state==='checking') btn.textContent = t('ver_checking');
+    else if(state==='done') btn.textContent = t('ver_up_to_date');
+    else if(state==='err')  btn.textContent = t('ver_net_err');
+    else                    btn.textContent = t('ver_check_btn');
+    if(state!=='idle') setTimeout(function(){ if(!_newVerFound) _setCheckBtn('idle'); }, 3000);
+  }
+  function _showUpdate(ver){
+    _newVerFound = true;
+    // Badge on ⚙️ button
+    var badge=document.getElementById('settings-update-badge');
+    if(badge) badge.style.display='inline-block';
+    // Card in settings panel
+    var card=document.getElementById('settings-update-card');
+    if(card) card.style.display='block';
+    var verEl=document.getElementById('settings-update-ver');
+    if(verEl) verEl.textContent='v'+APP_VERSION+' → v'+ver;
+  }
+  function _check(manual){
+    if(_checking) return;
+    _checking=true;
+    if(manual) _setCheckBtn('checking');
+    var url=location.href.split('?')[0]+'?_vc='+Date.now();
+    fetch(url,{cache:'no-store'})
+      .then(function(r){ return r.text(); })
+      .then(function(txt){
+        _checking=false;
+        var m=txt.match(/const APP_VERSION\s*=\s*'([^']+)'/);
+        if(!m){ if(manual) _setCheckBtn('err'); return; }
+        var remoteVer=m[1];
+        if(_isNewer(remoteVer, APP_VERSION)){
+          _showUpdate(remoteVer);
+          if(manual) _setCheckBtn('idle');
+        } else {
+          if(manual) _setCheckBtn('done');
+          else _setCheckBtn('idle');
+        }
+      })
+      .catch(function(){
+        _checking=false;
+        if(manual) _setCheckBtn('err');
+      });
+  }
+  window._doAppUpdate=function(){
+    try{ showToast('Güncelleniyor...'); }catch(_){}
+    setTimeout(function(){ location.reload(true); }, 700);
+  };
+  window._checkVersionManual=function(){ _check(true); };
+  // Sessiz arka plan kontrolü — açılıştan 5sn sonra
+  setTimeout(function(){ _check(false); }, 5000);
+})();
+
 (function(){
 
 var WEEK_GIFTS = [
