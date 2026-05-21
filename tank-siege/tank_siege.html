@@ -1591,7 +1591,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.150';
+const APP_VERSION      = '1.0.151';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1610,7 +1610,7 @@ let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
 const APP_VERSION_DATE = '2026.05.21 04:53';
-const APP_VERSION_NOTE = '[20.05 22:24] tank 01:28 - Inventory butonu LevelMap ile aynı ölçü (38x32px) [Claude] buna donus yaptim';
+const APP_VERSION_NOTE = 'TSLB gercek veri: _fetch + receiveData + podium render [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -17945,7 +17945,7 @@ window.TSLB = (function(){
   // Gerçek leaderboard verisi Google Play Games tarafında — bu UI sadece
   // önizleme/giriş noktası. Demo veriler kaldırıldı; oyuncu sıralamasını
   // görmek için "Tam Sıralamayı Aç" butonu ile native ekrana yönlendiriyoruz.
-  var DEMO_DATA = { weekly:[], monthly:[], yearly:[], alltime:[] };
+  var _data = { weekly:null, monthly:null, yearly:null, alltime:null };
 
   var PERIOD_LABEL = {
     weekly:  'HAFTALIK',
@@ -17966,7 +17966,21 @@ window.TSLB = (function(){
     ov.style.display = 'block';
     _applyI18n();
     _setActiveTab(currentKind);
-    _render();
+    if(_data[currentKind] !== null) _render();
+    else _fetch(currentKind);
+  }
+  function _fetch(kind){
+    if(typeof Android === 'undefined'){ _render(); return; }
+    if(!_cloudSignedIn){ _render(); return; }
+    var id = (typeof LEADERBOARD_IDS !== 'undefined') ? LEADERBOARD_IDS[kind] : null;
+    if(!id){ _render(); return; }
+    var cont = document.getElementById('tslb-content');
+    if(cont) cont.innerHTML = '<div style="text-align:center;padding:48px 0;color:rgba(255,255,255,0.4);font-size:24px;">⏳</div>';
+    try { Android.loadLeaderboard(id, kind); } catch(e){ _render(); }
+  }
+  function _receiveData(kind, scores, err){
+    _data[kind] = (scores && Array.isArray(scores)) ? scores : [];
+    if(kind === currentKind) _render();
   }
   function _applyI18n(){
     function _t(k, fb){ try { return (typeof t==='function')?(t(k)||fb):fb; } catch(_) { return fb; } }
@@ -17994,7 +18008,8 @@ window.TSLB = (function(){
   function _tab(kind){
     currentKind = kind;
     _setActiveTab(kind);
-    _render();
+    if(_data[kind] !== null) _render();
+    else _fetch(kind);
   }
   function _setActiveTab(kind){
     var tabs = document.querySelectorAll('.tslb-tab');
@@ -18020,63 +18035,89 @@ window.TSLB = (function(){
   }
 
   function _render(){
-    var cont = document.getElementById('tslb-content');
+    var cont = document.getElementById(‘tslb-content’);
     if(!cont) return;
-    var hint = document.getElementById('tslb-signin-hint');
-    var signedIn = (typeof _cloudSignedIn !== 'undefined') && _cloudSignedIn;
-    if(hint) hint.style.display = signedIn ? 'none' : 'block';
+    var hint = document.getElementById(‘tslb-signin-hint’);
+    var signedIn = (typeof _cloudSignedIn !== ‘undefined’) && _cloudSignedIn;
+    if(hint) hint.style.display = signedIn ? ‘none’ : ‘block’;
 
-    // Oyuncunun skorunu al
     var myScore = 0;
-    try { myScore = parseInt((typeof lsGet==='function'?lsGet('total_score'):localStorage.getItem('ts_total_score'))||'0') || 0; } catch(_) {}
-    var myName  = (typeof _cloudUserName !== 'undefined' && _cloudUserName) ? _cloudUserName : (signedIn ? 'Oyuncu' : ((typeof t==='function'?t('tslb_me'):null) || 'SEN'));
+    try { myScore = parseInt((typeof lsGet===’function’?lsGet(‘total_score’):localStorage.getItem(‘ts_total_score’))||’0’) || 0; } catch(_) {}
+    var myName = (typeof _cloudUserName !== ‘undefined’ && _cloudUserName) ? _cloudUserName : (signedIn ? ‘Oyuncu’ : ‘SEN’);
+    function _t(k,fb){ try{return(typeof t===’function’)?(t(k)||fb):fb;}catch(_){return fb;} }
+    var meLabel = _t(‘tslb_me’,’SEN’);
 
-    function _t(k, fb){ try { return (typeof t==='function')?(t(k)||fb):fb; } catch(_) { return fb; } }
+    var scores = _data[currentKind];
+    var html = ‘’;
 
-    // Demo veri yok — her tab boş. UI:
-    //  1) Oyuncunun kendi skor kartı (highlight) en üstte
-    //  2) "Sıralama görmek için aç" ipucu kutusu
-    var html = '';
+    if(scores && scores.length > 0){
+      // Gerçek veri var — podium + liste
+      scores.forEach(function(s){ if(s.name===myName) s.isMe=true; });
+      var myEntry = null;
+      scores.forEach(function(s){ if(s.isMe) myEntry=s; });
 
-    // Oyuncu kartı — büyük, "SEN" highlight
-    html += ''
-      + '<div style="background:linear-gradient(180deg,rgba(0,229,255,0.15),rgba(0,229,255,0.04));'
-      +   'border:1.5px solid rgba(0,229,255,0.50);border-radius:16px;'
-      +   'box-shadow:0 0 18px rgba(0,229,255,0.18), inset 0 1px 0 rgba(255,255,255,0.06);'
-      +   'padding:14px 16px;margin-bottom:14px;'
-      +   'display:flex;align-items:center;gap:14px;">'
-      +   '<div style="width:54px;height:54px;border-radius:50%;'
-      +     'background:radial-gradient(circle at 35% 30%,#3a5a8a,#0a1530);'
-      +     'border:2px solid #00E5FF;display:flex;align-items:center;justify-content:center;'
-      +     'font-size:24px;flex-shrink:0;box-shadow:0 0 14px rgba(0,229,255,0.4);">⚔️</div>'
-      +   '<div style="flex:1;min-width:0;">'
-      +     '<div style="color:#00E5FF;font-size:9px;font-weight:800;letter-spacing:2px;">'+_t('tslb_me','SEN')+'</div>'
-      +     '<div style="color:#fff;font-size:17px;font-weight:800;line-height:1.1;margin-top:2px;'
-      +       'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(myName)+'</div>'
-      +     '<div style="color:rgba(255,255,255,0.55);font-size:10px;letter-spacing:1px;margin-top:2px;font-weight:700;">'
-      +       '🏆 '+_fmtNum(myScore)+'</div>'
-      +   '</div>'
-      + '</div>';
+      // Podium (ilk 3)
+      var top = scores.slice(0,3);
+      var order  = top.length>=3?[top[1],top[0],top[2]]:top.length===2?[null,top[0],top[1]]:[null,top[0]||null,null];
+      var cls    = [‘second’,’first’,’third’];
+      var ranks  = [‘2’,’1’,’3’];
+      html += ‘<div class="tslb-podium">’;
+      for(var pi=0;pi<3;pi++){
+        html += order[pi] ? _podHtml(order[pi],ranks[pi],cls[pi])
+                          : ‘<div class="tslb-pod-item ‘+cls[pi]+’"></div>’;
+      }
+      html += ‘</div>’;
 
-    // Boş durum açıklaması — neden burada veri yok?
-    var emptyTitle = signedIn
-      ? _t('tslb_empty_title', '🌐 Online Sıralama')
-      : _t('tslb_empty_title_off', '🔒 Henüz Bağlı Değilsin');
-    var emptyBody = signedIn
-      ? _t('tslb_empty_body', 'Tam sıralamayı görmek için aşağıdaki butona dokun. Skorların otomatik olarak Google Play Games’e gönderiliyor.')
-      : _t('tslb_empty_body_off', 'Sıralamada yer almak için Google Play Games’e giriş yap. Aşağıdaki butonla tam sıralamayı açabilirsin.');
+      // Liste (4. ve sonrası)
+      for(var i=3;i<scores.length;i++){
+        html += _rowHtml(scores[i], scores[i].rank||(i+1));
+      }
+      // Oyuncunun kendi satırı listede görünmüyorsa alta ekle
+      if(myEntry){
+        var inList = scores.slice(0,scores.length).some(function(s){return s.isMe;});
+        if(!inList){
+          html += ‘<div style="height:1px;background:rgba(255,255,255,0.08);margin:6px 0;"></div>’;
+          html += _rowHtml(myEntry, myEntry.rank||’···’);
+        }
+      }
 
-    html += ''
-      + '<div style="text-align:center;padding:22px 18px 18px;'
-      +   'background:rgba(255,255,255,0.03);border:1.5px dashed rgba(255,255,255,0.12);'
-      +   'border-radius:16px;margin-bottom:4px;">'
-      +   '<div style="font-size:46px;line-height:1;margin-bottom:8px;'
-      +     'filter:drop-shadow(0 0 18px rgba(255,215,0,0.4));">🏆</div>'
-      +   '<div style="color:#FFD700;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:800;'
-      +     'letter-spacing:0.5px;margin-bottom:6px;">'+emptyTitle+'</div>'
-      +   '<div style="color:rgba(255,255,255,0.65);font-size:12px;line-height:1.5;'
-      +     'max-width:260px;margin:0 auto;">'+emptyBody+'</div>'
-      + '</div>';
+    } else if(scores && scores.length === 0){
+      // Skor yok
+      html += ‘<div style="text-align:center;padding:32px;color:rgba(255,255,255,0.45);font-size:13px;font-weight:700;">’
+        + _t(‘tslb_no_scores’,’Henüz bu tabloda skor yok’) + ‘</div>’;
+      if(myName){
+        html += ‘<div style="height:1px;background:rgba(255,255,255,0.08);margin:6px 0;"></div>’;
+        html += _rowHtml({name:myName,score:myScore,isMe:true,rank:’···’},’···’);
+      }
+
+    } else {
+      // Yüklenmedi / giriş yapılmamış — oyuncu kartı + hint
+      html += ‘<div style="background:linear-gradient(180deg,rgba(0,229,255,0.15),rgba(0,229,255,0.04));’
+        +’border:1.5px solid rgba(0,229,255,0.50);border-radius:16px;’
+        +’box-shadow:0 0 18px rgba(0,229,255,0.18);padding:14px 16px;margin-bottom:14px;’
+        +’display:flex;align-items:center;gap:14px;">’
+        +’<div style="width:54px;height:54px;border-radius:50%;’
+        +’background:radial-gradient(circle at 35% 30%,#3a5a8a,#0a1530);’
+        +’border:2px solid #00E5FF;display:flex;align-items:center;justify-content:center;’
+        +’font-size:24px;flex-shrink:0;box-shadow:0 0 14px rgba(0,229,255,0.4);">⚔️</div>’
+        +’<div style="flex:1;min-width:0;">’
+        +’<div style="color:#00E5FF;font-size:9px;font-weight:800;letter-spacing:2px;">’+meLabel+’</div>’
+        +’<div style="color:#fff;font-size:17px;font-weight:800;line-height:1.1;margin-top:2px;’
+        +’white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">’+_esc(myName)+’</div>’
+        +’<div style="color:rgba(255,255,255,0.55);font-size:10px;letter-spacing:1px;margin-top:2px;font-weight:700;">’
+        +’🏆 ‘+_fmtNum(myScore)+’</div>’
+        +’</div></div>’;
+      var emptyTitle = signedIn?_t(‘tslb_empty_title’,’🌐 Online Sıralama’):_t(‘tslb_empty_title_off’,’🔒 Henüz Bağlı Değilsin’);
+      var emptyBody  = signedIn
+        ?_t(‘tslb_empty_body’,’Sıralama yüklenemedi. Aşağıdan Play Games\’i açarak görebilirsin.’)
+        :_t(‘tslb_empty_body_off’,’Sıralamada yer almak için Google Play Games\’e giriş yap.’);
+      html += ‘<div style="text-align:center;padding:20px 16px;background:rgba(255,255,255,0.03);’
+        +’border:1.5px dashed rgba(255,255,255,0.12);border-radius:16px;">’
+        +’<div style="font-size:40px;margin-bottom:8px;">🏆</div>’
+        +’<div style="color:#FFD700;font-size:14px;font-weight:800;margin-bottom:5px;">’+emptyTitle+’</div>’
+        +’<div style="color:rgba(255,255,255,0.6);font-size:11px;line-height:1.5;">’+emptyBody+’</div>’
+        +’</div>’;
+    }
 
     cont.innerHTML = html;
   }
@@ -18119,6 +18160,7 @@ window.TSLB = (function(){
     close: _close,
     tab: _tab,
     openNative: _openNative,
+    receiveData: _receiveData,
   };
 })();
 </script>
