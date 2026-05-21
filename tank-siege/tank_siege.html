@@ -1591,7 +1591,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.154';
+const APP_VERSION      = '1.0.155';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1609,8 +1609,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 10:00';
-const APP_VERSION_NOTE = 'Quest fix: giveWindBlock Quests.track(windblock) eksikti; TSLB overlay kaldirildi [Claude]';
+const APP_VERSION_DATE = '2026.05.21 11:00';
+const APP_VERSION_NOTE = 'Ilk Hafta Hediye (#16) + Tutorial Odulu (#22) eklendi [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -2192,6 +2192,9 @@ function init(){
     try{ if(typeof tryAutoSignIn === 'function') tryAutoSignIn(); }catch(_){}
     try{ if(typeof _maybeShowFirstLaunchPgPrompt === 'function') _maybeShowFirstLaunchPgPrompt(); }catch(_){}
   }, 600);
+
+  // İlk hafta hediye kontrolü — login bonus gösterildikten sonra
+  setTimeout(function(){ try{ if(typeof checkWeekGift==='function') checkWeekGift(); }catch(_){} }, 1500);
 
   requestAnimationFrame(loop);
 }
@@ -10876,6 +10879,7 @@ function onWin(){
               Quests.track('theme', _themeKey);
             }
             // combo zaten onTargetHit'te track edildi — burada tekrarlama (zamanlamada kayıp olur)
+            try{ if(typeof checkTutorialReward==='function') checkTutorialReward(curLevel); }catch(_){}
           }catch(_){}
         }, 100);
       }
@@ -16132,7 +16136,31 @@ function openTacticalInfo(){
   </div>
 </div>
 
-<!-- Buried info popup — modern redesigned card -->
+<!-- ── First Week Gift & Tutorial Reward Popup ─────────────────── -->
+<div id="gift-overlay" onclick="if(event.target.id==='gift-overlay')_giftClose()"
+  style="display:none;position:fixed;inset:0;z-index:970;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;">
+  <div id="gift-card" style="width:300px;max-width:calc(100vw - 32px);
+    background:linear-gradient(180deg,#1a2238 0%,#0a0f1c 100%);
+    border:1.5px solid rgba(255,215,0,0.45);border-radius:22px;padding:28px 22px;
+    text-align:center;font-family:'Rajdhani',sans-serif;
+    box-shadow:0 20px 60px rgba(0,0,0,0.85),0 0 40px rgba(255,215,0,0.15),inset 0 1px 0 rgba(255,255,255,0.06);">
+    <div id="gift-icon" style="font-size:54px;line-height:1;margin-bottom:12px;filter:drop-shadow(0 0 18px rgba(255,215,0,0.5));">🎁</div>
+    <div id="gift-badge" style="color:rgba(255,215,0,0.65);font-size:10px;font-weight:800;letter-spacing:2.5px;margin-bottom:4px;"></div>
+    <div id="gift-title" style="color:#fff;font-size:21px;font-weight:800;letter-spacing:0.3px;margin-bottom:10px;"></div>
+    <div id="gift-reward-box" style="background:rgba(255,215,0,0.10);border:1.5px solid rgba(255,215,0,0.30);
+      border-radius:14px;padding:12px;margin-bottom:10px;
+      color:#FFD700;font-size:19px;font-weight:800;"></div>
+    <div id="gift-desc" style="color:rgba(255,255,255,0.5);font-size:11px;line-height:1.5;margin-bottom:20px;"></div>
+    <button id="gift-btn" onclick="_giftClaim()"
+      style="width:100%;padding:14px;border-radius:14px;border:none;
+      background:linear-gradient(180deg,#FFE066,#FFD700 45%,#a87900 100%);
+      color:#1a1408;font-family:'Rajdhani',sans-serif;font-weight:800;font-size:17px;letter-spacing:0.3px;
+      cursor:pointer;-webkit-tap-highlight-color:transparent;
+      box-shadow:0 4px 0 #6d5000,0 5px 14px rgba(255,215,0,0.4);">AL! 🎁</button>
+  </div>
+</div>
+
+
 <div id="buried-info-pop" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.78);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="closeBuriedInfo()">
   <div style="background:linear-gradient(180deg,#241a08 0%,#0e0a02 100%);border:1.5px solid rgba(255,180,40,0.35);border-radius:24px;padding:0;width:300px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(255,215,0,0.22),0 0 40px rgba(255,140,40,0.18),inset 0 1px 0 rgba(255,255,255,0.06);overflow:hidden;animation:buriedCardIn 0.35s cubic-bezier(0.34,1.56,0.64,1);" onclick="event.stopPropagation()">
     <!-- Hero band with rotating radiation icon -->
@@ -17890,6 +17918,106 @@ window.addEventListener('resize', function(){
     <button id="bh-result-finish" onclick="BirdHunt.close()">▶ BİTİR</button>
   </div>
 </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// İlk Hafta Hediye Programı (#16) + Tutorial Reward (#22)
+// ═══════════════════════════════════════════════════════════════
+(function(){
+
+var WEEK_GIFTS = [
+  { day:1, icon:'🎉', badge:'GÜN 1 · HOŞ GELDİN',  title:'Aramıza Hoş Geldin!',     reward:'score',  value:100,  rewardTxt:'+100 Puan',          desc:'Tank Siege\'e hoş geldin! Hazır ol.' },
+  { day:2, icon:'💰', badge:'GÜN 2',                title:'Gün 2 Hediyesi',           reward:'score',  value:150,  rewardTxt:'+150 Puan',          desc:'Devam ediyorsun, harika!' },
+  { day:3, icon:'❤️', badge:'GÜN 3',                title:'Ekstra Can!',              reward:'life',   value:2,    rewardTxt:'+2 Can',             desc:'2 can hediye — zorlu levellerde işine yarar.' },
+  { day:4, icon:'🎁', badge:'GÜN 4',                title:'Gün 4 Hediyesi',           reward:'score',  value:200,  rewardTxt:'+200 Puan',          desc:'4 gün üst üste — azimlisin!' },
+  { day:5, icon:'💎', badge:'GÜN 5 · BONUS',        title:'Büyük Bonus!',             reward:'score',  value:500,  rewardTxt:'+500 Puan',          desc:'Yarı yoldasın, büyük ödül sende!' },
+  { day:6, icon:'💨', badge:'GÜN 6 · ÖZEL ITEM',    title:'Rüzgar Kalkanı!',          reward:'wblock', value:1,    rewardTxt:'💨 Rüzgar Kalkanı',  desc:'Rüzgarlı levellerde işe yarar özel item.' },
+  { day:7, icon:'🏆', badge:'GÜN 7 · BÜYÜK ÖDÜL',  title:'7 Gün Tamamlandı!',        reward:'score',  value:1000, rewardTxt:'+1000 Puan',         desc:'Bir haftayı tamamladın! Büyük ödülün sende.' },
+];
+
+var _pendingGift = null;
+
+window.checkWeekGift = function(){
+  var fpt = lsGet('first_play_ts');
+  if(!fpt){ lsSet('first_play_ts', String(Date.now())); fpt = lsGet('first_play_ts'); }
+  var daysPassed = Math.floor((Date.now() - parseInt(fpt||Date.now())) / 86400000);
+  var idx = Math.min(daysPassed, 6);
+  var claimed = (lsGet('week_gifts_claimed')||'').split(',').filter(Boolean);
+  var gift = WEEK_GIFTS[idx];
+  if(!gift || claimed.indexOf(String(gift.day)) !== -1) return;
+  _pendingGift = { type:'week', gift:gift, claimed:claimed };
+  _showGiftPopup(gift, 'AL! 🎁');
+};
+
+function _applyWeekGift(gift){
+  if(gift.reward === 'score'){
+    score += gift.value;
+    lsSet('total_score', score);
+    try{ updateUI(); }catch(_){}
+  } else if(gift.reward === 'life'){
+    var cur = _livesNow();
+    lsSet('lives_count', String(Math.min(MAX_LIVES, cur + gift.value)));
+    try{ updateLivesBadge(); }catch(_){}
+  } else if(gift.reward === 'wblock'){
+    try{ giveWindBlock(); }catch(_){}
+  }
+}
+
+window.checkTutorialReward = function(level){
+  if(parseInt(lsGet('tutorial_reward_done')||'0') >= 1) return;
+  if(level < 4) return;
+  lsSet('tutorial_reward_done', '1');
+  var gift = {
+    icon:'🎓', badge:'EĞİTİM TAMAMLANDI',
+    title:'İlk 5 Leveli Bitirdin!',
+    reward:'tut', value:0,
+    rewardTxt:'+200 Puan + ❤️ +1 Can',
+    desc:'Tank kullanmayı öğrendin! Harika bir başlangıç.'
+  };
+  _pendingGift = { type:'tutorial', gift:gift };
+  setTimeout(function(){ _showGiftPopup(gift, 'DEVAM ET! 🚀'); }, 1500);
+};
+
+function _showGiftPopup(gift, btnLabel){
+  var ov = document.getElementById('gift-overlay');
+  if(!ov) return;
+  document.getElementById('gift-icon').textContent       = gift.icon;
+  document.getElementById('gift-badge').textContent      = gift.badge;
+  document.getElementById('gift-title').textContent      = gift.title;
+  document.getElementById('gift-reward-box').textContent = gift.rewardTxt;
+  document.getElementById('gift-desc').textContent       = gift.desc || '';
+  document.getElementById('gift-btn').textContent        = btnLabel || 'AL! 🎁';
+  ov.style.display = 'flex';
+}
+
+window._giftClaim = function(){
+  var pd = _pendingGift; _pendingGift = null;
+  if(!pd) return;
+  if(pd.type === 'week'){
+    pd.claimed.push(String(pd.gift.day));
+    lsSet('week_gifts_claimed', pd.claimed.join(','));
+    _applyWeekGift(pd.gift);
+    try{ showToast(pd.gift.rewardTxt + ' kazanıldı! 🎉'); }catch(_){}
+  } else if(pd.type === 'tutorial'){
+    score += 200;
+    lsSet('total_score', score);
+    var cur = _livesNow();
+    lsSet('lives_count', String(Math.min(MAX_LIVES, cur + 1)));
+    try{ updateUI(); }catch(_){}
+    try{ updateLivesBadge(); }catch(_){}
+    try{ showToast('+200 puan + ❤️ +1 can kazanıldı! 🎉'); }catch(_){}
+  }
+  var ov = document.getElementById('gift-overlay');
+  if(ov) ov.style.display = 'none';
+};
+
+window._giftClose = function(){
+  var ov = document.getElementById('gift-overlay');
+  if(ov) ov.style.display = 'none';
+};
+
+})();
+</script>
 
 <script>
 window.BirdHunt = (function(){
