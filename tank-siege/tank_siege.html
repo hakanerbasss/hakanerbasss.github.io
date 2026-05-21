@@ -1628,7 +1628,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.164';
+const APP_VERSION      = '1.0.165';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1646,8 +1646,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.22 01:00';
-const APP_VERSION_NOTE = 'BirdHunt Part2: 14 tema gokyuzu+zemin+hava (kar/yagmur/lav/sehir/sis) [Claude]';
+const APP_VERSION_DATE = '2026.05.22 03:00';
+const APP_VERSION_NOTE = 'BirdHunt Part3: terrain dekorasyonlari + 9 yerde yurüyen hayvan [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -18450,6 +18450,7 @@ window.BirdHunt = (function(){
     _playBgSound();
     // Tema partikülleri ve özel elementleri init et (canvas boyutu burada hazır)
     _initThemeElements();
+    _initAnimals();
     for(var i=0; i<3; i++) _spawnBird(true);
     _loop();
   }
@@ -18950,6 +18951,261 @@ window.BirdHunt = (function(){
     }
   }
 
+  // ── Terrain dekorasyonları — temaya göre ağaç/kaktüs/palmiye/kaya ──
+  function _drawDecorations(ctx){
+    var th=BH_THEME[_bhTheme]||BH_THEME.valley;
+    var W=S.W, H=S.H, dpr=S.dpr;
+    var groundY=H*0.84;
+
+    if(_bhTheme==='nightcity'||_bhTheme==='skyislands') return; // kendi özel elementleri var
+
+    // Zemin çizgisi şeridi (zemin çimenliği / kumu)
+    if(_bhTheme==='desert'){
+      // Kum deseni
+      ctx.fillStyle='rgba(200,150,60,0.3)';
+      for(var di=0;di<6;di++){
+        var dx=W*(0.05+di*0.17);
+        ctx.beginPath();
+        ctx.ellipse(dx,groundY+4*dpr,18*dpr,5*dpr,0,0,Math.PI*2); ctx.fill();
+      }
+    } else if(_bhTheme!=='volcano'){
+      // Çimen şeridi
+      ctx.fillStyle=_bhTheme==='snow'||_bhTheme==='snowyweather'?'rgba(200,220,255,0.4)':'rgba(80,140,50,0.35)';
+      ctx.beginPath();
+      for(var gi=0;gi<=W;gi+=8*dpr){
+        var gh=Math.sin(gi*0.04)*3*dpr+4*dpr;
+        ctx.lineTo(gi,groundY-gh);
+      }
+      ctx.lineTo(W,groundY); ctx.lineTo(0,groundY); ctx.closePath(); ctx.fill();
+    }
+
+    // Tema bazlı dekorasyonlar
+    var spots=[0.07,0.22,0.42,0.62,0.80,0.92]; // x pozisyon oranları
+    for(var si2=0;si2<spots.length;si2++){
+      var sx=W*spots[si2], sy=groundY;
+      if(_bhTheme==='valley'||_bhTheme==='meadow'||_bhTheme==='rocky'){
+        _drawTree(ctx,sx,sy,dpr,_bhTheme);
+      } else if(_bhTheme==='desert'){
+        if(si2%2===0) _drawCactus(ctx,sx,sy,dpr);
+        else _drawRock(ctx,sx,sy,dpr,'#a87828');
+      } else if(_bhTheme==='forest'){
+        _drawPineTree(ctx,sx,sy,dpr,'#1a4018');
+      } else if(_bhTheme==='snow'||_bhTheme==='snowyweather'){
+        _drawPineTree(ctx,sx,sy,dpr,'#1a3828');
+        // Kar örtüsü
+        ctx.fillStyle='rgba(220,235,255,0.85)';
+        ctx.beginPath(); ctx.ellipse(sx,sy-28*dpr,10*dpr,4*dpr,0,0,Math.PI*2); ctx.fill();
+      } else if(_bhTheme==='tropical'){
+        _drawPalm(ctx,sx,sy,dpr);
+      } else if(_bhTheme==='volcano'){
+        _drawRock(ctx,sx,sy,dpr,'#2a1008');
+      } else if(_bhTheme==='rainy'||_bhTheme==='cloudy'){
+        _drawTree(ctx,sx,sy,dpr,'rainy');
+      } else {
+        _drawTree(ctx,sx,sy,dpr,'valley');
+      }
+    }
+  }
+
+  function _drawTree(ctx,x,y,dpr,variant){
+    var trunkC = variant==='rainy'?'#3a2a18':'#5a2e08';
+    var leafC1 = variant==='rocky'?'#7a8860':variant==='rainy'?'#2a4820':'#1e6a1e';
+    var leafC2 = variant==='rocky'?'#9a9a70':variant==='rainy'?'#3a5830':'#2a7a2a';
+    var h=28*dpr;
+    ctx.fillStyle=trunkC;
+    ctx.fillRect(x-3*dpr, y-h, 6*dpr, h);
+    ctx.fillStyle=leafC1;
+    ctx.beginPath(); ctx.arc(x,y-h-6*dpr,16*dpr,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=leafC2;
+    ctx.beginPath();
+    ctx.arc(x-9*dpr,y-h-12*dpr,12*dpr,0,Math.PI*2);
+    ctx.arc(x+9*dpr,y-h-10*dpr,11*dpr,0,Math.PI*2); ctx.fill();
+  }
+
+  function _drawPineTree(ctx,x,y,dpr,col){
+    ctx.fillStyle='#5a3010';
+    ctx.fillRect(x-2.5*dpr, y-18*dpr, 5*dpr, 18*dpr);
+    ctx.fillStyle=col||'#1a4018';
+    // 3 katlı üçgen
+    [[0,44,14],[8,32,11],[16,22,8]].forEach(function(t){
+      ctx.beginPath();
+      ctx.moveTo(x, y-18*dpr-t[0]*dpr);
+      ctx.lineTo(x-t[1]*dpr, y-18*dpr-t[2]*dpr);
+      ctx.lineTo(x+t[1]*dpr, y-18*dpr-t[2]*dpr);
+      ctx.closePath(); ctx.fill();
+    });
+  }
+
+  function _drawCactus(ctx,x,y,dpr){
+    ctx.fillStyle='#508a28';
+    // Gövde
+    ctx.fillRect(x-5*dpr, y-40*dpr, 10*dpr, 40*dpr);
+    // Sol kol
+    ctx.fillRect(x-16*dpr, y-30*dpr, 11*dpr, 6*dpr);
+    ctx.fillRect(x-16*dpr, y-38*dpr, 6*dpr, 14*dpr);
+    // Sağ kol
+    ctx.fillRect(x+5*dpr, y-26*dpr, 11*dpr, 6*dpr);
+    ctx.fillRect(x+10*dpr, y-34*dpr, 6*dpr, 14*dpr);
+  }
+
+  function _drawPalm(ctx,x,y,dpr){
+    ctx.strokeStyle='#8a6030'; ctx.lineWidth=6*dpr; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.bezierCurveTo(x+8*dpr,y-20*dpr,x-4*dpr,y-38*dpr,x,y-50*dpr); ctx.stroke();
+    // Yapraklar
+    var leafAngles=[-70,-40,-10,20,50,80];
+    ctx.strokeStyle='#3a9030'; ctx.lineWidth=3*dpr;
+    leafAngles.forEach(function(a){
+      var rad2=a*Math.PI/180;
+      ctx.beginPath(); ctx.moveTo(x,y-50*dpr);
+      ctx.lineTo(x+Math.cos(rad2)*28*dpr, y-50*dpr+Math.sin(rad2)*28*dpr); ctx.stroke();
+    });
+  }
+
+  function _drawRock(ctx,x,y,dpr,col){
+    ctx.fillStyle=col||'#6a6a6a';
+    ctx.beginPath();
+    ctx.ellipse(x,y-8*dpr,14*dpr,10*dpr,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.ellipse(x-3*dpr,y-13*dpr,7*dpr,5*dpr,-0.4,0,Math.PI*2); ctx.fill();
+  }
+
+  // ── Yerde yürüyen hayvanlar ──────────────────────────────────
+  function _initAnimals(){
+    S.bhAnimals=[];
+    var animalMap={
+      valley:'cow', meadow:'sheep', desert:'lizard', forest:'deer',
+      rocky:'fox', snow:'rabbit', snowyweather:'rabbit',
+      rainy:'frog', cloudy:'fox', tropical:'parrot_walk',
+      volcano:null, nightcity:'cat', skyislands:null,
+    };
+    var aType=animalMap[_bhTheme];
+    if(!aType) return;
+    var count=2;
+    for(var i=0;i<count;i++){
+      var dir=i%2===0?1:-1;
+      S.bhAnimals.push({
+        type:aType, x:S.W*(0.1+i*0.5), dir:dir,
+        speed:(0.4+Math.random()*0.5)*S.dpr*dir,
+        frame:Math.floor(Math.random()*8), frameT:0,
+      });
+    }
+  }
+
+  function _drawAnimals(ctx){
+    if(!S.bhAnimals||!S.bhAnimals.length) return;
+    var H=S.H, dpr=S.dpr, groundY=H*0.84;
+    S.bhAnimals.forEach(function(a){
+      a.frameT++;
+      if(a.frameT>8){a.frameT=0;a.frame=(a.frame+1)%4;}
+      a.x+=a.speed;
+      if(a.x>S.W+60*dpr) a.x=-40*dpr;
+      if(a.x<-60*dpr) a.x=S.W+40*dpr;
+      ctx.save();
+      if(a.dir<0){ ctx.translate(a.x,groundY); ctx.scale(-1,1); }
+      else ctx.translate(a.x,groundY);
+      _drawAnimalSprite(ctx,a.type,a.frame,dpr);
+      ctx.restore();
+    });
+  }
+
+  function _drawAnimalSprite(ctx,type,frame,dpr){
+    var legOff=[0,3,0,-3][frame]; // bacak animasyonu
+    if(type==='cow'){
+      ctx.fillStyle='#e8e0d0';
+      ctx.fillRect(-12*dpr,-18*dpr,24*dpr,14*dpr); // gövde
+      ctx.fillStyle='#c8b8a0';
+      ctx.fillRect(-10*dpr,-14*dpr+legOff*dpr,4*dpr,8*dpr); // ön bacak
+      ctx.fillRect(4*dpr,-14*dpr-legOff*dpr,4*dpr,8*dpr);  // arka bacak
+      ctx.fillStyle='#d0c8b8';
+      ctx.fillRect(8*dpr,-22*dpr,8*dpr,8*dpr); // kafa
+      ctx.fillStyle='#e07070';
+      ctx.fillRect(10*dpr,-10*dpr,3*dpr,6*dpr); // ense
+    } else if(type==='sheep'){
+      ctx.fillStyle='#f0f0e8';
+      ctx.beginPath(); ctx.ellipse(0,-14*dpr,12*dpr,9*dpr,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#d8d0c0';
+      ctx.fillRect(-8*dpr,-12*dpr+legOff*dpr,3*dpr,7*dpr);
+      ctx.fillRect(4*dpr,-12*dpr-legOff*dpr,3*dpr,7*dpr);
+      ctx.fillStyle='#888';
+      ctx.beginPath(); ctx.ellipse(11*dpr,-16*dpr,5*dpr,4*dpr,0,0,Math.PI*2); ctx.fill();
+    } else if(type==='deer'){
+      ctx.fillStyle='#c89060';
+      ctx.fillRect(-8*dpr,-22*dpr,16*dpr,14*dpr);
+      ctx.fillStyle='#b07848';
+      ctx.fillRect(-6*dpr,-14*dpr+legOff*dpr,3*dpr,9*dpr);
+      ctx.fillRect(2*dpr,-14*dpr-legOff*dpr,3*dpr,9*dpr);
+      ctx.fillStyle='#d0a070';
+      ctx.fillRect(5*dpr,-28*dpr,7*dpr,8*dpr);
+      // Boynuz
+      ctx.strokeStyle='#6a3a10'; ctx.lineWidth=1.5*dpr;
+      ctx.beginPath(); ctx.moveTo(8*dpr,-28*dpr); ctx.lineTo(6*dpr,-36*dpr); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(10*dpr,-28*dpr); ctx.lineTo(13*dpr,-36*dpr); ctx.stroke();
+    } else if(type==='fox'){
+      ctx.fillStyle='#d86820';
+      ctx.fillRect(-9*dpr,-16*dpr,18*dpr,10*dpr);
+      ctx.fillRect(-7*dpr,-10*dpr+legOff*dpr,3*dpr,7*dpr);
+      ctx.fillRect(3*dpr,-10*dpr-legOff*dpr,3*dpr,7*dpr);
+      ctx.fillStyle='#e08030';
+      ctx.fillRect(7*dpr,-20*dpr,7*dpr,6*dpr); // kafa
+      ctx.fillStyle='#fff';
+      ctx.fillRect(9*dpr,-17*dpr,3*dpr,3*dpr); // yüz
+      // Kuyruk
+      ctx.strokeStyle='#d86820'; ctx.lineWidth=4*dpr; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(-9*dpr,-12*dpr); ctx.quadraticCurveTo(-18*dpr,-6*dpr,-14*dpr,0); ctx.stroke();
+    } else if(type==='rabbit'){
+      ctx.fillStyle='#e8e8f0';
+      ctx.fillRect(-6*dpr,-14*dpr,12*dpr,10*dpr);
+      ctx.fillRect(-4*dpr,-10*dpr+legOff*dpr,3*dpr,6*dpr);
+      ctx.fillRect(0,-10*dpr-legOff*dpr,3*dpr,6*dpr);
+      ctx.beginPath(); ctx.ellipse(5*dpr,-17*dpr,4*dpr,3*dpr,0,0,Math.PI*2); ctx.fill();
+      // Kulaklar
+      ctx.fillRect(3*dpr,-24*dpr,2*dpr,10*dpr);
+      ctx.fillRect(6*dpr,-22*dpr,2*dpr,8*dpr);
+    } else if(type==='lizard'){
+      ctx.fillStyle='#70a030';
+      ctx.fillRect(-10*dpr,-7*dpr,20*dpr,6*dpr);
+      ctx.fillRect(-8*dpr,-5*dpr+legOff*dpr,3*dpr,5*dpr);
+      ctx.fillRect(4*dpr,-5*dpr-legOff*dpr,3*dpr,5*dpr);
+      ctx.fillRect(8*dpr,-8*dpr,7*dpr,5*dpr); // kafa
+      // Kuyruk
+      ctx.strokeStyle='#70a030'; ctx.lineWidth=3*dpr; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(-10*dpr,-5*dpr); ctx.quadraticCurveTo(-20*dpr,-2*dpr,-22*dpr,-5*dpr); ctx.stroke();
+    } else if(type==='frog'){
+      ctx.fillStyle='#50a830';
+      ctx.beginPath(); ctx.ellipse(0,-6*dpr,9*dpr,6*dpr,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#60c040';
+      ctx.beginPath(); ctx.ellipse(0,-10*dpr,6*dpr,4*dpr,0,0,Math.PI*2); ctx.fill();
+      // Bacaklar
+      ctx.strokeStyle='#50a830'; ctx.lineWidth=3*dpr; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(-9*dpr,-5*dpr); ctx.lineTo(-14*dpr,-2*dpr+legOff*dpr); ctx.lineTo(-10*dpr,1*dpr); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(9*dpr,-5*dpr); ctx.lineTo(14*dpr,-2*dpr-legOff*dpr); ctx.lineTo(10*dpr,1*dpr); ctx.stroke();
+    } else if(type==='cat'){
+      ctx.fillStyle='#484848';
+      ctx.fillRect(-7*dpr,-16*dpr,14*dpr,10*dpr);
+      ctx.fillRect(-5*dpr,-10*dpr+legOff*dpr,3*dpr,7*dpr);
+      ctx.fillRect(1*dpr,-10*dpr-legOff*dpr,3*dpr,7*dpr);
+      ctx.fillStyle='#585858';
+      ctx.beginPath(); ctx.ellipse(5*dpr,-19*dpr,5*dpr,4*dpr,0,0,Math.PI*2); ctx.fill();
+      // Kulak
+      ctx.fillStyle='#484848';
+      ctx.beginPath(); ctx.moveTo(2*dpr,-22*dpr); ctx.lineTo(5*dpr,-28*dpr); ctx.lineTo(8*dpr,-22*dpr); ctx.closePath(); ctx.fill();
+      // Kuyruk
+      ctx.strokeStyle='#585858'; ctx.lineWidth=3*dpr; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(-7*dpr,-14*dpr); ctx.quadraticCurveTo(-16*dpr,-10*dpr,-13*dpr,-4*dpr); ctx.stroke();
+    } else if(type==='parrot_walk'){
+      ctx.fillStyle='#e83020';
+      ctx.beginPath(); ctx.ellipse(0,-12*dpr,6*dpr,8*dpr,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#20a830';
+      ctx.beginPath(); ctx.ellipse(4*dpr,-16*dpr,4*dpr,3*dpr,0.4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#f8d020';
+      ctx.fillRect(4*dpr,-13*dpr,4*dpr,2*dpr); // gaga
+      ctx.fillStyle='#888';
+      ctx.fillRect(-2*dpr,-6*dpr+legOff*dpr,2*dpr,5*dpr);
+      ctx.fillRect(1*dpr,-6*dpr-legOff*dpr,2*dpr,5*dpr);
+    }
+  }
+
   function _drawBullets(ctx){
     S.bullets.forEach(function(bu){
       ctx.save();
@@ -18974,6 +19230,8 @@ window.BirdHunt = (function(){
     if(!c || !S || !S.running) return;
     var ctx = c.getContext('2d');
     _drawBackground(ctx);
+    _drawDecorations(ctx);
+    _drawAnimals(ctx);
     _updateBirds();
     S.birds.forEach(function(b){ _drawBird(ctx, b); });
     var _th=BH_THEME[_bhTheme]||BH_THEME.valley;
