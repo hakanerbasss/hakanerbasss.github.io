@@ -166,7 +166,7 @@ input:focus,select:focus{border-color:#f0a500;}
         </select>
       </div>
     </div>
-    <div class="form-row">
+    <div id="newUtFields" class="form-row">
       <div class="form-group"><label>UT Key Value</label><input type="number" id="newUtKey" value="2" step="0.1"></div>
       <div class="form-group"><label>UT ATR Period</label><input type="number" id="newUtAtr" value="7"></div>
       <div class="form-group"><label>Kapanış Satış %</label><input type="number" id="newCloseSell" value="100" min="1" max="100"></div>
@@ -355,7 +355,7 @@ input:focus,select:focus{border-color:#f0a500;}
         </select>
       </div>
     </div>
-    <div class="form-row">
+    <div id="editUtFields" class="form-row">
       <div class="form-group"><label>UT Key Value</label><input type="number" id="editUtKey" step="0.1"></div>
       <div class="form-group"><label>UT ATR Period</label><input type="number" id="editUtAtr"></div>
       <div class="form-group"><label>Kapanış Satış %</label><input type="number" id="editCloseSell" min="1" max="100"></div>
@@ -495,7 +495,9 @@ function loadDashboard() {
 function renderCoins() {
   const el = document.getElementById('coinList');
   if (!coins.length) { el.innerHTML = '<p style="color:#999;font-size:13px;">Henüz coin eklenmedi.</p>'; return; }
-  el.innerHTML = coins.map(c => `
+  el.innerHTML = coins.map(c => {
+    const isSeans = c.signal_source === 'seans';
+    return `
     <div class="coin-card">
       <div class="coin-card-header">
         <div class="sym">${c.symbol}</div>
@@ -509,19 +511,20 @@ function renderCoins() {
       </div>
       <div class="coin-detail">
         <span>Alım: <b>$${c.usdt_amount}</b></span>
-        <span>Periyot: <b>${c.period}</b></span>
-        <span>Kapanış Satış: <b>%${c.close_sell_pct}</b></span>
-        <span>UT Key: <b>${c.ut_key||2}</b></span>
-        <span>UT ATR: <b>${c.ut_atr||7}</b></span>
+        ${isSeans ? '' : `<span>Periyot: <b>${c.period}</b></span>`}
+        ${isSeans ? '' : `<span>Kapanış Satış: <b>%${c.close_sell_pct}</b></span>`}
+        ${isSeans ? '' : `<span>UT Key: <b>${c.ut_key||2}</b></span>`}
+        ${isSeans ? '' : `<span>UT ATR: <b>${c.ut_atr||7}</b></span>`}
         <span>Kâr Hedefi: <b>${c.take_profit_pct>0?'%'+c.take_profit_pct:'—'}</b></span>
         <span>Kâr Satış: <b>${c.take_profit_pct>0?'%'+c.take_profit_sell_pct:'—'}</b></span>
         <span>Stop Loss: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_pct:'—'}</b></span>
         <span>Stop Satış: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_sell_pct:'—'}</b></span>
-        ${(c.signal_source==='seans'||c.signal_source==='both') ? `
+        ${isSeans ? `
         <span>Seans: <b>${SEANS_LABELS[c.seans_strategy]||c.seans_strategy||'—'}</b></span>
         <span>Satış Saati: <b>${c.seans_sell_hour||13}:00</b></span>` : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function addCoin() {
@@ -1110,8 +1113,10 @@ function updateModeLabel() {
 // ── Seans Toggle ─────────────────────────────────
 function toggleSeansOpts(prefix) {
   const source = document.getElementById(prefix+'Source').value;
-  const show = source === 'seans' || source === 'both';
-  document.getElementById(prefix+'SeansOpts').style.display = show ? 'block' : 'none';
+  const isSeans = source === 'seans';
+  document.getElementById(prefix+'SeansOpts').style.display = (isSeans || source === 'both') ? 'block' : 'none';
+  const utFields = document.getElementById(prefix+'UtFields');
+  if (utFields) utFields.style.display = isSeans ? 'none' : '';
 }
 
 // ── Init ─────────────────────────────────────────
