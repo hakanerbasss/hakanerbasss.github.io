@@ -23,12 +23,13 @@ def calc_rma(values, period):
     return rma
 
 def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7):
-    if len(closes) < atr_period + 2:
+    n = len(closes)
+    if n < atr_period + 2:
         return None
 
-    # True Range
+    # Per-candle True Range
     trs = []
-    for i in range(1, len(closes)):
+    for i in range(1, n):
         tr = max(
             highs[i] - lows[i],
             abs(highs[i] - closes[i-1]),
@@ -39,33 +40,40 @@ def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7):
     if len(trs) < atr_period:
         return None
 
-    atr = calc_rma(trs, atr_period)
-    n_loss = key_value * atr
+    # Per-candle ATR — Wilder's smoothing (her mum için ayrı)
+    atr_val = sum(trs[:atr_period]) / atr_period
+    atr_per_candle = [None] * atr_period
+    atr_per_candle.append(atr_val)
+    for tr in trs[atr_period:]:
+        atr_val = (atr_val * (atr_period - 1) + tr) / atr_period
+        atr_per_candle.append(atr_val)
+    # atr_per_candle[i] → closes[i+1] için n_loss
 
-    # Trailing stop hesapla
-    trail = closes[0]
-    prev_close = closes[0]
-    signal = None
+    # Trailing stop — ilk geçerli ATR'den başla
+    start = atr_period + 1
+    trail = closes[start - 1]
+    prev_close = closes[start - 1]
 
-    for i in range(1, len(closes)):
+    for i in range(start, n):
         c = closes[i]
         prev_trail = trail
+        n_loss = key_value * atr_per_candle[i - 1]
 
         if c > prev_trail:
             trail = max(prev_trail, c - n_loss)
         else:
             trail = min(prev_trail, c + n_loss)
 
-        # Buy: önceki kapanış trail altında, şimdiki trail üstünde
-        if prev_close <= prev_trail and c > trail:
-            signal = 'buy'
-        # Sell: önceki kapanış trail üstünde, şimdiki trail altında
-        elif prev_close >= prev_trail and c < trail:
-            signal = 'sell'
+        # Sinyal sadece SON mumda crossover olursa dönderilir
+        if i == n - 1:
+            if prev_close <= prev_trail and c > trail:
+                return 'buy'
+            if prev_close >= prev_trail and c < trail:
+                return 'sell'
 
         prev_close = c
 
-    return signal
+    return None
 
 def get_klines(client, symbol, interval, limit=150):
     from binance.client import Client
