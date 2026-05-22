@@ -480,12 +480,16 @@ def seans_analiz():
         # Varsayılan (13:00) sonuçları geriye dönük uyumluluk için
         results = by_hour['13']
 
-        # En iyi strateji: önce win rate, eşitse net %
-        best_key = max(
-            results,
-            key=lambda k: (results[k]['wr'], results[k]['net'])
-            if results[k]['trades'] >= 5 else (-1, -999)
-        )
+        # En iyi strateji: win rate > 0, işlem sayısı ağırlıklı skor
+        # Skor = wr * log(trades+1) → hem yüksek WR hem yeterli işlem sayısı ödüllendirilir
+        import math
+        def score(k):
+            v = results[k]
+            if v['trades'] == 0:
+                return -999
+            return v['wr'] * math.log(v['trades'] + 1)
+
+        best_key = max(results, key=score)
 
         return jsonify({
             'ok': True,

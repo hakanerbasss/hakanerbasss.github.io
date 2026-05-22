@@ -1017,10 +1017,12 @@ function seansAnaliz() {
       }
 
       // Her satış saati için en iyi strateji bul
+      // Skor = wr * log(trades+1) — yüksek WR + yeterli işlem birlikte ödüllendirilir
       function bestForHour(results) {
+        const score = v => v.trades === 0 ? -999 : v.wr * Math.log(v.trades + 1);
         return Object.entries(results)
-          .filter(([,v]) => v.trades >= 5)
-          .sort((a,b) => b[1].wr - a[1].wr || b[1].net - a[1].net)[0]?.[0];
+          .filter(([,v]) => v.trades > 0)
+          .sort((a,b) => score(b[1]) - score(a[1]))[0]?.[0];
       }
 
       function tableForHour(sellH, results, highlightKey) {
