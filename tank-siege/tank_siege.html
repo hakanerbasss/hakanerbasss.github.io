@@ -1642,7 +1642,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.171';
+const APP_VERSION      = '1.0.172';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1660,8 +1660,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.22 16:30';
-const APP_VERSION_NOTE = 'Fuze+guided: WP gecisinde anlik hiz snap, WP2 statik±80px, guided WP1 agiz ustu [Claude]';
+const APP_VERSION_DATE = '2026.05.22 17:00';
+const APP_VERSION_NOTE = 'Fuze: WP1 tank+150px saga, turnRate 0.04+; guided WP1 ekran klamp; snap kaldirildi [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -4397,20 +4397,21 @@ function _spawnMissile(offsetX){
   var sty = typeof tankY !== 'undefined' ? tankY : H*0.75;
 
   // Her fuze biraz farkli davransin
-  var _skyVariance = skyY + (Math.random()-0.5) * 80;  // WP0/WP1 yuksekligi farkli
-  var _wp1xOffset  = (Math.random()-0.5) * 120;        // WP1 X biraz offset
-  var _turnRate    = 0.020 + Math.random() * 0.035;    // 0.020-0.055 arasi
+  var _skyVariance = skyY + (Math.random()-0.5) * 60;
+  // WP1 x: tanktan 150-210px sağda — dönüş arki sol ekran içinde kalır
+  var _wp1x = stx + 150 + (Math.random()-0.5) * 60;
+  _wp1x = Math.max(stx + 100, Math.min(_wp1x, W - 30));
+  var _turnRate    = 0.040 + Math.random() * 0.025;    // 0.040-0.065 — arc radius küçük
   var _speed       = 4.0  + Math.random() * 2.0;       // 4-6 arasi
-  var _wp2xOffset  = (Math.random()-0.5) * 60;         // tank etrafina dagil
 
   missiles.push({
     x: mx, y: my,
     vx: 0,
     vy: -_speed,
     waypoints: [
-      {x: mx,                  y: _skyVariance},   // WP0: hedef ustu
-      {x: stx + _wp1xOffset,   y: _skyVariance},   // WP1: tank ustu (offset)
-      {x: stx + (Math.random()-0.5)*160, y: sty - Math.random()*25},  // WP2: statik, ±80px offset
+      {x: mx,    y: _skyVariance},                                       // WP0: hedef ustu
+      {x: _wp1x, y: _skyVariance},                                       // WP1: sagda, dönüs arki icin alan
+      {x: stx + (Math.random()-0.5)*160, y: sty - Math.random()*25},    // WP2: statik ±80px
     ],
     wpIdx: 0,
     maxTurnRate: _turnRate,
@@ -4454,10 +4455,6 @@ function updateMissiles(){
     if(distToCur < threshold && m.wpIdx < 2){
       m.wpIdx++;
       cur = m.waypoints[m.wpIdx];
-      // Yeni waypoint'e aninda yönel — gradual turn yerine hiz sifirla
-      var _snapA = Math.atan2(cur.y - m.y, cur.x - m.x);
-      m.vx = Math.cos(_snapA) * m.speed;
-      m.vy = Math.sin(_snapA) * m.speed;
     }
 
     // Seek + clamp turn rate
@@ -5928,18 +5925,13 @@ function update(){
         const _entX   = caveData.mx;
         const _entY   = caveData.my + caveData.mh * 0.5;
 
-        // WP1 — ağzın tam üstü (sağa değil), ekran sınırları içinde
-        const _wp1X = Math.max(20, Math.min(W-20, _entX + (Math.random()-0.5)*30));
-        const _wp1Y = _entY - (70 + _upgLvl * 12);
+        // WP1 — ağzın sağında ve yukarısında, ekran içinde klamp
+        const _wp1X = Math.min(_entX + 80 + _upgLvl * 15, W - 25);
+        const _wp1Y = _entY - (40 + _upgLvl * 8);
 
         // Aşama geçişleri
         if(!bullet.reachedWP1 && Math.hypot(_wp1X - bullet.x, _wp1Y - bullet.y) < 55){
           bullet.reachedWP1 = true;
-          // Mağaza ağzına aninda yönel — overshoot önle
-          var _ga = Math.atan2(_entY - bullet.y, _entX - bullet.x);
-          var _gs = Math.hypot(bullet.vx, bullet.vy);
-          bullet.vx = Math.cos(_ga) * _gs;
-          bullet.vy = Math.sin(_ga) * _gs;
         }
         if(bullet.reachedWP1 && !bullet.enteredCave &&
            Math.hypot(_entX - bullet.x, _entY - bullet.y) < 50){
