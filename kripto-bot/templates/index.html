@@ -1006,14 +1006,17 @@ function seansAnaliz() {
 
       const bestKey = d.best_strategy;
       const byHour  = d.by_hour || {'13': d.results};
+      const vol     = d.volatility || {};
 
-      function applyStrategy(key, sellHour) {
+      function applyStrategy(key, sellHour, sl, tp) {
         document.getElementById('newSource').value = 'seans';
         toggleSeansOpts('new');
         document.getElementById('newSeansStrategy').value = key;
         document.getElementById('newSeansSellHour').value = sellHour;
+        if (sl != null) document.getElementById('newSl').value = sl;
+        if (tp != null) document.getElementById('newTp').value = tp;
         document.getElementById('seansModal').classList.remove('open');
-        toast(`Strateji seçildi: ${SEANS_LABELS[key]||key} → Satış ${sellHour}:00`);
+        toast(`Strateji: ${SEANS_LABELS[key]||key} | SL:%${sl} TP:%${tp}`);
       }
 
       // Her satış saati için en iyi strateji bul
@@ -1036,7 +1039,7 @@ function seansAnaliz() {
               <td style="text-align:center;color:#94a3b8;">${data.trades}</td>
               <td style="text-align:center;"><span class="${data.avg>=0?'green':'red'}">%${data.avg}</span></td>
               <td style="text-align:center;">
-                <button class="btn btn-orange btn-sm" onclick="(${applyStrategy})('${key}',${sellH})">Seç</button>
+                <button class="btn btn-orange btn-sm" onclick="(${applyStrategy})('${key}',${sellH},${vol.suggested_sl??0},${vol.suggested_tp??0})">Seç</button>
               </td>
             </tr>`;
         };
@@ -1065,9 +1068,16 @@ function seansAnaliz() {
       });
 
       document.getElementById('seansModalContent').innerHTML = `
+        <div style="background:#f0f9ff;border:1px solid #0ea5e9;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;">
+          📊 <b>Oynaklık (${vol.count||0} gece):</b>
+          Ort. düşüş <span class="red">%${vol.avg_drawdown||0}</span> |
+          Ort. yükseliş <span class="green">%${vol.avg_gain||0}</span> |
+          Önerilen SL <span class="red"><b>%${vol.suggested_sl||0}</b></span> |
+          Önerilen TP <span class="green"><b>%${vol.suggested_tp||0}</b></span>
+        </div>
         <div style="background:#fff3cd;border:1px solid #f0a500;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
           ⭐ En iyi strateji (13:00): <b>${SEANS_LABELS[bestKey]||bestKey}</b>
-          <button class="btn btn-orange btn-sm" style="margin-left:8px;" onclick="(${applyStrategy})('${bestKey}',13)">Uygula</button>
+          <button class="btn btn-orange btn-sm" style="margin-left:8px;" onclick="(${applyStrategy})('${bestKey}',13,${vol.suggested_sl??0},${vol.suggested_tp??0})">Uygula</button>
         </div>
         <div style="display:flex;gap:4px;margin-bottom:0;">${tabs}</div>
         <div style="border:1px solid #e5e7eb;border-radius:0 8px 8px 8px;padding:8px;overflow-x:auto;">${panels}</div>

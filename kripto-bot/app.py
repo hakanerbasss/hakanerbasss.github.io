@@ -318,6 +318,8 @@ def seans_analiz():
                 'hour_tr': dt_tr.hour,
                 'date_tr': dt_tr.strftime('%Y-%m-%d'),
                 'open':    float(k[1]),
+                'high':    float(k[2]),
+                'low':     float(k[3]),
                 'close':   float(k[4]),
             })
 
@@ -491,12 +493,48 @@ def seans_analiz():
 
         best_key = max(results, key=score)
 
+        # ── Oynaklık Analizi ─────────────────────────
+        # 20:00 alım → ertesi 13:00 arası max düşüş ve max yükseliş
+        drawdowns, gains = [], []
+        for i, date in enumerate(dates[:-1]):
+            today_dc = days[date]
+            next_dc  = days[dates[i + 1]]
+            buy_c    = [c for c in today_dc if c['hour_tr'] == 20]
+            if not buy_c:
+                continue
+            buy_price = buy_c[0]['open']
+            overnight = [c for c in today_dc if c['hour_tr'] >= 20] + \
+                        [c for c in next_dc   if c['hour_tr'] <= 13]
+            if len(overnight) < 2:
+                continue
+            min_low  = min(c['low']  for c in overnight)
+            max_high = max(c['high'] for c in overnight)
+            drawdowns.append((buy_price - min_low)  / buy_price * 100)
+            gains.append(    (max_high - buy_price) / buy_price * 100)
+
+        def _pct(lst, p):
+            if not lst:
+                return 0.0
+            s = sorted(lst)
+            return round(s[min(int(len(s) * p / 100), len(s) - 1)], 1)
+
+        volatility = {
+            'avg_drawdown':  round(sum(drawdowns) / len(drawdowns), 2) if drawdowns else 0,
+            'avg_gain':      round(sum(gains)     / len(gains),     2) if gains     else 0,
+            # %70 işlemde bu seviyenin üzerinde kalıyor → güvenli SL
+            'suggested_sl':  _pct(drawdowns, 70),
+            # %60 işlemde bu seviyeye ulaşıyor → gerçekçi TP
+            'suggested_tp':  _pct(gains, 60),
+            'count': len(drawdowns),
+        }
+
         return jsonify({
             'ok': True,
             'symbol': symbol,
             'results': results,
             'by_hour': by_hour,
             'best_strategy': best_key,
+            'volatility': volatility,
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
