@@ -1642,7 +1642,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.170';
+const APP_VERSION      = '1.0.171';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1660,8 +1660,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.22 15:30';
-const APP_VERSION_NOTE = 'Badge etiket data-i18n ile GUNLUK/DAILY degisiyor [Claude]';
+const APP_VERSION_DATE = '2026.05.22 16:30';
+const APP_VERSION_NOTE = 'Fuze+guided: WP gecisinde anlik hiz snap, WP2 statik±80px, guided WP1 agiz ustu [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -4410,7 +4410,7 @@ function _spawnMissile(offsetX){
     waypoints: [
       {x: mx,                  y: _skyVariance},   // WP0: hedef ustu
       {x: stx + _wp1xOffset,   y: _skyVariance},   // WP1: tank ustu (offset)
-      {x: stx + _wp2xOffset,   y: sty},            // WP2: tank civari
+      {x: stx + (Math.random()-0.5)*160, y: sty - Math.random()*25},  // WP2: statik, ±80px offset
     ],
     wpIdx: 0,
     maxTurnRate: _turnRate,
@@ -4441,11 +4441,9 @@ function updateMissiles(){
     var speed = m.speed || 5.0;
     var maxTurnRate = m.maxTurnRate || 0.04;
 
-    // Son waypoint (WP2) tank koordinatini guncelle
+    // Isabet kontrolü için tank konumu — WP2 artık dinamik değil, statik
     var tx = typeof tankX !== 'undefined' ? tankX : m.spawnTankX;
     var ty = typeof tankY !== 'undefined' ? tankY : m.spawnTankY;
-    m.waypoints[2].x = tx;
-    m.waypoints[2].y = ty;
 
     // Mevcut hedef
     var cur = m.waypoints[m.wpIdx];
@@ -4456,6 +4454,10 @@ function updateMissiles(){
     if(distToCur < threshold && m.wpIdx < 2){
       m.wpIdx++;
       cur = m.waypoints[m.wpIdx];
+      // Yeni waypoint'e aninda yönel — gradual turn yerine hiz sifirla
+      var _snapA = Math.atan2(cur.y - m.y, cur.x - m.x);
+      m.vx = Math.cos(_snapA) * m.speed;
+      m.vy = Math.sin(_snapA) * m.speed;
     }
 
     // Seek + clamp turn rate
@@ -5926,13 +5928,18 @@ function update(){
         const _entX   = caveData.mx;
         const _entY   = caveData.my + caveData.mh * 0.5;
 
-        // WP1 — ağzın sağında ve yukarısında, ekran dışına çıkabilir
-        const _wp1X = _entX + 80 + _upgLvl * 15;
-        const _wp1Y = _entY - (40 + _upgLvl * 8);
+        // WP1 — ağzın tam üstü (sağa değil), ekran sınırları içinde
+        const _wp1X = Math.max(20, Math.min(W-20, _entX + (Math.random()-0.5)*30));
+        const _wp1Y = _entY - (70 + _upgLvl * 12);
 
         // Aşama geçişleri
         if(!bullet.reachedWP1 && Math.hypot(_wp1X - bullet.x, _wp1Y - bullet.y) < 55){
           bullet.reachedWP1 = true;
+          // Mağaza ağzına aninda yönel — overshoot önle
+          var _ga = Math.atan2(_entY - bullet.y, _entX - bullet.x);
+          var _gs = Math.hypot(bullet.vx, bullet.vy);
+          bullet.vx = Math.cos(_ga) * _gs;
+          bullet.vy = Math.sin(_ga) * _gs;
         }
         if(bullet.reachedWP1 && !bullet.enteredCave &&
            Math.hypot(_entX - bullet.x, _entY - bullet.y) < 50){
