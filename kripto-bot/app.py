@@ -7,7 +7,7 @@ from bot import (load_config, save_config, get_client, get_market_summary,
 from signal_engine import start_engine
 from telegram_bot import start_telegram_bot
 
-app = Flask(__name__)
+app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
 app.permanent_session_lifetime = datetime.timedelta(days=30)
 
