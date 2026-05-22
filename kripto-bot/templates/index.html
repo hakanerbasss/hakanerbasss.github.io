@@ -184,14 +184,22 @@ input:focus,select:focus{border-color:#f0a500;}
         <div class="form-group">
           <label>Seans Stratejisi</label>
           <select id="newSeansStrategy">
-            <option value="btc_yy_coin_y">BTC 2gün🟢 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_yy_coin_r">BTC 2gün🟢 + Coin bugün🔴 (20:00)</option>
-            <option value="btc_rr_coin_y">BTC 2gün🔴 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_rr_coin_r">BTC 2gün🔴 + Coin bugün🔴 (20:00)</option>
-            <option value="btc_yr_coin_y">BTC dün🟢 bugün🔴 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_yr_coin_r">BTC dün🟢 bugün🔴 + Coin bugün🔴 (20:00)</option>
-            <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
+            <optgroup label="── Coin Bazlı ──">
+              <option value="coin_yy">Coin dün🟢 bugün🟢 (20:00)</option>
+              <option value="coin_ky">Coin dün🔴 bugün🟢 (20:00)</option>
+              <option value="coin_kk">Coin dün🔴 bugün🔴 (20:00)</option>
+              <option value="coin_yk">Coin dün🟢 bugün🔴 (20:00)</option>
+            </optgroup>
+            <optgroup label="── BTC Filtreli ──">
+              <option value="btc_yy_coin_y">BTC 2gün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yy_coin_r">BTC 2gün🟢 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_rr_coin_y">BTC 2gün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_rr_coin_r">BTC 2gün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_yr_coin_y">BTC dün🟢 bugün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yr_coin_r">BTC dün🟢 bugün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
@@ -365,14 +373,22 @@ input:focus,select:focus{border-color:#f0a500;}
         <div class="form-group">
           <label>Seans Stratejisi</label>
           <select id="editSeansStrategy">
-            <option value="btc_yy_coin_y">BTC 2gün🟢 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_yy_coin_r">BTC 2gün🟢 + Coin bugün🔴 (20:00)</option>
-            <option value="btc_rr_coin_y">BTC 2gün🔴 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_rr_coin_r">BTC 2gün🔴 + Coin bugün🔴 (20:00)</option>
-            <option value="btc_yr_coin_y">BTC dün🟢 bugün🔴 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_yr_coin_r">BTC dün🟢 bugün🔴 + Coin bugün🔴 (20:00)</option>
-            <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
-            <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
+            <optgroup label="── Coin Bazlı ──">
+              <option value="coin_yy">Coin dün🟢 bugün🟢 (20:00)</option>
+              <option value="coin_ky">Coin dün🔴 bugün🟢 (20:00)</option>
+              <option value="coin_kk">Coin dün🔴 bugün🔴 (20:00)</option>
+              <option value="coin_yk">Coin dün🟢 bugün🔴 (20:00)</option>
+            </optgroup>
+            <optgroup label="── BTC Filtreli ──">
+              <option value="btc_yy_coin_y">BTC 2gün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yy_coin_r">BTC 2gün🟢 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_rr_coin_y">BTC 2gün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_rr_coin_r">BTC 2gün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_yr_coin_y">BTC dün🟢 bugün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yr_coin_r">BTC dün🟢 bugün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
@@ -502,7 +518,7 @@ function renderCoins() {
         <span>Stop Loss: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_pct:'—'}</b></span>
         <span>Stop Satış: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_sell_pct:'—'}</b></span>
         ${(c.signal_source==='seans'||c.signal_source==='both') ? `
-        <span>Seans: <b>${c.seans_strategy==='abd_red'?'ABD Kırmızı':c.seans_strategy==='prev_green'?'Önceki Yeşil':c.seans_strategy==='prev_green_btc'?'Önceki Yeşil+BTC':c.seans_strategy==='abd_red_btc'?'ABD+BTC Kırmızı':'Kombine'}</b></span>
+        <span>Seans: <b>${SEANS_LABELS[c.seans_strategy]||c.seans_strategy||'—'}</b></span>
         <span>Satış Saati: <b>${c.seans_sell_hour||13}:00</b></span>` : ''}
       </div>
     </div>`).join('');
@@ -782,8 +798,8 @@ function drawChart(candles, trails, signals) {
 // ── Chart ────────────────────────────────────────
 function initChartSymbols() {
   const sel = document.getElementById('chartSymbol');
+  const prev = sel.value;
   sel.innerHTML = '';
-  const coins = CFG.coins || [];
   if (coins.length === 0) {
     sel.innerHTML = '<option value="BTCUSDT">BTCUSDT</option>';
   } else {
@@ -796,6 +812,7 @@ function initChartSymbols() {
       opt.dataset.atr = c.ut_atr || 7;
       sel.appendChild(opt);
     });
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
   }
   updateChartParams();
 }
@@ -950,13 +967,33 @@ function drawChart(candles, trails, signals) {
 
 let chartAutoRefresh = null;
 
+const SEANS_LABELS = {
+  btc_yy_coin_y: 'BTC 2gün🟢 + Coin bugün🟢',
+  btc_yy_coin_r: 'BTC 2gün🟢 + Coin bugün🔴',
+  btc_rr_coin_y: 'BTC 2gün🔴 + Coin bugün🟢',
+  btc_rr_coin_r: 'BTC 2gün🔴 + Coin bugün🔴',
+  btc_yr_coin_y: 'BTC dün🟢 bugün🔴 + Coin bugün🟢',
+  btc_yr_coin_r: 'BTC dün🟢 bugün🔴 + Coin bugün🔴',
+  btc_ry_coin_y: 'BTC dün🔴 bugün🟢 + Coin bugün🟢',
+  btc_ry_coin_r: 'BTC dün🔴 bugün🟢 + Coin bugün🔴',
+  coin_yy:       'Coin dün🟢 bugün🟢',
+  coin_ky:       'Coin dün🔴 bugün🟢',
+  coin_kk:       'Coin dün🔴 bugün🔴',
+  coin_yk:       'Coin dün🟢 bugün🔴',
+  abd_red:       'ABD Kırmızı',
+  prev_green:    'Önceki Yeşil',
+  both:          'ABD Kırmızı + Önceki Yeşil',
+  prev_green_btc:'Önceki Yeşil + BTC Yeşil',
+  abd_red_btc:   'ABD + BTC Kırmızı',
+};
+
 // ── Seans Analiz ─────────────────────────────────
 function seansAnaliz() {
   const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
   if (!symbol) { toast('Sembol girin', false); return; }
 
   document.getElementById('seansModalSymbol').textContent = symbol;
-  document.getElementById('seansModalContent').innerHTML = '<div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor...</div>';
+  document.getElementById('seansModalContent').innerHTML = '<div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor... (180 gün veri)</div>';
   document.getElementById('seansModal').classList.add('open');
 
   fetch(`/api/seans_analiz?symbol=${symbol}`)
@@ -966,57 +1003,88 @@ function seansAnaliz() {
         document.getElementById('seansModalContent').innerHTML = `<div style="color:#dc2626;">Hata: ${d.error}</div>`;
         return;
       }
-      const r = d.results;
-      const row = (label, buyH, sellH, data, highlight) => `
-        <tr style="${highlight ? 'background:rgba(16,185,129,0.08);' : ''}">
-          <td style="font-size:11px;">${label}</td>
-          <td style="text-align:center;font-size:11px;color:#94a3b8;">${buyH}:00 → ${sellH}:00</td>
-          <td style="text-align:center;"><span class="${data.wr>=60?'green':data.wr>=50?'yellow':'red'}"><b>%${data.wr}</b></span></td>
-          <td style="text-align:center;"><span class="${data.net>=0?'green':'red'}">%${data.net}</span></td>
-          <td style="text-align:center;color:#94a3b8;">${data.trades}</td>
-          <td style="text-align:center;"><span class="${data.avg>=0?'green':'red'}">%${data.avg}</span></td>
-        </tr>`;
 
-      const best = Object.values(r).reduce((a,b) => a.wr > b.wr ? a : b);
+      const bestKey = d.best_strategy;
+      const byHour  = d.by_hour || {'13': d.results};
+
+      function applyStrategy(key, sellHour) {
+        document.getElementById('newSource').value = 'seans';
+        toggleSeansOpts('new');
+        document.getElementById('newSeansStrategy').value = key;
+        document.getElementById('newSeansSellHour').value = sellHour;
+        document.getElementById('seansModal').classList.remove('open');
+        toast(`Strateji seçildi: ${SEANS_LABELS[key]||key} → Satış ${sellHour}:00`);
+      }
+
+      // Her satış saati için en iyi strateji bul
+      function bestForHour(results) {
+        return Object.entries(results)
+          .filter(([,v]) => v.trades >= 5)
+          .sort((a,b) => b[1].wr - a[1].wr || b[1].net - a[1].net)[0]?.[0];
+      }
+
+      function tableForHour(sellH, results, highlightKey) {
+        const row = (key, label, data) => {
+          const isBest = key === highlightKey;
+          return `
+            <tr style="${isBest ? 'background:rgba(16,185,129,0.10);font-weight:bold;' : ''}">
+              <td style="font-size:11px;">${isBest ? '⭐ ' : ''}${label}</td>
+              <td style="text-align:center;"><span class="${data.wr>=60?'green':data.wr>=50?'yellow':'red'}"><b>%${data.wr}</b></span></td>
+              <td style="text-align:center;"><span class="${data.net>=0?'green':'red'}">%${data.net}</span></td>
+              <td style="text-align:center;color:#94a3b8;">${data.trades}</td>
+              <td style="text-align:center;"><span class="${data.avg>=0?'green':'red'}">%${data.avg}</span></td>
+              <td style="text-align:center;">
+                <button class="btn btn-orange btn-sm" onclick="(${applyStrategy})('${key}',${sellH})">Seç</button>
+              </td>
+            </tr>`;
+        };
+        const coinKeys = ['coin_yy','coin_ky','coin_kk','coin_yk'];
+        const btcKeys  = ['btc_yy_coin_y','btc_yy_coin_r','btc_rr_coin_y','btc_rr_coin_r',
+                          'btc_yr_coin_y','btc_yr_coin_r','btc_ry_coin_y','btc_ry_coin_r'];
+        return `
+          <p style="font-size:11px;color:#94a3b8;margin:8px 0 3px;">📅 Satış Saati: <b>${sellH}:00</b></p>
+          <table>
+            <thead><tr><th>Strateji</th><th>Kazanma</th><th>Net %</th><th>İşlem</th><th>Ort %</th><th></th></tr></thead>
+            <tbody>
+              ${coinKeys.map(k => row(k, SEANS_LABELS[k], results[k])).join('')}
+              <tr><td colspan="6" style="padding:2px 0;background:#f8f8f8;font-size:10px;color:#999;text-align:center;">── BTC Filtreli ──</td></tr>
+              ${btcKeys.map(k => row(k, SEANS_LABELS[k], results[k])).join('')}
+            </tbody>
+          </table>`;
+      }
+
+      const SELL_HOURS = [11, 12, 13, 19];
+      let tabs = '', panels = '';
+      SELL_HOURS.forEach((h, i) => {
+        const res = byHour[String(h)] || {};
+        const bk  = bestForHour(res);
+        tabs   += `<span id="stab-${h}" class="stab${i===0?' stab-active':''}" onclick="switchStab(${h})" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;${i===0?'background:#f0a500;color:#fff;':'background:#f0f0f0;color:#666;'}">${h}:00${bk?' ⭐':''}</span>`;
+        panels += `<div id="spanel-${h}" style="display:${i===0?'block':'none'}">${tableForHour(h, res, bk)}</div>`;
+      });
 
       document.getElementById('seansModalContent').innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Strateji</th>
-              <th>Saat</th>
-              <th>Kazanma</th>
-              <th>Net %</th>
-              <th>İşlem</th>
-              <th>Ort %</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${row('Coin dün🟢 bugün🟢 (YY)', 20, 13, r.coin_yy, r.coin_yy===best)}
-            ${row('Coin dün🔴 bugün🟢 (KY)', 20, 13, r.coin_ky, r.coin_ky===best)}
-            ${row('Coin dün🔴 bugün🔴 (KK)', 20, 13, r.coin_kk, r.coin_kk===best)}
-            ${row('Coin dün🟢 bugün🔴 (YK)', 20, 13, r.coin_yk, r.coin_yk===best)}
-          </tbody>
-        </table>
-        <p style="font-size:11px;color:#94a3b8;margin:10px 0 4px;">📊 BTC Piyasa Filtreli:</p>
-        <table>
-          <thead><tr><th>Strateji + BTC Filtre</th><th>Saat</th><th>Kazanma</th><th>Net %</th><th>İşlem</th><th>Ort %</th></tr></thead>
-          <tbody>
-            ${row('BTC 2gün🟢 + Coin bugün🟢', 20, 13, r.btc_yy_coin_y, r.btc_yy_coin_y===best)}
-            ${row('BTC 2gün🟢 + Coin bugün🔴', 20, 13, r.btc_yy_coin_r, r.btc_yy_coin_r===best)}
-            ${row('BTC 2gün🔴 + Coin bugün🟢', 20, 13, r.btc_rr_coin_y, r.btc_rr_coin_y===best)}
-            ${row('BTC 2gün🔴 + Coin bugün🔴', 20, 13, r.btc_rr_coin_r, r.btc_rr_coin_r===best)}
-            ${row('BTC dün🟢 bugün🔴 + Coin bugün🟢', 20, 13, r.btc_yr_coin_y, r.btc_yr_coin_y===best)}
-            ${row('BTC dün🟢 bugün🔴 + Coin bugün🔴', 20, 13, r.btc_yr_coin_r, r.btc_yr_coin_r===best)}
-            ${row('BTC dün🔴 bugün🟢 + Coin bugün🟢', 20, 13, r.btc_ry_coin_y, r.btc_ry_coin_y===best)}
-            ${row('BTC dün🔴 bugün🟢 + Coin bugün🔴', 20, 13, r.btc_ry_coin_r, r.btc_ry_coin_r===best)}
-          </tbody>
-        </table>
-        <p style="font-size:10px;color:#64748b;margin-top:8px;">* Son 180 gün verisi | Fee (%0.2) dahil</p>`;
+        <div style="background:#fff3cd;border:1px solid #f0a500;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
+          ⭐ En iyi strateji (13:00): <b>${SEANS_LABELS[bestKey]||bestKey}</b>
+          <button class="btn btn-orange btn-sm" style="margin-left:8px;" onclick="(${applyStrategy})('${bestKey}',13)">Uygula</button>
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:0;">${tabs}</div>
+        <div style="border:1px solid #e5e7eb;border-radius:0 8px 8px 8px;padding:8px;overflow-x:auto;">${panels}</div>
+        <p style="font-size:10px;color:#64748b;margin-top:8px;">* Son 180 gün | Fee (%0.2) dahil | Min 5 işlem</p>`;
     })
     .catch(() => {
       document.getElementById('seansModalContent').innerHTML = '<div style="color:#dc2626;">Bağlantı hatası</div>';
     });
+}
+
+function switchStab(h) {
+  document.querySelectorAll('.stab').forEach(t => {
+    t.style.background = '#f0f0f0'; t.style.color = '#666';
+  });
+  document.querySelectorAll('[id^="spanel-"]').forEach(p => p.style.display = 'none');
+  const tab = document.getElementById('stab-'+h);
+  if (tab) { tab.style.background = '#f0a500'; tab.style.color = '#fff'; }
+  const panel = document.getElementById('spanel-'+h);
+  if (panel) panel.style.display = 'block';
 }
 
 // ── Mode Label ───────────────────────────────────

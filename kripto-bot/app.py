@@ -457,21 +457,43 @@ def seans_analiz():
             avg = round(total/trades,2) if trades > 0 else 0
             return {'trades': trades, 'wins': wins, 'wr': wr, 'net': round(total,2), 'avg': avg}
 
-        results = {
-            'coin_yy': run_backtest_coin_only(20, 13, G, G),
-            'coin_ky': run_backtest_coin_only(20, 13, R, G),
-            'coin_kk': run_backtest_coin_only(20, 13, R, R),
-            'coin_yk': run_backtest_coin_only(20, 13, G, R),
-            'btc_yy_coin_y': run_backtest(20, 13, G, G, G),
-            'btc_yy_coin_r': run_backtest(20, 13, G, G, R),
-            'btc_rr_coin_y': run_backtest(20, 13, R, R, G),
-            'btc_rr_coin_r': run_backtest(20, 13, R, R, R),
-            'btc_yr_coin_y': run_backtest(20, 13, G, R, G),
-            'btc_yr_coin_r': run_backtest(20, 13, G, R, R),
-            'btc_ry_coin_y': run_backtest(20, 13, R, G, G),
-            'btc_ry_coin_r': run_backtest(20, 13, R, G, R),
-        }
-        return jsonify({'ok': True, 'symbol': symbol, 'results': results})
+        SELL_HOURS = [11, 12, 13, 19]
+
+        def run_all(buy_h, sell_h):
+            return {
+                'coin_yy':       run_backtest_coin_only(buy_h, sell_h, G, G),
+                'coin_ky':       run_backtest_coin_only(buy_h, sell_h, R, G),
+                'coin_kk':       run_backtest_coin_only(buy_h, sell_h, R, R),
+                'coin_yk':       run_backtest_coin_only(buy_h, sell_h, G, R),
+                'btc_yy_coin_y': run_backtest(buy_h, sell_h, G, G, G),
+                'btc_yy_coin_r': run_backtest(buy_h, sell_h, G, G, R),
+                'btc_rr_coin_y': run_backtest(buy_h, sell_h, R, R, G),
+                'btc_rr_coin_r': run_backtest(buy_h, sell_h, R, R, R),
+                'btc_yr_coin_y': run_backtest(buy_h, sell_h, G, R, G),
+                'btc_yr_coin_r': run_backtest(buy_h, sell_h, G, R, R),
+                'btc_ry_coin_y': run_backtest(buy_h, sell_h, R, G, G),
+                'btc_ry_coin_r': run_backtest(buy_h, sell_h, R, G, R),
+            }
+
+        by_hour = {str(h): run_all(20, h) for h in SELL_HOURS}
+
+        # Varsayılan (13:00) sonuçları geriye dönük uyumluluk için
+        results = by_hour['13']
+
+        # En iyi strateji: önce win rate, eşitse net %
+        best_key = max(
+            results,
+            key=lambda k: (results[k]['wr'], results[k]['net'])
+            if results[k]['trades'] >= 5 else (-1, -999)
+        )
+
+        return jsonify({
+            'ok': True,
+            'symbol': symbol,
+            'results': results,
+            'by_hour': by_hour,
+            'best_strategy': best_key,
+        })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 

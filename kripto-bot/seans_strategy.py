@@ -34,6 +34,14 @@ def day_change(day_candles):
         return None
     return (day_candles[-1]['close'] - day_candles[0]['open']) / day_candles[0]['open'] * 100
 
+def get_17_20_change(day_candles):
+    """17:00 açılış → 20:00 açılış değişimi (ABD seansı başlangıcı)"""
+    h17 = [c for c in day_candles if c['hour_tr'] == 17]
+    h20 = [c for c in day_candles if c['hour_tr'] == 20]
+    if not h17 or not h20:
+        return None
+    return (h20[0]['open'] - h17[0]['open']) / h17[0]['open'] * 100
+
 def abd_first_hour_change(day_candles):
     h17 = [c for c in day_candles if c['hour_tr'] == 17]
     h18 = [c for c in day_candles if c['hour_tr'] == 18]
@@ -41,14 +49,62 @@ def abd_first_hour_change(day_candles):
         return None
     return (h18[-1]['close'] - h17[0]['open']) / h17[0]['open'] * 100
 
+# Strateji → okunabilir ad
+STRATEGY_LABELS = {
+    'btc_yy_coin_y': 'BTC 2gün🟢 + Coin bugün🟢',
+    'btc_yy_coin_r': 'BTC 2gün🟢 + Coin bugün🔴',
+    'btc_rr_coin_y': 'BTC 2gün🔴 + Coin bugün🟢',
+    'btc_rr_coin_r': 'BTC 2gün🔴 + Coin bugün🔴',
+    'btc_yr_coin_y': 'BTC dün🟢 bugün🔴 + Coin bugün🟢',
+    'btc_yr_coin_r': 'BTC dün🟢 bugün🔴 + Coin bugün🔴',
+    'btc_ry_coin_y': 'BTC dün🔴 bugün🟢 + Coin bugün🟢',
+    'btc_ry_coin_r': 'BTC dün🔴 bugün🟢 + Coin bugün🔴',
+    'coin_yy':       'Coin dün🟢 bugün🟢',
+    'coin_ky':       'Coin dün🔴 bugün🟢',
+    'coin_kk':       'Coin dün🔴 bugün🔴',
+    'coin_yk':       'Coin dün🟢 bugün🔴',
+    'abd_red':       'ABD Kırmızı',
+    'prev_green':    'Önceki Yeşil',
+    'both':          'ABD Kırmızı + Önceki Yeşil',
+    'prev_green_btc':'Önceki Yeşil + BTC Yeşil',
+    'abd_red_btc':   'ABD + BTC Kırmızı',
+}
+
+# Strateji koşulları: (btc_prev_op, btc_1720_op, coin_1720_op)
+# None = bu değer kontrol edilmez
+_BTC_CONDS = {
+    'btc_yy_coin_y': ('>=0', '>=0', '>=0'),
+    'btc_yy_coin_r': ('>=0', '>=0', '<0'),
+    'btc_rr_coin_y': ('<0',  '<0',  '>=0'),
+    'btc_rr_coin_r': ('<0',  '<0',  '<0'),
+    'btc_yr_coin_y': ('>=0', '<0',  '>=0'),
+    'btc_yr_coin_r': ('>=0', '<0',  '<0'),
+    'btc_ry_coin_y': ('<0',  '>=0', '>=0'),
+    'btc_ry_coin_r': ('<0',  '>=0', '<0'),
+}
+
+_COIN_CONDS = {
+    'coin_yy': ('>=0', '>=0'),
+    'coin_ky': ('<0',  '>=0'),
+    'coin_kk': ('<0',  '<0'),
+    'coin_yk': ('>=0', '<0'),
+}
+
+
+def _chk(v, op):
+    return v >= 0 if op == '>=0' else v < 0
+
+
 def check_seans_signal(client, symbol, strategy='both'):
     """
-    strategy seçenekleri:
-      'abd_red'            — Coin ABD ilk saat kırmızıysa 20:00 al
-      'prev_green'         — Coin önceki gün yeşilse 17:00 al
-      'both'               — İkisi de
-      'prev_green_btc'     — Coin önceki yeşil + BTC önceki yeşil → 17:00 al
-      'abd_red_btc'        — Coin ABD kırmızı + BTC ABD kırmızı → 20:00 al
+    Canlı seans sinyali — 20:00'de alım, seçilen saatte satış.
+
+    Desteklenen stratejiler:
+      BTC filtreli : btc_yy_coin_y/r, btc_rr_coin_y/r,
+                     btc_yr_coin_y/r, btc_ry_coin_y/r
+      Coin-only    : coin_yy, coin_ky, coin_kk, coin_yk
+      Eski (uyumluluk): abd_red, prev_green, both,
+                        prev_green_btc, abd_red_btc
     """
     try:
         now_tr        = datetime.datetime.now(TR_TZ)
@@ -56,83 +112,89 @@ def check_seans_signal(client, symbol, strategy='both'):
         today_str     = now_tr.strftime('%Y-%m-%d')
         yesterday_str = (now_tr - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
 
-        # Coin verisi
         candles           = get_hourly_candles(client, symbol, limit=72)
         today_candles     = get_day_candles(candles, today_str)
         yesterday_candles = get_day_candles(candles, yesterday_str)
 
-        # BTC verisi (filtreli stratejiler için)
-        btc_candles           = get_hourly_candles(client, 'BTCUSDT', limit=72)
-        btc_today             = get_day_candles(btc_candles, today_str)
-        btc_yesterday         = get_day_candles(btc_candles, yesterday_str)
+        btc_candles   = get_hourly_candles(client, 'BTCUSDT', limit=72)
+        btc_today     = get_day_candles(btc_candles, today_str)
+        btc_yesterday = get_day_candles(btc_candles, yesterday_str)
 
-        coin_prev_chg  = day_change(yesterday_candles)
-        coin_abd_chg   = abd_first_hour_change(today_candles)
-        btc_prev_chg   = day_change(btc_yesterday)
-        btc_abd_chg    = abd_first_hour_change(btc_today)
+        coin_prev_chg = day_change(yesterday_candles)
+        btc_prev_chg  = day_change(btc_yesterday)
+        coin_17_20    = get_17_20_change(today_candles)
+        btc_17_20     = get_17_20_change(btc_today)
+        coin_abd_chg  = abd_first_hour_change(today_candles)
+        btc_abd_chg   = abd_first_hour_change(btc_today)
 
-        # ── Strateji: prev_green_btc — 17:00 ────────────
+        def _buy(reason):
+            return {'signal': 'buy', 'reason': reason, 'buy_hour': 20}
+
+        def _none():
+            return {'signal': None, 'reason': f'Koşul sağlanmadı (saat {current_hour}:00)'}
+
+        # ── 17:00 stratejileri (eski) ─────────────────
+        if strategy in ['prev_green', 'both'] and current_hour == 17:
+            if coin_prev_chg is not None and coin_prev_chg >= 0:
+                return _buy(f'Önceki gün yeşil ({round(coin_prev_chg,2)}%) → 17:00')
+
         if strategy == 'prev_green_btc' and current_hour == 17:
             if (coin_prev_chg is not None and coin_prev_chg >= 0 and
                 btc_prev_chg  is not None and btc_prev_chg  >= 0):
-                return {
-                    'signal':   'buy',
-                    'reason':   f'Önceki yeşil ({round(coin_prev_chg,2)}%) + BTC yeşil ({round(btc_prev_chg,2)}%) → 17:00',
-                    'buy_hour': 17,
-                }
+                return _buy(
+                    f'Önceki yeşil ({round(coin_prev_chg,2)}%) '
+                    f'+ BTC yeşil ({round(btc_prev_chg,2)}%) → 17:00'
+                )
 
-        # ── Strateji: abd_red_btc — 20:00 ───────────────
-        elif strategy == 'abd_red_btc' and current_hour == 20:
+        # ── 20:00 stratejileri ────────────────────────
+        if current_hour != 20:
+            return _none()
+
+        # BTC filtreli kombinasyonlar
+        if strategy in _BTC_CONDS:
+            op1, op2, op3 = _BTC_CONDS[strategy]
+            if any(v is None for v in [btc_prev_chg, btc_17_20, coin_17_20]):
+                return _none()
+            if _chk(btc_prev_chg, op1) and _chk(btc_17_20, op2) and _chk(coin_17_20, op3):
+                return _buy(
+                    f'{STRATEGY_LABELS[strategy]} — '
+                    f'BTC dün {round(btc_prev_chg,2)}% '
+                    f'BTC bugün {round(btc_17_20,2)}% '
+                    f'Coin {round(coin_17_20,2)}%'
+                )
+            return _none()
+
+        # Coin-only kombinasyonlar
+        if strategy in _COIN_CONDS:
+            op1, op2 = _COIN_CONDS[strategy]
+            if coin_prev_chg is None or coin_17_20 is None:
+                return _none()
+            if _chk(coin_prev_chg, op1) and _chk(coin_17_20, op2):
+                return _buy(
+                    f'{STRATEGY_LABELS[strategy]} — '
+                    f'dün {round(coin_prev_chg,2)}% '
+                    f'bugün {round(coin_17_20,2)}%'
+                )
+            return _none()
+
+        # Eski stratejiler (geriye dönük uyumluluk)
+        if strategy in ['abd_red', 'both']:
+            if coin_abd_chg is not None and coin_abd_chg < 0:
+                return _buy(f'ABD açılış kırmızı ({round(coin_abd_chg,2)}%) → 20:00')
+
+        if strategy == 'abd_red_btc':
             if (coin_abd_chg is not None and coin_abd_chg < 0 and
                 btc_abd_chg  is not None and btc_abd_chg  < 0):
-                return {
-                    'signal':   'buy',
-                    'reason':   f'ABD kırmızı ({round(coin_abd_chg,2)}%) + BTC kırmızı ({round(btc_abd_chg,2)}%) → 20:00',
-                    'buy_hour': 20,
-                }
+                return _buy(
+                    f'ABD kırmızı ({round(coin_abd_chg,2)}%) '
+                    f'+ BTC kırmızı ({round(btc_abd_chg,2)}%) → 20:00'
+                )
 
-        # ── Strateji: abd_red — 20:00 ───────────────────
-        elif strategy in ['abd_red', 'both'] and current_hour == 20:
-            if coin_abd_chg is not None and coin_abd_chg < 0:
-                return {
-                    'signal':   'buy',
-                    'reason':   f'ABD açılış kırmızı ({round(coin_abd_chg,2)}%) → 20:00',
-                    'buy_hour': 20,
-                }
-
-        # ── Strateji: prev_green — 17:00 ────────────────
-        if strategy in ['prev_green', 'both'] and current_hour == 17:
-            if coin_prev_chg is not None and coin_prev_chg >= 0:
-                return {
-                    'signal':   'buy',
-                    'reason':   f'Önceki gün yeşil ({round(coin_prev_chg,2)}%) → 17:00',
-                    'buy_hour': 17,
-                }
-
-        # ── Strateji 5: BTC 2 gün kırmızı + Coin kırmızı → 20:00 AL ─────
-        if strategy == 'btc_2red_coin_red' and current_hour == 20:
-            from bot import get_client
-            btc_client = get_client()
-            btc_candles = get_hourly_candles(btc_client, 'BTCUSDT', limit=72)
-            btc_yesterday  = get_day_candles(btc_candles, yesterday_str)
-            day_before_str = (now_tr - datetime.timedelta(days=2)).strftime('%Y-%m-%d')
-            btc_day_before = get_day_candles(btc_candles, day_before_str)
-            btc_prev1 = day_change(btc_yesterday)
-            btc_prev2 = day_change(btc_day_before)
-            coin_today_chg = day_change(today_candles)
-            if (btc_prev1 is not None and btc_prev1 < 0 and
-                btc_prev2 is not None and btc_prev2 < 0 and
-                coin_today_chg is not None and coin_today_chg < 0):
-                return {
-                    'signal':   'buy',
-                    'reason':   f'BTC 2 gün kırmızı ({round(btc_prev2,2)}%, {round(btc_prev1,2)}%) + Coin kırmızı ({round(coin_today_chg,2)}%) → 20:00 alım',
-                    'buy_hour': 20,
-                }
-
-        return {'signal': None, 'reason': f'Koşul sağlanmadı (saat {current_hour}:00)'}
+        return _none()
 
     except Exception as e:
         return {'signal': None, 'reason': f'Hata: {e}'}
+
 
 def check_seans_sell(sell_hour=13):
     now_tr = datetime.datetime.now(TR_TZ)
