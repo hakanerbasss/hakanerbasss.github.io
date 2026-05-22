@@ -630,6 +630,11 @@ button:active{opacity:0.75;transform:scale(0.96);}
   0%,100%{transform:scale(1);}
   50%{transform:scale(1.025);}
 }
+@keyframes qbGoldPulse{
+  0%,100%{box-shadow:0 0 0 2px rgba(255,215,0,0.45),0 3px 14px rgba(0,0,0,0.7),0 0 22px rgba(255,215,0,0.5);}
+  50%{box-shadow:0 0 0 3px rgba(255,215,0,0.7),0 3px 14px rgba(0,0,0,0.7),0 0 38px rgba(255,215,0,0.85);}
+}
+.qb-complete{animation:qbGoldPulse 2.4s ease-in-out infinite;}
 /* Version update badge on settings button */
 #settings-update-badge{
   display:none;position:absolute;top:-5px;right:-5px;
@@ -1495,7 +1500,16 @@ button:active{opacity:0.75;transform:scale(0.96);}
   <button id="tactical-badge" onclick="onTacticalBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="boost-badge" onclick="onDmgBoostBadgeTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
   <button id="windblock-badge" onclick="onWindBlockTap()" style="display:none;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.35);border-radius:10px;padding:5px 10px;color:white;font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5);min-width:52px;text-align:center;"></button>
-  <button id="quests-badge" onclick="Quests.open()" style="background:linear-gradient(180deg,rgba(0,150,80,0.85),rgba(0,80,40,0.92));border:2px solid rgba(0,230,120,0.55);border-radius:10px;padding:5px 10px;color:#00E676;font-size:13px;font-weight:800;font-family:'Rajdhani',sans-serif;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5),0 0 12px rgba(0,200,80,0.25);min-width:52px;text-align:center;">📋 <span id="quests-badge-count">0/3</span></button>
+  <button id="quests-badge" onclick="Quests.open()" style="position:relative;width:52px;height:52px;background:rgba(0,0,0,0.55);border:none;border-radius:50%;padding:0;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.5);flex-shrink:0;">
+    <svg width="52" height="52" style="position:absolute;inset:0;overflow:visible;" viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="21" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4.5"/>
+      <circle id="quests-ring" cx="26" cy="26" r="21" fill="none" stroke="rgba(0,230,120,0.40)" stroke-width="4.5" stroke-dasharray="0 131.9" stroke-linecap="round" transform="rotate(-90 26 26)" style="transition:stroke-dasharray 0.55s cubic-bezier(0.34,1.56,0.64,1),stroke 0.35s ease;"/>
+    </svg>
+    <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;">
+      <span style="font-size:8.5px;font-weight:700;font-family:'Rajdhani',sans-serif;color:rgba(255,255,255,0.45);letter-spacing:0.5px;line-height:1;">GÖREV</span>
+      <span id="quests-badge-count" style="color:rgba(0,230,120,0.8);font-size:13px;font-weight:900;font-family:'Rajdhani',sans-serif;line-height:1;letter-spacing:0;">0/3</span>
+    </div>
+  </button>
 </div>
 
 <div id="wind-wrap" style="position:fixed;top:108px;right:12px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;">
@@ -1628,7 +1642,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.168';
+const APP_VERSION      = '1.0.169';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1646,8 +1660,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.22 14:00';
-const APP_VERSION_NOTE = 'Gunluk gorev TDZ bug duzeltildi (star3+tema artik track); tebrikler karti; yeni gun oto-acilis [Claude]';
+const APP_VERSION_DATE = '2026.05.22 15:00';
+const APP_VERSION_NOTE = 'Gunluk gorev: SVG ring badge (animasyonlu cember); yeşil→turuncu→altin renk gecisi [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -17209,28 +17223,35 @@ const Quests = (function(){
     return _list().filter(q => _isClaimed(q.id)).length;
   }
   function _updateBadge(){
-    const el = document.getElementById('quests-badge-count');
-    const btn = document.getElementById('quests-badge');
+    var el  = document.getElementById('quests-badge-count');
+    var ring= document.getElementById('quests-ring');
+    var btn = document.getElementById('quests-badge');
     if(!el || !btn) return;
-    var done = _doneCount();
+    var done    = _doneCount();
     var claimed = _claimedCount();
     el.textContent = done + '/3';
-    // Görsel: tüm görevler bitti → altın glow; en az 1 tamamlandı → daha parlak yeşil
+    // SVG ring — çevre 2π×21 ≈ 131.9
+    var C = 131.9;
+    var dashFill = (Math.min(1, done/3) * C).toFixed(1);
+    if(ring) ring.setAttribute('stroke-dasharray', dashFill + ' ' + C);
     if(claimed >= 3){
-      btn.style.background = 'linear-gradient(180deg,rgba(255,215,0,0.95),rgba(200,140,0,0.95))';
-      btn.style.borderColor = 'rgba(255,215,0,0.85)';
-      btn.style.color = '#1a1408';
-      btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5),0 0 18px rgba(255,215,0,0.55)';
+      if(ring) ring.setAttribute('stroke','#FFD700');
+      el.style.color = '#FFD700';
+      btn.style.background = 'radial-gradient(circle,rgba(50,35,0,0.85),rgba(15,10,0,0.80))';
+      btn.style.boxShadow = '0 0 0 2px rgba(255,215,0,0.45),0 3px 14px rgba(0,0,0,0.7),0 0 22px rgba(255,215,0,0.5)';
+      btn.classList.add('qb-complete');
     } else if(done >= 1){
-      btn.style.background = 'linear-gradient(180deg,rgba(0,200,100,0.95),rgba(0,140,60,0.95))';
-      btn.style.borderColor = 'rgba(0,230,120,0.80)';
-      btn.style.color = '#fff';
-      btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5),0 0 16px rgba(0,230,120,0.45)';
+      if(ring) ring.setAttribute('stroke','#FF9800');
+      el.style.color = '#FF9800';
+      btn.style.background = 'rgba(0,0,0,0.55)';
+      btn.style.boxShadow = '0 0 0 1.5px rgba(255,152,0,0.4),0 2px 12px rgba(0,0,0,0.65),0 0 16px rgba(255,152,0,0.35)';
+      btn.classList.remove('qb-complete');
     } else {
-      btn.style.background = 'linear-gradient(180deg,rgba(0,150,80,0.85),rgba(0,80,40,0.92))';
-      btn.style.borderColor = 'rgba(0,230,120,0.55)';
-      btn.style.color = '#00E676';
-      btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5),0 0 12px rgba(0,200,80,0.25)';
+      if(ring) ring.setAttribute('stroke','rgba(0,230,120,0.40)');
+      el.style.color = 'rgba(0,230,120,0.8)';
+      btn.style.background = 'rgba(0,0,0,0.55)';
+      btn.style.boxShadow = '0 2px 10px rgba(0,0,0,0.5)';
+      btn.classList.remove('qb-complete');
     }
   }
 
