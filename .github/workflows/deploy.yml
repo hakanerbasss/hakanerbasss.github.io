@@ -18,9 +18,12 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd ~/kripto-bot
+            cd ~/hakanerbasss.github.io
             git pull origin main
+            cp -r kripto-bot/app.py kripto-bot/bot.py kripto-bot/seans_strategy.py kripto-bot/signal_engine.py kripto-bot/telegram_bot.py ~/kripto-bot/
+            cp -r kripto-bot/templates ~/kripto-bot/
+            cp -r kripto-bot/static ~/kripto-bot/
+            cd ~/kripto-bot
             source venv/bin/activate
-            pip install -r requirements.txt --quiet
             systemctl restart kripto-bot
             systemctl status kripto-bot --no-pager
