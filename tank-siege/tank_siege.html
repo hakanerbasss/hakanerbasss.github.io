@@ -1628,7 +1628,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.167';
+const APP_VERSION      = '1.0.168';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1646,8 +1646,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.21 13:00';
-const APP_VERSION_NOTE = 'BirdHunt: muzik kapali iken arka plan sesi calmiyor artik — SFX._musicOn yerine isMusicEnabled() [Claude]';
+const APP_VERSION_DATE = '2026.05.22 14:00';
+const APP_VERSION_NOTE = 'Gunluk gorev TDZ bug duzeltildi (star3+tema artik track); tebrikler karti; yeni gun oto-acilis [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -10908,24 +10908,20 @@ function onWin(){
   try{
     if(typeof Quests!=='undefined'){
       Quests.track('win');
-      if(typeof stars!=='undefined' || true){
-        // 3 yıldız kontrolü onWin sonunda hesaplanıyor — gecikmeli track
-        setTimeout(function(){
-          try{
-            var _s = parseInt(lsGet('stars_'+(lv&&lv.id))||'0');
-            if(_s>=3) Quests.track('star3');
-            if(lv && lv.cave) Quests.track('cave');
-            if(lv && lv.buried) Quests.track('buried');
-            if(typeof currentTheme!=='undefined' && currentTheme && currentTheme.name){
-              // Tema key'i (lv.theme) en güvenilir tanımlayıcı; name fallback
-              var _themeKey = (lv && lv.theme) ? lv.theme : currentTheme.name;
-              Quests.track('theme', _themeKey);
-            }
-            // combo zaten onTargetHit'te track edildi — burada tekrarlama (zamanlamada kayıp olur)
-            try{ if(typeof checkTutorialReward==='function') checkTutorialReward(curLevel); }catch(_){}
-          }catch(_){}
-        }, 100);
-      }
+      // 3 yıldız + tema — lsSet senkron çalışır; 200ms sonra localStorage'dan oku
+      setTimeout(function(){
+        try{
+          var _s = parseInt(lsGet('stars_'+(lv&&lv.id))||'0');
+          if(_s>=3) Quests.track('star3');
+          if(lv && lv.cave) Quests.track('cave');
+          if(lv && lv.buried) Quests.track('buried');
+          if(typeof currentTheme!=='undefined' && currentTheme && currentTheme.name){
+            var _themeKey = (lv && lv.theme) ? lv.theme : currentTheme.name;
+            Quests.track('theme', _themeKey);
+          }
+          try{ if(typeof checkTutorialReward==='function') checkTutorialReward(curLevel); }catch(_){}
+        }catch(_){}
+      }, 200);
     }
   }catch(_){}
   SFX.win();
@@ -12503,6 +12499,8 @@ const LANG = {
     quests_all_done:       '🎁 Bugünün tüm görevleri tamamlandı! Yarın yenilenir.',
     quests_reward_won:     '+{n} puan kazandın!',
     quests_reward_pts:     '+{n} 🏆 puan',
+    quest_complete_title:  'GÖREV TAMAMLANDI!',
+    quest_complete_btn:    'Harika!',
     q_win3_title:          '3 Hedef Yok Et',
     q_win5_title:          '5 Hedef Yok Et',
     q_star_title:          '3 Yıldızlı Level Bitir',
@@ -13071,6 +13069,8 @@ const LANG = {
     quests_all_done:       "🎁 All today's quests completed! Resets tomorrow.",
     quests_reward_won:     'You won +{n} points!',
     quests_reward_pts:     '+{n} 🏆 pts',
+    quest_complete_title:  'QUEST COMPLETE!',
+    quest_complete_btn:    'Great!',
     q_win3_title:          'Destroy 3 Targets',
     q_win5_title:          'Destroy 5 Targets',
     q_star_title:          'Beat a 3-Star Level',
@@ -17108,6 +17108,46 @@ const Quests = (function(){
     return _todayQuestIds().map(id => POOL.find(q=>q.id===id)).filter(Boolean);
   }
 
+  // Tebrikler kartı kuyruğu — başka kart açıksa bekle
+  var _completeQueue = [];
+
+  function _tryShowComplete(){
+    if(!_completeQueue.length) return;
+    var _bids=['result','quests-card','settings-panel','gallery-card',
+               'hint-overlay','theme-gate-overlay','quest-complete-ov'];
+    for(var i=0;i<_bids.length;i++){
+      var _be=document.getElementById(_bids[i]);
+      if(_be&&_be.style.display!=='none'){ setTimeout(_tryShowComplete,700); return; }
+    }
+    var itm=_completeQueue.shift();
+    _showQuestComplete(itm);
+  }
+
+  function _showQuestComplete(itm){
+    var _prev=document.getElementById('quest-complete-ov');
+    if(_prev) _prev.remove();
+    var ov=document.createElement('div');
+    ov.id='quest-complete-ov';
+    ov.style.cssText='position:fixed;inset:0;z-index:820;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.60);';
+    var _title=_str('quest_complete_title','QUEST COMPLETE!');
+    var _btn=_str('quest_complete_btn','Great!');
+    var _dailyTag=_str('quests_daily_tag','DAILY');
+    ov.innerHTML='<div style="background:linear-gradient(150deg,rgba(0,22,11,0.98),rgba(0,55,26,0.97));border:2.5px solid rgba(0,230,120,0.55);border-radius:24px;padding:30px 24px 24px;max-width:290px;width:88%;text-align:center;box-shadow:0 12px 60px rgba(0,0,0,0.8),0 0 50px rgba(0,200,80,0.18);">'
+      +'<div style="font-size:50px;line-height:1;margin-bottom:10px;">🎉</div>'
+      +'<div style="color:#00E676;font-size:11px;font-weight:800;letter-spacing:2px;margin-bottom:8px;opacity:0.85;">'+_dailyTag+' QUEST</div>'
+      +'<div style="color:#fff;font-size:16px;font-weight:800;margin-bottom:4px;line-height:1.3;">'+itm.icon+' '+itm.title+'</div>'
+      +'<div style="color:#00E676;font-size:11px;margin-bottom:16px;opacity:0.7;">'+_title+'</div>'
+      +'<div style="color:#FFD700;font-size:28px;font-weight:900;letter-spacing:0.5px;margin-bottom:22px;text-shadow:0 0 20px rgba(255,215,0,0.5);">+'+itm.reward+' 🏆</div>'
+      +'<button id="qc-ok-btn" style="background:linear-gradient(180deg,#00E676,#00A843 65%,#007a30);color:#001a0e;border:none;border-radius:14px;padding:14px 0;font-size:15px;font-weight:800;cursor:pointer;width:100%;box-shadow:0 5px 0 #004d1e,inset 0 1px 0 rgba(255,255,255,0.3);letter-spacing:0.5px;-webkit-tap-highlight-color:transparent;">'+_btn+'</button>'
+      +'</div>';
+    document.body.appendChild(ov);
+    document.getElementById('qc-ok-btn').addEventListener('click', function(){
+      ov.remove();
+      setTimeout(_tryShowComplete, 300);
+    });
+    try{ if(typeof SFX!=='undefined'&&SFX.upgrade) SFX.upgrade(); }catch(_){}
+  }
+
   function _autoClaim(q){
     if(_isClaimed(q.id)) return;
     var cur = _getCount(q.id);
@@ -17118,11 +17158,9 @@ const Quests = (function(){
       lsSet('total_score', score);
     }
     if(typeof updateUI==='function') updateUI();
-    if(typeof showToast==='function'){
-      var msg = _strFmt('quests_reward_won', {n: q.reward}, '+'+q.reward+' pts!');
-      showToast('🎯 '+_qTitle(q)+' — '+msg);
-    }
-    if(typeof SFX!=='undefined' && SFX.upgrade) SFX.upgrade();
+    // Tebrikler kuyruğuna ekle — başka kart kapanınca gösterilecek
+    _completeQueue.push({title:_qTitle(q), reward:q.reward, icon:q.icon});
+    setTimeout(_tryShowComplete, 1000);
     // Card açıksa yenile
     var card = document.getElementById('quests-card');
     if(card && card.style.display !== 'none') render();
@@ -17274,11 +17312,24 @@ const Quests = (function(){
     _autoClaim(q);
   }
 
-  return { open, close, render, track, claim, _updateBadge };
+  return { open, close, render, track, claim, _updateBadge, tryShowComplete: _tryShowComplete };
 })();
 
 // Sayfa açılınca badge'i güncelle
 setTimeout(()=>{ try{ Quests._updateBadge(); }catch(_){} }, 500);
+
+// Yeni gün olunca görev kartını bir kere otomatik aç
+setTimeout(function(){
+  try{
+    var _qsd = 'quests_shown_day';
+    var _nd = new Date();
+    var _nds = _nd.getFullYear()+'-'+(_nd.getMonth()+1)+'-'+_nd.getDate();
+    if(lsGet(_qsd) !== _nds){
+      lsSet(_qsd, _nds);
+      setTimeout(function(){ try{ Quests.open(); }catch(_){} }, 2200);
+    }
+  }catch(_){}
+}, 1500);
 </script>
 
 <!-- ════════════════════════════════════════════════════════════════════ -->
