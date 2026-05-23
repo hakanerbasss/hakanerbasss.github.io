@@ -177,6 +177,59 @@ def round_step(qty, step):
     precision = int(round(-math.log10(step)))
     return round(math.floor(qty / step) * step, precision)
 
+def _source_emoji(source):
+    s = (source or '').upper()
+    if 'KAR' in s or 'HEDEF' in s: return '🎯'
+    if 'STOP' in s: return '🛑'
+    if 'SMART' in s: return '🧠'
+    if 'SEANS' in s: return '📅'
+    if 'UT' in s: return '🤖'
+    return '📤'
+
+def _hold_duration(symbol, trades_list):
+    last_buy = next(
+        (t for t in reversed(trades_list)
+         if t.get('type') == 'buy' and t.get('symbol') == symbol), None)
+    if not last_buy:
+        return ''
+    try:
+        buy_dt = datetime.datetime.strptime(last_buy['time'], '%Y-%m-%d %H:%M:%S')
+        delta  = datetime.datetime.now() - buy_dt
+        total  = int(delta.total_seconds())
+        h, rem = divmod(total, 3600)
+        m      = rem // 60
+        return f'{h}s {m}dk' if h else f'{m}dk'
+    except:
+        return ''
+
+def _buy_msg(symbol, price, qty, usdt, source, period):
+    emoji = _source_emoji(source)
+    p = f'{price:.8f}'.rstrip('0') if price < 0.01 else f'{price:,.4f}'.rstrip('0').rstrip('.')
+    return (
+        f'{emoji} <b>ALIM</b> [{source}]\n'
+        f'━━━━━━━━━━━━━━\n'
+        f'🪙 <b>{symbol}</b>\n'
+        f'💰 Fiyat: ${p}\n'
+        f'📦 Miktar: {qty} | Tutar: ${usdt}\n'
+        f'⏱ Periyot: {period}'
+    )
+
+def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, source, hold):
+    emoji = _source_emoji(source)
+    win   = pnl >= 0
+    p = f'{price:.8f}'.rstrip('0') if price < 0.01 else f'{price:,.4f}'.rstrip('0').rstrip('.')
+    a = f'{avg_price:.8f}'.rstrip('0') if avg_price < 0.01 else f'{avg_price:,.4f}'.rstrip('0').rstrip('.')
+    sign  = '+' if win else ''
+    hold_line = f'\n⏱ Süre: {hold}' if hold else ''
+    return (
+        f'{emoji} <b>SATIM</b> [{source}]\n'
+        f'━━━━━━━━━━━━━━\n'
+        f'🪙 <b>{symbol}</b>\n'
+        f'💰 Satış: ${p} | Alış: ${a}\n'
+        f'{"🟢" if win else "🔴"} <b>{sign}{pnl_pct}%</b> → {sign}${round(pnl,2)}'
+        f'{hold_line}'
+    )
+
 def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
     try:
         price = get_price(client, symbol)
@@ -206,7 +259,7 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
             'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         save_trades(trades)
-        send_telegram(f'✅ <b>ALIM</b> [{source}]\nCoin: {symbol}\nFiyat: ${price}\nMiktar: {qty}\nTutar: ${usdt_amount}\nPeriyot: {period}')
+        send_telegram(_buy_msg(symbol, price, qty, usdt_amount, source, period))
         return {'ok': True, 'qty': qty, 'price': price}
     except Exception as e:
         return {'ok': False, 'error': str(e)}
@@ -258,7 +311,9 @@ def execute_sell(client, symbol, sell_pct, source='MANUEL', period='—'):
             'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         save_trades(trades)
-        send_telegram(f'✅ <b>SATIM</b> [{source}]\nCoin: {symbol}\nFiyat: ${price}\nMiktar: {qty}\nKâr/Zarar: ${pnl}\nPeriyot: {period}')
+        pnl_pct = round((price - pos['avg_price']) / pos['avg_price'] * 100, 2)
+        hold_str = _hold_duration(symbol, trades)
+        send_telegram(_sell_msg(symbol, price, pos['avg_price'], qty, pnl, pnl_pct, source, hold_str))
         return {'ok': True, 'qty': qty, 'price': price, 'pnl': round(pnl, 2)}
     except Exception as e:
         return {'ok': False, 'error': str(e)}
