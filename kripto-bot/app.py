@@ -432,6 +432,100 @@ def seans_analiz():
         G = lambda x: x >= 0
         R = lambda x: x < 0
 
+        # ── Yeni faktörler ────────────────────────────
+
+        def asian_chg(dc):
+            """Asya seansı 03:00-10:00 TR değişimi"""
+            h3  = [c for c in dc if c['hour_tr'] == 3]
+            h10 = [c for c in dc if c['hour_tr'] == 10]
+            if not h3 or not h10: return None
+            return (h10[-1]['close'] - h3[0]['open']) / h3[0]['open'] * 100
+
+        def run_composite(buy_h, sell_h, min_score):
+            """
+            Composite skor: 5 faktör her biri 1 puan
+              1. BTC dün >= 0
+              2. BTC 17:00-20:00 >= 0
+              3. Coin 17:00-20:00 >= 0
+              4. Coin dün >= 0
+              5. Asya seansı (önceki gün 03:00-10:00) >= 0
+            """
+            total = wins = trades = 0
+            for i, date in enumerate(dates):
+                if i < 2: continue
+                today_dc  = days[date]
+                prev_date = dates[i-1]
+
+                bp = btc_day_chg(prev_date)
+                bt = btc_today_chg(date)
+                ct = coin_today_chg(today_dc)
+                cp = day_chg(days.get(prev_date, []))
+                as_ = asian_chg(days.get(prev_date, []))
+
+                score = sum(1 for v in [bp, bt, ct, cp, as_] if v is not None and v >= 0)
+                if score < min_score: continue
+
+                if i + 1 >= len(dates): continue
+                sd = days[dates[i+1]]
+                bc = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc = [c for c in sd       if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                total += net; trades += 1
+                if net > 0: wins += 1
+            wr  = round(wins/trades*100, 1) if trades > 0 else 0
+            avg = round(total/trades,    2) if trades > 0 else 0
+            return {'trades': trades, 'wins': wins, 'wr': wr, 'net': round(total,2), 'avg': avg}
+
+        def run_rel_strong(buy_h, sell_h):
+            """Coin 17:00-20:00 hareketi BTC'den güçlü olduğunda al"""
+            total = wins = trades = 0
+            for i, date in enumerate(dates):
+                if i < 1: continue
+                today_dc = days[date]
+                ct = coin_today_chg(today_dc)
+                bt = btc_today_chg(date)
+                if ct is None or bt is None: continue
+                if ct - bt < 0: continue  # coin BTC'den zayıf → atla
+
+                if i + 1 >= len(dates): continue
+                sd = days[dates[i+1]]
+                bc = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc = [c for c in sd       if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                total += net; trades += 1
+                if net > 0: wins += 1
+            wr  = round(wins/trades*100, 1) if trades > 0 else 0
+            avg = round(total/trades,    2) if trades > 0 else 0
+            return {'trades': trades, 'wins': wins, 'wr': wr, 'net': round(total,2), 'avg': avg}
+
+        def run_dow(buy_h, sell_h):
+            """Haftanın günlerine göre performans analizi"""
+            DOW = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz']
+            by_dow = {d: [0, 0, 0.0] for d in range(7)}  # [trades, wins, total]
+            for i, date in enumerate(dates[:-1]):
+                today_dc = days[date]
+                dow = datetime.datetime.strptime(date, '%Y-%m-%d').weekday()
+                sd  = days[dates[i+1]]
+                bc  = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc  = [c for c in sd       if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                by_dow[dow][0] += 1
+                by_dow[dow][2] += net
+                if net > 0: by_dow[dow][1] += 1
+            result = {}
+            for d in range(7):
+                t, w, tot = by_dow[d]
+                result[DOW[d]] = {
+                    'trades': t,
+                    'wr':  round(w/t*100, 1) if t > 0 else 0,
+                    'avg': round(tot/t,   2) if t > 0 else 0,
+                    'net': round(tot,     2),
+                }
+            return result
+
         def run_backtest_coin_only(buy_hour, sell_hour, coin_prev_fn, coin_today_fn):
             total = wins = trades = 0
             for i, date in enumerate(dates):
@@ -475,6 +569,10 @@ def seans_analiz():
                 'btc_yr_coin_r': run_backtest(buy_h, sell_h, G, R, R),
                 'btc_ry_coin_y': run_backtest(buy_h, sell_h, R, G, G),
                 'btc_ry_coin_r': run_backtest(buy_h, sell_h, R, G, R),
+                'composite_3':   run_composite(buy_h, sell_h, 3),
+                'composite_4':   run_composite(buy_h, sell_h, 4),
+                'composite_5':   run_composite(buy_h, sell_h, 5),
+                'rel_strong':    run_rel_strong(buy_h, sell_h),
             }
 
         by_hour = {str(h): run_all(20, h) for h in SELL_HOURS}
@@ -528,6 +626,8 @@ def seans_analiz():
             'count': len(drawdowns),
         }
 
+        dow_analysis = run_dow(20, 13)
+
         return jsonify({
             'ok': True,
             'symbol': symbol,
@@ -535,6 +635,7 @@ def seans_analiz():
             'by_hour': by_hour,
             'best_strategy': best_key,
             'volatility': volatility,
+            'dow_analysis': dow_analysis,
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})

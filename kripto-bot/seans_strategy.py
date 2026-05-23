@@ -59,10 +59,14 @@ STRATEGY_LABELS = {
     'btc_yr_coin_r': 'BTC dün🟢 bugün🔴 + Coin bugün🔴',
     'btc_ry_coin_y': 'BTC dün🔴 bugün🟢 + Coin bugün🟢',
     'btc_ry_coin_r': 'BTC dün🔴 bugün🟢 + Coin bugün🔴',
-    'coin_yy':       'Coin dün🟢 bugün🟢',
-    'coin_ky':       'Coin dün🔴 bugün🟢',
-    'coin_kk':       'Coin dün🔴 bugün🔴',
-    'coin_yk':       'Coin dün🟢 bugün🔴',
+    'coin_yy':        'Coin dün🟢 bugün🟢',
+    'coin_ky':        'Coin dün🔴 bugün🟢',
+    'coin_kk':        'Coin dün🔴 bugün🔴',
+    'coin_yk':        'Coin dün🟢 bugün🔴',
+    'composite_3':   '⚡ Composite ≥3/5 Faktör Yeşil',
+    'composite_4':   '⚡ Composite ≥4/5 Faktör Yeşil',
+    'composite_5':   '⚡ Composite 5/5 Faktör Yeşil',
+    'rel_strong':    '💪 Coin BTC\'den Güçlü',
     'abd_red':       'ABD Kırmızı',
     'prev_green':    'Önceki Yeşil',
     'both':          'ABD Kırmızı + Önceki Yeşil',
@@ -163,6 +167,39 @@ def check_seans_signal(client, symbol, strategy='both'):
                     f'Coin {round(coin_17_20,2)}%'
                 )
             return _none()
+
+        # ── Composite Skor stratejileri ──────────────
+        if strategy.startswith('composite_'):
+            min_score = int(strategy.split('_')[1])
+            # Asya seansı: dünün 03:00-10:00 değişimi
+            asian_vals = [c for c in candles if c['date_tr'] == yesterday_str]
+            h3  = [c for c in asian_vals if c['hour_tr'] == 3]
+            h10 = [c for c in asian_vals if c['hour_tr'] == 10]
+            asian = None
+            if h3 and h10:
+                asian = (h10[-1]['close'] - h3[0]['open']) / h3[0]['open'] * 100
+
+            factors = [btc_prev_chg, btc_17_20, coin_17_20, coin_prev_chg, asian]
+            score = sum(1 for v in factors if v is not None and v >= 0)
+            labels = ['BTC dün', 'BTC 17-20', 'Coin 17-20', 'Coin dün', 'Asya']
+            detail = ' | '.join(
+                f'{l}:{"🟢" if v is not None and v>=0 else "🔴"}{round(v,1) if v is not None else "?"}'
+                for l, v in zip(labels, factors)
+            )
+            if score >= min_score:
+                return _buy(f'Composite {score}/5 → {detail}')
+            return {'signal': None, 'reason': f'Composite {score}/5 < {min_score} | {detail}'}
+
+        # ── Relatif güç stratejisi ────────────────────
+        if strategy == 'rel_strong':
+            if coin_17_20 is None or btc_17_20 is None:
+                return _none()
+            rs = coin_17_20 - btc_17_20
+            if rs >= 0:
+                return _buy(
+                    f'Coin BTC\'den güçlü (Coin:{round(coin_17_20,2)}% BTC:{round(btc_17_20,2)}% Fark:+{round(rs,2)}%) → 20:00'
+                )
+            return {'signal': None, 'reason': f'Coin zayıf vs BTC (fark:{round(rs,2)}%)'}
 
         # Coin-only kombinasyonlar
         if strategy in _COIN_CONDS:

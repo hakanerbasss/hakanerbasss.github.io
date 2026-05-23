@@ -200,6 +200,12 @@ input:focus,select:focus{border-color:#f0a500;}
               <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
               <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
             </optgroup>
+            <optgroup label="── ⚡ Gelişmiş ──">
+              <option value="composite_3">⚡ Composite ≥3/5 Faktör Yeşil</option>
+              <option value="composite_4">⚡ Composite ≥4/5 Faktör Yeşil</option>
+              <option value="composite_5">⚡ Composite 5/5 Tümü Yeşil</option>
+              <option value="rel_strong">💪 Coin BTC'den Güçlü</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
@@ -388,6 +394,12 @@ input:focus,select:focus{border-color:#f0a500;}
               <option value="btc_yr_coin_r">BTC dün🟢 bugün🔴 + Coin bugün🔴 (20:00)</option>
               <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
               <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
+            </optgroup>
+            <optgroup label="── ⚡ Gelişmiş ──">
+              <option value="composite_3">⚡ Composite ≥3/5 Faktör Yeşil</option>
+              <option value="composite_4">⚡ Composite ≥4/5 Faktör Yeşil</option>
+              <option value="composite_5">⚡ Composite 5/5 Tümü Yeşil</option>
+              <option value="rel_strong">💪 Coin BTC'den Güçlü</option>
             </optgroup>
           </select>
         </div>
@@ -983,6 +995,10 @@ const SEANS_LABELS = {
   coin_ky:       'Coin dün🔴 bugün🟢',
   coin_kk:       'Coin dün🔴 bugün🔴',
   coin_yk:       'Coin dün🟢 bugün🔴',
+  composite_3:   '⚡ Composite ≥3/5 Faktör',
+  composite_4:   '⚡ Composite ≥4/5 Faktör',
+  composite_5:   '⚡ Composite 5/5 Faktör',
+  rel_strong:    '💪 Coin BTC\'den Güçlü',
   abd_red:       'ABD Kırmızı',
   prev_green:    'Önceki Yeşil',
   both:          'ABD Kırmızı + Önceki Yeşil',
@@ -1069,6 +1085,49 @@ function seansAnaliz() {
         tabs   += `<span id="stab-${h}" class="stab${i===0?' stab-active':''}" onclick="switchStab(${h})" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;${i===0?'background:#f0a500;color:#fff;':'background:#f0f0f0;color:#666;'}">${h}:00${bk?' ⭐':''}</span>`;
         panels += `<div id="spanel-${h}" style="display:${i===0?'block':'none'}">${tableForHour(h, res, bk)}</div>`;
       });
+
+      // ⚡ Composite sekmesi
+      const compRes13 = byHour['13'] || {};
+      const compRows = ['composite_3','composite_4','composite_5','rel_strong'].map(k => {
+        const data = compRes13[k] || {wr:0,net:0,trades:0,avg:0};
+        const isBest = bestKey === k;
+        return `<tr style="${isBest?'background:rgba(16,185,129,0.10);font-weight:bold;':''}">
+          <td style="font-size:11px;">${isBest?'⭐ ':''}${SEANS_LABELS[k]||k}</td>
+          <td style="text-align:center;"><span class="${data.wr>=60?'green':data.wr>=50?'yellow':'red'}"><b>%${data.wr}</b></span></td>
+          <td style="text-align:center;"><span class="${data.net>=0?'green':'red'}">%${data.net}</span></td>
+          <td style="text-align:center;color:#94a3b8;">${data.trades}</td>
+          <td style="text-align:center;"><span class="${data.avg>=0?'green':'red'}">%${data.avg}</span></td>
+          <td><button class="btn btn-orange btn-sm" onclick="(${applyStrategy})('${k}',13,${vol.suggested_sl??0},${vol.suggested_tp??0})">Seç</button></td>
+        </tr>`;
+      }).join('');
+      tabs   += `<span id="stab-comp" class="stab" onclick="switchStab('comp')" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;background:#f0f0f0;color:#666;">⚡ Composite</span>`;
+      panels += `<div id="spanel-comp" style="display:none">
+        <p style="font-size:11px;color:#94a3b8;margin:6px 0 4px;">5 Faktör Skoru: BTC dün + BTC 17-20 + Coin 17-20 + Coin dün + <b>Asya seansı 03-10</b></p>
+        <table><thead><tr><th>Strateji</th><th>Kazanma</th><th>Net%</th><th>İşlem</th><th>Ort%</th><th></th></tr></thead>
+        <tbody>${compRows}</tbody></table>
+        <p style="font-size:10px;color:#64748b;margin-top:4px;">Composite: tüm faktörler aynı anda kontrol edilir — daha az sinyal ama daha yüksek kalite</p>
+      </div>`;
+
+      // 📅 DOW sekmesi
+      const dow = d.dow_analysis || {};
+      const dowOrder = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+      const dowRows = dowOrder.map(day => {
+        const v = dow[day] || {wr:0,avg:0,trades:0};
+        const bar = `<div style="height:3px;background:${v.wr>=60?'#16a34a':v.wr>=50?'#f0a500':'#dc2626'};border-radius:2px;width:${Math.min(v.wr,100)}%"></div>`;
+        return `<tr>
+          <td style="font-weight:bold;font-size:12px;">${day}</td>
+          <td><span class="${v.wr>=60?'green':v.wr>=50?'yellow':'red'}"><b>%${v.wr}</b></span>${bar}</td>
+          <td><span class="${v.avg>=0?'green':'red'}">%${v.avg}</span></td>
+          <td style="color:#94a3b8;">${v.trades}</td>
+        </tr>`;
+      }).join('');
+      tabs   += `<span id="stab-dow" class="stab" onclick="switchStab('dow')" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;background:#f0f0f0;color:#666;">📅 Günler</span>`;
+      panels += `<div id="spanel-dow" style="display:none">
+        <p style="font-size:11px;color:#94a3b8;margin:6px 0 4px;">20:00 alım → 13:00 satış — haftanın gününe göre performans</p>
+        <table><thead><tr><th>Gün</th><th>Kazanma %</th><th>Ort %</th><th>İşlem</th></tr></thead>
+        <tbody>${dowRows}</tbody></table>
+        <p style="font-size:10px;color:#64748b;margin-top:4px;">Düşük kazanma oranı olan günlerde işlem yapmayı düşünün.</p>
+      </div>`;
 
       document.getElementById('seansModalContent').innerHTML = `
         <div style="background:#f0f9ff;border:1px solid #0ea5e9;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;">
