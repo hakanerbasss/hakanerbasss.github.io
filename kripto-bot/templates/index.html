@@ -32,6 +32,7 @@ td{padding:7px 8px;border-top:1px solid #f0f0f0;}
 .badge.utbot{background:#dbeafe;color:#1d4ed8;}
 .badge.webhook{background:#fef3c7;color:#92400e;}
 .badge.both{background:#f3e8ff;color:#6b21a8;}
+.badge.smart{background:#e0f2fe;color:#0369a1;}
 .btn{padding:8px 14px;border:none;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;transition:opacity 0.15s;}
 .btn:hover{opacity:0.85;}
 .btn-green{background:#16a34a;color:#fff;}
@@ -539,6 +540,8 @@ function renderCoins() {
   if (!coins.length) { el.innerHTML = '<p style="color:#999;font-size:13px;">Henüz coin eklenmedi.</p>'; return; }
   el.innerHTML = coins.map(c => {
     const isSeans = c.signal_source === 'seans';
+    const isSmart = c.signal_source === 'smart';
+    const isUtBot = !isSeans && !isSmart;
     return `
     <div class="coin-card">
       <div class="coin-card-header">
@@ -553,10 +556,11 @@ function renderCoins() {
       </div>
       <div class="coin-detail">
         <span>Alım: <b>$${c.usdt_amount}</b></span>
-        ${isSeans ? '' : `<span>Periyot: <b>${c.period}</b></span>`}
-        ${isSeans ? '' : `<span>Kapanış Satış: <b>%${c.close_sell_pct}</b></span>`}
-        ${isSeans ? '' : `<span>UT Key: <b>${c.ut_key||2}</b></span>`}
-        ${isSeans ? '' : `<span>UT ATR: <b>${c.ut_atr||7}</b></span>`}
+        ${isUtBot ? `<span>Periyot: <b>${c.period}</b></span>` : ''}
+        ${isUtBot ? `<span>Kapanış Satış: <b>%${c.close_sell_pct}</b></span>` : ''}
+        ${isUtBot ? `<span>UT Key: <b>${c.ut_key||2}</b></span>` : ''}
+        ${isUtBot ? `<span>UT ATR: <b>${c.ut_atr||7}</b></span>` : ''}
+        ${isSmart ? `<span>Min Skor: <b>${c.smart_min_score||3}/4</b></span>` : ''}
         <span>Kâr Hedefi: <b>${c.take_profit_pct>0?'%'+c.take_profit_pct:'—'}</b></span>
         <span>Kâr Satış: <b>${c.take_profit_pct>0?'%'+c.take_profit_sell_pct:'—'}</b></span>
         <span>Stop Loss: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_pct:'—'}</b></span>
