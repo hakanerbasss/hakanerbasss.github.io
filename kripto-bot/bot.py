@@ -1,6 +1,8 @@
 import json, os, datetime, urllib.request, urllib.parse
 from binance.client import Client
 
+FEE_RATE = 0.001  # Binance spot %0.1 alım + %0.1 satım = %0.2 toplam
+
 CONFIG_FILE = 'config.json'
 TRADES_FILE = 'trades.json'
 POSITIONS_FILE = 'positions.json'
@@ -244,11 +246,12 @@ def _buy_msg(symbol, price, qty, usdt, source, period, tp_pct=0, sl_pct=0):
     lines.append(f'⏱ Periyot: {period}')
     return '\n'.join(lines)
 
-def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, source, hold):
+def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, fee, source, hold):
     emoji = _source_emoji(source)
-    win   = pnl >= 0
-    p = f'{price:.8f}'.rstrip('0') if price < 0.01 else f'{price:,.4f}'.rstrip('0').rstrip('.')
-    a = f'{avg_price:.8f}'.rstrip('0') if avg_price < 0.01 else f'{avg_price:,.4f}'.rstrip('0').rstrip('.')
+    net   = round(pnl - fee, 2)
+    win   = net >= 0
+    p = _fmt_price(price)
+    a = _fmt_price(avg_price)
     sign  = '+' if win else ''
     hold_line = f'\n⏱ Süre: {hold}' if hold else ''
     return (
@@ -256,8 +259,8 @@ def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, source, hold):
         f'━━━━━━━━━━━━━━\n'
         f'🪙 <b>{symbol}</b>\n'
         f'💰 Satış: ${p} | Alış: ${a}\n'
-        f'{"🟢" if win else "🔴"} <b>{sign}{pnl_pct}%</b> → {sign}${round(pnl,2)}'
-        f'{hold_line}'
+        f'{"🟢" if win else "🔴"} <b>{sign}{pnl_pct}%</b> → {sign}${net}'
+        f'\n💸 Komisyon: -${round(fee,3)}{hold_line}'
     )
 
 def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
@@ -341,7 +344,12 @@ def execute_sell(client, symbol, sell_pct, source='MANUEL', period='—'):
             return {'ok': False, 'error': 'Satılacak miktar hesaplanamadı'}
 
         order = client.order_market_sell(symbol=symbol, quantity=qty)
-        pnl = (price - pos['avg_price']) * qty
+        avg_price = pos['avg_price']
+        gross_pnl = (price - avg_price) * qty
+        fee       = (avg_price + price) * qty * FEE_RATE
+        net_pnl   = round(gross_pnl - fee, 2)
+        pnl_pct   = round((price - avg_price) / avg_price * 100, 2)
+
         pos['qty'] = round(pos['qty'] - qty, 6)
         if pos['qty'] <= 0:
             del positions[symbol]
@@ -351,15 +359,14 @@ def execute_sell(client, symbol, sell_pct, source='MANUEL', period='—'):
         trades = load_trades()
         trades.append({
             'type': 'sell', 'symbol': symbol, 'qty': qty,
-            'price': price, 'pnl': round(pnl, 2),
+            'price': price, 'pnl': net_pnl,
             'source': source,
             'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         save_trades(trades)
-        pnl_pct = round((price - pos['avg_price']) / pos['avg_price'] * 100, 2)
         hold_str = _hold_duration(symbol, trades)
-        send_telegram(_sell_msg(symbol, price, pos['avg_price'], qty, pnl, pnl_pct, source, hold_str))
-        return {'ok': True, 'qty': qty, 'price': price, 'pnl': round(pnl, 2)}
+        send_telegram(_sell_msg(symbol, price, avg_price, qty, gross_pnl, pnl_pct, fee, source, hold_str))
+        return {'ok': True, 'qty': qty, 'price': price, 'pnl': net_pnl}
     except Exception as e:
         return {'ok': False, 'error': str(e)}
 
