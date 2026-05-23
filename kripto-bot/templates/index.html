@@ -137,6 +137,12 @@ input:focus,select:focus{border-color:#f0a500;}
 <!-- COİNLER -->
 <div class="page" id="tab-coins">
   <div class="section" style="margin-top:12px;">
+    <h2>🔥 Popüler Coinler</h2>
+    <div id="quickCoinList" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px;">
+      <span style="color:#999;font-size:12px;">Dashboard yüklendikten sonra görünür...</span>
+    </div>
+  </div>
+  <div class="section">
     <h2>➕ Coin Ekle</h2>
     <div class="form-row">
       <div class="form-group">
@@ -522,6 +528,7 @@ input:focus,select:focus{border-color:#f0a500;}
 <script>
 const CFG = {{ cfg | tojson }};
 let coins = CFG.coins || [];
+let top50Data = [];
 
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -585,6 +592,8 @@ function loadDashboard() {
     ).join('');
 
     if (d.market.top50) {
+      top50Data = d.market.top50;
+      renderQuickCoins();
       document.getElementById('top50Table').innerHTML = d.market.top50.map((t,i) => `
         <tr>
           <td style="color:#888;">${i+1}</td>
@@ -600,8 +609,39 @@ function loadDashboard() {
 }
 
 // ── Coins ────────────────────────────────────────
+function renderQuickCoins() {
+  const el = document.getElementById('quickCoinList');
+  if (!el || !top50Data.length) return;
+  const existing = new Set(coins.map(c => c.symbol));
+  const items = top50Data.filter(t => !existing.has(t.symbol)).slice(0, 60);
+  if (!items.length) { el.innerHTML = '<span style="color:#999;font-size:12px;">Tüm popüler coinler zaten ekli.</span>'; return; }
+  el.innerHTML = items.map(t => {
+    const base = t.symbol.replace('USDT','');
+    const chg  = t.change >= 0 ? '+'+t.change.toFixed(1)+'%' : t.change.toFixed(1)+'%';
+    const col  = t.change >= 0 ? '#16a34a' : '#dc2626';
+    return `<button onclick="quickAdd('${t.symbol}')"
+      style="background:#f8f8f8;border:1px solid #e5e7eb;border-radius:20px;padding:4px 12px;
+             font-size:12px;cursor:pointer;transition:all 0.15s;"
+      onmouseover="this.style.background='#f0a50020';this.style.borderColor='#f0a500'"
+      onmouseout="this.style.background='#f8f8f8';this.style.borderColor='#e5e7eb'">
+      <b>${base}</b><span style="color:${col};margin-left:4px;font-size:10px;">${chg}</span>
+    </button>`;
+  }).join('');
+}
+
+function quickAdd(symbol) {
+  showTab('coins');
+  document.getElementById('newSymbol').value = symbol.replace('USDT','');
+  autoUsdt();
+  const input = document.getElementById('newSymbol');
+  input.scrollIntoView({behavior:'smooth', block:'center'});
+  input.style.borderColor = '#f0a500';
+  setTimeout(() => { input.style.borderColor = ''; document.getElementById('newSource').focus(); }, 800);
+}
+
 function renderCoins() {
   const el = document.getElementById('coinList');
+  renderQuickCoins();
   if (!coins.length) { el.innerHTML = '<p style="color:#999;font-size:13px;">Henüz coin eklenmedi.</p>'; return; }
   el.innerHTML = coins.map(c => {
     const isSeans = c.signal_source === 'seans';
