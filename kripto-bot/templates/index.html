@@ -1023,8 +1023,8 @@ function seansAnaliz() {
         return;
       }
 
-      const bestKey = d.best_strategy;
-      const byHour  = d.by_hour || {'13': d.results};
+      const bestByHour = d.best_strategy || {};
+      const byHour     = d.by_hour || {'13': d.results};
       const vol     = d.volatility || {};
 
       function applyStrategy(key, sellHour, sl, tp) {
@@ -1081,7 +1081,7 @@ function seansAnaliz() {
       let tabs = '', panels = '';
       SELL_HOURS.forEach((h, i) => {
         const res = byHour[String(h)] || {};
-        const bk  = bestForHour(res);
+        const bk  = bestByHour[String(h)] || bestForHour(res);
         tabs   += `<span id="stab-${h}" class="stab${i===0?' stab-active':''}" onclick="switchStab(${h})" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;${i===0?'background:#f0a500;color:#fff;':'background:#f0f0f0;color:#666;'}">${h}:00${bk?' ⭐':''}</span>`;
         panels += `<div id="spanel-${h}" style="display:${i===0?'block':'none'}">${tableForHour(h, res, bk)}</div>`;
       });
@@ -1090,7 +1090,7 @@ function seansAnaliz() {
       const compRes13 = byHour['13'] || {};
       const compRows = ['composite_3','composite_4','composite_5','rel_strong'].map(k => {
         const data = compRes13[k] || {wr:0,net:0,trades:0,avg:0};
-        const isBest = bestKey === k;
+        const isBest = bestByHour['13'] === k;
         return `<tr style="${isBest?'background:rgba(16,185,129,0.10);font-weight:bold;':''}">
           <td style="font-size:11px;">${isBest?'⭐ ':''}${SEANS_LABELS[k]||k}</td>
           <td style="text-align:center;"><span class="${data.wr>=60?'green':data.wr>=50?'yellow':'red'}"><b>%${data.wr}</b></span></td>
@@ -1190,12 +1190,16 @@ function seansAnaliz() {
           Önerilen TP <span class="green"><b>%${vol.suggested_tp||0}</b></span>
         </div>
         <div style="background:#fff3cd;border:1px solid #f0a500;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
-          ⭐ En iyi strateji (13:00): <b>${SEANS_LABELS[bestKey]||bestKey}</b>
-          <button class="btn btn-orange btn-sm" style="margin-left:8px;" onclick="(${applyStrategy})('${bestKey}',13,${vol.suggested_sl??0},${vol.suggested_tp??0})">Uygula</button>
+          ⭐ En iyi strateji (<span id="seansBestHour">11:00</span>):
+          <b id="seansBestLabel">${SEANS_LABELS[bestByHour['11']]||bestByHour['11']||'—'}</b>
+          <button class="btn btn-orange btn-sm" style="margin-left:8px;"
+            onclick="if(window._seansCtx){var c=window._seansCtx;c.apply(c.best[c.h]||'',+c.h,c.vol.suggested_sl??0,c.vol.suggested_tp??0);}">Uygula</button>
         </div>
         <div style="display:flex;gap:4px;margin-bottom:0;">${tabs}</div>
         <div style="border:1px solid #e5e7eb;border-radius:0 8px 8px 8px;padding:8px;overflow-x:auto;">${panels}</div>
         <p style="font-size:10px;color:#64748b;margin-top:8px;">* Son 180 gün | Fee (%0.2) dahil | Min 5 işlem</p>`;
+
+      window._seansCtx = { best: bestByHour, vol, apply: applyStrategy, h: '11' };
     })
     .catch(() => {
       document.getElementById('seansModalContent').innerHTML = '<div style="color:#dc2626;">Bağlantı hatası</div>';
@@ -1211,6 +1215,17 @@ function switchStab(h) {
   if (tab) { tab.style.background = '#f0a500'; tab.style.color = '#fff'; }
   const panel = document.getElementById('spanel-'+h);
   if (panel) panel.style.display = 'block';
+
+  // Banner'ı aktif saat sekmesine göre güncelle
+  if (typeof h === 'number' && window._seansCtx) {
+    const ctx = window._seansCtx;
+    ctx.h = String(h);
+    const bk = ctx.best[ctx.h] || '';
+    const el = document.getElementById('seansBestHour');
+    const lb = document.getElementById('seansBestLabel');
+    if (el) el.textContent = h + ':00';
+    if (lb) lb.textContent = SEANS_LABELS[bk] || bk || '—';
+  }
 }
 
 // ── Mode Label ───────────────────────────────────

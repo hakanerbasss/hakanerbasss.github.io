@@ -580,16 +580,16 @@ def seans_analiz():
         # Varsayılan (13:00) sonuçları geriye dönük uyumluluk için
         results = by_hour['13']
 
-        # En iyi strateji: win rate > 0, işlem sayısı ağırlıklı skor
-        # Skor = wr * log(trades+1) → hem yüksek WR hem yeterli işlem sayısı ödüllendirilir
+        # Her satış saati için en iyi strateji — skor = wr * log(trades+1)
         import math
-        def score(k):
-            v = results[k]
-            if v['trades'] == 0:
-                return -999
-            return v['wr'] * math.log(v['trades'] + 1)
+        def _best_for_hour(hour_results):
+            def _sc(k):
+                v = hour_results[k]
+                if v['trades'] == 0: return -999
+                return v['wr'] * math.log(v['trades'] + 1)
+            return max(hour_results, key=_sc)
 
-        best_key = max(results, key=score)
+        best_by_hour = {str(h): _best_for_hour(by_hour[str(h)]) for h in SELL_HOURS}
 
         # ── Oynaklık Analizi ─────────────────────────
         # 20:00 alım → ertesi 13:00 arası max düşüş ve max yükseliş
@@ -665,7 +665,7 @@ def seans_analiz():
             'symbol': symbol,
             'results': results,
             'by_hour': by_hour,
-            'best_strategy': best_key,
+            'best_strategy': best_by_hour,
             'volatility': volatility,
             'dow_analysis': dow_analysis,
             'timing_matrix': timing_matrix,
