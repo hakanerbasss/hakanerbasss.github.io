@@ -154,16 +154,16 @@ def run_engine():
                         avg_price = pos['avg_price']
                         change_pct = ((current_price - avg_price) / avg_price) * 100
 
-                        # Kâr hedefi
-                        tp = float(coin.get('take_profit_pct', 0))
+                        # Kâr/stop hedeflerini pozisyondan al (ATR otomatik), yoksa coin config
+                        tp = pos.get('tp_pct') or float(coin.get('take_profit_pct', 0))
+                        sl = pos.get('sl_pct') or float(coin.get('stop_loss_pct', 0))
                         tp_sell_pct = float(coin.get('take_profit_sell_pct', 100))
+                        sl_sell_pct = float(coin.get('stop_loss_sell_pct', 100))
+
                         if tp > 0 and change_pct >= tp:
                             print(f'[Engine] {symbol} KÂR HEDEFİ +%{round(change_pct,2)}')
                             execute_sell(client, symbol, tp_sell_pct, source='KAR HEDEFİ', period=period)
 
-                        # Stop loss
-                        sl = float(coin.get('stop_loss_pct', 0))
-                        sl_sell_pct = float(coin.get('stop_loss_sell_pct', 100))
                         if sl > 0 and change_pct <= -sl:
                             print(f'[Engine] {symbol} STOP LOSS %{round(change_pct,2)}')
                             execute_sell(client, symbol, sl_sell_pct, source='STOP LOSS', period=period)

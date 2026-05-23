@@ -177,6 +177,28 @@ def round_step(qty, step):
     precision = int(round(-math.log10(step)))
     return round(math.floor(qty / step) * step, precision)
 
+def _calc_atr_pct(client, symbol, atr_period=7):
+    """Saatlik ATR'yi fiyata göre yüzde olarak döndür."""
+    try:
+        klines = client.get_klines(
+            symbol=symbol,
+            interval=Client.KLINE_INTERVAL_1HOUR,
+            limit=atr_period + 5
+        )
+        closes = [float(k[4]) for k in klines]
+        highs  = [float(k[2]) for k in klines]
+        lows   = [float(k[3]) for k in klines]
+        trs = [
+            max(highs[i]-lows[i], abs(highs[i]-closes[i-1]), abs(lows[i]-closes[i-1]))
+            for i in range(1, len(closes))
+        ]
+        if len(trs) < atr_period:
+            return None
+        atr = sum(trs[-atr_period:]) / atr_period
+        return round(atr / closes[-1] * 100, 3)
+    except:
+        return None
+
 def _source_emoji(source):
     s = (source or '').upper()
     if 'KAR' in s or 'HEDEF' in s: return '🎯'
@@ -202,17 +224,25 @@ def _hold_duration(symbol, trades_list):
     except:
         return ''
 
-def _buy_msg(symbol, price, qty, usdt, source, period):
+def _fmt_price(p):
+    return f'{p:.8f}'.rstrip('0') if p < 0.01 else f'{p:,.4f}'.rstrip('0').rstrip('.')
+
+def _buy_msg(symbol, price, qty, usdt, source, period, tp_pct=0, sl_pct=0):
     emoji = _source_emoji(source)
-    p = f'{price:.8f}'.rstrip('0') if price < 0.01 else f'{price:,.4f}'.rstrip('0').rstrip('.')
-    return (
-        f'{emoji} <b>ALIM</b> [{source}]\n'
-        f'━━━━━━━━━━━━━━\n'
-        f'🪙 <b>{symbol}</b>\n'
-        f'💰 Fiyat: ${p}\n'
-        f'📦 Miktar: {qty} | Tutar: ${usdt}\n'
-        f'⏱ Periyot: {period}'
-    )
+    p = _fmt_price(price)
+    lines = [
+        f'{emoji} <b>ALIM</b> [{source}]',
+        f'━━━━━━━━━━━━━━',
+        f'🪙 <b>{symbol}</b>',
+        f'💰 Fiyat: ${p}',
+        f'📦 Miktar: {qty} | Tutar: ${usdt}',
+    ]
+    if tp_pct > 0:
+        lines.append(f'🎯 TP: ${_fmt_price(round(price*(1+tp_pct/100),8))} (+%{tp_pct})')
+    if sl_pct > 0:
+        lines.append(f'🛑 SL: ${_fmt_price(round(price*(1-sl_pct/100),8))} (-%{sl_pct})')
+    lines.append(f'⏱ Periyot: {period}')
+    return '\n'.join(lines)
 
 def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, source, hold):
     emoji = _source_emoji(source)
@@ -249,7 +279,22 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
         pos = positions.get(symbol, {'qty': 0, 'avg_price': 0})
         total_qty = pos['qty'] + qty
         avg = ((pos['qty'] * pos['avg_price']) + (qty * price)) / total_qty
-        positions[symbol] = {'qty': total_qty, 'avg_price': avg}
+
+        # ATR bazlı TP/SL hesapla
+        cfg_data  = load_config()
+        coin_cfg  = next((c for c in cfg_data.get('coins', []) if c['symbol'] == symbol), {})
+        tp_pct    = float(coin_cfg.get('take_profit_pct', 0))
+        sl_pct    = float(coin_cfg.get('stop_loss_pct', 0))
+        if coin_cfg.get('auto_tp_sl', False):
+            atr = _calc_atr_pct(client, symbol, int(coin_cfg.get('ut_atr', 7)))
+            if atr:
+                sl_pct = max(1.0, min(5.0,  round(atr * 1.5, 2)))
+                tp_pct = max(2.0, min(10.0, round(atr * 3.0, 2)))
+
+        positions[symbol] = {
+            'qty': total_qty, 'avg_price': avg,
+            'tp_pct': tp_pct, 'sl_pct': sl_pct,
+        }
         save_positions(positions)
         trades = load_trades()
         trades.append({
@@ -259,7 +304,7 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
             'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         save_trades(trades)
-        send_telegram(_buy_msg(symbol, price, qty, usdt_amount, source, period))
+        send_telegram(_buy_msg(symbol, price, qty, usdt_amount, source, period, tp_pct, sl_pct))
         return {'ok': True, 'qty': qty, 'price': price}
     except Exception as e:
         return {'ok': False, 'error': str(e)}

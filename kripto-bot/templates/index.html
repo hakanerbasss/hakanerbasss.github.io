@@ -183,10 +183,22 @@ input:focus,select:focus{border-color:#f0a500;}
     </div>
     <hr class="divider">
     <div class="form-row">
+      <div class="form-group">
+        <label>TP/SL Modu</label>
+        <select id="newTpSlMode" onchange="toggleTpSlMode('new')">
+          <option value="manual">Manuel</option>
+          <option value="auto">⚡ ATR Otomatik (SL×1.5 / TP×3)</option>
+        </select>
+      </div>
+    </div>
+    <div id="newTpSlFields" class="form-row">
       <div class="form-group"><label>Kâr Hedefi %</label><input type="number" id="newTp" value="0" step="0.1"></div>
       <div class="form-group"><label>Kâr Satış %</label><input type="number" id="newTpSell" value="100" min="1" max="100"></div>
       <div class="form-group"><label>Stop Loss %</label><input type="number" id="newSl" value="0" step="0.1"></div>
       <div class="form-group"><label>Stop Satış %</label><input type="number" id="newSlSell" value="100" min="1" max="100"></div>
+    </div>
+    <div id="newTpSlInfo" style="display:none;font-size:11px;color:#0369a1;background:#e0f2fe;border-radius:6px;padding:6px 10px;margin-bottom:6px;">
+      ⚡ Alım anında ATR hesaplanır — SL = 1.5×ATR%, TP = 3×ATR% — 2:1 oran sabit.
     </div>
     <div id="newSmartOpts" style="display:none;">
       <hr class="divider">
@@ -426,10 +438,22 @@ input:focus,select:focus{border-color:#f0a500;}
     </div>
     <hr class="divider">
     <div class="form-row">
+      <div class="form-group">
+        <label>TP/SL Modu</label>
+        <select id="editTpSlMode" onchange="toggleTpSlMode('edit')">
+          <option value="manual">Manuel</option>
+          <option value="auto">⚡ ATR Otomatik (SL×1.5 / TP×3)</option>
+        </select>
+      </div>
+    </div>
+    <div id="editTpSlFields" class="form-row">
       <div class="form-group"><label>Kâr Hedefi %</label><input type="number" id="editTp" step="0.1"></div>
       <div class="form-group"><label>Kâr Satış %</label><input type="number" id="editTpSell" min="1" max="100"></div>
       <div class="form-group"><label>Stop Loss %</label><input type="number" id="editSl" step="0.1"></div>
       <div class="form-group"><label>Stop Satış %</label><input type="number" id="editSlSell" min="1" max="100"></div>
+    </div>
+    <div id="editTpSlInfo" style="display:none;font-size:11px;color:#0369a1;background:#e0f2fe;border-radius:6px;padding:6px 10px;margin-bottom:6px;">
+      ⚡ Alım anında ATR hesaplanır — SL = 1.5×ATR%, TP = 3×ATR% — 2:1 oran sabit.
     </div>
     <div id="editSmartOpts" style="display:none;">
       <hr class="divider">
@@ -603,10 +627,11 @@ function renderCoins() {
         ${isUtBot ? `<span>UT ATR: <b>${c.ut_atr||7}</b></span>` : ''}
         ${isUtBot ? `<span>Mod: <b>${c.ut_mode==='early'?'⚡ Erken':'Klasik'}</b></span>` : ''}
         ${isSmart ? `<span>Min Skor: <b>${c.smart_min_score||3}/4</b></span>` : ''}
-        <span>Kâr Hedefi: <b>${c.take_profit_pct>0?'%'+c.take_profit_pct:'—'}</b></span>
-        <span>Kâr Satış: <b>${c.take_profit_pct>0?'%'+c.take_profit_sell_pct:'—'}</b></span>
-        <span>Stop Loss: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_pct:'—'}</b></span>
-        <span>Stop Satış: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_sell_pct:'—'}</b></span>
+        ${c.auto_tp_sl
+          ? `<span>TP/SL: <b>⚡ ATR Otomatik</b></span>`
+          : `<span>Kâr Hedefi: <b>${c.take_profit_pct>0?'%'+c.take_profit_pct:'—'}</b></span>
+        <span>Stop Loss: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_pct:'—'}</b></span>`
+        }
         ${isSeans ? `
         <span>Seans: <b>${SEANS_LABELS[c.seans_strategy]||c.seans_strategy||'—'}</b></span>
         <span>Satış Saati: <b>${c.seans_sell_hour||13}:00</b></span>` : ''}
@@ -641,6 +666,7 @@ function addCoin() {
     seans_strategy:       document.getElementById('newSeansStrategy').value,
     seans_sell_hour:      parseInt(document.getElementById('newSeansSellHour').value),
     smart_min_score:      parseInt(document.getElementById('newSmartMinScore').value),
+    auto_tp_sl:           document.getElementById('newTpSlMode').value === 'auto',
   };
   fetch('/coin/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{
@@ -682,6 +708,8 @@ function openEdit(symbol) {
   document.getElementById('editSeansStrategy').value = c.seans_strategy||'both';
   document.getElementById('editSeansSellHour').value = c.seans_sell_hour||13;
   document.getElementById('editSmartMinScore').value = c.smart_min_score||3;
+  document.getElementById('editTpSlMode').value = c.auto_tp_sl ? 'auto' : 'manual';
+  toggleTpSlMode('edit');
   toggleSeansOpts('edit');
   document.getElementById('editModal').classList.add('open');
 }
@@ -706,6 +734,7 @@ function saveEdit() {
     seans_strategy:       document.getElementById('editSeansStrategy').value,
     seans_sell_hour:      parseInt(document.getElementById('editSeansSellHour').value),
     smart_min_score:      parseInt(document.getElementById('editSmartMinScore').value),
+    auto_tp_sl:           document.getElementById('editTpSlMode').value === 'auto',
   };
   fetch('/coin/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{
@@ -1461,6 +1490,15 @@ function updateModeLabel() {
   const label = document.getElementById('modeLabel');
   label.textContent = isTestnet ? '🧪 TESTNET' : '💰 GERÇEK HESAP';
   label.style.color = isTestnet ? '#f59e0b' : '#16a34a';
+}
+
+// ── TP/SL Toggle ─────────────────────────────────
+function toggleTpSlMode(prefix) {
+  const auto = document.getElementById(prefix+'TpSlMode').value === 'auto';
+  const fields = document.getElementById(prefix+'TpSlFields');
+  const info   = document.getElementById(prefix+'TpSlInfo');
+  if (fields) fields.style.display = auto ? 'none' : '';
+  if (info)   info.style.display   = auto ? 'block' : 'none';
 }
 
 // ── Seans Toggle ─────────────────────────────────
