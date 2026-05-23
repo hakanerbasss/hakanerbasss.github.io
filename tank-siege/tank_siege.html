@@ -1642,7 +1642,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.174';
+const APP_VERSION      = '1.0.175';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -7533,39 +7533,36 @@ function drawTarget(){
   ctx.save();
   ctx.translate(tx, ty-th+embedDepth);
 
-  // ── Tekerlekler — animasyon aktifken yanlara kayarak çıkar ──────
-  // (aşağı değil yatay: terrain altına gömülme sorunu yok)
+  // ── Tekerlekler — isabet animasyonunda alttan çıkar ──────────────
   if(_wheelOut > 0){
-    var _wr = 7;
-    // Y: gövdenin görünen alt çeyreği (terrain üstünde)
-    var _wyPos = th - embedDepth - _wr - 2;
-    var _wScale = 0.35 + 0.65 * _wheelOut;
-    // Sol ve sağ tekerlek: gövde kenarından dışarı kayıyor
-    [[-1, -tw/2], [1, tw/2]].forEach(function(side){
-      var _dir = side[0];                           // -1=sol, +1=sağ
-      var _wx = side[1] + _dir * _wr * _wheelOut;  // yatay kayma
+    var _wr = 9;
+    var _surfY = th - embedDepth;               // terrain yüzeyi (local coords)
+    // Alttan çıkış: terrain altından başlar, yüzeyin hemen altına kadar yükselir
+    var _wyPos = (_surfY + _wr + 2) + ((-2 * _wr - 4)) * _wheelOut;
+    var _wScale = _wheelOut;                    // 0'dan tam boya büyür
+    [-tw * 0.28, tw * 0.28].forEach(function(_wx){
       ctx.save();
       ctx.translate(_wx, _wyPos);
       ctx.scale(_wScale, _wScale);
       // Lastik
-      ctx.beginPath(); ctx.arc(0,0,_wr,0,Math.PI*2);
-      ctx.fillStyle='#1a1a1a'; ctx.fill();
-      ctx.strokeStyle='#555'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, _wr, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a1a1a'; ctx.fill();
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5; ctx.stroke();
       // Jant
-      ctx.beginPath(); ctx.arc(0,0,_wr*0.55,0,Math.PI*2);
-      ctx.fillStyle='#aaa'; ctx.fill();
-      // Jant sapları (3 adet)
-      ctx.strokeStyle='#777'; ctx.lineWidth=1.2;
-      for(var _wi=0;_wi<3;_wi++){
-        var _wa = (_wi/3)*Math.PI*2 + _ha.f*0.25; // hafif dönüş efekti
+      ctx.beginPath(); ctx.arc(0, 0, _wr * 0.55, 0, Math.PI * 2);
+      ctx.fillStyle = '#aaa'; ctx.fill();
+      // Jant sapları (3 adet, hafif dönüş)
+      ctx.strokeStyle = '#777'; ctx.lineWidth = 1.2;
+      for(var _wi = 0; _wi < 3; _wi++){
+        var _wa = (_wi / 3) * Math.PI * 2 + _ha.f * 0.25;
         ctx.beginPath();
-        ctx.moveTo(Math.cos(_wa)*_wr*0.18, Math.sin(_wa)*_wr*0.18);
-        ctx.lineTo(Math.cos(_wa)*_wr*0.50, Math.sin(_wa)*_wr*0.50);
+        ctx.moveTo(Math.cos(_wa) * _wr * 0.18, Math.sin(_wa) * _wr * 0.18);
+        ctx.lineTo(Math.cos(_wa) * _wr * 0.50, Math.sin(_wa) * _wr * 0.50);
         ctx.stroke();
       }
       // Merkez
-      ctx.beginPath(); ctx.arc(0,0,_wr*0.18,0,Math.PI*2);
-      ctx.fillStyle='#555'; ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, _wr * 0.18, 0, Math.PI * 2);
+      ctx.fillStyle = '#555'; ctx.fill();
       ctx.restore();
     });
   }
@@ -9371,8 +9368,11 @@ function onTargetHit(){
   spawnImpact(bullet.x,bullet.y,'target');
   spawnExplosionSprite(bullet.x,bullet.y,1.2);
   // Tekerlek + sallama animasyonunu tetikle
-  _tHitAnim.f = 0; _tHitAnim.dur = 38;
-  _tHitAnim.dx = (bullet && bullet.vx > 0) ? 1 : -1;
+  var _hitDir = (bullet && bullet.vx > 0) ? 1 : -1;
+  _tHitAnim.f = 0; _tHitAnim.dur = 42; _tHitAnim.dx = _hitDir;
+  // Animasyon bitince targetX kalıcı kayar — aynı noktaya ikinci atış ıskalasın
+  var _posShift = _hitDir * (7 + Math.random() * 9);
+  setTimeout(function(){ targetX = Math.max(targetW, Math.min(W - targetW, targetX + _posShift)); }, 720);
   bullet=null;
 
   if(targetHP<=0){
