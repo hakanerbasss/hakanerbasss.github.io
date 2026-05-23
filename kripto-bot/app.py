@@ -93,9 +93,11 @@ def smart_backtest():
             limit=180 * 24
         )
 
+        opens   = [float(k[1]) for k in klines]
+        highs   = [float(k[2]) for k in klines]
+        lows    = [float(k[3]) for k in klines]
         closes  = [float(k[4]) for k in klines]
         volumes = [float(k[5]) for k in klines]
-        times   = [k[0] for k in klines]
 
         def calc_rsi(cls, period=14):
             if len(cls) < period + 1:
@@ -111,29 +113,43 @@ def smart_backtest():
             avg = sum(vols[i-lb:i]) / lb
             return vols[i] / avg if avg > 0 else 0
 
+        def candle_pattern(i):
+            """Yükseliş dönüş formasyonu — son 3 mum"""
+            if i < 2:
+                return 0
+            from smart_strategy import detect_bullish_pattern
+            candles = [
+                {'o': opens[i-2], 'h': highs[i-2], 'l': lows[i-2], 'c': closes[i-2]},
+                {'o': opens[i-1], 'h': highs[i-1], 'l': lows[i-1], 'c': closes[i-1]},
+                {'o': opens[i],   'h': highs[i],   'l': lows[i],   'c': closes[i]},
+            ]
+            score, _ = detect_bullish_pattern(candles)
+            return score
+
         EXIT_HOURS = [4, 8, 24, 48]
         WARMUP     = 20
 
-        # Backtest: score 0/1/2 için ayrı ayrı çalıştır
+        # 3 backtestlenebilir faktör: RSI + Volume + Formasyon
         def run(min_score, exit_h, rsi_exit=True):
             wins = total = 0
-            net = 0.0
-            i = WARMUP
+            net  = 0.0
+            i    = WARMUP
             while i < len(closes) - exit_h:
                 rsi = calc_rsi(closes[:i+1])
                 vr  = vol_ratio(volumes, i)
+                pat = candle_pattern(i)
                 if rsi is None:
                     i += 1; continue
 
                 rsi_s = 1 if 30 <= rsi <= 65 else 0
                 vol_s = 1 if vr > 1.5 else 0
-                score = rsi_s + vol_s
+                score = rsi_s + vol_s + pat
 
                 if score < min_score:
                     i += 1; continue
 
                 buy_price = closes[i]
-                exit_i    = i + exit_h  # default: fixed hold
+                exit_i    = i + exit_h
 
                 if rsi_exit:
                     for j in range(i+1, min(i+exit_h+1, len(closes))):
@@ -141,7 +157,7 @@ def smart_backtest():
                         if r is not None and r > 72:
                             exit_i = j; break
 
-                exit_i    = min(exit_i, len(closes)-1)
+                exit_i     = min(exit_i, len(closes)-1)
                 sell_price = closes[exit_i]
                 pnl = (sell_price - buy_price) / buy_price * 100 - 0.2
                 net += pnl; total += 1
@@ -155,16 +171,22 @@ def smart_backtest():
                 'avg': round(net/total, 2) if total else 0,
             }
 
+        LABELS = {
+            0: 'Filtresiz',
+            1: 'Herhangi 1 faktör',
+            2: 'Herhangi 2 faktör',
+            3: 'RSI + Volume + Formasyon',
+        }
         results = {}
-        for ms in [0, 1, 2]:
-            label = {0: 'Filtresiz', 1: 'RSI veya Volume', 2: 'RSI ve Volume'}[ms]
+        for ms in [0, 1, 2, 3]:
+            label = LABELS[ms]
             results[label] = {}
             for eh in EXIT_HOURS:
                 results[label][f'{eh}s'] = run(ms, eh)
             results[label]['RSI Çıkış'] = run(ms, 48, rsi_exit=True)
 
         return jsonify({'ok': True, 'symbol': symbol, 'results': results,
-                        'note': 'Backtest: RSI+Volume (Order Book ve Funding Rate backtestlenemez)'})
+                        'note': 'Backtest: Formasyon + RSI + Volume (3 faktör). Funding Rate canlıda ek filtre.'})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 

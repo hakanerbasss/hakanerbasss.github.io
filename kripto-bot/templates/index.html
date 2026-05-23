@@ -366,8 +366,8 @@ input:focus,select:focus{border-color:#f0a500;}
   <div class="modal-box" style="width:min(95vw,560px);">
     <h3>🧠 Smart Composite Backtest: <span id="smartModalSymbol"></span></h3>
     <div style="background:#e0f2fe;border:1px solid #0369a1;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#0369a1;">
-      ⚠️ Backtest sadece <b>RSI + Volume</b> faktörlerini test eder.<br>
-      Order Book ve Funding Rate anlık veri olduğu için geçmiş verisi yoktur — canlıda ek filtre görevi görürler.
+      ✅ Backtest <b>3 faktörü</b> test eder: <b>Mum Formasyonu + RSI + Volume</b><br>
+      ⚠️ Funding Rate anlık veri — geçmişi yok, canlıda ek filtre olarak çalışır.
     </div>
     <div id="smartModalContent">
       <div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor...</div>
@@ -1371,9 +1371,10 @@ function smartAnaliz() {
 
       const EXIT_ORDER = ['4s','8s','24s','48s','RSI Çıkış'];
       const SCORE_LABELS = {
-        'Filtresiz':      { color:'#6b7280', desc:'Koşulsuz (baz karşılaştırma)' },
-        'RSI veya Volume':{ color:'#f0a500', desc:'RSI 30-65 VEYA Hacim >1.5×' },
-        'RSI ve Volume':  { color:'#16a34a', desc:'RSI 30-65 VE Hacim >1.5× (Smart\'a en yakın)' },
+        'Filtresiz':             { color:'#6b7280', desc:'Koşulsuz — baz karşılaştırma' },
+        'Herhangi 1 faktör':     { color:'#94a3b8', desc:'RSI, Volume veya Formasyon — herhangi biri' },
+        'Herhangi 2 faktör':     { color:'#f0a500', desc:'3 faktörden 2\'si yeşil' },
+        'RSI + Volume + Formasyon': { color:'#16a34a', desc:'3 faktörün tümü yeşil — Smart\'a en yakın (Funding Rate canlıda ek filtre)' },
       };
 
       let html = '';
