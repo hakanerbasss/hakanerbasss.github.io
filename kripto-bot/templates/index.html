@@ -144,6 +144,7 @@ input:focus,select:focus{border-color:#f0a500;}
         <div style="display:flex;gap:6px;">
           <input type="text" id="newSymbol" placeholder="BTCUSDT">
           <button class="btn btn-blue btn-sm" onclick="seansAnaliz()" title="Seans Analizi">📊</button>
+          <button class="btn btn-gray btn-sm" onclick="smartAnaliz()" title="Smart Backtest">🧠</button>
         </div>
       </div>
       <div class="form-group"><label>Alım USDT</label><input type="number" id="newUsdt" value="10"></div>
@@ -356,6 +357,23 @@ input:focus,select:focus{border-color:#f0a500;}
     </div>
     <div class="btn-row" style="margin-top:12px;">
       <button class="btn btn-gray" onclick="document.getElementById('seansModal').classList.remove('open')">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- Smart Backtest Modal -->
+<div class="modal" id="smartModal">
+  <div class="modal-box" style="width:min(95vw,560px);">
+    <h3>🧠 Smart Composite Backtest: <span id="smartModalSymbol"></span></h3>
+    <div style="background:#e0f2fe;border:1px solid #0369a1;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#0369a1;">
+      ⚠️ Backtest sadece <b>RSI + Volume</b> faktörlerini test eder.<br>
+      Order Book ve Funding Rate anlık veri olduğu için geçmiş verisi yoktur — canlıda ek filtre görevi görürler.
+    </div>
+    <div id="smartModalContent">
+      <div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor...</div>
+    </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-gray" onclick="document.getElementById('smartModal').classList.remove('open')">Kapat</button>
     </div>
   </div>
 </div>
@@ -1331,6 +1349,73 @@ function switchStab(h) {
     if (el) el.textContent = h + ':00';
     if (lb) lb.textContent = SEANS_LABELS[bk] || bk || '—';
   }
+}
+
+// ── Smart Backtest ────────────────────────────────
+function smartAnaliz() {
+  const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+  if (!symbol) { toast('Sembol girin', false); return; }
+  document.getElementById('smartModalSymbol').textContent = symbol;
+  document.getElementById('smartModalContent').innerHTML =
+    '<div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor... (180 gün)</div>';
+  document.getElementById('smartModal').classList.add('open');
+
+  fetch(`/api/smart_backtest?symbol=${symbol}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        document.getElementById('smartModalContent').innerHTML =
+          `<div style="color:#dc2626;">Hata: ${d.error}</div>`;
+        return;
+      }
+
+      const EXIT_ORDER = ['4s','8s','24s','48s','RSI Çıkış'];
+      const SCORE_LABELS = {
+        'Filtresiz':      { color:'#6b7280', desc:'Koşulsuz (baz karşılaştırma)' },
+        'RSI veya Volume':{ color:'#f0a500', desc:'RSI 30-65 VEYA Hacim >1.5×' },
+        'RSI ve Volume':  { color:'#16a34a', desc:'RSI 30-65 VE Hacim >1.5× (Smart\'a en yakın)' },
+      };
+
+      let html = '';
+      Object.entries(d.results).forEach(([label, exits]) => {
+        const meta = SCORE_LABELS[label] || { color:'#6b7280', desc:'' };
+        html += `
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:bold;color:${meta.color};margin-bottom:2px;">${label}</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:5px;">${meta.desc}</div>
+            <table style="width:100%;">
+              <thead><tr>
+                <th>Çıkış</th><th style="text-align:center;">İşlem</th>
+                <th style="text-align:center;">Kazanma %</th>
+                <th style="text-align:center;">Toplam %</th>
+                <th style="text-align:center;">Ort %</th>
+              </tr></thead>
+              <tbody>
+                ${EXIT_ORDER.filter(e => exits[e]).map(e => {
+                  const v = exits[e];
+                  const isRsi = e === 'RSI Çıkış';
+                  return `<tr style="${isRsi?'background:#f0fdf4;font-style:italic;':''}">
+                    <td style="font-size:11px;">${isRsi?'🔴 RSI>72':e}</td>
+                    <td style="text-align:center;color:#94a3b8;">${v.trades}</td>
+                    <td style="text-align:center;">
+                      <span class="${v.wr>=60?'green':v.wr>=50?'yellow':'red'}"><b>%${v.wr}</b></span>
+                    </td>
+                    <td style="text-align:center;" class="${v.net>=0?'green':'red'}">%${v.net}</td>
+                    <td style="text-align:center;" class="${v.avg>=0?'green':'red'}">%${v.avg}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      });
+
+      document.getElementById('smartModalContent').innerHTML = html +
+        '<p style="font-size:10px;color:#64748b;margin-top:4px;">* Fee %0.2 dahil | Son 180 gün saatlik veri</p>';
+    })
+    .catch(() => {
+      document.getElementById('smartModalContent').innerHTML =
+        '<div style="color:#dc2626;">Bağlantı hatası</div>';
+    });
 }
 
 // ── Trades Reset ─────────────────────────────────

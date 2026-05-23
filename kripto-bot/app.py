@@ -76,6 +76,98 @@ def trades_reset():
     save_trades([])
     return jsonify({'ok': True})
 
+# ── API: Smart Backtest ──────────────────────────
+@app.route('/api/smart_backtest')
+@login_required
+def smart_backtest():
+    try:
+        symbol = request.args.get('symbol', '').upper()
+        if not symbol:
+            return jsonify({'ok': False, 'error': 'Sembol gerekli'})
+
+        client = get_client()
+        from binance.client import Client as BClient
+        klines = client.get_klines(
+            symbol=symbol,
+            interval=BClient.KLINE_INTERVAL_1HOUR,
+            limit=180 * 24
+        )
+
+        closes  = [float(k[4]) for k in klines]
+        volumes = [float(k[5]) for k in klines]
+        times   = [k[0] for k in klines]
+
+        def calc_rsi(cls, period=14):
+            if len(cls) < period + 1:
+                return None
+            deltas = [cls[i] - cls[i-1] for i in range(1, len(cls))]
+            g = [max(d, 0) for d in deltas[-period:]]
+            l = [max(-d, 0) for d in deltas[-period:]]
+            ag, al = sum(g)/period, sum(l)/period
+            return round(100 - 100/(1 + ag/al), 1) if al > 0 else 100.0
+
+        def vol_ratio(vols, i, lb=20):
+            if i < lb: return 0
+            avg = sum(vols[i-lb:i]) / lb
+            return vols[i] / avg if avg > 0 else 0
+
+        EXIT_HOURS = [4, 8, 24, 48]
+        WARMUP     = 20
+
+        # Backtest: score 0/1/2 için ayrı ayrı çalıştır
+        def run(min_score, exit_h, rsi_exit=True):
+            wins = total = 0
+            net = 0.0
+            i = WARMUP
+            while i < len(closes) - exit_h:
+                rsi = calc_rsi(closes[:i+1])
+                vr  = vol_ratio(volumes, i)
+                if rsi is None:
+                    i += 1; continue
+
+                rsi_s = 1 if 30 <= rsi <= 65 else 0
+                vol_s = 1 if vr > 1.5 else 0
+                score = rsi_s + vol_s
+
+                if score < min_score:
+                    i += 1; continue
+
+                buy_price = closes[i]
+                exit_i    = i + exit_h  # default: fixed hold
+
+                if rsi_exit:
+                    for j in range(i+1, min(i+exit_h+1, len(closes))):
+                        r = calc_rsi(closes[:j+1])
+                        if r is not None and r > 72:
+                            exit_i = j; break
+
+                exit_i    = min(exit_i, len(closes)-1)
+                sell_price = closes[exit_i]
+                pnl = (sell_price - buy_price) / buy_price * 100 - 0.2
+                net += pnl; total += 1
+                if pnl > 0: wins += 1
+                i = exit_i + 1
+
+            return {
+                'trades': total,
+                'wr':  round(wins/total*100, 1) if total else 0,
+                'net': round(net, 2),
+                'avg': round(net/total, 2) if total else 0,
+            }
+
+        results = {}
+        for ms in [0, 1, 2]:
+            label = {0: 'Filtresiz', 1: 'RSI veya Volume', 2: 'RSI ve Volume'}[ms]
+            results[label] = {}
+            for eh in EXIT_HOURS:
+                results[label][f'{eh}s'] = run(ms, eh)
+            results[label]['RSI Çıkış'] = run(ms, 48, rsi_exit=True)
+
+        return jsonify({'ok': True, 'symbol': symbol, 'results': results,
+                        'note': 'Backtest: RSI+Volume (Order Book ve Funding Rate backtestlenemez)'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
 # ── API: Stats (indikatör bazlı) ─────────────────
 @app.route('/api/stats')
 @login_required
