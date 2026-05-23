@@ -142,7 +142,7 @@ input:focus,select:focus{border-color:#f0a500;}
       <div class="form-group">
         <label>Sembol</label>
         <div style="display:flex;gap:6px;">
-          <input type="text" id="newSymbol" placeholder="BTCUSDT">
+          <input type="text" id="newSymbol" placeholder="BTC veya BTCUSDT" onblur="autoUsdt()">
           <button class="btn btn-blue btn-sm" onclick="seansAnaliz()" title="Seans Analizi">📊</button>
           <button class="btn btn-gray btn-sm" onclick="smartAnaliz()" title="Smart Backtest">🧠</button>
         </div>
@@ -615,7 +615,14 @@ function renderCoins() {
   }).join('');
 }
 
+function autoUsdt() {
+  const el = document.getElementById('newSymbol');
+  const v = el.value.trim().toUpperCase();
+  if (v && !v.endsWith('USDT')) el.value = v + 'USDT';
+}
+
 function addCoin() {
+  autoUsdt();
   const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
   if (!symbol) { toast('Sembol girin', false); return; }
   const data = {
