@@ -116,6 +116,7 @@ def coin_add():
         'stop_loss_sell_pct':  float(data.get('stop_loss_sell_pct', 100)),
         'seans_strategy':      data.get('seans_strategy', 'both'),
         'seans_sell_hour':     int(data.get('seans_sell_hour', 13)),
+        'smart_min_score':     int(data.get('smart_min_score', 3)),
         'active': True,
     })
     cfg['coins'] = coins
@@ -152,6 +153,7 @@ def coin_update():
             c['stop_loss_sell_pct']   = float(data.get('stop_loss_sell_pct', c.get('stop_loss_sell_pct', 100)))
             c['seans_strategy']       = data.get('seans_strategy', c.get('seans_strategy', 'both'))
             c['seans_sell_hour']      = int(data.get('seans_sell_hour', c.get('seans_sell_hour', 13)))
+            c['smart_min_score']      = int(data.get('smart_min_score', c.get('smart_min_score', 3)))
             c['active']               = data.get('active', c['active'])
             break
     save_config(cfg)

@@ -152,6 +152,7 @@ input:focus,select:focus{border-color:#f0a500;}
           <option value="utbot">UT Bot</option>
           <option value="webhook">Webhook</option>
           <option value="seans">Seans Stratejisi</option>
+          <option value="smart">🧠 Smart Composite</option>
           <option value="both">Hepsi</option>
         </select>
       </div>
@@ -177,6 +178,20 @@ input:focus,select:focus{border-color:#f0a500;}
       <div class="form-group"><label>Kâr Satış %</label><input type="number" id="newTpSell" value="100" min="1" max="100"></div>
       <div class="form-group"><label>Stop Loss %</label><input type="number" id="newSl" value="0" step="0.1"></div>
       <div class="form-group"><label>Stop Satış %</label><input type="number" id="newSlSell" value="100" min="1" max="100"></div>
+    </div>
+    <div id="newSmartOpts" style="display:none;">
+      <hr class="divider">
+      <p style="font-size:11px;color:#64748b;margin-bottom:6px;">🧠 <b>Smart Composite:</b> Order Book + Funding Rate + Volume + RSI — 4 faktörden kaçı yeşil olunca alım yapılsın?</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Minimum Skor</label>
+          <select id="newSmartMinScore">
+            <option value="2">2/4 — Daha sık sinyal</option>
+            <option value="3" selected>3/4 — Dengeli (önerilen)</option>
+            <option value="4">4/4 — Sadece mükemmel koşul</option>
+          </select>
+        </div>
+      </div>
     </div>
     <div id="newSeansOpts" style="display:none;">
       <hr class="divider">
@@ -347,6 +362,7 @@ input:focus,select:focus{border-color:#f0a500;}
           <option value="utbot">UT Bot</option>
           <option value="webhook">Webhook</option>
           <option value="seans">Seans Stratejisi</option>
+          <option value="smart">🧠 Smart Composite</option>
           <option value="both">Hepsi</option>
         </select>
       </div>
@@ -372,6 +388,20 @@ input:focus,select:focus{border-color:#f0a500;}
       <div class="form-group"><label>Kâr Satış %</label><input type="number" id="editTpSell" min="1" max="100"></div>
       <div class="form-group"><label>Stop Loss %</label><input type="number" id="editSl" step="0.1"></div>
       <div class="form-group"><label>Stop Satış %</label><input type="number" id="editSlSell" min="1" max="100"></div>
+    </div>
+    <div id="editSmartOpts" style="display:none;">
+      <hr class="divider">
+      <p style="font-size:11px;color:#64748b;margin-bottom:6px;">🧠 <b>Smart Composite:</b> Order Book + Funding Rate + Volume + RSI</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Minimum Skor</label>
+          <select id="editSmartMinScore">
+            <option value="2">2/4 — Daha sık sinyal</option>
+            <option value="3">3/4 — Dengeli (önerilen)</option>
+            <option value="4">4/4 — Sadece mükemmel koşul</option>
+          </select>
+        </div>
+      </div>
     </div>
     <div id="editSeansOpts" style="display:none;">
       <hr class="divider">
@@ -556,6 +586,7 @@ function addCoin() {
     stop_loss_sell_pct:   parseFloat(document.getElementById('newSlSell').value),
     seans_strategy:       document.getElementById('newSeansStrategy').value,
     seans_sell_hour:      parseInt(document.getElementById('newSeansSellHour').value),
+    smart_min_score:      parseInt(document.getElementById('newSmartMinScore').value),
   };
   fetch('/coin/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{
@@ -595,6 +626,7 @@ function openEdit(symbol) {
   document.getElementById('editSlSell').value = c.stop_loss_sell_pct||100;
   document.getElementById('editSeansStrategy').value = c.seans_strategy||'both';
   document.getElementById('editSeansSellHour').value = c.seans_sell_hour||13;
+  document.getElementById('editSmartMinScore').value = c.smart_min_score||3;
   toggleSeansOpts('edit');
   document.getElementById('editModal').classList.add('open');
 }
@@ -617,6 +649,7 @@ function saveEdit() {
     stop_loss_sell_pct:   parseFloat(document.getElementById('editSlSell').value),
     seans_strategy:       document.getElementById('editSeansStrategy').value,
     seans_sell_hour:      parseInt(document.getElementById('editSeansSellHour').value),
+    smart_min_score:      parseInt(document.getElementById('editSmartMinScore').value),
   };
   fetch('/coin/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{
@@ -1238,11 +1271,14 @@ function updateModeLabel() {
 
 // ── Seans Toggle ─────────────────────────────────
 function toggleSeansOpts(prefix) {
-  const source = document.getElementById(prefix+'Source').value;
+  const source  = document.getElementById(prefix+'Source').value;
   const isSeans = source === 'seans';
+  const isSmart = source === 'smart';
   document.getElementById(prefix+'SeansOpts').style.display = (isSeans || source === 'both') ? 'block' : 'none';
+  const smartOpts = document.getElementById(prefix+'SmartOpts');
+  if (smartOpts) smartOpts.style.display = isSmart ? 'block' : 'none';
   const utFields = document.getElementById(prefix+'UtFields');
-  if (utFields) utFields.style.display = isSeans ? 'none' : '';
+  if (utFields) utFields.style.display = (isSeans || isSmart) ? 'none' : '';
 }
 
 // ── Init ─────────────────────────────────────────

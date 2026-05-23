@@ -247,6 +247,41 @@ def run_engine():
                 except Exception as e:
                     print(f'[Seans] {symbol} hata: {e}')
 
+            # ── Smart Composite Stratejisi ───────────────
+            for coin in coins:
+                if not coin.get('active', True):
+                    continue
+                if coin.get('signal_source', 'utbot') != 'smart':
+                    continue
+
+                symbol    = coin['symbol']
+                min_score = int(coin.get('smart_min_score', 3))
+
+                try:
+                    from smart_strategy import check_smart_signal, check_smart_sell
+                    positions = load_positions()
+                    pos       = positions.get(symbol, {})
+                    pos_qty   = pos.get('qty', 0)
+                    pos_value = pos_qty * get_price(client, symbol) if pos_qty > 0 else 0
+
+                    if pos_qty > 0 and pos_value >= 1.0:
+                        sell_sig = check_smart_sell(client, symbol)
+                        if sell_sig['signal'] == 'sell':
+                            execute_sell(client, symbol, 100,
+                                source='SMART', period=sell_sig['reason'])
+                            print(f'[Smart] {symbol} SATIŞ — {sell_sig["reason"]}')
+                    else:
+                        sig = check_smart_signal(client, symbol, min_score)
+                        print(f'[Smart] {symbol} Skor:{sig["score"]}/4 {sig["detail"]}')
+                        if sig['signal'] == 'buy':
+                            usdt = float(coin.get('usdt_amount', 10))
+                            execute_buy(client, symbol, usdt,
+                                source='SMART', period=sig['detail'])
+                            print(f'[Smart] {symbol} ALIM — {sig["detail"]}')
+
+                except Exception as e:
+                    print(f'[Smart] {symbol} hata: {e}')
+
             time.sleep(check_interval)
 
         except Exception as e:

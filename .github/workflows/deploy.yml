@@ -20,7 +20,7 @@ jobs:
           script: |
             cd ~/hakanerbasss.github.io
             git pull origin main
-            cp -r kripto-bot/app.py kripto-bot/bot.py kripto-bot/seans_strategy.py kripto-bot/signal_engine.py kripto-bot/telegram_bot.py ~/kripto-bot/
+            cp -r kripto-bot/app.py kripto-bot/bot.py kripto-bot/seans_strategy.py kripto-bot/signal_engine.py kripto-bot/smart_strategy.py kripto-bot/telegram_bot.py ~/kripto-bot/
             cp -r kripto-bot/templates ~/kripto-bot/
             cp -r kripto-bot/static ~/kripto-bot/
             cd ~/kripto-bot
