@@ -1129,22 +1129,6 @@ function seansAnaliz() {
         <p style="font-size:10px;color:#64748b;margin-top:4px;">Düşük kazanma oranı olan günlerde işlem yapmayı düşünün.</p>
       </div>`;
 
-      document.getElementById('seansModalContent').innerHTML = `
-        <div style="background:#f0f9ff;border:1px solid #0ea5e9;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;">
-          📊 <b>Oynaklık (${vol.count||0} gece):</b>
-          Ort. düşüş <span class="red">%${vol.avg_drawdown||0}</span> |
-          Ort. yükseliş <span class="green">%${vol.avg_gain||0}</span> |
-          Önerilen SL <span class="red"><b>%${vol.suggested_sl||0}</b></span> |
-          Önerilen TP <span class="green"><b>%${vol.suggested_tp||0}</b></span>
-        </div>
-        <div style="background:#fff3cd;border:1px solid #f0a500;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
-          ⭐ En iyi strateji (13:00): <b>${SEANS_LABELS[bestKey]||bestKey}</b>
-          <button class="btn btn-orange btn-sm" style="margin-left:8px;" onclick="(${applyStrategy})('${bestKey}',13,${vol.suggested_sl??0},${vol.suggested_tp??0})">Uygula</button>
-        </div>
-        <div style="display:flex;gap:4px;margin-bottom:0;">${tabs}</div>
-        <div style="border:1px solid #e5e7eb;border-radius:0 8px 8px 8px;padding:8px;overflow-x:auto;">${panels}</div>
-        <p style="font-size:10px;color:#64748b;margin-top:8px;">* Son 180 gün | Fee (%0.2) dahil | Min 5 işlem</p>`;
-
       // ⏰ Saat Matrisi sekmesi
       const matrix   = d.timing_matrix || {};
       const buyHours = d.timing_buy_hours  || [16,17,18,19,20,21,22,23];
@@ -1196,6 +1180,22 @@ function seansAnaliz() {
 
       tabs   += `<span id="stab-time" class="stab" onclick="switchStab('time')" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;background:#f0f0f0;color:#666;">⏰ Saatler</span>`;
       panels += `<div id="spanel-time" style="display:none">${matrixHtml}</div>`;
+
+      document.getElementById('seansModalContent').innerHTML = `
+        <div style="background:#f0f9ff;border:1px solid #0ea5e9;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;">
+          📊 <b>Oynaklık (${vol.count||0} gece):</b>
+          Ort. düşüş <span class="red">%${vol.avg_drawdown||0}</span> |
+          Ort. yükseliş <span class="green">%${vol.avg_gain||0}</span> |
+          Önerilen SL <span class="red"><b>%${vol.suggested_sl||0}</b></span> |
+          Önerilen TP <span class="green"><b>%${vol.suggested_tp||0}</b></span>
+        </div>
+        <div style="background:#fff3cd;border:1px solid #f0a500;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
+          ⭐ En iyi strateji (13:00): <b>${SEANS_LABELS[bestKey]||bestKey}</b>
+          <button class="btn btn-orange btn-sm" style="margin-left:8px;" onclick="(${applyStrategy})('${bestKey}',13,${vol.suggested_sl??0},${vol.suggested_tp??0})">Uygula</button>
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:0;">${tabs}</div>
+        <div style="border:1px solid #e5e7eb;border-radius:0 8px 8px 8px;padding:8px;overflow-x:auto;">${panels}</div>
+        <p style="font-size:10px;color:#64748b;margin-top:8px;">* Son 180 gün | Fee (%0.2) dahil | Min 5 işlem</p>`;
     })
     .catch(() => {
       document.getElementById('seansModalContent').innerHTML = '<div style="color:#dc2626;">Bağlantı hatası</div>';
