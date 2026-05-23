@@ -267,6 +267,9 @@ def run_engine():
                     if pos_qty > 0 and pos_value >= 1.0:
                         sell_sig = check_smart_sell(client, symbol)
                         if sell_sig['signal'] == 'sell':
+                            send_telegram(
+                                f'🧠 <b>{symbol}</b> | {sell_sig["reason"]} → SATIŞ'
+                            )
                             execute_sell(client, symbol, 100,
                                 source='SMART', period=sell_sig['reason'])
                             print(f'[Smart] {symbol} SATIŞ — {sell_sig["reason"]}')
@@ -274,6 +277,10 @@ def run_engine():
                         sig = check_smart_signal(client, symbol, min_score)
                         print(f'[Smart] {symbol} Skor:{sig["score"]}/4 {sig["detail"]}')
                         if sig['signal'] == 'buy':
+                            send_telegram(
+                                f'🧠 <b>{symbol}</b> | Skor: {sig["score"]}/4\n'
+                                f'{sig["detail"]} → ALIM'
+                            )
                             usdt = float(coin.get('usdt_amount', 10))
                             execute_buy(client, symbol, usdt,
                                 source='SMART', period=sig['detail'])
