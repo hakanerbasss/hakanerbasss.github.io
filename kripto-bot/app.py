@@ -272,6 +272,7 @@ def coin_add():
         # UT Bot
         'ut_key':              float(data.get('ut_key', 2)),
         'ut_atr':              int(data.get('ut_atr', 7)),
+        'ut_mode':             data.get('ut_mode', 'crossover'),
         # Kapanış sinyali satış
         'close_sell_pct':      float(data.get('close_sell_pct', 100)),
         # Kâr hedefi
@@ -312,6 +313,7 @@ def coin_update():
             c['signal_source']        = data.get('signal_source', c.get('signal_source','utbot'))
             c['ut_key']               = float(data.get('ut_key', c.get('ut_key', 2)))
             c['ut_atr']               = int(data.get('ut_atr', c.get('ut_atr', 7)))
+            c['ut_mode']              = data.get('ut_mode', c.get('ut_mode', 'crossover'))
             c['close_sell_pct']       = float(data.get('close_sell_pct', c.get('close_sell_pct', 100)))
             c['take_profit_pct']      = float(data.get('take_profit_pct', c.get('take_profit_pct', 0)))
             c['take_profit_sell_pct'] = float(data.get('take_profit_sell_pct', c.get('take_profit_sell_pct', 100)))

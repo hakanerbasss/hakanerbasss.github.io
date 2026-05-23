@@ -22,7 +22,7 @@ def calc_rma(values, period):
         rma = (rma * (period - 1) + v) / period
     return rma
 
-def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7):
+def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7, mode='crossover'):
     n = len(closes)
     if n < atr_period + 2:
         return None
@@ -53,6 +53,7 @@ def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7):
     start = atr_period + 1
     trail = closes[start - 1]
     prev_close = closes[start - 1]
+    trail_history = [trail]  # early mod için son 3 trail değeri
 
     for i in range(start, n):
         c = closes[i]
@@ -64,12 +65,28 @@ def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7):
         else:
             trail = min(prev_trail, c + n_loss)
 
-        # Sinyal sadece SON mumda crossover olursa dönderilir
+        trail_history.append(trail)
+        if len(trail_history) > 3:
+            trail_history.pop(0)
+
+        # Sinyal sadece SON mumda üretilir
         if i == n - 1:
-            if prev_close <= prev_trail and c > trail:
-                return 'buy'
-            if prev_close >= prev_trail and c < trail:
-                return 'sell'
+            if mode == 'crossover':
+                if prev_close <= prev_trail and c > trail:
+                    return 'buy'
+                if prev_close >= prev_trail and c < trail:
+                    return 'sell'
+            elif mode == 'early':
+                if len(trail_history) >= 2:
+                    delta_curr = trail_history[-1] - trail_history[-2]
+                    delta_prev = (trail_history[-2] - trail_history[-3]
+                                  if len(trail_history) >= 3 else delta_curr - 1)
+                    # Trail düşüyordu, durdu → fiyat hâlâ altında → erken alım
+                    if c < trail and delta_prev < 0 and delta_curr >= 0:
+                        return 'buy'
+                    # Trail yükseliyordu, durdu → fiyat hâlâ üstünde → erken satış
+                    if c > trail and delta_prev > 0 and delta_curr <= 0:
+                        return 'sell'
 
         prev_close = c
 
@@ -172,7 +189,8 @@ def run_engine():
                     signal = calc_ut_bot(
                         closes, highs, lows,
                         key_value=float(coin.get('ut_key', 2)),
-                        atr_period=int(coin.get('ut_atr', 7))
+                        atr_period=int(coin.get('ut_atr', 7)),
+                        mode=coin.get('ut_mode', 'crossover')
                     )
 
                     # State güncelle — sinyal olsa da olmasa da bu mumu işaretle
