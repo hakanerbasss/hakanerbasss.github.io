@@ -339,6 +339,11 @@ input:focus,select:focus{border-color:#f0a500;}
     </div>
     <button class="btn btn-blue" onclick="saveSettings()">💾 Kaydet</button>
   </div>
+  <div class="section">
+    <h2>🗂 Veri Yönetimi</h2>
+    <p style="font-size:12px;color:#666;margin-bottom:12px;">İşlem geçmişini sıfırlamak istatistikleri ve başarı oranını temizler. Açık pozisyonlar ve bakiye etkilenmez.</p>
+    <button class="btn btn-red" onclick="resetTrades()">🗑 İşlem Geçmişini Sıfırla</button>
+  </div>
 </div>
 
 <!-- Edit Modal -->
@@ -1326,6 +1331,17 @@ function switchStab(h) {
     if (el) el.textContent = h + ':00';
     if (lb) lb.textContent = SEANS_LABELS[bk] || bk || '—';
   }
+}
+
+// ── Trades Reset ─────────────────────────────────
+function resetTrades() {
+  if (!confirm('İşlem geçmişini sıfırlamak istediğinize emin misiniz?\nBu işlem geri alınamaz.')) return;
+  fetch('/trades/reset', {method:'POST'})
+    .then(r=>r.json())
+    .then(d => {
+      if (d.ok) { loadTrades(); loadDashboard(); toast('İşlem geçmişi sıfırlandı'); }
+      else toast(d.error, false);
+    });
 }
 
 // ── Mode Label ───────────────────────────────────

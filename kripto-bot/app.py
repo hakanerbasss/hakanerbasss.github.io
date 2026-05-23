@@ -69,6 +69,13 @@ def api_trades():
     trades = load_trades()
     return jsonify(list(reversed(trades[-50:])))
 
+@app.route('/trades/reset', methods=['POST'])
+@login_required
+def trades_reset():
+    from bot import save_trades
+    save_trades([])
+    return jsonify({'ok': True})
+
 # ── API: Stats (indikatör bazlı) ─────────────────
 @app.route('/api/stats')
 @login_required
