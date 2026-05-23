@@ -628,6 +628,38 @@ def seans_analiz():
 
         dow_analysis = run_dow(20, 13)
 
+        # ── Saat Matrisi: tüm alım × satım kombinasyonları ─
+        BUY_HOURS  = [16, 17, 18, 19, 20, 21, 22, 23]
+        SELL_HOURS_M = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+
+        def run_timing(buy_h, sell_h):
+            total = wins = trades = 0
+            for i, date in enumerate(dates[:-1]):
+                today_dc = days[date]
+                next_dc  = days[dates[i+1]]
+                bc = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc = [c for c in next_dc  if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                total += net; trades += 1
+                if net > 0: wins += 1
+            wr  = round(wins/trades*100, 1) if trades > 0 else 0
+            avg = round(total/trades,    2) if trades > 0 else 0
+            return {'wr': wr, 'avg': avg, 'trades': trades}
+
+        timing_matrix = {
+            str(bh): {str(sh): run_timing(bh, sh) for sh in SELL_HOURS_M}
+            for bh in BUY_HOURS
+        }
+
+        # En iyi saat kombinasyonu (min 20 işlem)
+        best_timing = max(
+            ((bh, sh) for bh in BUY_HOURS for sh in SELL_HOURS_M
+             if timing_matrix[str(bh)][str(sh)]['trades'] >= 20),
+            key=lambda x: timing_matrix[str(x[0])][str(x[1])]['wr'],
+            default=(20, 13)
+        )
+
         return jsonify({
             'ok': True,
             'symbol': symbol,
@@ -636,6 +668,10 @@ def seans_analiz():
             'best_strategy': best_key,
             'volatility': volatility,
             'dow_analysis': dow_analysis,
+            'timing_matrix': timing_matrix,
+            'best_timing': {'buy': best_timing[0], 'sell': best_timing[1]},
+            'timing_buy_hours': BUY_HOURS,
+            'timing_sell_hours': SELL_HOURS_M,
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})

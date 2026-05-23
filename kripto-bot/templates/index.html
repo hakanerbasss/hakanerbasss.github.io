@@ -1144,6 +1144,58 @@ function seansAnaliz() {
         <div style="display:flex;gap:4px;margin-bottom:0;">${tabs}</div>
         <div style="border:1px solid #e5e7eb;border-radius:0 8px 8px 8px;padding:8px;overflow-x:auto;">${panels}</div>
         <p style="font-size:10px;color:#64748b;margin-top:8px;">* Son 180 gün | Fee (%0.2) dahil | Min 5 işlem</p>`;
+
+      // ⏰ Saat Matrisi sekmesi
+      const matrix   = d.timing_matrix || {};
+      const buyHours = d.timing_buy_hours  || [16,17,18,19,20,21,22,23];
+      const sellHours= d.timing_sell_hours || [7,8,9,10,11,12,13,14,15,16,17];
+      const bestT    = d.best_timing || {buy:20, sell:13};
+
+      function wrColor(wr, trades) {
+        if (trades < 10) return '#e5e7eb';
+        if (wr >= 65) return '#16a34a';
+        if (wr >= 58) return '#4ade80';
+        if (wr >= 52) return '#fbbf24';
+        if (wr >= 45) return '#f97316';
+        return '#dc2626';
+      }
+
+      let matrixHtml = `<div style="overflow-x:auto;margin-top:4px;">
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:4px;">
+          Alım saati (sol) × Satış saati ertesi gün (üst) — koşulsuz backtest<br>
+          ⭐ En iyi: <b>Al ${bestT.buy}:00 → Sat ${bestT.sell}:00</b>
+          <button class="btn btn-orange btn-sm" style="margin-left:6px;"
+            onclick="document.getElementById('newSeansSellHour').value=${bestT.sell};
+                     document.getElementById('seansModal').classList.remove('open');
+                     toast('Satış saati ${bestT.sell}:00 seçildi');">Uygula</button>
+        </p>
+        <table style="border-collapse:collapse;font-size:10px;">
+          <thead><tr><th style="padding:3px 6px;background:#f8f8f8;">Al↓ Sat→</th>
+            ${sellHours.map(h=>`<th style="padding:3px 5px;background:#f8f8f8;text-align:center;">${h}:00</th>`).join('')}
+          </tr></thead><tbody>`;
+
+      buyHours.forEach(bh => {
+        matrixHtml += `<tr><td style="padding:3px 6px;font-weight:bold;background:#f8f8f8;">${bh}:00</td>`;
+        sellHours.forEach(sh => {
+          const cell = (matrix[String(bh)] || {})[String(sh)] || {wr:0,avg:0,trades:0};
+          const isBest = bh === bestT.buy && sh === bestT.sell;
+          const bg = wrColor(cell.wr, cell.trades);
+          const textCol = cell.wr >= 52 && cell.trades >= 10 ? '#fff' : '#666';
+          matrixHtml += `<td style="padding:3px 5px;text-align:center;background:${bg};color:${textCol};
+            border:${isBest?'2px solid #1a1a1a':'1px solid #e5e7eb'};border-radius:3px;cursor:default;"
+            title="Al ${bh}:00 → Sat ${sh}:00 | Kazanma:%${cell.wr} | Ort:%${cell.avg} | ${cell.trades} işlem">
+            ${cell.trades >= 10 ? cell.wr+'%' : '—'}
+          </td>`;
+        });
+        matrixHtml += `</tr>`;
+      });
+
+      matrixHtml += `</tbody></table>
+        <p style="font-size:10px;color:#64748b;margin-top:4px;">🟢 ≥65% &nbsp; 🟡 52-64% &nbsp; 🟠 45-51% &nbsp; 🔴 &lt;45% &nbsp; — az veri</p>
+      </div>`;
+
+      tabs   += `<span id="stab-time" class="stab" onclick="switchStab('time')" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;background:#f0f0f0;color:#666;">⏰ Saatler</span>`;
+      panels += `<div id="spanel-time" style="display:none">${matrixHtml}</div>`;
     })
     .catch(() => {
       document.getElementById('seansModalContent').innerHTML = '<div style="color:#dc2626;">Bağlantı hatası</div>';
