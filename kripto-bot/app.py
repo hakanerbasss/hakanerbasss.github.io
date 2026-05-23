@@ -69,6 +69,51 @@ def api_trades():
     trades = load_trades()
     return jsonify(list(reversed(trades[-50:])))
 
+# ── API: Stats (indikatör bazlı) ─────────────────
+@app.route('/api/stats')
+@login_required
+def api_stats():
+    trades = load_trades()
+    trades_sorted = sorted(trades, key=lambda t: t.get('time', ''))
+
+    def _normalize(source):
+        s = (source or '').upper()
+        if 'UT' in s:     return 'UT BOT'
+        if 'SEANS' in s:  return 'SEANS'
+        if 'SMART' in s:  return 'SMART'
+        if 'MANUEL' in s: return 'MANUEL'
+        return 'DİĞER'
+
+    last_buy_source = {}  # symbol → normalized indicator
+    by_ind = {}           # indicator → {wins, total, pnl}
+
+    for t in trades_sorted:
+        symbol = t.get('symbol', '')
+        source = t.get('source', '')
+        if t.get('type') == 'buy':
+            last_buy_source[symbol] = _normalize(source)
+        elif t.get('type') == 'sell':
+            key = last_buy_source.get(symbol, _normalize(source))
+            if key not in by_ind:
+                by_ind[key] = {'wins': 0, 'total': 0, 'pnl': 0.0}
+            pnl = t.get('pnl', 0) or 0
+            by_ind[key]['total'] += 1
+            by_ind[key]['pnl']   = round(by_ind[key]['pnl'] + pnl, 2)
+            if pnl > 0:
+                by_ind[key]['wins'] += 1
+
+    result = {
+        k: {
+            'trades': v['total'],
+            'wins':   v['wins'],
+            'wr':     round(v['wins'] / v['total'] * 100, 1) if v['total'] else 0,
+            'pnl':    v['pnl'],
+            'avg':    round(v['pnl'] / v['total'], 2) if v['total'] else 0,
+        }
+        for k, v in by_ind.items()
+    }
+    return jsonify({'ok': True, 'by_indicator': result})
+
 # ── Ayarlar ──────────────────────────────────────
 @app.route('/settings', methods=['POST'])
 @login_required
