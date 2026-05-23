@@ -1642,7 +1642,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.173';
+const APP_VERSION      = '1.0.174';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -1660,8 +1660,8 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.22 18:03';
-const APP_VERSION_NOTE = 'Hedef isabet: 2 tekerlek alttan kayarak cikar + damped sallama animasyonu [Claude]';
+const APP_VERSION_DATE = '2026.05.22 18:30';
+const APP_VERSION_NOTE = 'Tekerlek animasyonu duzeltildi: yanlardan cikiyor, terrain altina gommulme sorunu giderildi [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 // ── TEMA TANIMI ────────────────────────────────────────────────
@@ -7533,30 +7533,34 @@ function drawTarget(){
   ctx.save();
   ctx.translate(tx, ty-th+embedDepth);
 
-  // ── Tekerlekler — animasyon aktifken alttan kayarak çıkar ─────
+  // ── Tekerlekler — animasyon aktifken yanlara kayarak çıkar ──────
+  // (aşağı değil yatay: terrain altına gömülme sorunu yok)
   if(_wheelOut > 0){
     var _wr = 7;
-    var _wyBase = th - embedDepth;               // gövde alt kenarı
-    var _wyOut  = _wyBase + _wr * _wheelOut;     // dışarı çıkma miktarı
-    var _wScale = 0.4 + 0.6 * _wheelOut;
-    [-tw*0.28, tw*0.28].forEach(function(wx){
+    // Y: gövdenin görünen alt çeyreği (terrain üstünde)
+    var _wyPos = th - embedDepth - _wr - 2;
+    var _wScale = 0.35 + 0.65 * _wheelOut;
+    // Sol ve sağ tekerlek: gövde kenarından dışarı kayıyor
+    [[-1, -tw/2], [1, tw/2]].forEach(function(side){
+      var _dir = side[0];                           // -1=sol, +1=sağ
+      var _wx = side[1] + _dir * _wr * _wheelOut;  // yatay kayma
       ctx.save();
-      ctx.translate(wx, _wyOut);
+      ctx.translate(_wx, _wyPos);
       ctx.scale(_wScale, _wScale);
-      // Lastik (dış)
+      // Lastik
       ctx.beginPath(); ctx.arc(0,0,_wr,0,Math.PI*2);
-      ctx.fillStyle='#111'; ctx.fill();
-      ctx.strokeStyle='#444'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle='#1a1a1a'; ctx.fill();
+      ctx.strokeStyle='#555'; ctx.lineWidth=1.5; ctx.stroke();
       // Jant
-      ctx.beginPath(); ctx.arc(0,0,_wr*0.52,0,Math.PI*2);
-      ctx.fillStyle='#999'; ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,_wr*0.55,0,Math.PI*2);
+      ctx.fillStyle='#aaa'; ctx.fill();
       // Jant sapları (3 adet)
-      ctx.strokeStyle='#666'; ctx.lineWidth=1.2;
+      ctx.strokeStyle='#777'; ctx.lineWidth=1.2;
       for(var _wi=0;_wi<3;_wi++){
-        var _wa = (_wi/3)*Math.PI*2;
+        var _wa = (_wi/3)*Math.PI*2 + _ha.f*0.25; // hafif dönüş efekti
         ctx.beginPath();
         ctx.moveTo(Math.cos(_wa)*_wr*0.18, Math.sin(_wa)*_wr*0.18);
-        ctx.lineTo(Math.cos(_wa)*_wr*0.48, Math.sin(_wa)*_wr*0.48);
+        ctx.lineTo(Math.cos(_wa)*_wr*0.50, Math.sin(_wa)*_wr*0.50);
         ctx.stroke();
       }
       // Merkez
