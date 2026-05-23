@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kripto Bot Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#f0f2f5;font-family:Arial,sans-serif;color:#1a1a1a;}
+header{background:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,0.1);position:sticky;top:0;z-index:100;}
+header h1{font-size:16px;}
+header a{font-size:13px;color:#888;text-decoration:none;}
+.tabs{display:flex;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 16px;overflow-x:auto;}
+.tab{padding:12px 14px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;color:#888;white-space:nowrap;}
+.tab.active{color:#f0a500;border-bottom-color:#f0a500;font-weight:bold;}
+.page{display:none;padding:12px;max-width:960px;margin:0 auto;}
+.page.active{display:block;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px;}
+.card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.07);}
+.card h3{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.card .val{font-size:20px;font-weight:bold;}
+.green{color:#16a34a;}.red{color:#dc2626;}.yellow{color:#f0a500;}.blue{color:#2563eb;}
+.section{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.07);margin-bottom:12px;}
+.section h2{font-size:14px;font-weight:bold;margin-bottom:12px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;padding:7px 8px;background:#f8f8f8;color:#666;font-size:10px;text-transform:uppercase;}
+td{padding:7px 8px;border-top:1px solid #f0f0f0;}
+.badge{padding:2px 7px;border-radius:20px;font-size:10px;font-weight:bold;}
+.badge.buy{background:#dcfce7;color:#16a34a;}
+.badge.sell{background:#fee2e2;color:#dc2626;}
+.badge.neutral{background:#f3f4f6;color:#6b7280;}
+.badge.utbot{background:#dbeafe;color:#1d4ed8;}
+.badge.webhook{background:#fef3c7;color:#92400e;}
+.badge.both{background:#f3e8ff;color:#6b21a8;}
+.badge.smart{background:#e0f2fe;color:#0369a1;}
+.btn{padding:8px 14px;border:none;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;transition:opacity 0.15s;}
+.btn:hover{opacity:0.85;}
+.btn-green{background:#16a34a;color:#fff;}
+.btn-red{background:#dc2626;color:#fff;}
+.btn-blue{background:#2563eb;color:#fff;}
+.btn-orange{background:#f0a500;color:#fff;}
+.btn-gray{background:#6b7280;color:#fff;}
+.btn-sm{padding:4px 8px;font-size:11px;}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+input,select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;outline:none;width:100%;}
+input:focus,select:focus{border-color:#f0a500;}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:8px;}
+.form-group label{font-size:11px;color:#666;display:block;margin-bottom:3px;}
+.coin-card{border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px;background:#fafafa;}
+.coin-card-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.coin-card-header .sym{font-weight:bold;font-size:15px;flex:1;}
+.coin-detail{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;font-size:11px;color:#666;}
+.coin-detail span b{color:#1a1a1a;}
+.fg-bar{height:8px;border-radius:4px;background:linear-gradient(to right,#dc2626,#f0a500,#16a34a);margin:8px 0;position:relative;}
+.fg-dot{width:12px;height:12px;background:#1a1a1a;border-radius:50%;position:absolute;top:-2px;transform:translateX(-50%);}
+.market-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.toast{position:fixed;bottom:16px;right:16px;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:8px;font-size:12px;z-index:999;display:none;max-width:280px;}
+.webhook-box{background:#f8f8f8;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;word-break:break-all;margin-top:6px;}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;}
+.modal.open{display:flex;}
+.modal-box{background:#fff;border-radius:12px;padding:20px;width:min(95vw,480px);max-height:90vh;overflow-y:auto;}
+.modal-box h3{font-size:15px;margin-bottom:14px;}
+.divider{border:none;border-top:1px solid #e5e7eb;margin:10px 0;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Kripto Bot</h1>
+  <a href="/logout">Çıkış</a>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
+  <div class="tab" onclick="showTab('coins')">Coinler</div>
+  <div class="tab" onclick="showTab('trades')">İşlemler</div>
+  <div class="tab" onclick="showTab('settings')">Ayarlar</div>
+  <div class="tab" onclick="showTab('chart')">📊 Grafik</div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page active" id="tab-dashboard">
+  <div class="grid" style="margin-top:12px;">
+    <div class="card"><h3>Toplam Bakiye</h3><div class="val" id="totalCurrent">—</div></div>
+    <div class="card"><h3>Kâr/Zarar</h3><div class="val" id="totalPnl">—</div></div>
+    <div class="card"><h3>Başarı Oranı</h3><div class="val" id="successRate">—</div></div>
+    <div class="card"><h3>Toplam İşlem</h3><div class="val" id="totalTrades">—</div></div>
+    <div class="card"><h3>Piyasa Kırmızı</h3><div class="val red" id="redPct">—</div></div>
+    <div class="card"><h3>Korku/Açgözlülük</h3><div class="val" id="fgVal">—</div></div>
+    <div class="card"><h3>USDT Bakiye</h3><div class="val green" id="usdtBalance">—</div></div>
+  </div>
+
+  <div class="section">
+    <h2>😱 Korku & Açgözlülük Endeksi</h2>
+    <div class="fg-bar"><div class="fg-dot" id="fgDot" style="left:50%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#888;">
+      <span>Aşırı Korku</span><span>Nötr</span><span>Aşırı Açgözlülük</span>
+    </div>
+    <div style="text-align:center;margin-top:6px;font-size:13px;font-weight:bold;" id="fgLabel">—</div>
+  </div>
+
+  <div class="section">
+    <h2>📈 Açık Pozisyonlar</h2>
+    <table>
+      <thead><tr><th>Coin</th><th>Değer</th><th>Alış</th><th>Güncel</th><th>K/Z</th><th>%</th><th>İşlem</th></tr></thead>
+      <tbody id="positionsTable"><tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Yükleniyor...</td></tr></tbody>
+    </table>
+    <div style="margin-top:10px;text-align:right;"><button class="btn btn-red" onclick="closeAll()">⛔ Tümünü Kapat</button></div>
+  </div>
+
+  <div class="market-cols">
+    <div class="section">
+      <h2>🚀 Yükselenler</h2>
+      <table>
+        <thead><tr><th>Coin</th><th>Fiyat</th><th>%</th></tr></thead>
+        <tbody id="gainersTable"></tbody>
+      </table>
+    </div>
+    <div class="section">
+      <h2>💥 Düşenler</h2>
+      <table>
+        <thead><tr><th>Coin</th><th>Fiyat</th><th>%</th></tr></thead>
+        <tbody id="losersTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📊 Hacme Göre Top 50</h2>
+    <table>
+      <thead><tr><th>#</th><th>Coin</th><th>Fiyat</th><th>24s %</th><th>24s Yüksek</th><th>24s Düşük</th><th>Hacim (USDT)</th></tr></thead>
+      <tbody id="top50Table"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- COİNLER -->
+<div class="page" id="tab-coins">
+  <div class="section" style="margin-top:12px;">
+    <h2>➕ Coin Ekle</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Sembol</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="newSymbol" placeholder="BTC veya BTCUSDT" onblur="autoUsdt()">
+          <button class="btn btn-blue btn-sm" onclick="seansAnaliz()" title="Seans Analizi">📊</button>
+          <button class="btn btn-gray btn-sm" onclick="smartAnaliz()" title="Smart Backtest">🧠</button>
+        </div>
+      </div>
+      <div class="form-group"><label>Alım USDT</label><input type="number" id="newUsdt" value="10"></div>
+      <div class="form-group">
+        <label>Sinyal Kaynağı</label>
+        <select id="newSource" onchange="toggleSeansOpts('new')">
+          <option value="utbot">UT Bot</option>
+          <option value="webhook">Webhook</option>
+          <option value="seans">Seans Stratejisi</option>
+          <option value="smart">🧠 Smart Composite</option>
+          <option value="both">Hepsi</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Periyot</label>
+        <select id="newPeriod">
+          <option value="5m">5 Dakika</option>
+          <option value="15m">15 Dakika</option>
+          <option value="1h" selected>1 Saat</option>
+          <option value="4h">4 Saat</option>
+          <option value="1d">1 Gün</option>
+        </select>
+      </div>
+    </div>
+    <div id="newUtFields" class="form-row">
+      <div class="form-group"><label>UT Key Value</label><input type="number" id="newUtKey" value="2" step="0.1"></div>
+      <div class="form-group"><label>UT ATR Period</label><input type="number" id="newUtAtr" value="7"></div>
+      <div class="form-group"><label>Kapanış Satış %</label><input type="number" id="newCloseSell" value="100" min="1" max="100"></div>
+      <div class="form-group">
+        <label>Sinyal Modu</label>
+        <select id="newUtMode">
+          <option value="crossover">Klasik (Crossover)</option>
+          <option value="early">⚡ Erken (Trail Dönüşü)</option>
+        </select>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="form-row">
+      <div class="form-group"><label>Kâr Hedefi %</label><input type="number" id="newTp" value="0" step="0.1"></div>
+      <div class="form-group"><label>Kâr Satış %</label><input type="number" id="newTpSell" value="100" min="1" max="100"></div>
+      <div class="form-group"><label>Stop Loss %</label><input type="number" id="newSl" value="0" step="0.1"></div>
+      <div class="form-group"><label>Stop Satış %</label><input type="number" id="newSlSell" value="100" min="1" max="100"></div>
+    </div>
+    <div id="newSmartOpts" style="display:none;">
+      <hr class="divider">
+      <p style="font-size:11px;color:#64748b;margin-bottom:6px;">🧠 <b>Smart Composite:</b> Order Book + Funding Rate + Volume + RSI — 4 faktörden kaçı yeşil olunca alım yapılsın?</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Minimum Skor</label>
+          <select id="newSmartMinScore">
+            <option value="2">2/4 — Daha sık sinyal</option>
+            <option value="3" selected>3/4 — Dengeli (önerilen)</option>
+            <option value="4">4/4 — Sadece mükemmel koşul</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="newSeansOpts" style="display:none;">
+      <hr class="divider">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Seans Stratejisi</label>
+          <select id="newSeansStrategy">
+            <optgroup label="── Coin Bazlı ──">
+              <option value="coin_yy">Coin dün🟢 bugün🟢 (20:00)</option>
+              <option value="coin_ky">Coin dün🔴 bugün🟢 (20:00)</option>
+              <option value="coin_kk">Coin dün🔴 bugün🔴 (20:00)</option>
+              <option value="coin_yk">Coin dün🟢 bugün🔴 (20:00)</option>
+            </optgroup>
+            <optgroup label="── BTC Filtreli ──">
+              <option value="btc_yy_coin_y">BTC 2gün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yy_coin_r">BTC 2gün🟢 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_rr_coin_y">BTC 2gün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_rr_coin_r">BTC 2gün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_yr_coin_y">BTC dün🟢 bugün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yr_coin_r">BTC dün🟢 bugün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
+            </optgroup>
+            <optgroup label="── ⚡ Gelişmiş ──">
+              <option value="composite_3">⚡ Composite ≥3/5 Faktör Yeşil</option>
+              <option value="composite_4">⚡ Composite ≥4/5 Faktör Yeşil</option>
+              <option value="composite_5">⚡ Composite 5/5 Tümü Yeşil</option>
+              <option value="rel_strong">💪 Coin BTC'den Güçlü</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Satış Saati</label>
+          <select id="newSeansSellHour">
+            <option value="13">13:00</option>
+            <option value="12">12:00</option>
+            <option value="11">11:00</option>
+            <option value="19">19:00</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-orange" onclick="addCoin()">➕ Ekle</button>
+  </div>
+
+  <div class="section">
+    <h2>📋 Coin Listesi</h2>
+    <div id="coinList">Yükleniyor...</div>
+  </div>
+
+  <div class="section">
+    <h2>🔗 Webhook</h2>
+    <p style="font-size:12px;color:#666;margin-bottom:6px;">POST adresi:</p>
+    <div class="webhook-box">http://45.143.4.169:5000/webhook</div>
+    <p style="font-size:11px;color:#888;margin-top:8px;">Örnek:</p>
+    <div class="webhook-box">{"symbol":"BTCUSDT","action":"buy","secret":"SECRET"}</div>
+  </div>
+</div>
+
+<!-- İŞLEMLER -->
+<div class="page" id="tab-trades">
+  <div class="section" style="margin-top:12px;">
+    <h2>📊 İndikatör Performansı</h2>
+    <div id="statsTable">Yükleniyor...</div>
+  </div>
+  <div class="section">
+    <h2>📋 İşlem Geçmişi</h2>
+    <table>
+      <thead><tr><th>Tarih</th><th>Tür</th><th>Kaynak</th><th>Coin</th><th>Miktar</th><th>Fiyat</th><th>K/Z</th></tr></thead>
+      <tbody id="tradesTable"><tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">Yükleniyor...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- GRAFİK -->
+<div class="page" id="tab-chart">
+  <div class="section" style="margin-top:12px;">
+    <h2>📊 UT Bot Grafik</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">
+      <div class="form-group" style="margin:0;">
+        <label>Coin</label>
+        <select id="chartSymbol" style="width:130px;" onchange="updateChartParams();loadChart()"></select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Periyot</label>
+        <select id="chartInterval" style="width:100px;" onchange="loadChart()">
+          <option value="5m">5 Dakika</option>
+          <option value="15m">15 Dakika</option>
+          <option value="1h">1 Saat</option>
+          <option value="4h">4 Saat</option>
+          <option value="1d">1 Gün</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Key Value</label>
+        <input type="number" id="chartKeyValue" value="2" step="0.1" min="0.1" style="width:80px;" oninput="loadChart()">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>ATR Period</label>
+        <input type="number" id="chartAtrPeriod" value="7" step="1" min="1" style="width:80px;" oninput="loadChart()">
+      </div>
+      <button class="btn btn-blue btn-sm" onclick="loadChart()">🔄 Yenile</button>
+      <span id="chartStatus" style="font-size:11px;color:#888;"></span>
+    </div>
+    <canvas id="chartCanvas" style="width:100%;height:400px;background:#111;border-radius:8px;display:block;"></canvas>
+  </div>
+</div>
+
+<!-- AYARLAR -->
+<div class="page" id="tab-settings">
+  <div class="section" style="margin-top:12px;">
+    <h2>⚙️ API Ayarları</h2>
+    <div style="background:#1e3a5f22;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:11px;color:#f59e0b;font-weight:bold;margin-bottom:8px;">🧪 TESTNET</div>
+      <div class="form-group" style="margin-bottom:8px;"><label>Testnet API Key</label><input type="text" id="cfgApiKey" value="{{ cfg.get('api_key','') }}"></div>
+      <div class="form-group"><label>Testnet API Secret</label><input type="password" id="cfgApiSecret" value="{{ cfg.get('api_secret','') }}"></div>
+    </div>
+    <div style="background:#16a34a22;border:1px solid #16a34a44;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:11px;color:#16a34a;font-weight:bold;margin-bottom:8px;">💰 GERÇEK HESAP</div>
+      <div class="form-group" style="margin-bottom:8px;"><label>Gerçek API Key</label><input type="text" id="cfgRealApiKey" value="{{ cfg.get('real_api_key','') }}"></div>
+      <div class="form-group"><label>Gerçek API Secret</label><input type="password" id="cfgRealApiSecret" value="{{ cfg.get('real_api_secret','') }}"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:8px;"><label>Webhook Secret</label><input type="text" id="cfgWebhookSecret" value="{{ cfg.get('webhook_secret','secret123') }}"></div>
+    <div class="form-group" style="margin-bottom:12px;"><label>Fiyat İzleme Aralığı (saniye)</label><input type="number" id="cfgInterval" value="{{ cfg.get('check_interval', 45) }}" min="10"></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:12px;background:#f8f8f8;border-radius:8px;">
+      <span style="font-size:13px;font-weight:bold;">Mod:</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="cfgTestnet" style="width:auto;" {% if cfg.get('testnet',True) %}checked{% endif %} onchange="updateModeLabel()">
+        <span id="modeLabel" style="font-size:13px;font-weight:bold;color:{% if cfg.get('testnet',True) %}#f59e0b{% else %}#16a34a{% endif %};">
+          {% if cfg.get('testnet',True) %}🧪 TESTNET{% else %}💰 GERÇEK HESAP{% endif %}
+        </span>
+      </label>
+    </div>
+    <div style="background:#7c3aed22;border:1px solid #7c3aed44;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:11px;color:#a78bfa;font-weight:bold;margin-bottom:8px;">📢 TELEGRAM BİLDİRİMLERİ</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label>Bot Token</label>
+        <input type="password" id="cfgTelegramToken" value="{{ cfg.get('telegram_token','') }}" placeholder="123456789:AAF...">
+      </div>
+      <div class="form-group">
+        <label>Chat ID / Group ID</label>
+        <input type="text" id="cfgTelegramChatId" value="{{ cfg.get('telegram_chat_id','') }}" placeholder="-100123456789 veya 123456789">
+      </div>
+    </div>
+    <button class="btn btn-blue" onclick="saveSettings()">💾 Kaydet</button>
+  </div>
+  <div class="section">
+    <h2>🗂 Veri Yönetimi</h2>
+    <p style="font-size:12px;color:#666;margin-bottom:12px;">İşlem geçmişini sıfırlamak istatistikleri ve başarı oranını temizler. Açık pozisyonlar ve bakiye etkilenmez.</p>
+    <button class="btn btn-red" onclick="resetTrades()">🗑 İşlem Geçmişini Sıfırla</button>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<!-- Seans Analiz Modal -->
+<div class="modal" id="seansModal">
+  <div class="modal-box" style="width:min(95vw,520px);">
+    <h3>📊 Seans Analizi: <span id="seansModalSymbol"></span></h3>
+    <div id="seansModalContent" style="margin-top:12px;">
+      <div style="text-align:center;color:#999;padding:20px;">Yükleniyor...</div>
+    </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-gray" onclick="document.getElementById('seansModal').classList.remove('open')">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- Smart Backtest Modal -->
+<div class="modal" id="smartModal">
+  <div class="modal-box" style="width:min(95vw,560px);">
+    <h3>🧠 Smart Composite Backtest: <span id="smartModalSymbol"></span></h3>
+    <div style="background:#e0f2fe;border:1px solid #0369a1;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#0369a1;">
+      ✅ Backtest <b>3 faktörü</b> test eder: <b>Mum Formasyonu + RSI + Volume</b><br>
+      ⚠️ Funding Rate anlık veri — geçmişi yok, canlıda ek filtre olarak çalışır.
+    </div>
+    <div id="smartModalContent">
+      <div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor...</div>
+    </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-gray" onclick="document.getElementById('smartModal').classList.remove('open')">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="editModal">
+  <div class="modal-box">
+    <h3>✏️ Coin Düzenle: <span id="editSymbolTitle"></span></h3>
+    <input type="hidden" id="editSymbol">
+    <div class="form-row">
+      <div class="form-group"><label>Alım USDT</label><input type="number" id="editUsdt"></div>
+      <div class="form-group">
+        <label>Sinyal Kaynağı</label>
+        <select id="editSource" onchange="toggleSeansOpts('edit')">
+          <option value="utbot">UT Bot</option>
+          <option value="webhook">Webhook</option>
+          <option value="seans">Seans Stratejisi</option>
+          <option value="smart">🧠 Smart Composite</option>
+          <option value="both">Hepsi</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Periyot</label>
+        <select id="editPeriod">
+          <option value="5m">5 Dakika</option>
+          <option value="15m">15 Dakika</option>
+          <option value="1h">1 Saat</option>
+          <option value="4h">4 Saat</option>
+          <option value="1d">1 Gün</option>
+        </select>
+      </div>
+    </div>
+    <div id="editUtFields" class="form-row">
+      <div class="form-group"><label>UT Key Value</label><input type="number" id="editUtKey" step="0.1"></div>
+      <div class="form-group"><label>UT ATR Period</label><input type="number" id="editUtAtr"></div>
+      <div class="form-group"><label>Kapanış Satış %</label><input type="number" id="editCloseSell" min="1" max="100"></div>
+      <div class="form-group">
+        <label>Sinyal Modu</label>
+        <select id="editUtMode">
+          <option value="crossover">Klasik (Crossover)</option>
+          <option value="early">⚡ Erken (Trail Dönüşü)</option>
+        </select>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="form-row">
+      <div class="form-group"><label>Kâr Hedefi %</label><input type="number" id="editTp" step="0.1"></div>
+      <div class="form-group"><label>Kâr Satış %</label><input type="number" id="editTpSell" min="1" max="100"></div>
+      <div class="form-group"><label>Stop Loss %</label><input type="number" id="editSl" step="0.1"></div>
+      <div class="form-group"><label>Stop Satış %</label><input type="number" id="editSlSell" min="1" max="100"></div>
+    </div>
+    <div id="editSmartOpts" style="display:none;">
+      <hr class="divider">
+      <p style="font-size:11px;color:#64748b;margin-bottom:6px;">🧠 <b>Smart Composite:</b> Order Book + Funding Rate + Volume + RSI</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Minimum Skor</label>
+          <select id="editSmartMinScore">
+            <option value="2">2/4 — Daha sık sinyal</option>
+            <option value="3">3/4 — Dengeli (önerilen)</option>
+            <option value="4">4/4 — Sadece mükemmel koşul</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="editSeansOpts" style="display:none;">
+      <hr class="divider">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Seans Stratejisi</label>
+          <select id="editSeansStrategy">
+            <optgroup label="── Coin Bazlı ──">
+              <option value="coin_yy">Coin dün🟢 bugün🟢 (20:00)</option>
+              <option value="coin_ky">Coin dün🔴 bugün🟢 (20:00)</option>
+              <option value="coin_kk">Coin dün🔴 bugün🔴 (20:00)</option>
+              <option value="coin_yk">Coin dün🟢 bugün🔴 (20:00)</option>
+            </optgroup>
+            <optgroup label="── BTC Filtreli ──">
+              <option value="btc_yy_coin_y">BTC 2gün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yy_coin_r">BTC 2gün🟢 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_rr_coin_y">BTC 2gün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_rr_coin_r">BTC 2gün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_yr_coin_y">BTC dün🟢 bugün🔴 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_yr_coin_r">BTC dün🟢 bugün🔴 + Coin bugün🔴 (20:00)</option>
+              <option value="btc_ry_coin_y">BTC dün🔴 bugün🟢 + Coin bugün🟢 (20:00)</option>
+              <option value="btc_ry_coin_r">BTC dün🔴 bugün🟢 + Coin bugün🔴 (20:00)</option>
+            </optgroup>
+            <optgroup label="── ⚡ Gelişmiş ──">
+              <option value="composite_3">⚡ Composite ≥3/5 Faktör Yeşil</option>
+              <option value="composite_4">⚡ Composite ≥4/5 Faktör Yeşil</option>
+              <option value="composite_5">⚡ Composite 5/5 Tümü Yeşil</option>
+              <option value="rel_strong">💪 Coin BTC'den Güçlü</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Satış Saati</label>
+          <select id="editSeansSellHour">
+            <option value="13">13:00</option>
+            <option value="12">12:00</option>
+            <option value="11">11:00</option>
+            <option value="19">19:00</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-blue" onclick="saveEdit()">💾 Kaydet</button>
+      <button class="btn btn-gray" onclick="closeModal()">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CFG = {{ cfg | tojson }};
+let coins = CFG.coins || [];
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const tabs = ['dashboard','coins','trades','settings','chart'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'trades') loadTrades();
+  if (name === 'coins') renderCoins();
+  if (name === 'chart') { initChartSymbols(); loadChart(); if(chartAutoRefresh) clearInterval(chartAutoRefresh); chartAutoRefresh = setInterval(loadChart, 60000); }
+}
+
+function toast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = ok ? '#16a34a' : '#dc2626';
+  t.style.display = 'block';
+  setTimeout(() => t.style.display='none', 3000);
+}
+
+// ── Dashboard ────────────────────────────────────
+function loadDashboard() {
+  fetch('/api/dashboard').then(r => r.json()).then(d => {
+    if (!d.ok) { toast('Hata: '+d.error, false); return; }
+    const p = d.portfolio;
+    document.getElementById('totalCurrent').textContent = '$'+p.total_current.toLocaleString();
+    const pnlEl = document.getElementById('totalPnl');
+    pnlEl.textContent = (p.total_pnl>=0?'+':'')+'$'+p.total_pnl.toFixed(2)+' ('+p.total_pnl_pct+'%)';
+    pnlEl.className = 'val '+(p.total_pnl>=0?'green':'red');
+    document.getElementById('successRate').textContent = p.success_rate+'%';
+    document.getElementById('totalTrades').textContent = p.total_trades;
+    document.getElementById('redPct').textContent = d.market.red_pct+'%';
+    document.getElementById('usdtBalance').textContent = '$'+d.usdt_balance.toFixed(2);
+    const fg = d.fear_greed;
+    document.getElementById('fgVal').textContent = fg.value;
+    document.getElementById('fgVal').className = 'val '+(fg.value<30?'red':fg.value>70?'green':'yellow');
+    document.getElementById('fgLabel').textContent = fg.label;
+    document.getElementById('fgDot').style.left = fg.value+'%';
+
+    const tbody = document.getElementById('positionsTable');
+    if (!p.positions.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Açık pozisyon yok</td></tr>';
+    } else {
+      tbody.innerHTML = p.positions.map(pos => `
+        <tr>
+          <td><b>${pos.symbol}</b></td>
+          <td><b>$${pos.current_val.toFixed(2)}</b></td>
+          <td>$${pos.avg_price.toLocaleString()}</td>
+          <td>$${pos.current_price.toLocaleString()}</td>
+          <td class="${pos.pnl>=0?'green':'red'}">${pos.pnl>=0?'+':''}$${pos.pnl.toFixed(2)}</td>
+          <td class="${pos.pnl_pct>=0?'green':'red'}">${pos.pnl_pct>=0?'+':''}${pos.pnl_pct}%</td>
+          <td><button class="btn btn-red btn-sm" onclick="manualSell('${pos.symbol}')">Sat</button></td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('gainersTable').innerHTML = d.market.top_gainers.map(t =>
+      `<tr><td><b>${t.symbol}</b></td><td>$${t.price.toLocaleString()}</td><td class="green">+${t.change.toFixed(2)}%</td></tr>`
+    ).join('');
+    document.getElementById('losersTable').innerHTML = d.market.top_losers.map(t =>
+      `<tr><td><b>${t.symbol}</b></td><td>$${t.price.toLocaleString()}</td><td class="red">${t.change.toFixed(2)}%</td></tr>`
+    ).join('');
+
+    if (d.market.top50) {
+      document.getElementById('top50Table').innerHTML = d.market.top50.map((t,i) => `
+        <tr>
+          <td style="color:#888;">${i+1}</td>
+          <td><b>${t.symbol}</b></td>
+          <td>$${t.price.toLocaleString()}</td>
+          <td class="${t.change>=0?'green':'red'}">${t.change>=0?'+':''}${t.change.toFixed(2)}%</td>
+          <td>$${t.high.toLocaleString()}</td>
+          <td>$${t.low.toLocaleString()}</td>
+          <td style="color:#888;">${(t.volume/1000000).toFixed(1)}M</td>
+        </tr>`).join('');
+    }
+  }).catch(() => toast('Bağlantı hatası', false));
+}
+
+// ── Coins ────────────────────────────────────────
+function renderCoins() {
+  const el = document.getElementById('coinList');
+  if (!coins.length) { el.innerHTML = '<p style="color:#999;font-size:13px;">Henüz coin eklenmedi.</p>'; return; }
+  el.innerHTML = coins.map(c => {
+    const isSeans = c.signal_source === 'seans';
+    const isSmart = c.signal_source === 'smart';
+    const isUtBot = !isSeans && !isSmart;
+    return `
+    <div class="coin-card">
+      <div class="coin-card-header">
+        <div class="sym">${c.symbol}</div>
+        <span class="badge ${c.signal_source||'utbot'}">${(c.signal_source||'utbot').toUpperCase()}</span>
+        <span class="badge ${c.active?'buy':'neutral'}">${c.active?'Aktif':'Pasif'}</span>
+        <button class="btn btn-blue btn-sm" onclick="manualBuy('${c.symbol}',${c.usdt_amount})">Al</button>
+        <button class="btn btn-red btn-sm" onclick="manualSell('${c.symbol}')">Sat</button>
+        <button class="btn btn-orange btn-sm" onclick="openEdit('${c.symbol}')">✏️</button>
+        <button class="btn btn-gray btn-sm" onclick="toggleCoin('${c.symbol}')">${c.active?'Durdur':'Başlat'}</button>
+        <button class="btn btn-red btn-sm" onclick="removeCoin('${c.symbol}')">🗑</button>
+      </div>
+      <div class="coin-detail">
+        <span>Alım: <b>$${c.usdt_amount}</b></span>
+        ${isUtBot ? `<span>Periyot: <b>${c.period}</b></span>` : ''}
+        ${isUtBot ? `<span>Kapanış Satış: <b>%${c.close_sell_pct}</b></span>` : ''}
+        ${isUtBot ? `<span>UT Key: <b>${c.ut_key||2}</b></span>` : ''}
+        ${isUtBot ? `<span>UT ATR: <b>${c.ut_atr||7}</b></span>` : ''}
+        ${isUtBot ? `<span>Mod: <b>${c.ut_mode==='early'?'⚡ Erken':'Klasik'}</b></span>` : ''}
+        ${isSmart ? `<span>Min Skor: <b>${c.smart_min_score||3}/4</b></span>` : ''}
+        <span>Kâr Hedefi: <b>${c.take_profit_pct>0?'%'+c.take_profit_pct:'—'}</b></span>
+        <span>Kâr Satış: <b>${c.take_profit_pct>0?'%'+c.take_profit_sell_pct:'—'}</b></span>
+        <span>Stop Loss: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_pct:'—'}</b></span>
+        <span>Stop Satış: <b>${c.stop_loss_pct>0?'%'+c.stop_loss_sell_pct:'—'}</b></span>
+        ${isSeans ? `
+        <span>Seans: <b>${SEANS_LABELS[c.seans_strategy]||c.seans_strategy||'—'}</b></span>
+        <span>Satış Saati: <b>${c.seans_sell_hour||13}:00</b></span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function autoUsdt() {
+  const el = document.getElementById('newSymbol');
+  const v = el.value.trim().toUpperCase();
+  if (v && !v.endsWith('USDT')) el.value = v + 'USDT';
+}
+
+function addCoin() {
+  autoUsdt();
+  const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+  if (!symbol) { toast('Sembol girin', false); return; }
+  const data = {
+    symbol,
+    usdt_amount:          parseFloat(document.getElementById('newUsdt').value),
+    signal_source:        document.getElementById('newSource').value,
+    period:               document.getElementById('newPeriod').value,
+    ut_key:               parseFloat(document.getElementById('newUtKey').value),
+    ut_atr:               parseInt(document.getElementById('newUtAtr').value),
+    ut_mode:              document.getElementById('newUtMode').value,
+    close_sell_pct:       parseFloat(document.getElementById('newCloseSell').value),
+    take_profit_pct:      parseFloat(document.getElementById('newTp').value),
+    take_profit_sell_pct: parseFloat(document.getElementById('newTpSell').value),
+    stop_loss_pct:        parseFloat(document.getElementById('newSl').value),
+    stop_loss_sell_pct:   parseFloat(document.getElementById('newSlSell').value),
+    seans_strategy:       document.getElementById('newSeansStrategy').value,
+    seans_sell_hour:      parseInt(document.getElementById('newSeansSellHour').value),
+    smart_min_score:      parseInt(document.getElementById('newSmartMinScore').value),
+  };
+  fetch('/coin/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){coins.push({...data,active:true});renderCoins();toast(symbol+' eklendi');document.getElementById('newSymbol').value='';}
+      else toast(d.error,false);
+    });
+}
+
+function removeCoin(symbol) {
+  if(!confirm(symbol+' silinsin mi?')) return;
+  fetch('/coin/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol})})
+    .then(r=>r.json()).then(d=>{if(d.ok){coins=coins.filter(c=>c.symbol!==symbol);renderCoins();toast(symbol+' silindi');}});
+}
+
+function toggleCoin(symbol) {
+  fetch('/coin/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){const c=coins.find(c=>c.symbol===symbol);if(c)c.active=!c.active;renderCoins();toast(symbol+' güncellendi');}
+    });
+}
+
+// ── Edit Modal ───────────────────────────────────
+function openEdit(symbol) {
+  const c = coins.find(c=>c.symbol===symbol);
+  if(!c) return;
+  document.getElementById('editSymbol').value = symbol;
+  document.getElementById('editSymbolTitle').textContent = symbol;
+  document.getElementById('editUsdt').value = c.usdt_amount;
+  document.getElementById('editSource').value = c.signal_source||'utbot';
+  document.getElementById('editPeriod').value = c.period||'1h';
+  document.getElementById('editUtKey').value = c.ut_key||2;
+  document.getElementById('editUtAtr').value = c.ut_atr||7;
+  document.getElementById('editUtMode').value = c.ut_mode||'crossover';
+  document.getElementById('editCloseSell').value = c.close_sell_pct||100;
+  document.getElementById('editTp').value = c.take_profit_pct||0;
+  document.getElementById('editTpSell').value = c.take_profit_sell_pct||100;
+  document.getElementById('editSl').value = c.stop_loss_pct||0;
+  document.getElementById('editSlSell').value = c.stop_loss_sell_pct||100;
+  document.getElementById('editSeansStrategy').value = c.seans_strategy||'both';
+  document.getElementById('editSeansSellHour').value = c.seans_sell_hour||13;
+  document.getElementById('editSmartMinScore').value = c.smart_min_score||3;
+  toggleSeansOpts('edit');
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('editModal').classList.remove('open'); }
+
+function saveEdit() {
+  const symbol = document.getElementById('editSymbol').value;
+  const data = {
+    symbol,
+    usdt_amount:          parseFloat(document.getElementById('editUsdt').value),
+    signal_source:        document.getElementById('editSource').value,
+    period:               document.getElementById('editPeriod').value,
+    ut_key:               parseFloat(document.getElementById('editUtKey').value),
+    ut_atr:               parseInt(document.getElementById('editUtAtr').value),
+    ut_mode:              document.getElementById('editUtMode').value,
+    close_sell_pct:       parseFloat(document.getElementById('editCloseSell').value),
+    take_profit_pct:      parseFloat(document.getElementById('editTp').value),
+    take_profit_sell_pct: parseFloat(document.getElementById('editTpSell').value),
+    stop_loss_pct:        parseFloat(document.getElementById('editSl').value),
+    stop_loss_sell_pct:   parseFloat(document.getElementById('editSlSell').value),
+    seans_strategy:       document.getElementById('editSeansStrategy').value,
+    seans_sell_hour:      parseInt(document.getElementById('editSeansSellHour').value),
+    smart_min_score:      parseInt(document.getElementById('editSmartMinScore').value),
+  };
+  fetch('/coin/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){
+        const c=coins.find(c=>c.symbol===symbol);
+        if(c) Object.assign(c,data);
+        renderCoins();closeModal();toast(symbol+' güncellendi');
+      } else toast(d.error,false);
+    });
+}
+
+// ── Manuel ───────────────────────────────────────
+function manualBuy(symbol,usdt_amount) {
+  if(!confirm(symbol+' için $'+usdt_amount+' alım yapılsın mı?')) return;
+  fetch('/manual/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol,usdt_amount})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok) toast('✅ Alım: '+symbol); else toast('❌ '+d.error,false);
+      loadDashboard();
+    });
+}
+
+function closeAll() {
+  if(!confirm('Tüm pozisyonlar kapatılsın mı?')) return;
+  fetch('/manual/closeall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})
+    .then(r=>r.json()).then(d=>{
+      toast('✅ Tüm pozisyonlar kapatıldı');
+      loadDashboard();
+    });
+}
+
+function manualSell(symbol) {
+  if(!confirm(symbol+' satılsın mı?')) return;
+  fetch('/manual/sell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol,sell_pct:100})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok) toast('✅ Satım: '+symbol+' K/Z: $'+d.pnl); else toast('❌ '+d.error,false);
+      loadDashboard();
+    });
+}
+
+// ── Trades ───────────────────────────────────────
+const IND_COLORS = {
+  'UT BOT': '#1d4ed8', 'SEANS': '#92400e', 'SMART': '#0369a1',
+  'MANUEL': '#374151', 'DİĞER': '#6b7280',
+};
+
+function loadTrades() {
+  Promise.all([
+    fetch('/api/trades').then(r=>r.json()),
+    fetch('/api/stats').then(r=>r.json()),
+  ]).then(([trades, stats]) => {
+
+    // ── Performans tablosu ──
+    const statsEl = document.getElementById('statsTable');
+    const byInd   = stats.by_indicator || {};
+    if (!Object.keys(byInd).length) {
+      statsEl.innerHTML = '<p style="color:#999;font-size:13px;">Henüz kapalı işlem yok.</p>';
+    } else {
+      const ORDER = ['UT BOT','SEANS','SMART','MANUEL','DİĞER'];
+      const keys  = ORDER.filter(k => byInd[k]).concat(
+        Object.keys(byInd).filter(k => !ORDER.includes(k))
+      );
+      statsEl.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>İndikatör</th>
+              <th style="text-align:center;">İşlem</th>
+              <th style="text-align:center;">Kazanma %</th>
+              <th style="text-align:center;">Toplam K/Z</th>
+              <th style="text-align:center;">Ort K/Z</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${keys.map(k => {
+              const v   = byInd[k];
+              const col = IND_COLORS[k] || '#6b7280';
+              const bar = `<div style="height:4px;border-radius:2px;margin-top:3px;width:${Math.min(v.wr,100)}%;background:${v.wr>=60?'#16a34a':v.wr>=50?'#f0a500':'#dc2626'}"></div>`;
+              return `<tr>
+                <td><span style="background:${col}20;color:${col};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;">${k}</span></td>
+                <td style="text-align:center;">${v.trades}</td>
+                <td style="text-align:center;">
+                  <span class="${v.wr>=60?'green':v.wr>=50?'yellow':'red'}"><b>%${v.wr}</b></span>${bar}
+                </td>
+                <td style="text-align:center;" class="${v.pnl>=0?'green':'red'}">
+                  ${v.pnl>=0?'+':''}$${v.pnl.toFixed(2)}
+                </td>
+                <td style="text-align:center;" class="${v.avg>=0?'green':'red'}">
+                  ${v.avg>=0?'+':''}$${v.avg.toFixed(2)}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    // ── İşlem geçmişi tablosu ──
+    const tbody = document.getElementById('tradesTable');
+    if (!trades.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">İşlem yok</td></tr>';
+      return;
+    }
+    tbody.innerHTML = trades.map(t => {
+      const col = IND_COLORS[(t.source||'').toUpperCase()] || '#6b7280';
+      return `<tr>
+        <td style="font-size:11px;color:#666;">${t.time}</td>
+        <td><span class="badge ${t.type}">${t.type==='buy'?'ALIM':'SATIM'}</span></td>
+        <td><span style="background:${col}20;color:${col};padding:1px 6px;border-radius:10px;font-size:10px;font-weight:bold;">${t.source||'—'}</span></td>
+        <td><b>${t.symbol}</b></td>
+        <td style="color:#666;">${t.qty}</td>
+        <td>$${t.price?t.price.toLocaleString():'—'}</td>
+        <td class="${(t.pnl||0)>=0?'green':'red'}">${t.pnl!=null?(t.pnl>=0?'+':'')+'$'+t.pnl.toFixed(2):'—'}</td>
+      </tr>`;
+    }).join('');
+  });
+}
+
+// ── Settings ─────────────────────────────────────
+function saveSettings() {
+  const data = new FormData();
+  data.append('api_key', document.getElementById('cfgApiKey').value);
+  data.append('api_secret', document.getElementById('cfgApiSecret').value);
+  data.append('real_api_key', document.getElementById('cfgRealApiKey').value);
+  data.append('real_api_secret', document.getElementById('cfgRealApiSecret').value);
+  data.append('webhook_secret', document.getElementById('cfgWebhookSecret').value);
+  data.append('check_interval', document.getElementById('cfgInterval').value);
+  if(document.getElementById('cfgTestnet').checked) data.append('testnet','on');
+  data.append('telegram_token', document.getElementById('cfgTelegramToken').value);
+  data.append('telegram_chat_id', document.getElementById('cfgTelegramChatId').value);
+  fetch('/settings',{method:'POST',body:data}).then(r=>r.json())
+    .then(d=>{ if(d.ok) toast('Ayarlar kaydedildi'); else toast(d.error,false); });
+}
+
+
+
+function drawChart(candles, trails, signals) {
+  const canvas = document.getElementById('chartCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight || 400;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const PAD = {top:20, right:60, bottom:30, left:10};
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!candles.length) return;
+
+  // Fiyat aralığı
+  const allPrices = candles.flatMap(c => [c.h, c.l]).concat(trails);
+  const minP = Math.min(...allPrices) * 0.999;
+  const maxP = Math.max(...allPrices) * 1.001;
+  const priceRange = maxP - minP;
+
+  const toY = p => PAD.top + chartH - ((p - minP) / priceRange) * chartH;
+  const candleW = Math.max(2, chartW / candles.length - 1);
+  const toX = i => PAD.left + i * (chartW / candles.length) + candleW / 2;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 5; g++) {
+    const y = PAD.top + (chartH / 5) * g;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    const price = maxP - (priceRange / 5) * g;
+    ctx.fillStyle = '#555';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(price.toFixed(price < 1 ? 5 : 2), W - PAD.right + 2, y + 4);
+  }
+
+  // Mumlar
+  candles.forEach((c, i) => {
+    const x = toX(i);
+    const isGreen = c.c >= c.o;
+    ctx.strokeStyle = isGreen ? '#26a69a' : '#ef5350';
+    ctx.fillStyle  = isGreen ? '#26a69a' : '#ef5350';
+
+    // Wick
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, toY(c.h));
+    ctx.lineTo(x, toY(c.l));
+    ctx.stroke();
+
+    // Body
+    const bodyTop = toY(Math.max(c.o, c.c));
+    const bodyBot = toY(Math.min(c.o, c.c));
+    const bodyH = Math.max(1, bodyBot - bodyTop);
+    ctx.fillRect(x - candleW/2, bodyTop, candleW, bodyH);
+  });
+
+  // Trailing stop çizgisi
+  if (trails.length > 0) {
+    const offset = candles.length - trails.length;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < trails.length; i++) {
+      const ci = i + offset;
+      const x = toX(ci);
+      const y = toY(trails[i]);
+      const isGreen = candles[ci] && candles[ci].c > trails[i];
+      ctx.strokeStyle = isGreen ? '#4caf50' : '#f44336';
+      if (i === 0) { ctx.beginPath(); ctx.moveTo(x, y); }
+      else { ctx.lineTo(x, y); }
+      if (i === trails.length - 1 || 
+          (candles[ci] && candles[ci+1] && 
+           (candles[ci].c > trails[i]) !== (candles[ci+1] && candles[ci+1].c > trails[i+1]))) {
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
+    }
+    ctx.stroke();
+  }
+
+  // Sinyaller
+  signals.forEach(s => {
+    const x = toX(s.i);
+    const y = toY(s.price);
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    if (s.type === 'buy') {
+      ctx.fillStyle = '#4caf50';
+      ctx.fillText('▲', x, y + 20);
+    } else {
+      ctx.fillStyle = '#f44336';
+      ctx.fillText('▼', x, y - 10);
+    }
+  });
+
+  // Son fiyat çizgisi
+  const lastClose = candles[candles.length-1].c;
+  const lastY = toY(lastClose);
+  ctx.setLineDash([4,3]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD.left, lastY);
+  ctx.lineTo(W - PAD.right, lastY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(lastClose.toFixed(lastClose < 1 ? 5 : 2), W - PAD.right + 2, lastY + 4);
+}
+
+// ── Chart ────────────────────────────────────────
+function initChartSymbols() {
+  const sel = document.getElementById('chartSymbol');
+  const prev = sel.value;
+  sel.innerHTML = '';
+  if (coins.length === 0) {
+    sel.innerHTML = '<option value="BTCUSDT">BTCUSDT</option>';
+  } else {
+    coins.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.symbol;
+      opt.textContent = c.symbol;
+      // Key value ve ATR'yi coin ayarından al
+      opt.dataset.key = c.ut_key || 2;
+      opt.dataset.atr = c.ut_atr || 7;
+      sel.appendChild(opt);
+    });
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  }
+  updateChartParams();
+}
+
+function updateChartParams() {
+  const sel = document.getElementById('chartSymbol');
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.key) {
+    document.getElementById('chartKeyValue').value = opt.dataset.key;
+    document.getElementById('chartAtrPeriod').value = opt.dataset.atr;
+  }
+}
+
+let chartDebounce = null;
+function loadChart() {
+  clearTimeout(chartDebounce);
+  chartDebounce = setTimeout(_doLoadChart, 400);
+}
+
+function _doLoadChart() {
+  const symbol   = document.getElementById('chartSymbol').value;
+  const interval = document.getElementById('chartInterval').value;
+  const keyValue = document.getElementById('chartKeyValue').value;
+  const atrPeriod= document.getElementById('chartAtrPeriod').value;
+  const status   = document.getElementById('chartStatus');
+  status.textContent = 'Yükleniyor...';
+
+  fetch(`/api/chart?symbol=${symbol}&interval=${interval}&key_value=${keyValue}&atr_period=${atrPeriod}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { status.textContent = 'Hata: ' + d.error; return; }
+      status.textContent = `${d.candles.length} mum | ${d.signals.length} sinyal | Key:${keyValue} ATR:${atrPeriod}`;
+      drawChart(d.candles, d.trails, d.signals);
+    })
+    .catch(() => { status.textContent = 'Bağlantı hatası'; });
+}
+
+function drawChart(candles, trails, signals) {
+  const canvas = document.getElementById('chartCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = 400;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const PAD = {top:20, right:65, bottom:30, left:10};
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!candles.length) return;
+
+  const allPrices = candles.flatMap(c => [c.h, c.l]).concat(trails);
+  const minP = Math.min(...allPrices) * 0.999;
+  const maxP = Math.max(...allPrices) * 1.001;
+  const priceRange = maxP - minP;
+
+  const toY = p => PAD.top + chartH - ((p - minP) / priceRange) * chartH;
+  const candleW = Math.max(2, chartW / candles.length * 0.7);
+  const toX = i => PAD.left + (i + 0.5) * (chartW / candles.length);
+
+  // Grid
+  for (let g = 0; g <= 5; g++) {
+    const y = PAD.top + (chartH / 5) * g;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    const price = maxP - (priceRange / 5) * g;
+    ctx.fillStyle = '#666';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(price < 1 ? price.toFixed(5) : price.toFixed(2), W - PAD.right + 3, y + 4);
+  }
+
+  // Mumlar
+  candles.forEach((c, i) => {
+    const x = toX(i);
+    const isGreen = c.c >= c.o;
+    const col = isGreen ? '#26a69a' : '#ef5350';
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = 1;
+    // Wick
+    ctx.beginPath();
+    ctx.moveTo(x, toY(c.h));
+    ctx.lineTo(x, toY(c.l));
+    ctx.stroke();
+    // Body
+    const bodyTop = toY(Math.max(c.o, c.c));
+    const bodyH = Math.max(1, toY(Math.min(c.o, c.c)) - bodyTop);
+    ctx.fillRect(x - candleW/2, bodyTop, candleW, bodyH);
+  });
+
+  // Trailing stop — renk değişiminde segment kes
+  if (trails.length > 0) {
+    const offset = candles.length - trails.length;
+    ctx.lineWidth = 1.5;
+    let prevGreen = null;
+    ctx.beginPath();
+    for (let i = 0; i < trails.length; i++) {
+      const ci = i + offset;
+      const x = toX(ci);
+      const y = toY(trails[i]);
+      const isGreen = candles[ci] && candles[ci].c > trails[i];
+      if (prevGreen !== null && isGreen !== prevGreen) {
+        ctx.strokeStyle = prevGreen ? '#4caf50' : '#f44336';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      } else if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+      prevGreen = isGreen;
+    }
+    ctx.strokeStyle = prevGreen ? '#4caf50' : '#f44336';
+    ctx.stroke();
+  }
+
+  // Sinyaller
+  signals.forEach(s => {
+    const x = toX(s.i);
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'center';
+    if (s.type === 'buy') {
+      ctx.fillStyle = '#4caf50';
+      ctx.fillText('▲', x, toY(s.price) + 18);
+    } else {
+      ctx.fillStyle = '#f44336';
+      ctx.fillText('▼', x, toY(s.price) - 8);
+    }
+  });
+
+  // Son fiyat
+  const lastClose = candles[candles.length-1].c;
+  const lastY = toY(lastClose);
+  ctx.setLineDash([4,3]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD.left, lastY); ctx.lineTo(W - PAD.right, lastY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(lastClose < 1 ? lastClose.toFixed(5) : lastClose.toFixed(2), W - PAD.right + 3, lastY + 4);
+}
+
+let chartAutoRefresh = null;
+
+const SEANS_LABELS = {
+  btc_yy_coin_y: 'BTC 2gün🟢 + Coin bugün🟢',
+  btc_yy_coin_r: 'BTC 2gün🟢 + Coin bugün🔴',
+  btc_rr_coin_y: 'BTC 2gün🔴 + Coin bugün🟢',
+  btc_rr_coin_r: 'BTC 2gün🔴 + Coin bugün🔴',
+  btc_yr_coin_y: 'BTC dün🟢 bugün🔴 + Coin bugün🟢',
+  btc_yr_coin_r: 'BTC dün🟢 bugün🔴 + Coin bugün🔴',
+  btc_ry_coin_y: 'BTC dün🔴 bugün🟢 + Coin bugün🟢',
+  btc_ry_coin_r: 'BTC dün🔴 bugün🟢 + Coin bugün🔴',
+  coin_yy:       'Coin dün🟢 bugün🟢',
+  coin_ky:       'Coin dün🔴 bugün🟢',
+  coin_kk:       'Coin dün🔴 bugün🔴',
+  coin_yk:       'Coin dün🟢 bugün🔴',
+  composite_3:   '⚡ Composite ≥3/5 Faktör',
+  composite_4:   '⚡ Composite ≥4/5 Faktör',
+  composite_5:   '⚡ Composite 5/5 Faktör',
+  rel_strong:    '💪 Coin BTC\'den Güçlü',
+  abd_red:       'ABD Kırmızı',
+  prev_green:    'Önceki Yeşil',
+  both:          'ABD Kırmızı + Önceki Yeşil',
+  prev_green_btc:'Önceki Yeşil + BTC Yeşil',
+  abd_red_btc:   'ABD + BTC Kırmızı',
+};
+
+// ── Seans Analiz ─────────────────────────────────
+function seansAnaliz() {
+  const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+  if (!symbol) { toast('Sembol girin', false); return; }
+
+  document.getElementById('seansModalSymbol').textContent = symbol;
+  document.getElementById('seansModalContent').innerHTML = '<div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor... (180 gün veri)</div>';
+  document.getElementById('seansModal').classList.add('open');
+
+  fetch(`/api/seans_analiz?symbol=${symbol}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        document.getElementById('seansModalContent').innerHTML = `<div style="color:#dc2626;">Hata: ${d.error}</div>`;
+        return;
+      }
+
+      const bestByHour = d.best_strategy || {};
+      const byHour     = d.by_hour || {'13': d.results};
+      const vol     = d.volatility || {};
+
+      function applyStrategy(key, sellHour, sl, tp) {
+        document.getElementById('newSource').value = 'seans';
+        toggleSeansOpts('new');
+        document.getElementById('newSeansStrategy').value = key;
+        document.getElementById('newSeansSellHour').value = sellHour;
+        if (sl != null) document.getElementById('newSl').value = sl;
+        if (tp != null) document.getElementById('newTp').value = tp;
+        document.getElementById('seansModal').classList.remove('open');
+        toast(`Strateji: ${SEANS_LABELS[key]||key} | SL:%${sl} TP:%${tp}`);
+      }
+
+      // Her satış saati için en iyi strateji bul
+      // Skor = wr * log(trades+1) — yüksek WR + yeterli işlem birlikte ödüllendirilir
+      function bestForHour(results) {
+        const score = v => v.trades === 0 ? -999 : v.wr * Math.log(v.trades + 1);
+        return Object.entries(results)
+          .filter(([,v]) => v.trades > 0)
+          .sort((a,b) => score(b[1]) - score(a[1]))[0]?.[0];
+      }
+
+      function tableForHour(sellH, results, highlightKey) {
+        const row = (key, label, data) => {
+          const isBest = key === highlightKey;
+          return `
+            <tr style="${isBest ? 'background:rgba(16,185,129,0.10);font-weight:bold;' : ''}">
+              <td style="font-size:11px;">${isBest ? '⭐ ' : ''}${label}</td>
+              <td style="text-align:center;"><span class="${data.wr>=60?'green':data.wr>=50?'yellow':'red'}"><b>%${data.wr}</b></span></td>
+              <td style="text-align:center;"><span class="${data.net>=0?'green':'red'}">%${data.net}</span></td>
+              <td style="text-align:center;color:#94a3b8;">${data.trades}</td>
+              <td style="text-align:center;"><span class="${data.avg>=0?'green':'red'}">%${data.avg}</span></td>
+              <td style="text-align:center;">
+                <button class="btn btn-orange btn-sm" onclick="(${applyStrategy})('${key}',${sellH},${vol.suggested_sl??0},${vol.suggested_tp??0})">Seç</button>
+              </td>
+            </tr>`;
+        };
+        const coinKeys = ['coin_yy','coin_ky','coin_kk','coin_yk'];
+        const btcKeys  = ['btc_yy_coin_y','btc_yy_coin_r','btc_rr_coin_y','btc_rr_coin_r',
+                          'btc_yr_coin_y','btc_yr_coin_r','btc_ry_coin_y','btc_ry_coin_r'];
+        return `
+          <p style="font-size:11px;color:#94a3b8;margin:8px 0 3px;">📅 Satış Saati: <b>${sellH}:00</b></p>
+          <table>
+            <thead><tr><th>Strateji</th><th>Kazanma</th><th>Net %</th><th>İşlem</th><th>Ort %</th><th></th></tr></thead>
+            <tbody>
+              ${coinKeys.map(k => row(k, SEANS_LABELS[k], results[k])).join('')}
+              <tr><td colspan="6" style="padding:2px 0;background:#f8f8f8;font-size:10px;color:#999;text-align:center;">── BTC Filtreli ──</td></tr>
+              ${btcKeys.map(k => row(k, SEANS_LABELS[k], results[k])).join('')}
+            </tbody>
+          </table>`;
+      }
+
+      const SELL_HOURS = [11, 12, 13, 19];
+      let tabs = '', panels = '';
+      SELL_HOURS.forEach((h, i) => {
+        const res = byHour[String(h)] || {};
+        const bk  = bestByHour[String(h)] || bestForHour(res);
+        tabs   += `<span id="stab-${h}" class="stab${i===0?' stab-active':''}" onclick="switchStab(${h})" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;${i===0?'background:#f0a500;color:#fff;':'background:#f0f0f0;color:#666;'}">${h}:00${bk?' ⭐':''}</span>`;
+        panels += `<div id="spanel-${h}" style="display:${i===0?'block':'none'}">${tableForHour(h, res, bk)}</div>`;
+      });
+
+      // ⚡ Composite sekmesi
+      const compRes13 = byHour['13'] || {};
+      const compRows = ['composite_3','composite_4','composite_5','rel_strong'].map(k => {
+        const data = compRes13[k] || {wr:0,net:0,trades:0,avg:0};
+        const isBest = bestByHour['13'] === k;
+        return `<tr style="${isBest?'background:rgba(16,185,129,0.10);font-weight:bold;':''}">
+          <td style="font-size:11px;">${isBest?'⭐ ':''}${SEANS_LABELS[k]||k}</td>
+          <td style="text-align:center;"><span class="${data.wr>=60?'green':data.wr>=50?'yellow':'red'}"><b>%${data.wr}</b></span></td>
+          <td style="text-align:center;"><span class="${data.net>=0?'green':'red'}">%${data.net}</span></td>
+          <td style="text-align:center;color:#94a3b8;">${data.trades}</td>
+          <td style="text-align:center;"><span class="${data.avg>=0?'green':'red'}">%${data.avg}</span></td>
+          <td><button class="btn btn-orange btn-sm" onclick="(${applyStrategy})('${k}',13,${vol.suggested_sl??0},${vol.suggested_tp??0})">Seç</button></td>
+        </tr>`;
+      }).join('');
+      tabs   += `<span id="stab-comp" class="stab" onclick="switchStab('comp')" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;background:#f0f0f0;color:#666;">⚡ Composite</span>`;
+      panels += `<div id="spanel-comp" style="display:none">
+        <p style="font-size:11px;color:#94a3b8;margin:6px 0 4px;">5 Faktör Skoru: BTC dün + BTC 17-20 + Coin 17-20 + Coin dün + <b>Asya seansı 03-10</b></p>
+        <table><thead><tr><th>Strateji</th><th>Kazanma</th><th>Net%</th><th>İşlem</th><th>Ort%</th><th></th></tr></thead>
+        <tbody>${compRows}</tbody></table>
+        <p style="font-size:10px;color:#64748b;margin-top:4px;">Composite: tüm faktörler aynı anda kontrol edilir — daha az sinyal ama daha yüksek kalite</p>
+      </div>`;
+
+      // 📅 DOW sekmesi
+      const dow = d.dow_analysis || {};
+      const dowOrder = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+      const dowRows = dowOrder.map(day => {
+        const v = dow[day] || {wr:0,avg:0,trades:0};
+        const bar = `<div style="height:3px;background:${v.wr>=60?'#16a34a':v.wr>=50?'#f0a500':'#dc2626'};border-radius:2px;width:${Math.min(v.wr,100)}%"></div>`;
+        return `<tr>
+          <td style="font-weight:bold;font-size:12px;">${day}</td>
+          <td><span class="${v.wr>=60?'green':v.wr>=50?'yellow':'red'}"><b>%${v.wr}</b></span>${bar}</td>
+          <td><span class="${v.avg>=0?'green':'red'}">%${v.avg}</span></td>
+          <td style="color:#94a3b8;">${v.trades}</td>
+        </tr>`;
+      }).join('');
+      tabs   += `<span id="stab-dow" class="stab" onclick="switchStab('dow')" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;background:#f0f0f0;color:#666;">📅 Günler</span>`;
+      panels += `<div id="spanel-dow" style="display:none">
+        <p style="font-size:11px;color:#94a3b8;margin:6px 0 4px;">20:00 alım → 13:00 satış — haftanın gününe göre performans</p>
+        <table><thead><tr><th>Gün</th><th>Kazanma %</th><th>Ort %</th><th>İşlem</th></tr></thead>
+        <tbody>${dowRows}</tbody></table>
+        <p style="font-size:10px;color:#64748b;margin-top:4px;">Düşük kazanma oranı olan günlerde işlem yapmayı düşünün.</p>
+      </div>`;
+
+      // ⏰ Saat Matrisi sekmesi
+      const matrix   = d.timing_matrix || {};
+      const buyHours = d.timing_buy_hours  || [16,17,18,19,20,21,22,23];
+      const sellHours= d.timing_sell_hours || [7,8,9,10,11,12,13,14,15,16,17];
+      const bestT    = d.best_timing || {buy:20, sell:13};
+
+      function wrColor(wr, trades) {
+        if (trades < 10) return '#e5e7eb';
+        if (wr >= 65) return '#16a34a';
+        if (wr >= 58) return '#4ade80';
+        if (wr >= 52) return '#fbbf24';
+        if (wr >= 45) return '#f97316';
+        return '#dc2626';
+      }
+
+      let matrixHtml = `<div style="overflow-x:auto;margin-top:4px;">
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:4px;">
+          Alım saati (sol) × Satış saati ertesi gün (üst) — koşulsuz backtest<br>
+          ⭐ En iyi: <b>Al ${bestT.buy}:00 → Sat ${bestT.sell}:00</b>
+          <button class="btn btn-orange btn-sm" style="margin-left:6px;"
+            onclick="document.getElementById('newSeansSellHour').value=${bestT.sell};
+                     document.getElementById('seansModal').classList.remove('open');
+                     toast('Satış saati ${bestT.sell}:00 seçildi');">Uygula</button>
+        </p>
+        <table style="border-collapse:collapse;font-size:10px;">
+          <thead><tr><th style="padding:3px 6px;background:#f8f8f8;">Al↓ Sat→</th>
+            ${sellHours.map(h=>`<th style="padding:3px 5px;background:#f8f8f8;text-align:center;">${h}:00</th>`).join('')}
+          </tr></thead><tbody>`;
+
+      buyHours.forEach(bh => {
+        matrixHtml += `<tr><td style="padding:3px 6px;font-weight:bold;background:#f8f8f8;">${bh}:00</td>`;
+        sellHours.forEach(sh => {
+          const cell = (matrix[String(bh)] || {})[String(sh)] || {wr:0,avg:0,trades:0};
+          const isBest = bh === bestT.buy && sh === bestT.sell;
+          const bg = wrColor(cell.wr, cell.trades);
+          const textCol = cell.wr >= 52 && cell.trades >= 10 ? '#fff' : '#666';
+          matrixHtml += `<td style="padding:3px 5px;text-align:center;background:${bg};color:${textCol};
+            border:${isBest?'2px solid #1a1a1a':'1px solid #e5e7eb'};border-radius:3px;cursor:default;"
+            title="Al ${bh}:00 → Sat ${sh}:00 | Kazanma:%${cell.wr} | Ort:%${cell.avg} | ${cell.trades} işlem">
+            ${cell.trades >= 10 ? cell.wr+'%' : '—'}
+          </td>`;
+        });
+        matrixHtml += `</tr>`;
+      });
+
+      matrixHtml += `</tbody></table>
+        <p style="font-size:10px;color:#64748b;margin-top:4px;">🟢 ≥65% &nbsp; 🟡 52-64% &nbsp; 🟠 45-51% &nbsp; 🔴 &lt;45% &nbsp; — az veri</p>
+      </div>`;
+
+      tabs   += `<span id="stab-time" class="stab" onclick="switchStab('time')" style="padding:5px 10px;cursor:pointer;font-size:11px;border-radius:6px 6px 0 0;background:#f0f0f0;color:#666;">⏰ Saatler</span>`;
+      panels += `<div id="spanel-time" style="display:none">${matrixHtml}</div>`;
+
+      document.getElementById('seansModalContent').innerHTML = `
+        <div style="background:#f0f9ff;border:1px solid #0ea5e9;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;">
+          📊 <b>Oynaklık (${vol.count||0} gece):</b>
+          Ort. düşüş <span class="red">%${vol.avg_drawdown||0}</span> |
+          Ort. yükseliş <span class="green">%${vol.avg_gain||0}</span> |
+          Önerilen SL <span class="red"><b>%${vol.suggested_sl||0}</b></span> |
+          Önerilen TP <span class="green"><b>%${vol.suggested_tp||0}</b></span>
+        </div>
+        <div style="background:#fff3cd;border:1px solid #f0a500;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
+          ⭐ En iyi strateji (<span id="seansBestHour">11:00</span>):
+          <b id="seansBestLabel">${SEANS_LABELS[bestByHour['11']]||bestByHour['11']||'—'}</b>
+          <button class="btn btn-orange btn-sm" style="margin-left:8px;"
+            onclick="if(window._seansCtx){var c=window._seansCtx;c.apply(c.best[c.h]||'',+c.h,c.vol.suggested_sl??0,c.vol.suggested_tp??0);}">Uygula</button>
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:0;">${tabs}</div>
+        <div style="border:1px solid #e5e7eb;border-radius:0 8px 8px 8px;padding:8px;overflow-x:auto;">${panels}</div>
+        <p style="font-size:10px;color:#64748b;margin-top:8px;">* Son 180 gün | Fee (%0.2) dahil | Min 5 işlem</p>`;
+
+      window._seansCtx = { best: bestByHour, vol, apply: applyStrategy, h: '11' };
+    })
+    .catch(() => {
+      document.getElementById('seansModalContent').innerHTML = '<div style="color:#dc2626;">Bağlantı hatası</div>';
+    });
+}
+
+function switchStab(h) {
+  document.querySelectorAll('.stab').forEach(t => {
+    t.style.background = '#f0f0f0'; t.style.color = '#666';
+  });
+  document.querySelectorAll('[id^="spanel-"]').forEach(p => p.style.display = 'none');
+  const tab = document.getElementById('stab-'+h);
+  if (tab) { tab.style.background = '#f0a500'; tab.style.color = '#fff'; }
+  const panel = document.getElementById('spanel-'+h);
+  if (panel) panel.style.display = 'block';
+
+  // Banner'ı aktif saat sekmesine göre güncelle
+  if (typeof h === 'number' && window._seansCtx) {
+    const ctx = window._seansCtx;
+    ctx.h = String(h);
+    const bk = ctx.best[ctx.h] || '';
+    const el = document.getElementById('seansBestHour');
+    const lb = document.getElementById('seansBestLabel');
+    if (el) el.textContent = h + ':00';
+    if (lb) lb.textContent = SEANS_LABELS[bk] || bk || '—';
+  }
+}
+
+// ── Smart Backtest ────────────────────────────────
+function smartAnaliz() {
+  const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+  if (!symbol) { toast('Sembol girin', false); return; }
+  document.getElementById('smartModalSymbol').textContent = symbol;
+  document.getElementById('smartModalContent').innerHTML =
+    '<div style="text-align:center;color:#999;padding:20px;">Analiz yapılıyor... (180 gün)</div>';
+  document.getElementById('smartModal').classList.add('open');
+
+  fetch(`/api/smart_backtest?symbol=${symbol}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        document.getElementById('smartModalContent').innerHTML =
+          `<div style="color:#dc2626;">Hata: ${d.error}</div>`;
+        return;
+      }
+
+      const EXIT_ORDER = ['4s','8s','24s','48s','RSI Çıkış'];
+      const SCORE_LABELS = {
+        'Filtresiz':             { color:'#6b7280', desc:'Koşulsuz — baz karşılaştırma' },
+        'Herhangi 1 faktör':     { color:'#94a3b8', desc:'RSI, Volume veya Formasyon — herhangi biri' },
+        'Herhangi 2 faktör':     { color:'#f0a500', desc:'3 faktörden 2\'si yeşil' },
+        'RSI + Volume + Formasyon': { color:'#16a34a', desc:'3 faktörün tümü yeşil — Smart\'a en yakın (Funding Rate canlıda ek filtre)' },
+      };
+
+      let html = '';
+      Object.entries(d.results).forEach(([label, exits]) => {
+        const meta = SCORE_LABELS[label] || { color:'#6b7280', desc:'' };
+        html += `
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:bold;color:${meta.color};margin-bottom:2px;">${label}</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:5px;">${meta.desc}</div>
+            <table style="width:100%;">
+              <thead><tr>
+                <th>Çıkış</th><th style="text-align:center;">İşlem</th>
+                <th style="text-align:center;">Kazanma %</th>
+                <th style="text-align:center;">Toplam %</th>
+                <th style="text-align:center;">Ort %</th>
+              </tr></thead>
+              <tbody>
+                ${EXIT_ORDER.filter(e => exits[e]).map(e => {
+                  const v = exits[e];
+                  const isRsi = e === 'RSI Çıkış';
+                  return `<tr style="${isRsi?'background:#f0fdf4;font-style:italic;':''}">
+                    <td style="font-size:11px;">${isRsi?'🔴 RSI>72':e}</td>
+                    <td style="text-align:center;color:#94a3b8;">${v.trades}</td>
+                    <td style="text-align:center;">
+                      <span class="${v.wr>=60?'green':v.wr>=50?'yellow':'red'}"><b>%${v.wr}</b></span>
+                    </td>
+                    <td style="text-align:center;" class="${v.net>=0?'green':'red'}">%${v.net}</td>
+                    <td style="text-align:center;" class="${v.avg>=0?'green':'red'}">%${v.avg}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      });
+
+      document.getElementById('smartModalContent').innerHTML = html +
+        '<p style="font-size:10px;color:#64748b;margin-top:4px;">* Fee %0.2 dahil | Son 180 gün saatlik veri</p>';
+    })
+    .catch(() => {
+      document.getElementById('smartModalContent').innerHTML =
+        '<div style="color:#dc2626;">Bağlantı hatası</div>';
+    });
+}
+
+// ── Trades Reset ─────────────────────────────────
+function resetTrades() {
+  if (!confirm('İşlem geçmişini sıfırlamak istediğinize emin misiniz?\nBu işlem geri alınamaz.')) return;
+  fetch('/trades/reset', {method:'POST'})
+    .then(r=>r.json())
+    .then(d => {
+      if (d.ok) { loadTrades(); loadDashboard(); toast('İşlem geçmişi sıfırlandı'); }
+      else toast(d.error, false);
+    });
+}
+
+// ── Mode Label ───────────────────────────────────
+function updateModeLabel() {
+  const isTestnet = document.getElementById('cfgTestnet').checked;
+  const label = document.getElementById('modeLabel');
+  label.textContent = isTestnet ? '🧪 TESTNET' : '💰 GERÇEK HESAP';
+  label.style.color = isTestnet ? '#f59e0b' : '#16a34a';
+}
+
+// ── Seans Toggle ─────────────────────────────────
+function toggleSeansOpts(prefix) {
+  const source  = document.getElementById(prefix+'Source').value;
+  const isSeans = source === 'seans';
+  const isSmart = source === 'smart';
+  document.getElementById(prefix+'SeansOpts').style.display = (isSeans || source === 'both') ? 'block' : 'none';
+  const smartOpts = document.getElementById(prefix+'SmartOpts');
+  if (smartOpts) smartOpts.style.display = isSmart ? 'block' : 'none';
+  const utFields = document.getElementById(prefix+'UtFields');
+  if (utFields) utFields.style.display = (isSeans || isSmart) ? 'none' : '';
+}
+
+// ── Init ─────────────────────────────────────────
+loadDashboard();
+setInterval(loadDashboard, 30000);
+initChartSymbols();
+</script>
+</body>
+</html>

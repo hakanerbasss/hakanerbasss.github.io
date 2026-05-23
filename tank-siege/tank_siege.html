@@ -1660,7 +1660,7 @@ let _cloudCtx     = null;
 let _cloudDirty   = true;
 let _cloudLastSig = '';    // bulut pozisyon imzası
 // ─────────────────────────────────────────────────────────────────
-const APP_VERSION_DATE = '2026.05.22 17:30';
+const APP_VERSION_DATE = '2026.05.22 18:03';
 const APP_VERSION_NOTE = 'Hedef isabet: 2 tekerlek alttan kayarak cikar + damped sallama animasyonu [Claude]';
 // ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
@@ -4398,21 +4398,20 @@ function _spawnMissile(offsetX){
   var sty = typeof tankY !== 'undefined' ? tankY : H*0.75;
 
   // Her fuze biraz farkli davransin
-  var _skyVariance = skyY + (Math.random()-0.5) * 60;
-  // WP1 x: tanktan 150-210px sağda — dönüş arki sol ekran içinde kalır
-  var _wp1x = stx + 150 + (Math.random()-0.5) * 60;
-  _wp1x = Math.max(stx + 100, Math.min(_wp1x, W - 30));
-  var _turnRate    = 0.040 + Math.random() * 0.025;    // 0.040-0.065 — arc radius küçük
+  var _skyVariance = skyY + (Math.random()-0.5) * 80;  // WP0/WP1 yuksekligi farkli
+  var _wp1xOffset  = (Math.random()-0.5) * 120;        // WP1 X biraz offset
+  var _turnRate    = 0.020 + Math.random() * 0.035;    // 0.020-0.055 arasi
   var _speed       = 4.0  + Math.random() * 2.0;       // 4-6 arasi
+  var _wp2xOffset  = (Math.random()-0.5) * 60;         // tank etrafina dagil
 
   missiles.push({
     x: mx, y: my,
     vx: 0,
     vy: -_speed,
     waypoints: [
-      {x: mx,    y: _skyVariance},                                       // WP0: hedef ustu
-      {x: _wp1x, y: _skyVariance},                                       // WP1: sagda, dönüs arki icin alan
-      {x: stx + (Math.random()-0.5)*160, y: sty - Math.random()*25},    // WP2: statik ±80px
+      {x: mx,                  y: _skyVariance},   // WP0: hedef ustu
+      {x: stx + _wp1xOffset,   y: _skyVariance},   // WP1: tank ustu (offset)
+      {x: stx + _wp2xOffset,   y: sty},            // WP2: tank civari
     ],
     wpIdx: 0,
     maxTurnRate: _turnRate,
@@ -4443,9 +4442,11 @@ function updateMissiles(){
     var speed = m.speed || 5.0;
     var maxTurnRate = m.maxTurnRate || 0.04;
 
-    // Isabet kontrolü için tank konumu — WP2 artık dinamik değil, statik
+    // Son waypoint (WP2) tank koordinatini guncelle
     var tx = typeof tankX !== 'undefined' ? tankX : m.spawnTankX;
     var ty = typeof tankY !== 'undefined' ? tankY : m.spawnTankY;
+    m.waypoints[2].x = tx;
+    m.waypoints[2].y = ty;
 
     // Mevcut hedef
     var cur = m.waypoints[m.wpIdx];
@@ -5926,8 +5927,8 @@ function update(){
         const _entX   = caveData.mx;
         const _entY   = caveData.my + caveData.mh * 0.5;
 
-        // WP1 — ağzın sağında ve yukarısında, ekran içinde klamp
-        const _wp1X = Math.min(_entX + 80 + _upgLvl * 15, W - 25);
+        // WP1 — ağzın sağında ve yukarısında, ekran dışına çıkabilir
+        const _wp1X = _entX + 80 + _upgLvl * 15;
         const _wp1Y = _entY - (40 + _upgLvl * 8);
 
         // Aşama geçişleri
