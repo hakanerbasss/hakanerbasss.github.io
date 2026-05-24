@@ -286,6 +286,7 @@ def coin_add():
         'smart_min_score':     int(data.get('smart_min_score', 3)),
         'auto_tp_sl':          bool(data.get('auto_tp_sl', False)),
         'sl_cooldown_hours':   float(data.get('sl_cooldown_hours', 4)),
+        'btc_filter':          bool(data.get('btc_filter', False)),
         'active': True,
     })
     cfg['coins'] = coins
@@ -326,6 +327,7 @@ def coin_update():
             c['smart_min_score']      = int(data.get('smart_min_score', c.get('smart_min_score', 3)))
             c['auto_tp_sl']           = bool(data.get('auto_tp_sl', c.get('auto_tp_sl', False)))
             c['sl_cooldown_hours']    = float(data.get('sl_cooldown_hours', c.get('sl_cooldown_hours', 4)))
+            c['btc_filter']           = bool(data.get('btc_filter', c.get('btc_filter', False)))
             c['active']               = data.get('active', c['active'])
             break
     save_config(cfg)

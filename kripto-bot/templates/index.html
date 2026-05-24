@@ -184,6 +184,14 @@ input:focus,select:focus{border-color:#f0a500;}
         <select id="newUtMode">
           <option value="crossover">Klasik (Crossover)</option>
           <option value="early">⚡ Erken (Trail Dönüşü)</option>
+          <option value="hybrid">Hibrit (Erken Al + Klasik Sat)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>BTC Filtresi</label>
+        <select id="newBtcFilter">
+          <option value="false">Kapalı</option>
+          <option value="true">Açık — BTC düşüşte alım yapma</option>
         </select>
       </div>
     </div>
@@ -445,6 +453,14 @@ input:focus,select:focus{border-color:#f0a500;}
         <select id="editUtMode">
           <option value="crossover">Klasik (Crossover)</option>
           <option value="early">⚡ Erken (Trail Dönüşü)</option>
+          <option value="hybrid">Hibrit (Erken Al + Klasik Sat)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>BTC Filtresi</label>
+        <select id="editBtcFilter">
+          <option value="false">Kapalı</option>
+          <option value="true">Açık — BTC düşüşte alım yapma</option>
         </select>
       </div>
     </div>
@@ -677,7 +693,8 @@ function renderCoins() {
         ${isUtBot ? `<span>Kapanış Satış: <b>%${c.close_sell_pct}</b></span>` : ''}
         ${isUtBot ? `<span>UT Key: <b>${c.ut_key||2}</b></span>` : ''}
         ${isUtBot ? `<span>UT ATR: <b>${c.ut_atr||7}</b></span>` : ''}
-        ${isUtBot ? `<span>Mod: <b>${c.ut_mode==='early'?'⚡ Erken':'Klasik'}</b></span>` : ''}
+        ${isUtBot ? `<span>Mod: <b>${c.ut_mode==='early'?'⚡ Erken':c.ut_mode==='hybrid'?'Hibrit':'Klasik'}</b></span>` : ''}
+        ${c.btc_filter ? `<span style="color:#dc2626">BTC Filtre: <b>Açık</b></span>` : ''}
         ${isSmart ? `<span>Min Skor: <b>${c.smart_min_score||3}/4</b></span>` : ''}
         ${c.auto_tp_sl
           ? `<span>TP/SL: <b>⚡ ATR Otomatik</b></span>`
@@ -721,6 +738,7 @@ function addCoin() {
     smart_min_score:      parseInt(document.getElementById('newSmartMinScore').value),
     auto_tp_sl:           document.getElementById('newTpSlMode').value === 'auto',
     sl_cooldown_hours:    parseFloat(document.getElementById('newSlCooldown').value)||4,
+    btc_filter:           document.getElementById('newBtcFilter').value === 'true',
   };
   fetch('/coin/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{
@@ -764,6 +782,7 @@ function openEdit(symbol) {
   document.getElementById('editSmartMinScore').value = c.smart_min_score||3;
   document.getElementById('editSlCooldown').value = c.sl_cooldown_hours ?? 4;
   document.getElementById('editTpSlMode').value = c.auto_tp_sl ? 'auto' : 'manual';
+  document.getElementById('editBtcFilter').value = c.btc_filter ? 'true' : 'false';
   toggleTpSlMode('edit');
   toggleSeansOpts('edit');
   document.getElementById('editModal').classList.add('open');
@@ -791,6 +810,7 @@ function saveEdit() {
     smart_min_score:      parseInt(document.getElementById('editSmartMinScore').value),
     auto_tp_sl:           document.getElementById('editTpSlMode').value === 'auto',
     sl_cooldown_hours:    parseFloat(document.getElementById('editSlCooldown').value)||4,
+    btc_filter:           document.getElementById('editBtcFilter').value === 'true',
   };
   fetch('/coin/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(r=>r.json()).then(d=>{

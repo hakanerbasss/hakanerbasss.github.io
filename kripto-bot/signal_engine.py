@@ -87,10 +87,32 @@ def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7, mode='crossover'
                     # Trail yükseliyordu, durdu → fiyat hâlâ üstünde → erken satış
                     if c > trail and delta_prev > 0 and delta_curr <= 0:
                         return 'sell'
+            elif mode == 'hybrid':
+                # Erken alım (trail dönüşü) + Klasik satış (crossover)
+                if len(trail_history) >= 2:
+                    delta_curr = trail_history[-1] - trail_history[-2]
+                    delta_prev = (trail_history[-2] - trail_history[-3]
+                                  if len(trail_history) >= 3 else delta_curr - 1)
+                    if c < trail and delta_prev < 0 and delta_curr >= 0:
+                        return 'buy'
+                if prev_close >= prev_trail and c < trail:
+                    return 'sell'
 
         prev_close = c
 
     return None
+
+def _btc_trend_up(client, period='1h', ma_len=20):
+    """BTC son {ma_len} kapanış ortalamasının üzerindeyse True döner."""
+    try:
+        closes, _, _, _ = get_klines(client, 'BTCUSDT', period, limit=ma_len + 5)
+        if len(closes) < ma_len:
+            return True
+        ma = sum(closes[-ma_len:]) / ma_len
+        return closes[-1] > ma
+    except Exception as e:
+        print(f'[Engine] BTC trend hatası: {e}')
+        return True
 
 def get_klines(client, symbol, interval, limit=150):
     from binance.client import Client
@@ -208,6 +230,10 @@ def run_engine():
                     positions = load_positions()
 
                     if signal == 'buy':
+                        if coin.get('btc_filter', False) and symbol != 'BTCUSDT':
+                            if not _btc_trend_up(client, period):
+                                print(f'[UT Bot] {symbol} BTC düşüşte, alım atlandı')
+                                continue
                         pos = positions.get(symbol, {})
                         pos_qty = pos.get('qty', 0)
                         pos_price = get_price(client, symbol)
@@ -255,6 +281,10 @@ def run_engine():
 
                     # Alım kontrolü
                     elif pos_qty == 0 or pos_qty * get_price(client, symbol) < 1.0:
+                        if coin.get('btc_filter', False) and symbol != 'BTCUSDT':
+                            if not _btc_trend_up(client, '1h'):
+                                print(f'[Seans] {symbol} BTC düşüşte, alım atlandı')
+                                continue
                         sig = check_seans_signal(client, symbol, strategy)
                         if sig['signal'] == 'buy':
                             usdt = float(coin.get('usdt_amount', 10))
@@ -292,6 +322,10 @@ def run_engine():
                                 source='SMART', period=sell_sig['reason'])
                             print(f'[Smart] {symbol} SATIŞ — {sell_sig["reason"]}')
                     else:
+                        if coin.get('btc_filter', False) and symbol != 'BTCUSDT':
+                            if not _btc_trend_up(client, '1h'):
+                                print(f'[Smart] {symbol} BTC düşüşte, alım atlandı')
+                                continue
                         sig = check_smart_signal(client, symbol, min_score)
                         print(f'[Smart] {symbol} Skor:{sig["score"]}/4 {sig["detail"]}')
                         if sig['signal'] == 'buy':
