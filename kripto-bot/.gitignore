@@ -1,6 +1,7 @@
 venv/
 __pycache__/
 *.bak
+config.json
 positions.json
 signal_state.json
 tg_offset.json

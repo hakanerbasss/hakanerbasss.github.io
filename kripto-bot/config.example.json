@@ -1,0 +1,32 @@
+{
+  "api_key": "TESTNET_API_KEY_BURAYA",
+  "api_secret": "TESTNET_API_SECRET_BURAYA",
+  "testnet": true,
+  "real_api_key": "REAL_API_KEY_BURAYA",
+  "real_api_secret": "REAL_API_SECRET_BURAYA",
+  "telegram_token": "BOT_TOKEN_BURAYA",
+  "telegram_chat_id": "CHAT_ID_BURAYA",
+  "webhook_secret": "GUCLU_BIR_SIFRE_BURAYA",
+  "symbol": "BTCUSDT",
+  "quantity": 0.001,
+  "admin_pass": "",
+  "check_interval": 45,
+  "coins": [
+    {
+      "symbol": "BTCUSDT",
+      "usdt_amount": 500.0,
+      "period": "4h",
+      "signal_source": "seans",
+      "ut_key": 2.0,
+      "ut_atr": 7,
+      "close_sell_pct": 100.0,
+      "take_profit_pct": 3.0,
+      "take_profit_sell_pct": 100.0,
+      "stop_loss_pct": 5.0,
+      "stop_loss_sell_pct": 100.0,
+      "active": true,
+      "seans_strategy": "both",
+      "seans_sell_hour": 13
+    }
+  ]
+}
