@@ -153,7 +153,7 @@ input:focus,select:focus{border-color:#f0a500;}
           <button class="btn btn-gray btn-sm" onclick="smartAnaliz()" title="Smart Backtest">🧠</button>
         </div>
       </div>
-      <div class="form-group"><label>Alım USDT</label><input type="number" id="newUsdt" value="10"></div>
+      <div class="form-group"><label>Alım USDT</label><input type="number" id="newUsdt" value="100"></div>
       <div class="form-group">
         <label>Sinyal Kaynağı</label>
         <select id="newSource" onchange="toggleSeansOpts('new')">
@@ -184,14 +184,14 @@ input:focus,select:focus{border-color:#f0a500;}
         <select id="newUtMode">
           <option value="crossover">Klasik (Crossover)</option>
           <option value="early">⚡ Erken (Trail Dönüşü)</option>
-          <option value="hybrid">Hibrit (Erken Al + Klasik Sat)</option>
+          <option value="hybrid" selected>Hibrit (Erken Al + Klasik Sat)</option>
         </select>
       </div>
       <div class="form-group">
         <label>BTC Filtresi</label>
         <select id="newBtcFilter">
           <option value="false">Kapalı</option>
-          <option value="true">Açık — BTC düşüşte alım yapma</option>
+          <option value="true" selected>Açık — BTC düşüşte alım yapma</option>
         </select>
       </div>
     </div>
@@ -201,7 +201,7 @@ input:focus,select:focus{border-color:#f0a500;}
         <label>TP/SL Modu</label>
         <select id="newTpSlMode" onchange="toggleTpSlMode('new')">
           <option value="manual">Manuel</option>
-          <option value="auto">⚡ ATR Otomatik (SL×1.5 / TP×3)</option>
+          <option value="auto" selected>⚡ ATR Otomatik (SL×1.5 / TP×3)</option>
         </select>
       </div>
     </div>
@@ -1582,17 +1582,30 @@ function toggleSeansOpts(prefix) {
   const source  = document.getElementById(prefix+'Source').value;
   const isSeans = source === 'seans';
   const isSmart = source === 'smart';
+  const isUtBot = source === 'utbot' || source === 'both';
   document.getElementById(prefix+'SeansOpts').style.display = (isSeans || source === 'both') ? 'block' : 'none';
   const smartOpts = document.getElementById(prefix+'SmartOpts');
   if (smartOpts) smartOpts.style.display = isSmart ? 'block' : 'none';
   const utFields = document.getElementById(prefix+'UtFields');
   if (utFields) utFields.style.display = (isSeans || isSmart) ? 'none' : '';
+
+  // UT Bot seçilince varsayılanları otomatik doldur (sadece new formu)
+  if (prefix === 'new' && isUtBot) {
+    const usdt = document.getElementById('newUsdt');
+    if (usdt && (parseFloat(usdt.value) === 10 || !usdt.value)) usdt.value = 100;
+    document.getElementById('newUtMode').value   = 'hybrid';
+    document.getElementById('newBtcFilter').value = 'true';
+    document.getElementById('newTpSlMode').value  = 'auto';
+    document.getElementById('newSlCooldown').value = 4;
+    toggleTpSlMode('new');
+  }
 }
 
 // ── Init ─────────────────────────────────────────
 loadDashboard();
 setInterval(loadDashboard, 30000);
 initChartSymbols();
+toggleTpSlMode('new');  // ATR otomatik seçili gelince TP/SL alanlarını gizle
 </script>
 </body>
 </html>
