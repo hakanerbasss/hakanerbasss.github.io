@@ -263,11 +263,47 @@ def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, fee, source, hold):
         f'\n💸 Komisyon: -${round(fee,3)}{hold_line}'
     )
 
+def _check_sl_cooldown(symbol, cooldown_hours=4):
+    """SL'den sonra cooldown süresi geçti mi? True = alım yapılabilir."""
+    trades = load_trades()
+    last_sl = next(
+        (t for t in reversed(trades)
+         if t.get('symbol') == symbol
+         and t.get('type') == 'sell'
+         and 'STOP' in (t.get('source', '').upper())),
+        None
+    )
+    if not last_sl:
+        return True
+    try:
+        sl_time = datetime.datetime.strptime(last_sl['time'], '%Y-%m-%d %H:%M:%S')
+        elapsed = (datetime.datetime.now() - sl_time).total_seconds() / 3600
+        return elapsed >= cooldown_hours
+    except:
+        return True
+
 def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
     try:
         price = get_price(client, symbol)
         if price <= 0:
             return {'ok': False, 'error': 'Fiyat alınamadı'}
+
+        # SL cooldown kontrolü
+        cfg_check   = load_config()
+        coin_check  = next((c for c in cfg_check.get('coins', []) if c['symbol'] == symbol), {})
+        cooldown_h  = float(coin_check.get('sl_cooldown_hours', 4))
+        if cooldown_h > 0 and not _check_sl_cooldown(symbol, cooldown_h):
+            trades_tmp = load_trades()
+            last_sl = next((t for t in reversed(trades_tmp)
+                            if t.get('symbol') == symbol and t.get('type') == 'sell'
+                            and 'STOP' in (t.get('source','').upper())), None)
+            if last_sl:
+                sl_time  = datetime.datetime.strptime(last_sl['time'], '%Y-%m-%d %H:%M:%S')
+                elapsed  = (datetime.datetime.now() - sl_time).total_seconds() / 3600
+                kalan    = round(cooldown_h - elapsed, 1)
+                print(f'[Bot] {symbol} SL cooldown aktif — {kalan}s kaldı')
+                return {'ok': False, 'error': f'SL cooldown: {kalan}s kaldı'}
+
         # Bakiye kontrolü
         balance = get_usdt_balance(client)
         if balance < usdt_amount:

@@ -285,6 +285,7 @@ def coin_add():
         'seans_sell_hour':     int(data.get('seans_sell_hour', 13)),
         'smart_min_score':     int(data.get('smart_min_score', 3)),
         'auto_tp_sl':          bool(data.get('auto_tp_sl', False)),
+        'sl_cooldown_hours':   float(data.get('sl_cooldown_hours', 4)),
         'active': True,
     })
     cfg['coins'] = coins
@@ -324,6 +325,7 @@ def coin_update():
             c['seans_sell_hour']      = int(data.get('seans_sell_hour', c.get('seans_sell_hour', 13)))
             c['smart_min_score']      = int(data.get('smart_min_score', c.get('smart_min_score', 3)))
             c['auto_tp_sl']           = bool(data.get('auto_tp_sl', c.get('auto_tp_sl', False)))
+            c['sl_cooldown_hours']    = float(data.get('sl_cooldown_hours', c.get('sl_cooldown_hours', 4)))
             c['active']               = data.get('active', c['active'])
             break
     save_config(cfg)
