@@ -282,6 +282,7 @@ def coin_add():
         'stop_loss_pct':       float(data.get('stop_loss_pct', 0)),
         'stop_loss_sell_pct':  float(data.get('stop_loss_sell_pct', 100)),
         'seans_strategy':      data.get('seans_strategy', 'both'),
+        'seans_buy_hour':      int(data.get('seans_buy_hour', 20)),
         'seans_sell_hour':     int(data.get('seans_sell_hour', 13)),
         'smart_min_score':     int(data.get('smart_min_score', 3)),
         'auto_tp_sl':          bool(data.get('auto_tp_sl', False)),
@@ -324,6 +325,7 @@ def coin_update():
             c['stop_loss_pct']        = float(data.get('stop_loss_pct', c.get('stop_loss_pct', 0)))
             c['stop_loss_sell_pct']   = float(data.get('stop_loss_sell_pct', c.get('stop_loss_sell_pct', 100)))
             c['seans_strategy']       = data.get('seans_strategy', c.get('seans_strategy', 'both'))
+            c['seans_buy_hour']       = int(data.get('seans_buy_hour', c.get('seans_buy_hour', 20)))
             c['seans_sell_hour']      = int(data.get('seans_sell_hour', c.get('seans_sell_hour', 13)))
             c['smart_min_score']      = int(data.get('smart_min_score', c.get('smart_min_score', 3)))
             c['auto_tp_sl']           = bool(data.get('auto_tp_sl', c.get('auto_tp_sl', False)))

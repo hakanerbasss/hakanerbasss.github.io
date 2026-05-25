@@ -243,7 +243,10 @@ input:focus,select:focus{border-color:#f0a500;}
       <div class="form-row">
         <div class="form-group">
           <label>Seans Stratejisi</label>
-          <select id="newSeansStrategy">
+          <select id="newSeansStrategy" onchange="toggleSeansBuyHour('new')">
+            <optgroup label="── ⏰ Basit Zamanlama ──">
+              <option value="simple">⏰ Saatinde Al/Sat (koşulsuz)</option>
+            </optgroup>
             <optgroup label="── Coin Bazlı ──">
               <option value="coin_yy">Coin dün🟢 bugün🟢 (20:00)</option>
               <option value="coin_ky">Coin dün🔴 bugün🟢 (20:00)</option>
@@ -266,6 +269,16 @@ input:focus,select:focus{border-color:#f0a500;}
               <option value="composite_5">⚡ Composite 5/5 Tümü Yeşil</option>
               <option value="rel_strong">💪 Coin BTC'den Güçlü</option>
             </optgroup>
+          </select>
+        </div>
+        <div class="form-group" id="newBuyHourGroup" style="display:none;">
+          <label>Alım Saati</label>
+          <select id="newSeansBuyHour">
+            <option value="8">08:00</option>
+            <option value="9">09:00</option>
+            <option value="10">10:00</option>
+            <option value="17">17:00</option>
+            <option value="20" selected>20:00</option>
           </select>
         </div>
         <div class="form-group">
@@ -516,7 +529,10 @@ input:focus,select:focus{border-color:#f0a500;}
       <div class="form-row">
         <div class="form-group">
           <label>Seans Stratejisi</label>
-          <select id="editSeansStrategy">
+          <select id="editSeansStrategy" onchange="toggleSeansBuyHour('edit')">
+            <optgroup label="── ⏰ Basit Zamanlama ──">
+              <option value="simple">⏰ Saatinde Al/Sat (koşulsuz)</option>
+            </optgroup>
             <optgroup label="── Coin Bazlı ──">
               <option value="coin_yy">Coin dün🟢 bugün🟢 (20:00)</option>
               <option value="coin_ky">Coin dün🔴 bugün🟢 (20:00)</option>
@@ -539,6 +555,16 @@ input:focus,select:focus{border-color:#f0a500;}
               <option value="composite_5">⚡ Composite 5/5 Tümü Yeşil</option>
               <option value="rel_strong">💪 Coin BTC'den Güçlü</option>
             </optgroup>
+          </select>
+        </div>
+        <div class="form-group" id="editBuyHourGroup" style="display:none;">
+          <label>Alım Saati</label>
+          <select id="editSeansBuyHour">
+            <option value="8">08:00</option>
+            <option value="9">09:00</option>
+            <option value="10">10:00</option>
+            <option value="17">17:00</option>
+            <option value="20">20:00</option>
           </select>
         </div>
         <div class="form-group">
@@ -711,8 +737,10 @@ function renderCoins() {
         }
         <span>SL Bekleme: <b>${c.sl_cooldown_hours??4}s</b></span>
         ${isSeans ? `
-        <span>Seans: <b>${SEANS_LABELS[c.seans_strategy]||c.seans_strategy||'—'}</b></span>
-        <span>Satış Saati: <b>${c.seans_sell_hour||13}:00</b></span>` : ''}
+        ${c.seans_strategy==='simple'
+          ? `<span>Seans: <b>⏰ ${c.seans_buy_hour||8}:00 Al → ${c.seans_sell_hour||13}:00 Sat</b></span>`
+          : `<span>Seans: <b>${SEANS_LABELS[c.seans_strategy]||c.seans_strategy||'—'}</b></span>
+        <span>Satış Saati: <b>${c.seans_sell_hour||13}:00</b></span>`}` : ''}
       </div>
     </div>`;
   }).join('');
@@ -742,6 +770,7 @@ function addCoin() {
     stop_loss_pct:        parseFloat(document.getElementById('newSl').value),
     stop_loss_sell_pct:   parseFloat(document.getElementById('newSlSell').value),
     seans_strategy:       document.getElementById('newSeansStrategy').value,
+    seans_buy_hour:       parseInt(document.getElementById('newSeansBuyHour').value)||8,
     seans_sell_hour:      parseInt(document.getElementById('newSeansSellHour').value),
     smart_min_score:      parseInt(document.getElementById('newSmartMinScore').value),
     auto_tp_sl:           document.getElementById('newTpSlMode').value === 'auto',
@@ -787,7 +816,9 @@ function openEdit(symbol) {
   document.getElementById('editSl').value = c.stop_loss_pct||0;
   document.getElementById('editSlSell').value = c.stop_loss_sell_pct||100;
   document.getElementById('editSeansStrategy').value = c.seans_strategy||'both';
+  document.getElementById('editSeansBuyHour').value  = c.seans_buy_hour||20;
   document.getElementById('editSeansSellHour').value = c.seans_sell_hour||13;
+  toggleSeansBuyHour('edit');
   document.getElementById('editSmartMinScore').value = c.smart_min_score||3;
   document.getElementById('editSlCooldown').value = c.sl_cooldown_hours ?? 4;
   document.getElementById('editTpSlMode').value = c.auto_tp_sl ? 'auto' : 'manual';
@@ -816,6 +847,7 @@ function saveEdit() {
     stop_loss_pct:        parseFloat(document.getElementById('editSl').value),
     stop_loss_sell_pct:   parseFloat(document.getElementById('editSlSell').value),
     seans_strategy:       document.getElementById('editSeansStrategy').value,
+    seans_buy_hour:       parseInt(document.getElementById('editSeansBuyHour').value)||8,
     seans_sell_hour:      parseInt(document.getElementById('editSeansSellHour').value),
     smart_min_score:      parseInt(document.getElementById('editSmartMinScore').value),
     auto_tp_sl:           document.getElementById('editTpSlMode').value === 'auto',
@@ -1589,6 +1621,12 @@ function toggleTpSlMode(prefix) {
 }
 
 // ── Seans Toggle ─────────────────────────────────
+function toggleSeansBuyHour(prefix) {
+  const strategy = document.getElementById(prefix+'SeansStrategy').value;
+  const grp = document.getElementById(prefix+'BuyHourGroup');
+  if (grp) grp.style.display = strategy === 'simple' ? '' : 'none';
+}
+
 function toggleSeansOpts(prefix) {
   const source  = document.getElementById(prefix+'Source').value;
   const isSeans = source === 'seans';

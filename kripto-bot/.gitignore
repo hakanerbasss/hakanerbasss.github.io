@@ -1,0 +1,6 @@
+config.json
+positions.json
+trades.json
+signal_state.json
+*.pyc
+__pycache__/
