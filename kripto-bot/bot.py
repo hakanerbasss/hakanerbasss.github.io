@@ -11,7 +11,10 @@ POSITIONS_FILE = 'positions.json'
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {}
     return {'testnet': True, 'api_key': '', 'api_secret': '', 'coins': [], 'webhook_secret': 'secret123'}
 
 def save_config(data):
@@ -22,7 +25,10 @@ def save_config(data):
 def load_trades():
     if os.path.exists(TRADES_FILE):
         with open(TRADES_FILE) as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return []
     return []
 
 def save_trades(trades):
@@ -33,7 +39,10 @@ def save_trades(trades):
 def load_positions():
     if os.path.exists(POSITIONS_FILE):
         with open(POSITIONS_FILE) as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {}
     return {}
 
 def save_positions(positions):
