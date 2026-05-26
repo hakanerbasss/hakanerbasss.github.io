@@ -76,8 +76,8 @@ def _oi_hist(symbol, period='5m', limit=12):
                 {'symbol': symbol, 'period': period, 'limit': limit}) or []
 
 def _liquidations(symbol):
-    """Son saatin zorunlu tasfiyeler. Auth gerekebilir, yoksa boş döner."""
-    return _pub('/fapi/v1/forceOrders', {'symbol': symbol, 'limit': 100}) or []
+    """Son saatin zorunlu tasfiyeler — public endpoint, auth gerekmez."""
+    return _pub('/fapi/v1/allForceOrders', {'symbol': symbol, 'limit': 200}) or []
 
 def _futures_symbols(min_vol=30_000_000) -> list:
     """Son 24 saatte quoteVolume > $30M olan futures semboller."""
@@ -196,7 +196,7 @@ def _sweep_signal(symbol, price):
     """
     liqs = _liquidations(symbol)
     if not liqs:
-        return 0.0, 'Likidite verisi yok (auth?)'
+        return 0.0, 'Son 1 saatte tasfiye yok'
     now_ms   = int(time.time() * 1000)
     hour_ago = now_ms - 3_600_000
     long_usd = sum(

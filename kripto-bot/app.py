@@ -905,7 +905,8 @@ def edge_status_api():
 
 # ── Başlat ───────────────────────────────────────
 if __name__ == '__main__':
-    start_engine()
+    start_engine()          # UT Bot + Seans + Smart sinyalleri
     start_telegram_bot()
-    start_edge_agent()
+    start_autonomous_agent()  # Teknik analiz: RSI/MACD/BB/Trend
+    start_edge_agent()        # Piyasa mekaniği: Funding/OI/CVD/Sweep/Haber
     app.run(host='0.0.0.0', port=5000, debug=False)
