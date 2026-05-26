@@ -212,13 +212,16 @@ def api_stats():
 
     def _normalize(source):
         s = (source or '').upper()
-        if 'INDICATOR' in s: return 'INDICATOR'
-        if 'EDGE' in s:      return 'EDGE'
-        if 'OTONOM' in s:    return 'OTONOM'
-        if 'UT' in s:        return 'UT BOT'
-        if 'SEANS' in s:     return 'SEANS'
-        if 'SMART' in s:     return 'SMART'
-        if 'MANUEL' in s:    return 'MANUEL'
+        if 'INDICATOR-UTBOT' in s:  return 'INDICATOR-UTBOT'
+        if 'INDICATOR-SMART' in s:  return 'INDICATOR-SMART'
+        if 'INDICATOR-SEANS' in s:  return 'INDICATOR-SEANS'
+        if 'INDICATOR' in s:        return 'INDICATOR-UTBOT'
+        if 'EDGE' in s:             return 'EDGE'
+        if 'OTONOM' in s:           return 'OTONOM'
+        if 'UT' in s:               return 'UT BOT'
+        if 'SEANS' in s:            return 'SEANS'
+        if 'SMART' in s:            return 'SMART'
+        if 'MANUEL' in s:           return 'MANUEL'
         return 'DİĞER'
 
     last_buy_source = {}  # symbol → normalized indicator
@@ -881,17 +884,23 @@ def agent_comparison():
     trades = load_trades()
     trades_sorted = sorted(trades, key=lambda t: t.get('time', ''))
 
-    AGENTS = ['INDICATOR', 'EDGE', 'OTONOM', 'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER']
+    AGENTS = [
+        'INDICATOR-UTBOT', 'INDICATOR-SMART', 'INDICATOR-SEANS',
+        'EDGE', 'OTONOM', 'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER',
+    ]
 
     def _normalize(source):
         s = (source or '').upper()
-        if 'INDICATOR' in s: return 'INDICATOR'
-        if 'EDGE' in s:      return 'EDGE'
-        if 'OTONOM' in s:    return 'OTONOM'
-        if 'UT' in s:        return 'UT BOT'
-        if 'SEANS' in s:     return 'SEANS'
-        if 'SMART' in s:     return 'SMART'
-        if 'MANUEL' in s:    return 'MANUEL'
+        if 'INDICATOR-UTBOT' in s:  return 'INDICATOR-UTBOT'
+        if 'INDICATOR-SMART' in s:  return 'INDICATOR-SMART'
+        if 'INDICATOR-SEANS' in s:  return 'INDICATOR-SEANS'
+        if 'INDICATOR' in s:        return 'INDICATOR-UTBOT'  # eski kayıtlar UTBOT'a düşsün
+        if 'EDGE' in s:             return 'EDGE'
+        if 'OTONOM' in s:           return 'OTONOM'
+        if 'UT' in s:               return 'UT BOT'
+        if 'SEANS' in s:            return 'SEANS'
+        if 'SMART' in s:            return 'SMART'
+        if 'MANUEL' in s:           return 'MANUEL'
         return 'DİĞER'
 
     stats = {a: {'wins': 0, 'losses': 0, 'total': 0, 'pnl': 0.0,
