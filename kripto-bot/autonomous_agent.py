@@ -565,7 +565,10 @@ class AutonomousAgent:
             try:
                 client    = get_client()
                 positions = load_positions()
-                balance   = get_usdt_balance(client)
+                try:
+                    balance = get_usdt_balance(client)
+                except Exception:
+                    balance = 0
                 open_pos  = [(s,p) for s,p in positions.items() if p.get('qty',0)>0]
                 regime    = self.state.get('last_regime','?')
                 er        = {'BULL':'🟢','SIDEWAYS':'🟡','BEAR':'🔴'}.get(regime,'⚪')
@@ -573,28 +576,31 @@ class AutonomousAgent:
                 day_chg   = round((balance - day_bal) / day_bal * 100, 2) if day_bal else 0
 
                 lines = [
-                    "📊 <b>SAATLIK RAPOR</b>",
+                    "🤖 <b>Otonom Ajan Saatlik Rapor</b>",
                     f"━━━━━━━━━━━━━━",
                     f"💰 Bakiye: <b>${round(balance,2)}</b>  "
                     f"({'+' if day_chg>=0 else ''}{day_chg}% bugün)",
                     f"💹 Toplam PnL: ${round(self.state.get('total_pnl',0),2)}",
-                    f"{er} Rejim: {regime}  |  🔍 Tarama: {self.state['scan_count']}x",
+                    f"{er} Rejim: {regime}  |  🔍 Tarama: {self.state.get('scan_count',0)}x",
                     f"📦 Açık: {len(open_pos)}/{self.MAX_POSITIONS}",
                 ]
                 if open_pos:
                     lines.append("")
                     for sym, pos in open_pos:
-                        price = get_price(client, sym)
-                        chg   = (price - pos['avg_price']) / pos['avg_price'] * 100
-                        icon  = '🟢' if chg >= 0 else '🔴'
-                        trail = ' 🎯trail' if pos.get('trail_active') else ''
-                        lines.append(f"  {icon} {sym}: {'+' if chg>=0 else ''}{round(chg,2)}%{trail}")
-                bl = [k for k,v in self.state['blacklist'].items() if v > time.time()]
+                        try:
+                            price = get_price(client, sym)
+                            chg   = (price - pos['avg_price']) / pos['avg_price'] * 100
+                            icon  = '🟢' if chg >= 0 else '🔴'
+                            trail = ' 🎯trail' if pos.get('trail_active') else ''
+                            lines.append(f"  {icon} {sym}: {'+' if chg>=0 else ''}{round(chg,2)}%{trail}")
+                        except Exception:
+                            lines.append(f"  ⚪ {sym}: fiyat alınamadı")
+                bl = [k for k,v in self.state.get('blacklist',{}).items() if v > time.time()]
                 if bl:
                     lines.append(f"\n⛔ Kara liste ({len(bl)}): {', '.join(bl[:5])}")
                 send_telegram('\n'.join(lines))
             except Exception as e:
-                print(f'[Hourly] {e}')
+                print(f'[Otonom Hourly] {e}')
 
     def _daily_loop(self):
         while self.running:

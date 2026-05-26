@@ -352,12 +352,15 @@ class IndicatorAgent:
             time.sleep(3600)
 
     def _report(self):
-        client    = get_client()
+        try:
+            client = get_client()
+        except Exception:
+            client = None
         positions = load_positions()
         open_pos  = {s: p for s, p in positions.items()
                      if p.get('qty', 0) > 0 and p.get('indicator_name')}
         try:
-            bal = get_usdt_balance(client)
+            bal = get_usdt_balance(client) if client else 0
         except Exception:
             bal = 0
 
