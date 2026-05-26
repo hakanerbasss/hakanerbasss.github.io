@@ -395,7 +395,7 @@ class AutonomousAgent:
                     if reason:
                         positions[sym] = pos
                         save_positions(positions)
-                        res = execute_sell(client, sym, 100, source=reason, period='Ajan')
+                        res = execute_sell(client, sym, 100, source='OTONOM', period=reason)
                         if res.get('ok'):
                             pnl = res.get('pnl', 0)
                             self.state['total_pnl'] = round(self.state.get('total_pnl',0) + pnl, 2)
