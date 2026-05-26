@@ -1,303 +1,275 @@
 """
-Otonom Kripto Ajan
-- Top 100 coini sürekli tarar
-- Kendi kararlarını kendi verir (ne alacak, ne kadar, ne zaman satacak)
-- Hiçbir manuel müdahale gerektirmez
-- Telegram üzerinden bildirim gönderir
+Otonom Kripto Ajan v2 — Gerçek Zamanlı
+─────────────────────────────────────────
+• Her 3 saniyede pozisyon takibi (SL/TP/trailing)
+• Her 90 saniyede top-100 fırsat taraması
+• Çoklu zaman dilimi (15m + 1h) confluance
+• Bollinger Bands + Stochastic RSI + VWAP
+• Kelly Criterion ile dinamik pozisyon boyutu
+• Günlük kayıp limiti (-8% → işlemler durur)
+• Gerçek/testnet modu farkı: gerçekte daha muhafazakâr
+• Telegram: her alım/satış gerekçe + saatlik rapor + günlük özet
 """
 
 import time, datetime, threading, json, os, math
+from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, save_positions, load_trades, get_price,
                  send_telegram, get_usdt_balance)
 
-STATE_FILE = 'agent_state.json'
-
-STABLECOINS = {
-    'USDCUSDT', 'BUSDUSDT', 'TUSDUSDT', 'USDTUSDT', 'FDUSDUSDT',
-    'EURUSDT', 'GBPUSDT', 'DAIUSDT', 'FRAXUSDT', 'USDPUSDT',
+# ─── Sabitler ────────────────────────────────────────────────────────────────
+STATE_FILE    = 'agent_state.json'
+STABLECOINS   = {
+    'USDCUSDT','BUSDUSDT','TUSDUSDT','USDTUSDT','FDUSDUSDT',
+    'EURUSDT','GBPUSDT','DAIUSDT','FRAXUSDT','USDPUSDT','PYUSDUSDT',
 }
 
-# Skor ağırlıkları — agent kendi performansına göre bunları günceller
 DEFAULT_WEIGHTS = {
-    'trend':    2.0,
-    'momentum': 3.0,
-    'volume':   2.0,
-    'pattern':  2.0,
-    'market':   1.0,
+    'trend': 2.5, 'momentum': 3.0, 'volume': 1.5,
+    'pattern': 1.5, 'bb': 1.0, 'market': 0.5,
 }
 
 
-# ── Yardımcı Matematik ───────────────────────────────────────────────────────
+# ─── Matematik Yardımcıları ───────────────────────────────────────────────────
 
-def _ema(closes, period):
-    if len(closes) < period:
-        return closes[-1] if closes else 0
-    k = 2 / (period + 1)
-    ema = sum(closes[:period]) / period
-    for c in closes[period:]:
-        ema = c * k + ema * (1 - k)
-    return ema
+def _ema(s, n):
+    if len(s) < n: return s[-1] if s else 0
+    k = 2 / (n + 1); e = sum(s[:n]) / n
+    for v in s[n:]: e = v * k + e * (1 - k)
+    return e
 
+def _rsi(s, n=14):
+    if len(s) < n + 1: return 50.0
+    d = [s[i] - s[i-1] for i in range(1, len(s))]
+    g = sum(max(v,0) for v in d[-n:]) / n
+    l = sum(max(-v,0) for v in d[-n:]) / n
+    return 100.0 if l == 0 else round(100 - 100/(1 + g/l), 1)
 
-def _rsi(closes, period=14):
-    if len(closes) < period + 1:
-        return 50.0
-    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
-    gains  = [max(d, 0)  for d in deltas[-period:]]
-    losses = [max(-d, 0) for d in deltas[-period:]]
-    ag = sum(gains)  / period
-    al = sum(losses) / period
-    if al == 0:
-        return 100.0
-    return round(100 - 100 / (1 + ag / al), 1)
+def _stoch_rsi(closes, rsi_n=14, stoch_n=14):
+    if len(closes) < rsi_n + stoch_n + 1: return 50.0
+    rsi_vals = [_rsi(closes[:i+1], rsi_n) for i in range(rsi_n, len(closes))]
+    if len(rsi_vals) < stoch_n: return 50.0
+    window = rsi_vals[-stoch_n:]
+    mn, mx = min(window), max(window)
+    if mx == mn: return 50.0
+    return round((rsi_vals[-1] - mn) / (mx - mn) * 100, 1)
 
+def _macd(s, fast=12, slow=26, sig=9):
+    if len(s) < slow + sig: return 0.0, 0.0, False
+    macd_s = [_ema(s[:i+1], fast) - _ema(s[:i+1], slow)
+               for i in range(slow-1, len(s))]
+    macd_now = macd_s[-1]
+    sig_now  = sum(macd_s[-sig:]) / sig
+    cross    = len(macd_s) > 1 and macd_s[-2] <= (sum(macd_s[-sig-1:-1]) / sig) and macd_now > sig_now
+    return macd_now, sig_now, cross
 
-def _macd(closes, fast=12, slow=26, signal=9):
-    if len(closes) < slow + signal:
-        return 0.0, 0.0
-    macd_series = []
-    for i in range(slow - 1, len(closes)):
-        ef = _ema(closes[:i + 1], fast)
-        es = _ema(closes[:i + 1], slow)
-        macd_series.append(ef - es)
-    macd_now  = macd_series[-1]
-    sig_now   = sum(macd_series[-signal:]) / signal
-    return macd_now, sig_now
+def _bollinger(closes, n=20, std_mult=2.0):
+    if len(closes) < n: return closes[-1], closes[-1], closes[-1]
+    window = closes[-n:]
+    mid  = sum(window) / n
+    std  = math.sqrt(sum((v - mid)**2 for v in window) / n)
+    return mid - std_mult * std, mid, mid + std_mult * std
 
+def _atr(highs, lows, closes, n=14):
+    if len(closes) < n + 2: return closes[-1] * 0.02
+    trs = [max(highs[i]-lows[i], abs(highs[i]-closes[i-1]), abs(lows[i]-closes[i-1]))
+           for i in range(1, len(closes))]
+    return sum(trs[-n:]) / n
 
-def _adx(highs, lows, closes, period=14):
-    """Basit ADX hesabı — trend gücü 0-100"""
-    if len(closes) < period + 2:
-        return 25.0
-    tr_list, pdm_list, ndm_list = [], [], []
+def _adx(highs, lows, closes, n=14):
+    if len(closes) < n + 2: return 20.0
+    trs, pdms, ndms = [], [], []
     for i in range(1, len(closes)):
-        tr  = max(highs[i] - lows[i],
-                  abs(highs[i] - closes[i - 1]),
-                  abs(lows[i]  - closes[i - 1]))
-        pdm = max(highs[i] - highs[i - 1], 0)
-        ndm = max(lows[i - 1] - lows[i], 0)
+        trs.append(max(highs[i]-lows[i], abs(highs[i]-closes[i-1]), abs(lows[i]-closes[i-1])))
+        pdm = max(highs[i]-highs[i-1], 0)
+        ndm = max(lows[i-1]-lows[i], 0)
         if pdm < ndm: pdm = 0
         if ndm < pdm: ndm = 0
-        tr_list.append(tr); pdm_list.append(pdm); ndm_list.append(ndm)
-
-    atr = sum(tr_list[-period:]) / period
-    if atr == 0:
-        return 25.0
-    pdi = (sum(pdm_list[-period:]) / period) / atr * 100
-    ndi = (sum(ndm_list[-period:]) / period) / atr * 100
+        pdms.append(pdm); ndms.append(ndm)
+    atr = sum(trs[-n:]) / n
+    if atr == 0: return 20.0
+    pdi = (sum(pdms[-n:]) / n) / atr * 100
+    ndi = (sum(ndms[-n:]) / n) / atr * 100
     denom = pdi + ndi
-    dx  = abs(pdi - ndi) / denom * 100 if denom else 25.0
-    return round(dx, 1)
+    return round(abs(pdi-ndi) / denom * 100, 1) if denom else 20.0
+
+def _vwap(highs, lows, closes, volumes, n=20):
+    if len(closes) < n: return closes[-1]
+    tp_vol = sum((highs[i]+lows[i]+closes[i])/3 * volumes[i]
+                 for i in range(-n, 0))
+    vol_sum = sum(volumes[-n:])
+    return tp_vol / vol_sum if vol_sum else closes[-1]
 
 
-def _atr_pct(highs, lows, closes, period=7):
-    if len(closes) < period + 2:
-        return 2.0
-    trs = [
-        max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1]))
-        for i in range(1, len(closes))
-    ]
-    atr = sum(trs[-period:]) / period
-    return round(atr / closes[-1] * 100, 3)
+# ─── Veri Çekme ──────────────────────────────────────────────────────────────
 
-
-# ── State ────────────────────────────────────────────────────────────────────
-
-def _load_state():
-    if os.path.exists(STATE_FILE):
-        try:
-            with open(STATE_FILE) as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {
-        'blacklist':   {},      # symbol → expire_timestamp
-        'weights':     DEFAULT_WEIGHTS.copy(),
-        'scan_count':  0,
-        'total_pnl':   0.0,
-        'signal_stats': {},     # 'signal_key' → {wins, total}
-        'last_regime':  'SIDEWAYS',
-        'started_at':   datetime.datetime.now().isoformat(),
-    }
-
-
-def _save_state(state):
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f, indent=2)
-
-
-# ── Market Data ──────────────────────────────────────────────────────────────
-
-def _get_klines(client, symbol, interval='1h', limit=110):
+def _klines(client, sym, interval='1h', limit=120):
     from binance.client import Client as BC
-    interval_map = {
-        '5m': BC.KLINE_INTERVAL_5MINUTE,
-        '15m': BC.KLINE_INTERVAL_15MINUTE,
-        '1h': BC.KLINE_INTERVAL_1HOUR,
-        '4h': BC.KLINE_INTERVAL_4HOUR,
-    }
-    kl = client.get_klines(
-        symbol=symbol,
-        interval=interval_map.get(interval, BC.KLINE_INTERVAL_1HOUR),
-        limit=limit
-    )
-    kl = kl[:-1]  # kapanmamış mumu çıkar
-    opens   = [float(k[1]) for k in kl]
-    highs   = [float(k[2]) for k in kl]
-    lows    = [float(k[3]) for k in kl]
-    closes  = [float(k[4]) for k in kl]
-    volumes = [float(k[5]) for k in kl]
-    return opens, highs, lows, closes, volumes
+    imap = {'1m': BC.KLINE_INTERVAL_1MINUTE,  '5m':  BC.KLINE_INTERVAL_5MINUTE,
+            '15m': BC.KLINE_INTERVAL_15MINUTE, '1h':  BC.KLINE_INTERVAL_1HOUR,
+            '4h': BC.KLINE_INTERVAL_4HOUR,     '1d':  BC.KLINE_INTERVAL_1DAY}
+    kl = client.get_klines(symbol=sym, interval=imap.get(interval, BC.KLINE_INTERVAL_1HOUR), limit=limit)
+    kl = kl[:-1]
+    o = [float(k[1]) for k in kl]; h = [float(k[2]) for k in kl]
+    l = [float(k[3]) for k in kl]; c = [float(k[4]) for k in kl]
+    v = [float(k[5]) for k in kl]
+    return o, h, l, c, v
 
-
-def _get_top_100(client):
+def _top_100(client):
     tickers = client.get_ticker()
-    usdt = [
-        t for t in tickers
-        if t['symbol'].endswith('USDT')
-        and t['symbol'] not in STABLECOINS
-        and float(t.get('quoteVolume', 0)) > 500_000
-        and float(t.get('lastPrice', 0)) > 0
-    ]
+    usdt = [t for t in tickers
+            if t['symbol'].endswith('USDT')
+            and t['symbol'] not in STABLECOINS
+            and float(t.get('quoteVolume', 0)) > 1_000_000
+            and float(t.get('lastPrice', 0)) > 0]
     usdt.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
     return [t['symbol'] for t in usdt[:100]]
 
 
-# ── Piyasa Rejimi ────────────────────────────────────────────────────────────
+# ─── Piyasa Rejimi ────────────────────────────────────────────────────────────
 
-def _get_market_regime(client):
+def _regime(client):
     try:
-        _, highs, lows, closes, _ = _get_klines(client, 'BTCUSDT', '1h', 60)
-        e20  = _ema(closes, 20)
-        e50  = _ema(closes, 50)
-        rsi  = _rsi(closes, 14)
-        adx  = _adx(highs, lows, closes, 14)
-        curr = closes[-1]
-
-        if curr > e20 > e50 and rsi > 45 and adx > 20:
-            return 'BULL'
-        elif curr < e20 < e50 and rsi < 55 and adx > 20:
-            return 'BEAR'
-        else:
-            return 'SIDEWAYS'
+        _, h, l, c, _ = _klines(client, 'BTCUSDT', '1h', 60)
+        e20 = _ema(c, 20); e50 = _ema(c, 50)
+        rsi = _rsi(c, 14);  adx = _adx(h, l, c, 14)
+        curr = c[-1]
+        if   curr > e20 > e50 and rsi > 45 and adx > 20: return 'BULL'
+        elif curr < e20 < e50 and rsi < 55 and adx > 20: return 'BEAR'
+        else:                                              return 'SIDEWAYS'
     except Exception:
         return 'SIDEWAYS'
 
 
-# ── Fırsat Skoru ─────────────────────────────────────────────────────────────
+# ─── Fırsat Skoru (0-10) ─────────────────────────────────────────────────────
 
-def _score_coin(client, symbol, regime, weights):
-    """Coini 0-10 arasında puanlar. None döndürürse bu coin taranamadı."""
+def _score(client, sym, regime, weights):
     try:
-        opens, highs, lows, closes, volumes = _get_klines(client, symbol, '1h', 110)
-        if len(closes) < 50:
-            return None
+        o1, h1, l1, c1, v1 = _klines(client, sym, '1h', 120)
+        o2, h2, l2, c2, v2 = _klines(client, sym, '15m', 80)
+        if len(c1) < 60 or len(c2) < 30: return None
 
-        # ── Trend (0 - weights['trend']) ──────────────
-        e20  = _ema(closes, 20)
-        e50  = _ema(closes, 50)
-        e100 = _ema(closes, 100)
-        curr = closes[-1]
-        adx  = _adx(highs, lows, closes, 14)
+        # ── Trend (1h) ───────────────────────────────
+        e20  = _ema(c1, 20); e50  = _ema(c1, 50); e100 = _ema(c1, 100)
+        adx  = _adx(h1, l1, c1, 14)
+        curr = c1[-1]
+        t = 0.0
+        if curr > e20:  t += 0.35
+        if e20  > e50:  t += 0.35
+        if e50  > e100: t += 0.20
+        if adx  > 22:   t += 0.10
+        trend = t * weights['trend']
 
-        trend_raw = 0.0
-        if curr > e20:   trend_raw += 0.35
-        if e20  > e50:   trend_raw += 0.35
-        if e50  > e100:  trend_raw += 0.20
-        if adx  > 25:    trend_raw += 0.10
-        trend = trend_raw * weights['trend']
+        # ── Momentum (15m + 1h confluance) ──────────
+        rsi1h  = _rsi(c1, 14)
+        rsi15m = _rsi(c2, 14)
+        srsi   = _stoch_rsi(c1, 14, 14)
+        m1, s1, cross1h  = _macd(c1)
+        m2, s2, cross15m = _macd(c2)
+        mom = 0.0
+        if 35 <= rsi1h  <= 62: mom += 0.25
+        if 30 <= rsi15m <= 60: mom += 0.15
+        if srsi < 30:          mom += 0.20   # stoch RSI oversold → dönüş beklentisi
+        if m1 > s1:            mom += 0.20
+        if cross1h:            mom += 0.20   # 1h MACD taze cross
+        if cross15m:           mom += 0.10   # 15m cross bonus (erken giriş)
+        # 15m ve 1h aynı yönde → güçlü sinyal
+        if m1 > s1 and m2 > s2: mom = min(mom + 0.10, 1.0)
+        momentum = mom * weights['momentum']
 
-        # ── Momentum (0 - weights['momentum']) ────────
-        rsi = _rsi(closes, 14)
-        macd_now, sig_now = _macd(closes)
-        macd_prev, sig_prev = _macd(closes[:-1])
-        fresh_cross = macd_prev <= sig_prev and macd_now > sig_now
+        # ── Hacim ────────────────────────────────────
+        avg_v  = sum(v1[-21:-1]) / 20 if len(v1) > 21 else v1[-1]
+        vr     = v1[-1] / avg_v if avg_v > 0 else 1.0
+        volume = min(vr / 3.0, 1.0) * weights['volume']
 
-        mom_raw = 0.0
-        if 35 <= rsi <= 60:   mom_raw += 0.40
-        elif 60 < rsi <= 70:  mom_raw += 0.20   # hafif aşırı alım
-        if macd_now > sig_now: mom_raw += 0.35
-        if fresh_cross:        mom_raw += 0.25   # taze cross bonus
-        momentum = mom_raw * weights['momentum']
+        # ── Bollinger Bands pozisyonu ─────────────────
+        bb_low, bb_mid, bb_up = _bollinger(c1, 20)
+        bb_pos = (curr - bb_low) / (bb_up - bb_low) if (bb_up - bb_low) > 0 else 0.5
+        # İdeal: diplere yakın (0.05-0.35) → yüksek puan
+        if   0.05 <= bb_pos <= 0.25: bb_sc = 1.0
+        elif 0.25 <  bb_pos <= 0.45: bb_sc = 0.6
+        elif bb_pos < 0.05:          bb_sc = 0.3  # aşırı aşağı
+        else:                        bb_sc = 0.0  # tepede
+        bb = bb_sc * weights['bb']
 
-        # ── Hacim (0 - weights['volume']) ─────────────
-        avg_vol  = sum(volumes[-21:-1]) / 20 if len(volumes) > 21 else volumes[-1]
-        curr_vol = volumes[-1]
-        vol_ratio = curr_vol / avg_vol if avg_vol > 0 else 1.0
-        vol_raw = min(vol_ratio / 3.0, 1.0)   # 3x hacim = tam puan
-        volume = vol_raw * weights['volume']
+        # ── Formasyon ────────────────────────────────
+        o0, h0, l0, c0 = o1[-1], h1[-1], l1[-1], c1[-1]
+        o_1, h_1, l_1, c_1 = o1[-2], h1[-2], l1[-2], c1[-2]
+        body0 = abs(c0 - o0); lower0 = min(o0,c0) - l0; upper0 = h0 - max(o0,c0)
+        pat = 0.0
+        if c_1 < o_1 and c0 > o0 and c0 > o_1 and o0 < c_1: pat += 0.55  # engulfing
+        if lower0 > 2*body0 and upper0 < body0 and c0 > o0:  pat += 0.45  # hammer
+        vwap = _vwap(h1, l1, c1, v1)
+        if curr < vwap * 1.002:                               pat += 0.20  # VWAP altı/üstü
+        pattern = min(pat, 1.0) * weights['pattern']
 
-        # ── Formasyon (0 - weights['pattern']) ────────
-        pat_raw = 0.0
-        o1, h1, l1, c1 = opens[-2], highs[-2], lows[-2], closes[-2]
-        o0, h0, l0, c0 = opens[-1], highs[-1], lows[-1], closes[-1]
-        body0 = abs(c0 - o0)
-        body1 = abs(c1 - o1)
-        lower0 = min(o0, c0) - l0
-        upper0 = h0 - max(o0, c0)
+        # ── Piyasa ───────────────────────────────────
+        mkt_raw = {'BULL': 1.0, 'SIDEWAYS': 0.5, 'BEAR': 0.1}.get(regime, 0.5)
+        market  = mkt_raw * weights['market']
 
-        # Bullish engulfing
-        if c1 < o1 and c0 > o0 and c0 > o1 and o0 < c1:
-            pat_raw += 0.55
-        # Hammer
-        if lower0 > 2 * body0 and upper0 < body0 and c0 > o0:
-            pat_raw += 0.45
-        # Fiyat 20 günlük düşükten toparlanıyor
-        low20 = min(lows[-20:])
-        high20 = max(highs[-20:])
-        range20 = high20 - low20
-        if range20 > 0:
-            pos_in_range = (c0 - low20) / range20
-            if 0.2 <= pos_in_range <= 0.6:   # diplere yakın ama toparlanıyor
-                pat_raw += 0.30
-        pat_raw = min(pat_raw, 1.0)
-        pattern = pat_raw * weights['pattern']
-
-        # ── Piyasa Koşulu (0 - weights['market']) ─────
-        if   regime == 'BULL':     mkt_raw = 1.00
-        elif regime == 'SIDEWAYS': mkt_raw = 0.55
-        else:                      mkt_raw = 0.10
-        market = mkt_raw * weights['market']
-
-        total = trend + momentum + volume + pattern + market
+        total     = trend + momentum + volume + bb + pattern + market
         max_total = sum(weights.values())
-        normalized = round(total / max_total * 10, 2)   # 0-10
+        score     = round(total / max_total * 10, 2)
+
+        atr_v   = _atr(h1, l1, c1)
+        atr_pct = round(atr_v / curr * 100, 3)
 
         return {
-            'total':    normalized,
-            'trend':    round(trend, 2),
-            'momentum': round(momentum, 2),
-            'volume':   round(volume, 2),
-            'pattern':  round(pattern, 2),
-            'market':   round(market, 2),
-            'rsi':      rsi,
-            'adx':      adx,
-            'vol_ratio': round(vol_ratio, 2),
-            'fresh_cross': fresh_cross,
-            'atr_pct':  _atr_pct(highs, lows, closes),
+            'total': score,       'trend': round(trend,2),
+            'momentum': round(momentum,2),  'volume': round(volume,2),
+            'bb': round(bb,2),    'pattern': round(pattern,2),
+            'market': round(market,2),
+            'rsi1h': rsi1h,       'rsi15m': rsi15m,
+            'srsi': srsi,         'adx': adx,
+            'vol_ratio': round(vr,2),
+            'cross1h': cross1h,   'cross15m': cross15m,
+            'bb_pos': round(bb_pos,2),
+            'vwap': round(vwap,4), 'atr_pct': atr_pct,
         }
     except Exception as e:
+        print(f'[Score] {sym}: {e}')
         return None
 
 
-# ── Pozisyon Boyutu ──────────────────────────────────────────────────────────
+# ─── Risk Yönetimi ────────────────────────────────────────────────────────────
 
-def _calc_position_size(balance, score_total, max_pct=0.20, min_usdt=10.0):
-    """Skora orantılı pozisyon büyüklüğü."""
-    confidence = max(0.0, (score_total - 5.0) / 5.0)   # 5→0%, 10→100%
-    amount = balance * max_pct * confidence
-    return max(min_usdt, min(amount, balance * max_pct))
+def _position_size(balance, score, atr_pct, is_real, max_positions):
+    """
+    Kelly benzeri dinamik boyut.
+    Gerçek hesapta daha muhafazakâr.
+    """
+    risk_per_trade = 0.01 if is_real else 0.02   # %1 real, %2 testnet
+    sl_pct_est     = max(atr_pct * 1.5, 1.5) / 100
+    raw_size       = balance * risk_per_trade / sl_pct_est
+
+    # Skor çarpanı: 5→0.5x, 7→0.8x, 9→1.0x
+    multiplier = max(0.4, min(1.0, (score - 5.0) / 4.0))
+    size       = raw_size * multiplier
+
+    # Per-pozisyon maksimum
+    max_pct  = 0.12 if is_real else 0.20
+    size     = min(size, balance * max_pct)
+
+    # Bakiyeyi eşit dağıt
+    per_slot = balance / max_positions * 0.85
+    size     = min(size, per_slot)
+
+    return max(10.0, round(size, 2))
 
 
-# ── Çıkış Mantığı ────────────────────────────────────────────────────────────
+def _daily_loss_ok(trades, balance_start, balance_now, max_loss_pct=8.0):
+    """Günlük kayıp limitini kontrol et."""
+    if balance_start <= 0: return True
+    loss_pct = (balance_start - balance_now) / balance_start * 100
+    return loss_pct < max_loss_pct
 
-def _should_exit(client, symbol, pos, regime):
-    """Çıkış kararı ver. ('reason', sell_pct) veya None döndürür."""
+
+# ─── Çıkış Kararı ────────────────────────────────────────────────────────────
+
+def _exit_decision(client, sym, pos, regime, live_price=None):
     try:
-        price = get_price(client, symbol)
-        if price <= 0:
-            return None
+        price = live_price or get_price(client, sym)
+        if price <= 0: return None
 
         avg    = pos['avg_price']
         change = (price - avg) / avg * 100
@@ -307,54 +279,48 @@ def _should_exit(client, symbol, pos, regime):
 
         # Peak güncelle
         if price > peak:
-            pos['peak_price'] = price
-            peak = price
+            pos['peak_price'] = price; peak = price
 
-        # ── Trailing Stop ────────────────────────────
-        trail_act = pos.get('trail_activated', False)
-        if change >= tp * 0.5 and not trail_act:
-            pos['trail_activated'] = True
-            trail_act = True
+        # Trailing stop aktifleştir (TP'nin %40'ına ulaşıldığında)
+        trail_active = pos.get('trail_active', False)
+        if change >= tp * 0.40 and not trail_active:
+            pos['trail_active'] = True; trail_active = True
 
-        if trail_act:
-            trail_threshold = sl * 0.7
-            drawdown_pct = (peak - price) / peak * 100
-            if drawdown_pct >= trail_threshold:
-                return ('TRAIL STOP', 100)
+        if trail_active:
+            drawdown = (peak - price) / peak * 100
+            if drawdown >= sl * 0.70:
+                return 'TRAIL STOP'
 
-        # ── Kâr Hedefi ───────────────────────────────
-        if change >= tp:
-            return ('KAR HEDEFİ', 100)
+        if change >= tp:         return 'KAR HEDEFİ'
+        if change <= -sl:        return 'STOP LOSS'
 
-        # ── Stop Loss ────────────────────────────────
-        if change <= -sl:
-            return ('STOP LOSS', 100)
-
-        # ── Momentum Kaybı ───────────────────────────
-        # MACD bearish cross + pozisyon kârda → çık
-        try:
-            _, _, _, closes, _ = _get_klines(client, symbol, '1h', 50)
-            macd_now, sig_now  = _macd(closes)
-            macd_prev, sig_prev = _macd(closes[:-1])
-            bearish_cross = macd_prev >= sig_prev and macd_now < sig_now
-            if bearish_cross and change > 0.5:
-                return ('MOMENTUM KAYBI', 100)
-        except Exception:
-            pass
-
-        # ── Piyasa Çöküşü ────────────────────────────
-        if regime == 'BEAR' and change < 0:
-            return ('PİYASA ÇÖKÜŞÜ', 100)
-
-        # ── Süre Bazlı Çıkış ─────────────────────────
-        # 48 saatten uzun tutuldu ve kâr yok
-        buy_time_str = pos.get('buy_time')
-        if buy_time_str:
+        # Momentum kaybı (saatlik analiz, her 3s'de çalıştırma)
+        if pos.get('check_momentum', False):
             try:
-                buy_time = datetime.datetime.strptime(buy_time_str, '%Y-%m-%d %H:%M:%S')
-                held_hours = (datetime.datetime.now() - buy_time).total_seconds() / 3600
-                if held_hours >= 48 and change < 0.5:
-                    return ('SÜRE DOLDU', 100)
+                _, _, _, c, _ = _klines(client, sym, '1h', 40)
+                m, s, _ = _macd(c)
+                _, _, _ = _macd(c[:-1])
+                prev_m = _ema(c[:-1], 12) - _ema(c[:-1], 26)
+                prev_s = sum([_ema(c[:i+1], 12) - _ema(c[:i+1], 26)
+                              for i in range(26, len(c)-1)][-9:]) / 9
+                bearish = prev_m >= prev_s and m < s
+                if bearish and change > 0.3:
+                    return 'MOMENTUM KAYBI'
+            except Exception:
+                pass
+
+        # Bear piyasasında zarar eden pozisyon → hızlı çık
+        if regime == 'BEAR' and change < -0.5:
+            return 'PİYASA ÇÖKÜŞÜ'
+
+        # Süre limiti (60 saat + flat)
+        bt = pos.get('buy_time', '')
+        if bt:
+            try:
+                elapsed = (datetime.datetime.now() -
+                           datetime.datetime.strptime(bt, '%Y-%m-%d %H:%M:%S')).total_seconds() / 3600
+                if elapsed >= 60 and abs(change) < 0.5:
+                    return 'SÜRE DOLDU'
             except Exception:
                 pass
 
@@ -363,354 +329,387 @@ def _should_exit(client, symbol, pos, regime):
         return None
 
 
-# ── Ana Agent ────────────────────────────────────────────────────────────────
+# ─── Ana Ajan ────────────────────────────────────────────────────────────────
 
 class AutonomousAgent:
-    MIN_SCORE     = 5.5    # alım için minimum skor
-    MAX_POSITIONS = 5      # aynı anda max açık pozisyon
-    MAX_POS_PCT   = 0.20   # bakiyenin max %20'si per trade
-    MIN_USDT      = 10.0   # minimum işlem tutarı
-    SCAN_INTERVAL = 300    # saniye (5 dakika)
-    SCAN_TOP_N    = 60     # ilk N coin'i tara (hız için)
+    SCAN_INTERVAL    = 90    # saniye — fırsat taraması
+    MONITOR_INTERVAL = 3     # saniye — pozisyon izleme
+    MOMENTUM_EVERY   = 20    # her N monitor döngüsünde momentum kontrolü
+    MAX_POSITIONS    = 6
+    MIN_SCORE        = 5.8
+    DAILY_LOSS_LIMIT = 8.0   # %
 
     def __init__(self):
-        self.running = False
-        self.state   = _load_state()
-        self._lock   = threading.Lock()
+        self.running     = False
+        self.state       = self._load()
+        self._lock       = threading.Lock()
+        self._mon_count  = 0
+        self._balance_start = 0.0
+
+    def _load(self):
+        if os.path.exists(STATE_FILE):
+            try:
+                with open(STATE_FILE) as f: return json.load(f)
+            except Exception: pass
+        return {
+            'blacklist': {}, 'weights': DEFAULT_WEIGHTS.copy(),
+            'scan_count': 0, 'total_pnl': 0.0, 'signal_stats': {},
+            'last_regime': 'SIDEWAYS', 'started_at': datetime.datetime.now().isoformat(),
+            'day_start_balance': 0.0,
+        }
+
+    def _save(self):
+        try:
+            with open(STATE_FILE, 'w') as f: json.dump(self.state, f, indent=2)
+        except Exception: pass
 
     # ── Blacklist ─────────────────────────────────────────────────────────
-    def _is_blacklisted(self, symbol):
-        bl = self.state['blacklist']
-        if symbol in bl:
-            if time.time() < bl[symbol]:
-                return True
-            del bl[symbol]
-        return False
+    def _bl(self, sym): return time.time() < self.state['blacklist'].get(sym, 0)
+    def _add_bl(self, sym, h=4): self.state['blacklist'][sym] = time.time() + h * 3600
 
-    def _blacklist(self, symbol, hours=4):
-        self.state['blacklist'][symbol] = time.time() + hours * 3600
-
-    # ── Ana Döngü ─────────────────────────────────────────────────────────
+    # ── Başlat ───────────────────────────────────────────────────────────
     def run(self):
         self.running = True
-        _save_state(self.state)
+        cfg = load_config()
+        is_real = not cfg.get('testnet', True)
+
+        try:
+            self._balance_start = get_usdt_balance(get_client())
+            self.state['day_start_balance'] = self._balance_start
+        except Exception:
+            pass
 
         send_telegram(
-            "🤖 <b>Otonom Ajan AKTİF</b>\n"
-            "━━━━━━━━━━━━━━\n"
+            f"{'🔴 GERÇEK' if is_real else '🧪 TESTNET'} <b>Otonom Ajan v2 AKTİF</b>\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"💰 Başlangıç Bakiye: ${round(self._balance_start,2)}\n"
             f"📊 Min Skor: {self.MIN_SCORE}/10\n"
             f"📦 Max Pozisyon: {self.MAX_POSITIONS}\n"
-            f"💰 Max Tutar: %{int(self.MAX_POS_PCT*100)} bakiye/pozisyon\n"
-            f"⏱ Tarama Aralığı: {self.SCAN_INTERVAL//60} dakika\n"
-            "Piyasa taranıyor..."
+            f"🛡 Günlük Kayıp Limiti: -%{self.DAILY_LOSS_LIMIT}\n"
+            f"⚡ Pozisyon Takip: her {self.MONITOR_INTERVAL}s\n"
+            f"🔍 Fırsat Tarama: her {self.SCAN_INTERVAL}s\n"
+            "Piyasa izleniyor..."
         )
 
-        threading.Thread(target=self._hourly_report_loop, daemon=True).start()
-        threading.Thread(target=self._daily_summary_loop, daemon=True).start()
-        threading.Thread(target=self._weight_update_loop, daemon=True).start()
+        # Thread'ler
+        threading.Thread(target=self._monitor_loop,  daemon=True).start()
+        threading.Thread(target=self._scanner_loop,  daemon=True).start()
+        threading.Thread(target=self._hourly_loop,   daemon=True).start()
+        threading.Thread(target=self._daily_loop,    daemon=True).start()
+        threading.Thread(target=self._weight_loop,   daemon=True).start()
+        threading.Thread(target=self._day_reset_loop, daemon=True).start()
 
+        # Ana thread canlı tutucu
+        while self.running:
+            time.sleep(30)
+
+    # ── Pozisyon İzleme (Her 3 Saniye) ───────────────────────────────────
+    def _monitor_loop(self):
+        while self.running:
+            try:
+                self._mon_count += 1
+                client    = get_client()
+                positions = load_positions()
+                regime    = self.state.get('last_regime', 'SIDEWAYS')
+                changed   = False
+
+                for sym, pos in list(positions.items()):
+                    if pos.get('qty', 0) <= 0: continue
+                    # Momentum kontrolü her 20 döngüde bir (API yükünü azalt)
+                    pos['check_momentum'] = (self._mon_count % self.MOMENTUM_EVERY == 0)
+                    reason = _exit_decision(client, sym, pos, regime)
+                    if reason:
+                        positions[sym] = pos
+                        save_positions(positions)
+                        res = execute_sell(client, sym, 100, source=reason, period='Ajan')
+                        if res.get('ok'):
+                            pnl = res.get('pnl', 0)
+                            self.state['total_pnl'] = round(self.state.get('total_pnl',0) + pnl, 2)
+                            self._add_bl(sym, 8 if 'STOP' in reason else 2)
+                            self._track_signal(pos, pnl)
+                        changed = True
+                    else:
+                        positions[sym] = pos   # peak_price güncellendi
+
+                if changed:
+                    save_positions(positions)
+                    self._save()
+
+            except Exception as e:
+                print(f'[Monitor] {e}')
+            time.sleep(self.MONITOR_INTERVAL)
+
+    # ── Fırsat Tarayıcı (Her 90 Saniye) ──────────────────────────────────
+    def _scanner_loop(self):
         while self.running:
             try:
                 with self._lock:
-                    regime = _get_market_regime(get_client())
+                    client = get_client()
+                    cfg    = load_config()
+                    is_real = not cfg.get('testnet', True)
+
+                    # Günlük kayıp kontrolü
+                    balance = get_usdt_balance(client)
+                    if not _daily_loss_ok({}, self.state.get('day_start_balance', balance),
+                                          balance, self.DAILY_LOSS_LIMIT):
+                        print('[Scanner] Günlük kayıp limiti — tarama durduruldu')
+                        time.sleep(self.SCAN_INTERVAL)
+                        continue
+
+                    regime = _regime(client)
                     if regime != self.state.get('last_regime'):
                         self._on_regime_change(regime)
                     self.state['last_regime'] = regime
 
-                    self._scan_and_open(regime)
-                    self._monitor_and_close(regime)
+                    if regime == 'BEAR':
+                        self.state['scan_count'] += 1
+                        self._save()
+                        time.sleep(self.SCAN_INTERVAL)
+                        continue
+
+                    positions = load_positions()
+                    held = {s for s, p in positions.items() if p.get('qty',0) > 0}
+                    if len(held) >= self.MAX_POSITIONS:
+                        self.state['scan_count'] += 1
+                        self._save()
+                        time.sleep(self.SCAN_INTERVAL)
+                        continue
+
+                    top100     = _top_100(client)
+                    candidates = [s for s in top100 if s not in held and not self._bl(s)]
+                    w          = self.state['weights']
+
+                    best_sym, best_sc = None, None
+                    for sym in candidates[:55]:
+                        sc = _score(client, sym, regime, w)
+                        if sc and sc['total'] >= self.MIN_SCORE:
+                            if best_sc is None or sc['total'] > best_sc['total']:
+                                best_sym, best_sc = sym, sc
+
+                    if best_sym:
+                        atr_pct = best_sc.get('atr_pct', 2.0)
+                        amount  = _position_size(balance, best_sc['total'],
+                                                 atr_pct, is_real, self.MAX_POSITIONS)
+                        if amount <= balance * 0.95:
+                            res = execute_buy(client, best_sym, amount,
+                                              source='OTONOM', period='Ajan')
+                            if res.get('ok'):
+                                sl  = max(1.5, min(6.0, atr_pct * 1.5))
+                                tp  = max(3.0, min(18.0, atr_pct * 3.0))
+                                positions = load_positions()
+                                if best_sym in positions:
+                                    positions[best_sym].update({
+                                        'tp_pct': tp, 'sl_pct': sl,
+                                        'trail_active': False,
+                                        'peak_price': res['price'],
+                                        'buy_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                        'open_score': best_sc['total'],
+                                    })
+                                save_positions(positions)
+                                self._send_buy_rationale(best_sym, best_sc, amount, tp, sl, regime, is_real)
+
                     self.state['scan_count'] += 1
-                    _save_state(self.state)
+                    self._save()
+
             except Exception as e:
-                print(f'[Agent] Ana döngü hatası: {e}')
+                print(f'[Scanner] {e}')
             time.sleep(self.SCAN_INTERVAL)
 
-    # ── Tarama & Alım ─────────────────────────────────────────────────────
-    def _scan_and_open(self, regime):
-        if regime == 'BEAR':
-            return   # Ayı piyasasında yeni pozisyon açma
+    # ── Telegram: Alım Gerekçesi ──────────────────────────────────────────
+    def _send_buy_rationale(self, sym, sc, amount, tp, sl, regime, is_real):
+        er = {'BULL': '🟢', 'SIDEWAYS': '🟡', 'BEAR': '🔴'}.get(regime, '⚪')
+        parts = []
+        if sc['cross1h']:  parts.append('1h MACD ✂️')
+        if sc['cross15m']: parts.append('15m MACD ✂️')
+        if sc['srsi'] < 30: parts.append(f"StochRSI {sc['srsi']:.0f}↓")
+        if sc['bb_pos'] < 0.3: parts.append(f"BB dipte {sc['bb_pos']:.2f}")
+        signal_str = ' | '.join(parts) if parts else '—'
 
-        client    = get_client()
-        positions = load_positions()
-        held      = {s for s, p in positions.items() if p.get('qty', 0) > 0}
-
-        if len(held) >= self.MAX_POSITIONS:
-            return
-
-        top100 = _get_top_100(client)
-        candidates = [
-            s for s in top100
-            if s not in held and not self._is_blacklisted(s)
-        ]
-
-        scores = []
-        for symbol in candidates[:self.SCAN_TOP_N]:
-            s = _score_coin(client, symbol, regime, self.state['weights'])
-            if s and s['total'] >= self.MIN_SCORE:
-                scores.append((symbol, s))
-
-        if not scores:
-            return
-
-        scores.sort(key=lambda x: x[1]['total'], reverse=True)
-        best_sym, best_sc = scores[0]
-
-        balance = get_usdt_balance(client)
-        amount  = _calc_position_size(
-            balance, best_sc['total'],
-            self.MAX_POS_PCT, self.MIN_USDT
-        )
-        if amount > balance * 0.95:
-            return
-
-        result = execute_buy(
-            client, best_sym, amount,
-            source='OTONOM', period='Ajan'
-        )
-        if not result.get('ok'):
-            return
-
-        # Dinamik TP/SL
-        atr = best_sc.get('atr_pct', 2.0)
-        sl  = max(1.5, min(5.0, atr * 1.5))
-        tp  = max(3.0, min(15.0, atr * 3.0))
-
-        positions = load_positions()
-        if best_sym in positions:
-            positions[best_sym].update({
-                'tp_pct':          tp,
-                'sl_pct':          sl,
-                'trail_activated': False,
-                'peak_price':      result['price'],
-                'buy_time':        datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'open_score':      best_sc['total'],
-            })
-        save_positions(positions)
-
-        # Telegram — karar gerekçesiyle birlikte
-        emoji_regime = {'BULL': '🟢', 'SIDEWAYS': '🟡', 'BEAR': '🔴'}.get(regime, '⚪')
         send_telegram(
-            f"🧠 <b>AJAN KARAR GEREKÇESİ</b>\n"
+            f"🧠 <b>AJAN ALIM GEREKÇESİ</b>"
+            f"{'  🔴GERÇEK' if is_real else ''}\n"
             f"━━━━━━━━━━━━━━\n"
-            f"🪙 {best_sym} | Skor: <b>{best_sc['total']:.1f}/10</b>\n"
-            f"  📈 Trend: {best_sc['trend']:.1f} "
-            f"(ADX {best_sc['adx']:.0f})\n"
-            f"  ⚡ Momentum: {best_sc['momentum']:.1f} "
-            f"(RSI {best_sc['rsi']:.0f}"
-            f"{' 🔀CROSS' if best_sc['fresh_cross'] else ''})\n"
-            f"  📊 Hacim: {best_sc['volume']:.1f} "
-            f"({best_sc['vol_ratio']:.1f}x ortalama)\n"
-            f"  🕯 Formasyon: {best_sc['pattern']:.1f}\n"
-            f"  {emoji_regime} Rejim: {regime}\n"
-            f"🎯 TP: +%{tp:.1f} | 🛑 SL: -%{sl:.1f} | 💰 ${amount:.2f}"
+            f"🪙 <b>{sym}</b>  Skor: <b>{sc['total']:.1f}/10</b>\n"
+            f"  📈 Trend {sc['trend']:.1f} (ADX {sc['adx']:.0f})\n"
+            f"  ⚡ Momentum {sc['momentum']:.1f}"
+            f"  RSI1h {sc['rsi1h']:.0f} / 15m {sc['rsi15m']:.0f}\n"
+            f"  📊 Hacim {sc['volume']:.1f}  ({sc['vol_ratio']:.1f}x avg)\n"
+            f"  🕯 BB {sc['bb']:.1f}  Formasyon {sc['pattern']:.1f}\n"
+            f"  💡 Sinyaller: {signal_str}\n"
+            f"  {er} Rejim: {regime}\n"
+            f"💰 ${amount:.2f}  |  🎯 TP+%{tp:.1f}  🛑 SL-%{sl:.1f}"
         )
 
-    # ── İzleme & Satış ────────────────────────────────────────────────────
-    def _monitor_and_close(self, regime):
-        client    = get_client()
-        positions = load_positions()
-
-        for symbol, pos in list(positions.items()):
-            if pos.get('qty', 0) <= 0:
-                continue
-            decision = _should_exit(client, symbol, pos, regime)
-            if decision:
-                reason, sell_pct = decision
-                save_positions(positions)
-                result = execute_sell(
-                    client, symbol, sell_pct,
-                    source=reason, period='Ajan'
-                )
-                if result.get('ok'):
-                    pnl = result.get('pnl', 0)
-                    self.state['total_pnl'] = round(
-                        self.state.get('total_pnl', 0) + pnl, 2
-                    )
-                    bl_hours = 8 if 'STOP' in reason else 2
-                    self._blacklist(symbol, hours=bl_hours)
-
-                    self._update_signal_stats(pos, pnl)
-
-    # ── Ağırlık Güncelleme (Basit Reinforcement) ──────────────────────────
-    def _update_signal_stats(self, pos, pnl):
-        """Hangi bileşen kârlı işlemlerle korelasyonu yüksek? Kaydet."""
-        score = pos.get('open_score', 0)
-        key   = f"score_{int(score)}"
-        stats = self.state.setdefault('signal_stats', {})
-        if key not in stats:
-            stats[key] = {'wins': 0, 'total': 0, 'pnl': 0.0}
-        stats[key]['total'] += 1
-        stats[key]['pnl']   = round(stats[key]['pnl'] + pnl, 2)
-        if pnl > 0:
-            stats[key]['wins'] += 1
-
-    def _weight_update_loop(self):
-        """Her 12 saatte bir performans verilerine göre ağırlıkları ayarla."""
+    # ── Ağırlık Öğrenme (Her 12 Saat) ────────────────────────────────────
+    def _weight_loop(self):
         while self.running:
             time.sleep(12 * 3600)
             try:
                 trades = load_trades()
-                sells  = [t for t in trades if t.get('type') == 'sell'
-                          and t.get('source') == 'OTONOM' or 'Ajan' in t.get('period','')]
-                if len(sells) < 5:
-                    continue
-
-                wins = [t for t in sells if t.get('pnl', 0) > 0]
-                wr   = len(wins) / len(sells)
-
-                # Kazanma oranı düşükse momentum ağırlığını artır
-                # (en belirleyici faktör genellikle momentum)
-                w = self.state['weights']
+                ajan_sells = [t for t in trades
+                              if t.get('type') == 'sell'
+                              and 'Ajan' in t.get('period','')]
+                if len(ajan_sells) < 5: continue
+                wins = [t for t in ajan_sells if t.get('pnl',0) > 0]
+                wr   = len(wins) / len(ajan_sells)
+                w    = self.state['weights']
                 if wr < 0.45:
-                    w['momentum'] = min(w['momentum'] * 1.1, 4.0)
-                    w['pattern']  = max(w['pattern']  * 0.95, 1.0)
+                    w['momentum'] = min(w['momentum'] * 1.08, 4.0)
+                    w['bb']       = min(w['bb']       * 1.05, 2.0)
+                    w['pattern']  = max(w['pattern']  * 0.95, 0.8)
                 elif wr > 0.65:
-                    # İyi gidiyorsa koruyucu ol, trend'e daha fazla bak
-                    w['trend']    = min(w['trend'] * 1.05, 3.0)
-                _save_state(self.state)
+                    w['trend']    = min(w['trend'] * 1.05, 3.5)
+                self._save()
                 send_telegram(
                     f"⚙️ <b>Ağırlık Güncellemesi</b>\n"
-                    f"Kazanma Oranı: %{round(wr*100,1)}\n"
-                    f"Trend: {w['trend']:.2f} | Momentum: {w['momentum']:.2f}"
+                    f"Kazanma: %{round(wr*100,1)} ({len(ajan_sells)} işlem)\n"
+                    f"T:{w['trend']:.2f} M:{w['momentum']:.2f} "
+                    f"V:{w['volume']:.2f} BB:{w['bb']:.2f}"
                 )
             except Exception as e:
-                print(f'[Agent Weights] {e}')
+                print(f'[Weights] {e}')
 
     # ── Rejim Değişikliği ─────────────────────────────────────────────────
-    def _on_regime_change(self, new_regime):
-        emoji = {'BULL': '🟢', 'SIDEWAYS': '🟡', 'BEAR': '🔴'}.get(new_regime, '⚪')
-        old   = self.state.get('last_regime', '?')
+    def _on_regime_change(self, new):
+        old = self.state.get('last_regime', '?')
+        er  = {'BULL': '🟢', 'SIDEWAYS': '🟡', 'BEAR': '🔴'}.get(new, '⚪')
         send_telegram(
-            f"{emoji} <b>REJİM DEĞİŞTİ</b>\n"
-            f"{old} → <b>{new_regime}</b>\n"
-            f"{'Yeni alımlar durduruldu.' if new_regime == 'BEAR' else 'Tarama devam ediyor.'}"
+            f"{er} <b>REJİM DEĞİŞTİ</b>  {old} → <b>{new}</b>\n"
+            f"{'⛔ Yeni alımlar durduruldu!' if new == 'BEAR' else '✅ Tarama aktif.'}"
         )
 
+    # ── Günlük Sıfırlama ─────────────────────────────────────────────────
+    def _day_reset_loop(self):
+        while self.running:
+            now  = datetime.datetime.now()
+            next_midnight = (now + datetime.timedelta(days=1)).replace(
+                hour=0, minute=0, second=5, microsecond=0)
+            time.sleep((next_midnight - now).total_seconds())
+            try:
+                bal = get_usdt_balance(get_client())
+                self.state['day_start_balance'] = bal
+                self._save()
+            except Exception: pass
+
     # ── Saatlik Rapor ─────────────────────────────────────────────────────
-    def _hourly_report_loop(self):
+    def _hourly_loop(self):
         while self.running:
             time.sleep(3600)
             try:
-                self._send_status_report()
+                client    = get_client()
+                positions = load_positions()
+                balance   = get_usdt_balance(client)
+                open_pos  = [(s,p) for s,p in positions.items() if p.get('qty',0)>0]
+                regime    = self.state.get('last_regime','?')
+                er        = {'BULL':'🟢','SIDEWAYS':'🟡','BEAR':'🔴'}.get(regime,'⚪')
+                day_bal   = self.state.get('day_start_balance', balance)
+                day_chg   = round((balance - day_bal) / day_bal * 100, 2) if day_bal else 0
+
+                lines = [
+                    "📊 <b>SAATLIK RAPOR</b>",
+                    f"━━━━━━━━━━━━━━",
+                    f"💰 Bakiye: <b>${round(balance,2)}</b>  "
+                    f"({'+' if day_chg>=0 else ''}{day_chg}% bugün)",
+                    f"💹 Toplam PnL: ${round(self.state.get('total_pnl',0),2)}",
+                    f"{er} Rejim: {regime}  |  🔍 Tarama: {self.state['scan_count']}x",
+                    f"📦 Açık: {len(open_pos)}/{self.MAX_POSITIONS}",
+                ]
+                if open_pos:
+                    lines.append("")
+                    for sym, pos in open_pos:
+                        price = get_price(client, sym)
+                        chg   = (price - pos['avg_price']) / pos['avg_price'] * 100
+                        icon  = '🟢' if chg >= 0 else '🔴'
+                        trail = ' 🎯trail' if pos.get('trail_active') else ''
+                        lines.append(f"  {icon} {sym}: {'+' if chg>=0 else ''}{round(chg,2)}%{trail}")
+                # Kara liste
+                bl = [k for k,v in self.state['blacklist'].items() if v > time.time()]
+                if bl:
+                    lines.append(f"\n⛔ Kara liste ({len(bl)}): {', '.join(bl[:5])}")
+                send_telegram('\n'.join(lines))
             except Exception as e:
-                print(f'[Agent HourlyReport] {e}')
-
-    def _send_status_report(self):
-        client    = get_client()
-        positions = load_positions()
-        balance   = get_usdt_balance(client)
-        open_pos  = [(s, p) for s, p in positions.items() if p.get('qty', 0) > 0]
-        regime    = self.state.get('last_regime', '?')
-        emoji_r   = {'BULL': '🟢', 'SIDEWAYS': '🟡', 'BEAR': '🔴'}.get(regime, '⚪')
-
-        lines = [
-            "📊 <b>SAATLIK DURUM RAPORU</b>",
-            f"━━━━━━━━━━━━━━",
-            f"💰 Bakiye: <b>${round(balance,2)}</b> USDT",
-            f"📈 Açık Poz: {len(open_pos)} / {self.MAX_POSITIONS}",
-            f"💹 Toplam PnL: ${round(self.state.get('total_pnl',0),2)}",
-            f"{emoji_r} Rejim: {regime}",
-            f"🔍 Tarama: {self.state['scan_count']}x",
-        ]
-
-        if open_pos:
-            lines.append("")
-            lines.append("📌 <b>Pozisyonlar:</b>")
-            for sym, pos in open_pos:
-                price  = get_price(client, sym)
-                chg    = (price - pos['avg_price']) / pos['avg_price'] * 100
-                sign   = '+' if chg >= 0 else ''
-                icon   = '🟢' if chg >= 0 else '🔴'
-                lines.append(f"  {icon} {sym}: {sign}{round(chg,2)}%")
-
-        send_telegram('\n'.join(lines))
+                print(f'[Hourly] {e}')
 
     # ── Günlük Özet ───────────────────────────────────────────────────────
-    def _daily_summary_loop(self):
+    def _daily_loop(self):
         while self.running:
             time.sleep(24 * 3600)
             try:
-                self._send_daily_summary()
+                trades  = load_trades()
+                today   = datetime.datetime.now().strftime('%Y-%m-%d')
+                recent  = [t for t in trades if t.get('type')=='sell' and t.get('time','')[:10]==today]
+                if not recent: continue
+                wins     = [t for t in recent if t.get('pnl',0) > 0]
+                pnl_sum  = sum(t.get('pnl',0) for t in recent)
+                wr       = round(len(wins)/len(recent)*100,1)
+                best     = max(recent, key=lambda t: t.get('pnl',0), default=None)
+                worst    = min(recent, key=lambda t: t.get('pnl',0), default=None)
+                w        = self.state['weights']
+                lines = [
+                    "🌙 <b>GÜNLÜK ÖZET</b>",
+                    f"━━━━━━━━━━━━━━",
+                    f"📊 {len(recent)} işlem | Kazanma %{wr}",
+                    f"💹 Net PnL: ${round(pnl_sum,2)}",
+                ]
+                if best:  lines.append(f"🏆 En İyi:  {best['symbol']} +${round(best.get('pnl',0),2)}")
+                if worst: lines.append(f"💀 En Kötü: {worst['symbol']} ${round(worst.get('pnl',0),2)}")
+                lines += [
+                    "",
+                    f"⚙️ Ağırlıklar — Trend:{w['trend']:.1f} "
+                    f"Mom:{w['momentum']:.1f} Vol:{w['volume']:.1f} "
+                    f"BB:{w['bb']:.1f}",
+                ]
+                send_telegram('\n'.join(lines))
             except Exception as e:
-                print(f'[Agent DailySummary] {e}')
+                print(f'[Daily] {e}')
 
-    def _send_daily_summary(self):
-        trades = load_trades()
-        now    = datetime.datetime.now()
-        day_ago = now - datetime.timedelta(days=1)
-        recent = [
-            t for t in trades
-            if t.get('type') == 'sell'
-            and t.get('time', '') >= day_ago.strftime('%Y-%m-%d')
-        ]
-        if not recent:
-            return
-
-        wins     = [t for t in recent if t.get('pnl', 0) > 0]
-        total_pnl = sum(t.get('pnl', 0) for t in recent)
-        wr        = round(len(wins) / len(recent) * 100, 1)
-        best  = max(recent, key=lambda t: t.get('pnl', 0), default=None)
-        worst = min(recent, key=lambda t: t.get('pnl', 0), default=None)
-
-        lines = [
-            "🌙 <b>GÜNLÜK ÖZET</b>",
-            f"━━━━━━━━━━━━━━",
-            f"📊 İşlem: {len(recent)} | Kazanma: %{wr}",
-            f"💹 Net PnL: ${round(total_pnl,2)}",
-        ]
-        if best:
-            lines.append(f"🏆 En İyi: {best['symbol']} +${round(best.get('pnl',0),2)}")
-        if worst:
-            lines.append(f"💀 En Kötü: {worst['symbol']} ${round(worst.get('pnl',0),2)}")
-
-        w = self.state['weights']
-        lines += [
-            "",
-            f"⚙️ Ağırlıklar: T:{w['trend']:.1f} M:{w['momentum']:.1f} "
-            f"V:{w['volume']:.1f} P:{w['pattern']:.1f}",
-        ]
-        send_telegram('\n'.join(lines))
+    # ── Sinyal Takibi ─────────────────────────────────────────────────────
+    def _track_signal(self, pos, pnl):
+        key  = f"sc_{int(pos.get('open_score',0))}"
+        stats = self.state.setdefault('signal_stats', {})
+        if key not in stats: stats[key] = {'wins':0,'total':0,'pnl':0.0}
+        stats[key]['total'] += 1
+        stats[key]['pnl']    = round(stats[key]['pnl'] + pnl, 2)
+        if pnl > 0: stats[key]['wins'] += 1
 
     def stop(self):
         self.running = False
         send_telegram("⛔ <b>Otonom Ajan durduruldu.</b>")
 
 
-# ── Global Instance & API ─────────────────────────────────────────────────────
+# ─── Global API ───────────────────────────────────────────────────────────────
 
-_agent_instance: AutonomousAgent | None = None
-_agent_thread:   threading.Thread | None = None
+_agent: AutonomousAgent | None = None
+_thread: threading.Thread | None = None
 
 
 def start_autonomous_agent():
-    global _agent_instance, _agent_thread
-    if _agent_instance and _agent_instance.running:
-        return False  # zaten çalışıyor
-    _agent_instance = AutonomousAgent()
-    _agent_thread   = threading.Thread(target=_agent_instance.run, daemon=True)
-    _agent_thread.start()
+    global _agent, _thread
+    if _agent and _agent.running: return False
+    _agent  = AutonomousAgent()
+    _thread = threading.Thread(target=_agent.run, daemon=True)
+    _thread.start()
     return True
 
 
 def stop_autonomous_agent():
-    global _agent_instance
-    if _agent_instance:
-        _agent_instance.stop()
-        _agent_instance.running = False
+    global _agent
+    if _agent: _agent.stop(); _agent.running = False
     return True
 
 
 def agent_status():
-    if _agent_instance and _agent_instance.running:
-        s = _agent_instance.state
-        return {
-            'running':      True,
-            'scan_count':   s.get('scan_count', 0),
-            'total_pnl':    s.get('total_pnl', 0.0),
-            'last_regime':  s.get('last_regime', 'SIDEWAYS'),
-            'weights':      s.get('weights', DEFAULT_WEIGHTS),
-            'blacklisted':  [k for k, v in s.get('blacklist', {}).items()
-                             if v > time.time()],
-            'started_at':   s.get('started_at', ''),
-        }
-    return {'running': False}
+    if not (_agent and _agent.running): return {'running': False}
+    s = _agent.state
+    cfg = load_config()
+    return {
+        'running':     True,
+        'is_real':     not cfg.get('testnet', True),
+        'scan_count':  s.get('scan_count', 0),
+        'total_pnl':   s.get('total_pnl', 0.0),
+        'last_regime': s.get('last_regime', 'SIDEWAYS'),
+        'weights':     s.get('weights', DEFAULT_WEIGHTS),
+        'blacklisted': [k for k,v in s.get('blacklist',{}).items() if v > time.time()],
+        'started_at':  s.get('started_at', ''),
+        'day_pnl':     round(s.get('total_pnl', 0), 2),
+    }
