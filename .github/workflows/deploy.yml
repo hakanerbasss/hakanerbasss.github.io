@@ -25,7 +25,8 @@ jobs:
             cp kripto-bot/bot.py ~/kripto-bot/
             cp kripto-bot/signal_engine.py ~/kripto-bot/
             cp kripto-bot/autonomous_agent.py ~/kripto-bot/ 2>/dev/null || true
-            cp kripto-bot/edge_agent.py ~/kripto-bot/
+            cp kripto-bot/edge_agent.py ~/kripto-bot/ 2>/dev/null || true
+            cp kripto-bot/indicator_agent.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/seans_strategy.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/smart_strategy.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/telegram_bot.py ~/kripto-bot/ 2>/dev/null || true
