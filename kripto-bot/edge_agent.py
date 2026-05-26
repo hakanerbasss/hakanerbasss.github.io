@@ -309,6 +309,8 @@ def _score(client, symbol, funding, weights, cfg):
         price = get_price(client, symbol)
     except Exception as e:
         return {'score': 0, 'signal': None, 'reason': str(e), 'details': {}, 'price': 0}
+    if not price or price <= 0:
+        return {'score': 0, 'signal': None, 'reason': 'Spot fiyat alınamadı', 'details': {}, 'price': 0}
 
     news_key = cfg.get('cryptopanic_key', '')
     sess, sess_mult, sess_note = _session()

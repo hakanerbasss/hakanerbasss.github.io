@@ -395,9 +395,9 @@ class AutonomousAgent:
                     reason = _exit_decision(client, sym, pos, regime)
                     if reason:
                         positions[sym] = pos
-                        save_positions(positions)
                         res = execute_sell(client, sym, 100, source='OTONOM', period=reason)
                         if res.get('ok'):
+                            positions[sym]['qty'] = 0  # local dict'i hemen güncelle
                             pnl = res.get('pnl', 0)
                             self.state['total_pnl'] = round(self.state.get('total_pnl',0) + pnl, 2)
                             self._add_bl(sym, 8 if 'STOP' in reason else 2)
