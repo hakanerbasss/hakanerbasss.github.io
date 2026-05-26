@@ -323,12 +323,21 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
             if atr:
                 sl_pct = max(1.0, min(5.0,  round(atr * 1.5, 2)))
                 tp_pct = max(2.0, min(10.0, round(atr * 3.0, 2)))
-                # Minimum TP filtresi — komisyon (≈%0.4) göz önünde
                 min_tp = float(coin_cfg.get('min_tp_pct', 0))
                 if min_tp > 0 and tp_pct < min_tp:
                     msg = f'ATR düşük: TP %{tp_pct} < min %{min_tp}, alım atlandı'
                     print(f'[Bot] {symbol} {msg}')
                     return {'ok': False, 'error': msg}
+        elif not coin_cfg:
+            # Otonom ajan tarafından bulunan coin — config yok, ATR ile otomatik belirle
+            atr = _calc_atr_pct(client, symbol, 7)
+            if atr:
+                sl_pct = max(1.5, min(5.0,  round(atr * 1.5, 2)))
+                tp_pct = max(3.0, min(12.0, round(atr * 3.0, 2)))
+            else:
+                sl_pct = 2.5   # varsayılan: -%2.5
+                tp_pct = 5.0   # varsayılan: +%5.0
+            print(f'[Bot] {symbol} otonom ajan — ATR TP/SL: +%{tp_pct} / -%{sl_pct}')
 
         # Bakiye kontrolü
         balance = get_usdt_balance(client)
