@@ -8,6 +8,7 @@ from signal_engine import start_engine
 from telegram_bot import start_telegram_bot
 from autonomous_agent import (start_autonomous_agent, stop_autonomous_agent,
                                agent_status)
+from edge_agent import start_edge_agent, stop_edge_agent, edge_agent_status
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -873,9 +874,24 @@ def agent_stop():
 def agent_status_api():
     return jsonify(agent_status())
 
+# ── Edge Agent API ────────────────────────────────
+@app.route('/edge/start', methods=['POST'])
+def edge_start():
+    ok = start_edge_agent()
+    return jsonify({'ok': ok, 'msg': 'Edge Agent başlatıldı' if ok else 'Zaten çalışıyor'})
+
+@app.route('/edge/stop', methods=['POST'])
+def edge_stop():
+    stop_edge_agent()
+    return jsonify({'ok': True})
+
+@app.route('/edge/status')
+def edge_status_api():
+    return jsonify(edge_agent_status())
+
 # ── Başlat ───────────────────────────────────────
 if __name__ == '__main__':
     start_engine()
     start_telegram_bot()
-    start_autonomous_agent()
+    start_edge_agent()
     app.run(host='0.0.0.0', port=5000, debug=False)
