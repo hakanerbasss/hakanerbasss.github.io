@@ -562,8 +562,9 @@ class AutonomousAgent:
             except Exception: pass
 
     def _hourly_loop(self):
+        now = datetime.datetime.now()
+        time.sleep((60 - now.minute) * 60 - now.second)
         while self.running:
-            time.sleep(3600)
             try:
                 client    = get_client()
                 positions = load_positions()
@@ -603,6 +604,7 @@ class AutonomousAgent:
                 send_telegram('\n'.join(lines))
             except Exception as e:
                 print(f'[Otonom Hourly] {e}')
+            time.sleep(3600)
 
     def _daily_loop(self):
         while self.running:

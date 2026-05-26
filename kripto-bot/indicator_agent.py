@@ -10,7 +10,7 @@ Indicator Agent — Kodlanmış İndikatörler ile Otonom Tarayıcı
 • İşlemler 'INDICATOR-UTBOT' | 'INDICATOR-SMART' | 'INDICATOR-SEANS' kaynağıyla etiketlenir
 """
 
-import time, threading, json, os
+import time, threading, json, os, datetime
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, get_price, send_telegram, get_usdt_balance)
 from signal_engine import calc_ut_bot, get_klines
@@ -346,7 +346,8 @@ class IndicatorAgent:
 
     # ── Saatlik Rapor ─────────────────────────────────────────────────────────
     def _report_loop(self):
-        time.sleep(3600)
+        now = datetime.datetime.now()
+        time.sleep((60 - now.minute) * 60 - now.second)
         while self._running:
             try:
                 self._report()

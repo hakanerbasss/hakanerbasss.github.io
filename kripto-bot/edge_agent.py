@@ -716,7 +716,8 @@ class EdgeAgent:
 
     # ── Saatlik Rapor ──────────────────────────────────────────────────────
     def _hourly_loop(self):
-        time.sleep(300)
+        now = datetime.datetime.now()
+        time.sleep((60 - now.minute) * 60 - now.second)
         while self._running:
             try:
                 self._hourly_report()
