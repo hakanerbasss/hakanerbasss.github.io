@@ -79,6 +79,13 @@ def trades_reset():
     save_trades([])
     return jsonify({'ok': True})
 
+@app.route('/positions/clear', methods=['POST'])
+def positions_clear():
+    """Positions.json'ı doğrudan sıfırla — elle silinen pozisyonlar için."""
+    from bot import save_positions
+    save_positions({})
+    return jsonify({'ok': True, 'msg': 'Tüm pozisyonlar temizlendi'})
+
 # ── API: Smart Backtest ──────────────────────────
 @app.route('/api/smart_backtest')
 @login_required
