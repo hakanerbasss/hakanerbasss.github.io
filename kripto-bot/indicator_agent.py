@@ -343,13 +343,13 @@ class IndicatorAgent:
 
     # ── Saatlik Rapor ─────────────────────────────────────────────────────────
     def _report_loop(self):
-        time.sleep(4 * 3600)
+        time.sleep(3600)
         while self._running:
             try:
                 self._report()
             except Exception as e:
                 print(f'[Indicator] Rapor hata: {e}')
-            time.sleep(4 * 3600)
+            time.sleep(3600)
 
     def _report(self):
         client    = get_client()

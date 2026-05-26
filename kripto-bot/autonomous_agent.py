@@ -561,7 +561,7 @@ class AutonomousAgent:
 
     def _hourly_loop(self):
         while self.running:
-            time.sleep(4 * 3600)
+            time.sleep(3600)
             try:
                 client    = get_client()
                 positions = load_positions()
