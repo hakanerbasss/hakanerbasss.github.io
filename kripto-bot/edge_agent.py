@@ -581,19 +581,19 @@ class EdgeAgent:
                     self._notified[symbol] = time.time()
                     send_telegram(f'💚 <b>{symbol}</b> KÂR HEDEFİ +%{pct:.2f}')
                     res = execute_sell(client, symbol, 100, source='EDGE TP', period='TP')
-                    if res.get('ok'):
-                        self._notified.pop(symbol, None)
-                        self._record_exit(symbol, pos, pct, 'TP')
+                    self._notified.pop(symbol, None)
+                    self._force_clear(symbol, res)
+                    self._record_exit(symbol, pos, pct, 'TP')
                     continue
 
                 if sl > 0 and pct <= -sl:
                     self._notified[symbol] = time.time()
                     send_telegram(f'🔴 <b>{symbol}</b> STOP LOSS %{pct:.2f}')
                     res = execute_sell(client, symbol, 100, source='EDGE SL', period='SL')
-                    if res.get('ok'):
-                        self._notified.pop(symbol, None)
-                        self.blacklist[symbol] = time.time() + 6 * 3600
-                        self._record_exit(symbol, pos, pct, 'SL')
+                    self._notified.pop(symbol, None)
+                    self._force_clear(symbol, res)
+                    self.blacklist[symbol] = time.time() + 6 * 3600
+                    self._record_exit(symbol, pos, pct, 'SL')
                     continue
 
                 # Trailing stop: %40 TP'de aktif, peak'ten %2.5 düşüşte çık
@@ -636,6 +636,19 @@ class EdgeAgent:
 
             except Exception as e:
                 print(f'[Edge] Monitor {symbol}: {e}')
+
+    def _force_clear(self, symbol, sell_result):
+        """Satış başarısız olsa bile pozisyonu sıfırla (elle silinen pozisyonlar için)."""
+        if not sell_result.get('ok'):
+            try:
+                from bot import save_positions
+                positions = load_positions()
+                if symbol in positions:
+                    positions[symbol]['qty'] = 0
+                    save_positions(positions)
+                    print(f'[Edge] {symbol} zorla sıfırlandı (satış başarısız ama pozisyon temizlendi)')
+            except Exception as e:
+                print(f'[Edge] force_clear hata {symbol}: {e}')
 
     def _record_exit(self, symbol, pos, pct, reason):
         """Çıkış sonrası öğrenme güncelleme."""
