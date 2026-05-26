@@ -116,6 +116,7 @@ class IndicatorAgent:
             self.state['day_start_bal'] = bal
         except Exception:
             bal = 0
+        print('[Indicator] Başladı')
         cfg  = load_config()
         mode = '🧪 TESTNET' if cfg.get('testnet', True) else '🔴 GERÇEK'
         send_telegram(
@@ -164,6 +165,8 @@ class IndicatorAgent:
         btc_ok     = _btc_up(client)
         candidates = _scan_candidates(client)
         held       = {s for s, p in positions.items() if p.get('qty', 0) > 0}
+        scan_no    = self.state.get('scan_count', 0) + 1
+        print(f'[Indicator] Tarama #{scan_no}: {len(candidates)} coin, BTC_OK={btc_ok}, açık={open_cnt}')
 
         for sym in candidates:
             if sym in held or self._bl(sym) or not btc_ok:

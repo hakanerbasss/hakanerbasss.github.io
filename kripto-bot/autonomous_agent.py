@@ -369,6 +369,7 @@ class AutonomousAgent:
             "Piyasa izleniyor..."
         )
 
+        print('[Otonom] Başladı')
         threading.Thread(target=self._monitor_loop,  daemon=True).start()
         threading.Thread(target=self._scanner_loop,  daemon=True).start()
         threading.Thread(target=self._hourly_loop,   daemon=True).start()
@@ -432,6 +433,7 @@ class AutonomousAgent:
                     if regime != self.state.get('last_regime'):
                         self._on_regime_change(regime)
                     self.state['last_regime'] = regime
+                    print(f'[Otonom] Tarama #{self.state.get("scan_count",0)+1}: rejim={regime}')
 
                     if regime == 'BEAR':
                         self.state['scan_count'] += 1

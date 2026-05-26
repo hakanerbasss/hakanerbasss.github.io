@@ -442,6 +442,7 @@ class EdgeAgent:
         except Exception:
             bal = 0
         mode = '🔴 GERÇEK' if not cfg.get('testnet', True) else '🧪 TESTNET'
+        print('[Edge] Başladı')
         send_telegram(
             f'{mode} <b>Edge Agent AKTİF</b>\n'
             f'━━━━━━━━━━━━━━\n'
@@ -489,6 +490,8 @@ class EdgeAgent:
         # Funding rates al
         fundings = _all_funding()
         symbols  = _futures_symbols()
+        scan_no  = self.state.get('scan_count', 0) + 1
+        print(f'[Edge] Tarama #{scan_no}: {len(symbols)} futures sembol, açık={open_count}')
 
         # Önce extreme funding'i olan coinlere bak
         candidates = []
