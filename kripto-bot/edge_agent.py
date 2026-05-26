@@ -30,10 +30,10 @@ FUNDING_SQUEEZE      = -0.0005   # < -0.05%: shortlar sıkışıyor → bull
 FUNDING_STRONG_SQ    = -0.0010   # < -0.10%: güçlü sıkışma
 FUNDING_AVOID        = +0.0008   # > +0.08%: longlar aşırı yüklenmiş → kaçın
 
-MAX_POSITIONS  = 5
+MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 60    # saniye
 MONITOR_SEC    = 5
-MIN_SCORE      = 5.5   # 0-10
+MIN_SCORE      = 4.5   # 0-10 — trend modda daha düşük eşik
 
 STABLECOINS = {
     'USDCUSDT','BUSDUSDT','TUSDUSDT','FDUSDUSDT','EURUSDT',
@@ -41,13 +41,14 @@ STABLECOINS = {
 }
 
 DEFAULT_WEIGHTS = {
-    'funding': 2.5,
-    'sweep':   2.0,
-    'oi':      1.5,
-    'cvd':     1.0,
-    'news':    1.5,
-    'session': 0.5,
-    'struct':  1.0,
+    'funding':   2.0,
+    'sweep':     2.0,
+    'oi':        1.5,
+    'cvd':       1.0,
+    'news':      1.5,
+    'session':   0.5,
+    'struct':    1.0,
+    'btc_trend': 1.5,   # BTC yükseliyorsa tüm coinlere bonus
 }
 
 # ─── Public Futures API ───────────────────────────────────────────────────────
@@ -268,6 +269,39 @@ def _structure_signal(client, symbol):
     except Exception:
         return 0.0, ''
 
+# ─── BTC Trend (tüm piyasanın yönü) ─────────────────────────────────────────
+
+_btc_trend_cache = {'ts': 0.0, 'val': (0.0, 'BTC verisi yok')}
+
+def _btc_trend_signal(client):
+    """
+    BTC 4H'de yükseliyorsa tüm coinlere +1.5 bonus.
+    Düşüyorsa -1.0. Piyasa trend değiştirdiğinde hızlı tepki.
+    """
+    global _btc_trend_cache
+    if time.time() - _btc_trend_cache['ts'] < 300:
+        return _btc_trend_cache['val']
+    try:
+        from signal_engine import get_klines
+        closes, highs, lows, _ = get_klines(client, 'BTCUSDT', '4h', limit=22)
+        sma20 = sum(closes[-20:]) / 20
+        price = closes[-1]
+        hh = sum(1 for i in range(1, 5) if highs[-i] > highs[-i-1])
+        ll = sum(1 for i in range(1, 5) if lows[-i]  < lows[-i-1])
+
+        if price > sma20 * 1.01 and hh >= 3:
+            result = (1.5, f'BTC yukarı trend (HH:{hh}/4, fiyat SMA üstünde)')
+        elif price > sma20:
+            result = (0.8, f'BTC SMA üstünde, nötr yapı')
+        elif price < sma20 * 0.99 and ll >= 3:
+            result = (-1.2, f'BTC aşağı trend (LL:{ll}/4)')
+        else:
+            result = (-0.3, f'BTC SMA altında, zayıf')
+        _btc_trend_cache = {'ts': time.time(), 'val': result}
+        return result
+    except Exception:
+        return 0.0, 'BTC trend alınamadı'
+
 # ─── Ana Skor ────────────────────────────────────────────────────────────────
 
 def _score(client, symbol, funding, weights, cfg):
@@ -280,26 +314,28 @@ def _score(client, symbol, funding, weights, cfg):
     sess, sess_mult, sess_note = _session()
 
     parts = {
-        'funding': _funding_part(funding),
-        'sweep':   _sweep_signal(symbol, price),
-        'oi':      _oi_signal(symbol, price),
-        'cvd':     _cvd_signal(client, symbol),
-        'news':    _news_signal(symbol, news_key),
-        'struct':  _structure_signal(client, symbol),
-        'session': ((sess_mult - 1.0) * 1.5, f'{sess}: {sess_note}'),
+        'funding':   _funding_part(funding),
+        'sweep':     _sweep_signal(symbol, price),
+        'oi':        _oi_signal(symbol, price),
+        'cvd':       _cvd_signal(client, symbol),
+        'news':      _news_signal(symbol, news_key),
+        'struct':    _structure_signal(client, symbol),
+        'session':   ((sess_mult - 1.0) * 1.5, f'{sess}: {sess_note}'),
+        'btc_trend': _btc_trend_signal(client),
     }
 
     raw = sum(v[0] * weights.get(k, 1.0) for k, v in parts.items())
 
     # Teorik max (hepsinin olumlu maksimumu)
     max_raw = (
-        3.0 * weights['funding'] +
-        2.5 * weights['sweep'] +
-        1.5 * weights['oi'] +
-        1.5 * weights['cvd'] +
-        2.0 * weights['news'] +
-        1.0 * weights['struct'] +
-        0.3 * weights['session']
+        3.0 * weights.get('funding', 2.0) +
+        2.5 * weights.get('sweep', 2.0) +
+        1.5 * weights.get('oi', 1.5) +
+        1.5 * weights.get('cvd', 1.0) +
+        2.0 * weights.get('news', 1.5) +
+        1.0 * weights.get('struct', 1.0) +
+        0.3 * weights.get('session', 0.5) +
+        1.5 * weights.get('btc_trend', 1.5)
     )
 
     # 0-10 normalize
@@ -473,7 +509,7 @@ class EdgeAgent:
         for sym, funding, _ in candidates:
             if not self._running:
                 break
-            if checked >= 20:
+            if checked >= 40:
                 break
             if sym in load_positions() and load_positions()[sym].get('qty', 0) > 0:
                 checked += 1
@@ -823,7 +859,7 @@ class EdgeAgent:
 
 # ─── Global API ──────────────────────────────────────────────────────────────
 
-_agent: EdgeAgent | None = None
+_agent = None  # type: EdgeAgent
 _agent_lock = threading.Lock()
 
 def start_edge_agent():
