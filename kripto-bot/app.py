@@ -6,6 +6,8 @@ from bot import (load_config, save_config, get_client, get_market_summary,
                  load_trades, load_positions, get_usdt_balance)
 from signal_engine import start_engine
 from telegram_bot import start_telegram_bot
+from autonomous_agent import (start_autonomous_agent, stop_autonomous_agent,
+                               agent_status)
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -855,6 +857,24 @@ def seans_analiz():
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
+
+# ── Otonom Ajan API ──────────────────────────────
+@app.route('/agent/start', methods=['POST'])
+@login_required
+def agent_start():
+    ok = start_autonomous_agent()
+    return jsonify({'ok': ok, 'msg': 'Ajan başlatıldı' if ok else 'Zaten çalışıyor'})
+
+@app.route('/agent/stop', methods=['POST'])
+@login_required
+def agent_stop():
+    stop_autonomous_agent()
+    return jsonify({'ok': True})
+
+@app.route('/agent/status')
+@login_required
+def agent_status_api():
+    return jsonify(agent_status())
 
 # ── Başlat ───────────────────────────────────────
 if __name__ == '__main__':
