@@ -9,6 +9,8 @@ from telegram_bot import start_telegram_bot
 from autonomous_agent import (start_autonomous_agent, stop_autonomous_agent,
                                agent_status)
 from edge_agent import start_edge_agent, stop_edge_agent, edge_agent_status
+from indicator_agent import (start_indicator_agent, stop_indicator_agent,
+                              indicator_agent_status)
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -210,10 +212,13 @@ def api_stats():
 
     def _normalize(source):
         s = (source or '').upper()
-        if 'UT' in s:     return 'UT BOT'
-        if 'SEANS' in s:  return 'SEANS'
-        if 'SMART' in s:  return 'SMART'
-        if 'MANUEL' in s: return 'MANUEL'
+        if 'INDICATOR' in s: return 'INDICATOR'
+        if 'EDGE' in s:      return 'EDGE'
+        if 'OTONOM' in s:    return 'OTONOM'
+        if 'UT' in s:        return 'UT BOT'
+        if 'SEANS' in s:     return 'SEANS'
+        if 'SMART' in s:     return 'SMART'
+        if 'MANUEL' in s:    return 'MANUEL'
         return 'DİĞER'
 
     last_buy_source = {}  # symbol → normalized indicator
@@ -868,6 +873,97 @@ def seans_analiz():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
+# ── Ajan Karşılaştırma Tablosu ───────────────────
+@app.route('/api/agent_comparison')
+@login_required
+def agent_comparison():
+    """Tüm ajan ve indikatörlerin karlılık karşılaştırma tablosu."""
+    trades = load_trades()
+    trades_sorted = sorted(trades, key=lambda t: t.get('time', ''))
+
+    AGENTS = ['INDICATOR', 'EDGE', 'OTONOM', 'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER']
+
+    def _normalize(source):
+        s = (source or '').upper()
+        if 'INDICATOR' in s: return 'INDICATOR'
+        if 'EDGE' in s:      return 'EDGE'
+        if 'OTONOM' in s:    return 'OTONOM'
+        if 'UT' in s:        return 'UT BOT'
+        if 'SEANS' in s:     return 'SEANS'
+        if 'SMART' in s:     return 'SMART'
+        if 'MANUEL' in s:    return 'MANUEL'
+        return 'DİĞER'
+
+    stats = {a: {'wins': 0, 'losses': 0, 'total': 0, 'pnl': 0.0,
+                 'best': 0.0, 'worst': 0.0} for a in AGENTS}
+    last_buy_agent = {}
+
+    for t in trades_sorted:
+        sym    = t.get('symbol', '')
+        source = t.get('source', '')
+        if t.get('type') == 'buy':
+            last_buy_agent[sym] = _normalize(source)
+        elif t.get('type') == 'sell':
+            agent = last_buy_agent.get(sym, _normalize(source))
+            if agent not in stats:
+                stats[agent] = {'wins': 0, 'losses': 0, 'total': 0,
+                                'pnl': 0.0, 'best': 0.0, 'worst': 0.0}
+            pnl = float(t.get('pnl', 0) or 0)
+            s   = stats[agent]
+            s['total'] += 1
+            s['pnl']    = round(s['pnl'] + pnl, 2)
+            if pnl > 0:
+                s['wins']  += 1
+                s['best']   = max(s['best'], pnl)
+            else:
+                s['losses'] += 1
+                s['worst']  = min(s['worst'], pnl)
+
+    table = []
+    for agent in AGENTS:
+        s = stats[agent]
+        if s['total'] == 0:
+            continue
+        wr  = round(s['wins'] / s['total'] * 100, 1)
+        avg = round(s['pnl'] / s['total'], 2)
+        table.append({
+            'agent':   agent,
+            'total':   s['total'],
+            'wins':    s['wins'],
+            'losses':  s['losses'],
+            'wr':      wr,
+            'pnl':     s['pnl'],
+            'avg_pnl': avg,
+            'best':    round(s['best'], 2),
+            'worst':   round(s['worst'], 2),
+        })
+
+    # En karlıyı belirle
+    if table:
+        best_agent = max(table, key=lambda x: x['pnl'])
+        for row in table:
+            row['is_best'] = (row['agent'] == best_agent['agent'])
+
+    return jsonify({'ok': True, 'table': table})
+
+# ── Indicator Agent API ───────────────────────────
+@app.route('/indicator/start', methods=['POST'])
+@login_required
+def indicator_start():
+    ok = start_indicator_agent()
+    return jsonify({'ok': ok, 'msg': 'Indicator Agent başlatıldı' if ok else 'Zaten çalışıyor'})
+
+@app.route('/indicator/stop', methods=['POST'])
+@login_required
+def indicator_stop():
+    stop_indicator_agent()
+    return jsonify({'ok': True})
+
+@app.route('/indicator/status')
+@login_required
+def indicator_status_api():
+    return jsonify(indicator_agent_status())
+
 # ── Otonom Ajan API ──────────────────────────────
 @app.route('/agent/start', methods=['POST'])
 @login_required
@@ -906,8 +1002,9 @@ def edge_status_api():
 
 # ── Başlat ───────────────────────────────────────
 if __name__ == '__main__':
-    start_engine()          # UT Bot + Seans + Smart sinyalleri
+    start_engine()            # UT Bot + Seans + Smart (manuel coinler)
     start_telegram_bot()
-    start_autonomous_agent()  # Teknik analiz: RSI/MACD/BB/Trend
-    start_edge_agent()        # Piyasa mekaniği: Funding/OI/CVD/Sweep/Haber
+    start_autonomous_agent()  # Teknik analiz: RSI/MACD/BB/Trend (otonom)
+    start_edge_agent()        # Piyasa mekaniği: Funding/OI/CVD/Sweep (otonom)
+    start_indicator_agent()   # UT Bot tarayıcı: otomatik coin seçimi (otonom)
     app.run(host='0.0.0.0', port=5000, debug=False)
