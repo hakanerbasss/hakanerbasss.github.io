@@ -860,19 +860,16 @@ def seans_analiz():
 
 # ── Otonom Ajan API ──────────────────────────────
 @app.route('/agent/start', methods=['POST'])
-@login_required
 def agent_start():
     ok = start_autonomous_agent()
     return jsonify({'ok': ok, 'msg': 'Ajan başlatıldı' if ok else 'Zaten çalışıyor'})
 
 @app.route('/agent/stop', methods=['POST'])
-@login_required
 def agent_stop():
     stop_autonomous_agent()
     return jsonify({'ok': True})
 
 @app.route('/agent/status')
-@login_required
 def agent_status_api():
     return jsonify(agent_status())
 
@@ -880,4 +877,5 @@ def agent_status_api():
 if __name__ == '__main__':
     start_engine()
     start_telegram_bot()
+    start_autonomous_agent()
     app.run(host='0.0.0.0', port=5000, debug=False)
