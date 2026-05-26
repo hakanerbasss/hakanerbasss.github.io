@@ -80,6 +80,7 @@ def trades_reset():
     return jsonify({'ok': True})
 
 @app.route('/positions/clear', methods=['POST'])
+@login_required
 def positions_clear():
     """Positions.json'ı doğrudan sıfırla — elle silinen pozisyonlar için."""
     from bot import save_positions
@@ -868,31 +869,37 @@ def seans_analiz():
 
 # ── Otonom Ajan API ──────────────────────────────
 @app.route('/agent/start', methods=['POST'])
+@login_required
 def agent_start():
     ok = start_autonomous_agent()
     return jsonify({'ok': ok, 'msg': 'Ajan başlatıldı' if ok else 'Zaten çalışıyor'})
 
 @app.route('/agent/stop', methods=['POST'])
+@login_required
 def agent_stop():
     stop_autonomous_agent()
     return jsonify({'ok': True})
 
 @app.route('/agent/status')
+@login_required
 def agent_status_api():
     return jsonify(agent_status())
 
 # ── Edge Agent API ────────────────────────────────
 @app.route('/edge/start', methods=['POST'])
+@login_required
 def edge_start():
     ok = start_edge_agent()
     return jsonify({'ok': ok, 'msg': 'Edge Agent başlatıldı' if ok else 'Zaten çalışıyor'})
 
 @app.route('/edge/stop', methods=['POST'])
+@login_required
 def edge_stop():
     stop_edge_agent()
     return jsonify({'ok': True})
 
 @app.route('/edge/status')
+@login_required
 def edge_status_api():
     return jsonify(edge_agent_status())
 

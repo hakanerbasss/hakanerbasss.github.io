@@ -128,11 +128,9 @@ def get_portfolio_summary(client):
     for symbol, pos in positions.items():
         if pos.get('qty', 0) <= 0:
             continue
-        # Pozisyon değeri $1 altındaysa yok say
         current_price = get_price(client, symbol)
         if pos.get('qty', 0) * current_price < 1.0:
             continue
-        current_price = get_price(client, symbol)
         invested = pos['avg_price'] * pos['qty']
         current_val = current_price * pos['qty']
         pnl = current_val - invested

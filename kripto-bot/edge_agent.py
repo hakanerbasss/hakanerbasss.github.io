@@ -387,7 +387,9 @@ class EdgeAgent:
         self._lock      = threading.Lock()
         self.state      = self._load_state()
         self.perf       = self._load_perf()
-        self.weights    = self.state.get('weights', dict(DEFAULT_WEIGHTS))
+        # Kaydedilmiş state'de eksik anahtar olabilir (ör. btc_trend yeni eklendi)
+        loaded_weights  = self.state.get('weights', {})
+        self.weights    = {**DEFAULT_WEIGHTS, **loaded_weights}
         self.blacklist  = self.state.get('blacklist', {})
         self.scan_log   = deque(maxlen=50)
         self._notified  = {}   # symbol → timestamp, spam önleyici
@@ -567,14 +569,12 @@ class EdgeAgent:
         res = execute_buy(client, symbol, usdt, source='EDGE', period=result['session'])
         if res.get('ok'):
             with self._lock:
-                pos = load_positions().get(symbol, {})
-                pos['edge_signals'] = active_signals
-                pos['edge_score']   = result['score']
                 from bot import save_positions
                 positions = load_positions()
                 if symbol in positions:
                     positions[symbol]['edge_signals'] = active_signals
                     positions[symbol]['edge_score']   = result['score']
+                    positions[symbol]['open_time']    = time.time()
                     save_positions(positions)
 
     # ── Pozisyon Takibi ────────────────────────────────────────────────────
@@ -697,8 +697,11 @@ class EdgeAgent:
                 self.perf[sig]['total'] += 1
                 if won:
                     self.perf[sig]['wins'] += 1
+            # Dolar bazlı PnL (yüzde değil)
+            dollar_pnl = round(
+                pos.get('qty', 0) * pos.get('avg_price', 0) * pct / 100, 2)
             self.state['total_pnl'] = round(
-                self.state.get('total_pnl', 0) + pct, 2)
+                self.state.get('total_pnl', 0) + dollar_pnl, 2)
             d = self.state.setdefault('daily', {})
             d['trades'] = d.get('trades', 0) + 1
             if won:
@@ -772,7 +775,7 @@ class EdgeAgent:
             nxt = now.replace(hour=23, minute=55, second=0, microsecond=0)
             if now >= nxt:
                 nxt += datetime.timedelta(days=1)
-            time.sleep(max(0, (nxt - now).seconds))
+            time.sleep(max(0, (nxt - now).total_seconds()))
             try:
                 self._daily_report()
                 self.state['daily'] = {
