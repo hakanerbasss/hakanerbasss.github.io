@@ -1,6 +1,6 @@
 import json, threading, time, datetime, urllib.request, urllib.parse
 from bot import (load_config, save_config, get_client, get_price,
-                 load_positions, load_trades, send_telegram)
+                 load_positions, load_trades, send_telegram, get_usdt_balance)
 
 OFFSET_FILE = 'tg_offset.json'
 
@@ -130,11 +130,92 @@ def handle_command(cmd, chat_id):
         except Exception as e:
             send_reply(chat_id, f'❌ {e}')
 
+    elif cmd == '/ajanlar':
+        try:
+            from autonomous_agent import agent_status
+            from edge_agent import edge_agent_status
+            from indicator_agent import indicator_agent_status
+            from signal_engine import get_klines
+
+            client = get_client()
+
+            # BTC trend kontrolü
+            try:
+                closes, _, _, _ = get_klines(client, 'BTCUSDT', '1h', limit=25)
+                btc_ok = closes[-1] > sum(closes[-20:]) / 20
+                btc_icon = '🟢' if btc_ok else '🔴'
+                btc_pct = round((closes[-1] - closes[-2]) / closes[-2] * 100, 2)
+                btc_line = f'{btc_icon} BTC: {"+" if btc_pct>=0 else ""}{btc_pct}% (SMA20 {"↑ üstünde" if btc_ok else "↓ altında"})'
+            except Exception:
+                btc_line = '⚪ BTC: veri alınamadı'
+
+            # Bakiye
+            try:
+                bal = get_usdt_balance(client)
+                bal_line = f'💰 Bakiye: ${bal:.2f}'
+            except Exception:
+                bal_line = '💰 Bakiye: alınamadı'
+
+            # Otonom
+            ot = agent_status()
+            if ot.get('running'):
+                regime = ot.get('last_regime', '?')
+                r_icon = {'BULL': '🟢', 'SIDEWAYS': '🟡', 'BEAR': '🔴'}.get(regime, '⚪')
+                otonom_line = f'🤖 Otonom: {r_icon} {regime} | Tarama: {ot.get("scan_count",0)}x'
+            else:
+                otonom_line = '🤖 Otonom: ⛔ Çalışmıyor'
+
+            # Edge
+            et = edge_agent_status()
+            if et.get('running'):
+                edge_line = f'⚡ Edge: 🟢 Aktif | Tarama: {et.get("scan_count",0)}x'
+            else:
+                edge_line = '⚡ Edge: ⛔ Çalışmıyor'
+
+            # Indicator
+            it = indicator_agent_status()
+            if it.get('running'):
+                btc_f = '🟢' if it.get('btc_ok', btc_ok) else '🔴'
+                ind_line = f'📐 Indicator: 🟢 Aktif | BTC filtre: {btc_f} | Tarama: {it.get("scan_count",0)}x'
+            else:
+                ind_line = '📐 Indicator: ⛔ Çalışmıyor'
+
+            # Açık pozisyonlar
+            positions = load_positions()
+            open_pos = [(s, p) for s, p in positions.items() if p.get('qty', 0) > 0]
+            pos_line = f'📦 Açık pozisyon: {len(open_pos)}'
+
+            # Alım koşulu özeti
+            if ot.get('running') and ot.get('last_regime') == 'BEAR':
+                neden = '⚠️ Alım yok: Otonom BEAR modda'
+            elif not btc_ok:
+                neden = '⚠️ Alım yok: BTC düşüşte (Indicator filtresi)'
+            else:
+                neden = '✅ Alım koşulları uygun'
+
+            send_reply(chat_id,
+                f'🔍 <b>Ajan Durumu</b>\n'
+                f'━━━━━━━━━━━━━━\n'
+                f'{bal_line}\n'
+                f'{btc_line}\n'
+                f'━━━━━━━━━━━━━━\n'
+                f'{otonom_line}\n'
+                f'{edge_line}\n'
+                f'{ind_line}\n'
+                f'━━━━━━━━━━━━━━\n'
+                f'{pos_line}\n'
+                f'{neden}\n'
+                f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
+            )
+        except Exception as e:
+            send_reply(chat_id, f'❌ Hata: {e}')
+
     elif cmd in ['/start', '/yardim']:
         send_reply(chat_id, '''🤖 <b>Kripto Bot Komutları</b>
 
 /durum — Genel durum özeti
 /pozisyonlar — Açık pozisyonlar
+/ajanlar — Ajan durumları (BTC trend, rejim, tarama)
 /baslat — Botu başlat
 /durdur — Botu duraklat
 /restart — Botu yeniden başlat
