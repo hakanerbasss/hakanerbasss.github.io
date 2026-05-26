@@ -1588,7 +1588,7 @@ const sessionThemes = new Set(); // Sandbox tema erişimi — sadece bellekte, k
 
 // ────────────────────────────────────────────────────────────────
 // ── Uygulama Versiyonu ──────────────────────────────────────────────────────
-const APP_VERSION      = '1.0.141';
+const APP_VERSION      = '1.0.176';
 
 // ── Offscreen Cloud Cache ─────────────────────────────────────────
 // Bulutlardaki blur(14px)/blur(18px) filter en pahalı GPU operasyonu.
@@ -10847,26 +10847,24 @@ function onJoyUp(e){
 // ═══════════════════════════════════════
 function onWin(){
   phase='done';
+  // 3-yıldız hesabını erken yap — setTimeout closure'ında kullanmak için
+  var _winStars = (function(){ var _u=lv.shots-shotsLeft,_h=Math.ceil(lv.shots/2); return _u<=1?3:_u<=_h?2:1; })();
   try{
     if(typeof Quests!=='undefined'){
       Quests.track('win');
-      if(typeof stars!=='undefined' || true){
-        // 3 yıldız kontrolü onWin sonunda hesaplanıyor — gecikmeli track
-        setTimeout(function(){
-          try{
-            var _s = parseInt(lsGet('stars_'+(lv&&lv.id))||'0');
-            if(_s>=3) Quests.track('star3');
-            if(lv && lv.cave) Quests.track('cave');
-            if(lv && lv.buried) Quests.track('buried');
-            if(typeof currentTheme!=='undefined' && currentTheme && currentTheme.name){
-              // Tema key'i (lv.theme) en güvenilir tanımlayıcı; name fallback
-              var _themeKey = (lv && lv.theme) ? lv.theme : currentTheme.name;
-              Quests.track('theme', _themeKey);
-            }
-            // combo zaten onTargetHit'te track edildi — burada tekrarlama (zamanlamada kayıp olur)
-          }catch(_){}
-        }, 100);
-      }
+      // 3 yıldız + tema — _winStars closure değişkeni, localStorage'a bağımlılık yok
+      setTimeout(function(){
+        try{
+          if(_winStars>=3) Quests.track('star3');
+          if(lv && lv.cave) Quests.track('cave');
+          if(lv && lv.buried) Quests.track('buried');
+          if(typeof currentTheme!=='undefined' && currentTheme && currentTheme.name){
+            var _themeKey = (lv && lv.theme) ? lv.theme : currentTheme.name;
+            Quests.track('theme', _themeKey);
+          }
+          try{ if(typeof checkTutorialReward==='function') checkTutorialReward(curLevel); }catch(_){}
+        }catch(_){}
+      }, 200);
     }
   }catch(_){}
   SFX.win();
