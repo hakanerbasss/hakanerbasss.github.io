@@ -312,8 +312,8 @@ input:focus,select:focus{border-color:#f0a500;}
 <!-- İŞLEMLER -->
 <div class="page" id="tab-trades">
   <div class="section" style="margin-top:12px;">
-    <h2>📊 İndikatör Performansı</h2>
-    <div id="statsTable">Yükleniyor...</div>
+    <h2>🤖 Ajan &amp; İndikatör Karşılaştırması</h2>
+    <div id="agentTable">Yükleniyor...</div>
   </div>
   <div class="section">
     <h2>📋 İşlem Geçmişi</h2>
@@ -895,58 +895,79 @@ function manualSell(symbol) {
 
 // ── Trades ───────────────────────────────────────
 const IND_COLORS = {
-  'UT BOT': '#1d4ed8', 'SEANS': '#92400e', 'SMART': '#0369a1',
-  'MANUEL': '#374151', 'DİĞER': '#6b7280',
+  // Ajanlar
+  'EDGE':             '#7c3aed',
+  'OTONOM':           '#0891b2',
+  'INDICATOR-UTBOT':  '#1d4ed8',
+  'INDICATOR-SMART':  '#0369a1',
+  'INDICATOR-SEANS':  '#92400e',
+  // Manuel indikatörler
+  'UT BOT':           '#1d4ed8',
+  'SEANS':            '#92400e',
+  'SMART':            '#0369a1',
+  'MANUEL':           '#374151',
+  'DİĞER':            '#6b7280',
 };
+
+const AGENT_ORDER = [
+  'EDGE', 'OTONOM',
+  'INDICATOR-UTBOT', 'INDICATOR-SMART', 'INDICATOR-SEANS',
+  'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER',
+];
+
+function _agentColor(name) {
+  return IND_COLORS[name] || '#6b7280';
+}
 
 function loadTrades() {
   Promise.all([
     fetch('/api/trades').then(r=>r.json()),
-    fetch('/api/stats').then(r=>r.json()),
-  ]).then(([trades, stats]) => {
+    fetch('/api/agent_comparison').then(r=>r.json()),
+  ]).then(([trades, cmp]) => {
 
-    // ── Performans tablosu ──
-    const statsEl = document.getElementById('statsTable');
-    const byInd   = stats.by_indicator || {};
-    if (!Object.keys(byInd).length) {
-      statsEl.innerHTML = '<p style="color:#999;font-size:13px;">Henüz kapalı işlem yok.</p>';
+    // ── Ajan karşılaştırma tablosu ──
+    const agentEl = document.getElementById('agentTable');
+    const table   = (cmp.table || []);
+    if (!table.length) {
+      agentEl.innerHTML = '<p style="color:#999;font-size:13px;">Henüz kapalı işlem yok. Ajanlar çalışırken burada sonuçlar görünecek.</p>';
     } else {
-      const ORDER = ['UT BOT','SEANS','SMART','MANUEL','DİĞER'];
-      const keys  = ORDER.filter(k => byInd[k]).concat(
-        Object.keys(byInd).filter(k => !ORDER.includes(k))
-      );
-      statsEl.innerHTML = `
+      // AGENT_ORDER sırasına göre sırala, sonra kalan ekle
+      const ordered = AGENT_ORDER.filter(a => table.find(r=>r.agent===a))
+        .map(a => table.find(r=>r.agent===a))
+        .concat(table.filter(r => !AGENT_ORDER.includes(r.agent)));
+
+      agentEl.innerHTML = `
+        <div style="overflow-x:auto;">
         <table>
           <thead>
             <tr>
-              <th>İndikatör</th>
+              <th>Kaynak</th>
               <th style="text-align:center;">İşlem</th>
               <th style="text-align:center;">Kazanma %</th>
               <th style="text-align:center;">Toplam K/Z</th>
               <th style="text-align:center;">Ort K/Z</th>
+              <th style="text-align:center;">En İyi</th>
+              <th style="text-align:center;">En Kötü</th>
             </tr>
           </thead>
           <tbody>
-            ${keys.map(k => {
-              const v   = byInd[k];
-              const col = IND_COLORS[k] || '#6b7280';
-              const bar = `<div style="height:4px;border-radius:2px;margin-top:3px;width:${Math.min(v.wr,100)}%;background:${v.wr>=60?'#16a34a':v.wr>=50?'#f0a500':'#dc2626'}"></div>`;
-              return `<tr>
-                <td><span style="background:${col}20;color:${col};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;">${k}</span></td>
-                <td style="text-align:center;">${v.trades}</td>
-                <td style="text-align:center;">
-                  <span class="${v.wr>=60?'green':v.wr>=50?'yellow':'red'}"><b>%${v.wr}</b></span>${bar}
-                </td>
-                <td style="text-align:center;" class="${v.pnl>=0?'green':'red'}">
-                  ${v.pnl>=0?'+':''}$${v.pnl.toFixed(2)}
-                </td>
-                <td style="text-align:center;" class="${v.avg>=0?'green':'red'}">
-                  ${v.avg>=0?'+':''}$${v.avg.toFixed(2)}
-                </td>
+            ${ordered.map(r => {
+              const col = _agentColor(r.agent);
+              const wrCls = r.wr>=60?'green':r.wr>=50?'yellow':'red';
+              const bar = `<div style="height:4px;border-radius:2px;margin-top:3px;width:${Math.min(r.wr,100)}%;background:${r.wr>=60?'#16a34a':r.wr>=50?'#f0a500':'#dc2626'}"></div>`;
+              const crown = r.is_best ? ' 👑' : '';
+              return `<tr style="${r.is_best?'background:rgba(22,163,74,0.07)':''}">
+                <td><span style="background:${col}20;color:${col};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;">${r.agent}${crown}</span></td>
+                <td style="text-align:center;">${r.total} <span style="color:#999;font-size:10px;">(${r.wins}K/${r.losses}Z)</span></td>
+                <td style="text-align:center;"><span class="${wrCls}"><b>%${r.wr}</b></span>${bar}</td>
+                <td style="text-align:center;" class="${r.pnl>=0?'green':'red'}">${r.pnl>=0?'+':''}$${r.pnl.toFixed(2)}</td>
+                <td style="text-align:center;" class="${r.avg_pnl>=0?'green':'red'}">${r.avg_pnl>=0?'+':''}$${r.avg_pnl.toFixed(2)}</td>
+                <td style="text-align:center;color:#16a34a;">+$${r.best.toFixed(2)}</td>
+                <td style="text-align:center;color:#dc2626;">$${r.worst.toFixed(2)}</td>
               </tr>`;
             }).join('')}
           </tbody>
-        </table>`;
+        </table></div>`;
     }
 
     // ── İşlem geçmişi tablosu ──
@@ -956,7 +977,8 @@ function loadTrades() {
       return;
     }
     tbody.innerHTML = trades.map(t => {
-      const col = IND_COLORS[(t.source||'').toUpperCase()] || '#6b7280';
+      const src = (t.source||'').toUpperCase();
+      const col = IND_COLORS[src] || '#6b7280';
       return `<tr>
         <td style="font-size:11px;color:#666;">${t.time}</td>
         <td><span class="badge ${t.type}">${t.type==='buy'?'ALIM':'SATIM'}</span></td>

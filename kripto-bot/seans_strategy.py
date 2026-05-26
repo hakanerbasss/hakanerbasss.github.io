@@ -1,0 +1,69 @@
+"""Seans (Session) Strategy — Türkiye saatine göre al/sat"""
+import datetime
+import pytz
+
+TR_TZ = pytz.timezone('Europe/Istanbul')
+
+
+def check_seans_sell(sell_hour):
+    """Şu an satış saatiyse True döner."""
+    now = datetime.datetime.now(TR_TZ)
+    return now.hour == sell_hour
+
+
+def check_seans_signal(client, symbol, strategy='both'):
+    """
+    strategy: 'morning' | 'evening' | 'both' | 'simple'
+    Returns: {'signal': 'buy'|'', 'reason': str}
+    """
+    from binance.client import Client as BClient
+
+    now  = datetime.datetime.now(TR_TZ)
+    hour = now.hour
+
+    morning = 9 <= hour < 12
+    evening = 20 <= hour < 23
+
+    if strategy == 'morning':
+        in_session = morning
+    elif strategy == 'evening':
+        in_session = evening
+    else:  # 'both' veya 'simple'
+        in_session = morning or evening
+
+    if not in_session:
+        return {'signal': '', 'reason': f'Seans dışı ({hour}:00 TR)'}
+
+    session_name = 'Sabah' if morning else 'Akşam'
+
+    if strategy == 'simple':
+        return {'signal': 'buy', 'reason': f'{session_name} seansı ({hour}:00)'}
+
+    try:
+        klines = client.get_klines(
+            symbol=symbol,
+            interval=BClient.KLINE_INTERVAL_1HOUR,
+            limit=26,
+        )
+        klines = klines[:-1]  # Son kapanmamış mumu çıkar
+        if len(klines) < 15:
+            return {'signal': '', 'reason': 'Yetersiz veri'}
+
+        closes = [float(k[4]) for k in klines]
+
+        # RSI < 65 ve son mum yükselen
+        d = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+        n = 14
+        g = sum(max(v, 0) for v in d[-n:]) / n
+        l = sum(max(-v, 0) for v in d[-n:]) / n
+        rsi = 100.0 if l == 0 else round(100 - 100 / (1 + g / l), 1)
+
+        if rsi > 65:
+            return {'signal': '', 'reason': f'RSI yüksek ({rsi})'}
+
+        if closes[-1] > closes[-2]:
+            return {'signal': 'buy', 'reason': f'{session_name} seansı + RSI={rsi}'}
+
+        return {'signal': '', 'reason': 'Son mum düşüşte'}
+    except Exception as e:
+        return {'signal': '', 'reason': f'Hata: {e}'}

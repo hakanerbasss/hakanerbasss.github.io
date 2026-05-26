@@ -719,7 +719,7 @@ class EdgeAgent:
                 self._hourly_report()
             except Exception as e:
                 print(f'[Edge] Saatlik hata: {e}')
-            time.sleep(3600)
+            time.sleep(4 * 3600)
 
     def _hourly_report(self):
         client    = get_client()

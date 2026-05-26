@@ -395,7 +395,7 @@ class AutonomousAgent:
                     if reason:
                         positions[sym] = pos
                         save_positions(positions)
-                        res = execute_sell(client, sym, 100, source=reason, period='Ajan')
+                        res = execute_sell(client, sym, 100, source='OTONOM', period=reason)
                         if res.get('ok'):
                             pnl = res.get('pnl', 0)
                             self.state['total_pnl'] = round(self.state.get('total_pnl',0) + pnl, 2)
@@ -561,7 +561,7 @@ class AutonomousAgent:
 
     def _hourly_loop(self):
         while self.running:
-            time.sleep(3600)
+            time.sleep(4 * 3600)
             try:
                 client    = get_client()
                 positions = load_positions()
