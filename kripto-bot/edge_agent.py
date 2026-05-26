@@ -354,6 +354,7 @@ class EdgeAgent:
         self.weights    = self.state.get('weights', dict(DEFAULT_WEIGHTS))
         self.blacklist  = self.state.get('blacklist', {})
         self.scan_log   = deque(maxlen=50)
+        self._notified  = {}   # symbol → timestamp, spam önleyici
 
     # ── Kalıcılık ──────────────────────────────────────────────────────────
     def _load_state(self):
@@ -555,9 +556,14 @@ class EdgeAgent:
         positions = load_positions()
         fundings  = {}
 
-        for symbol, pos in positions.items():
+        for symbol, pos in list(positions.items()):
             qty = pos.get('qty', 0)
             if qty <= 0:
+                continue
+
+            # Aynı sembol için 60 saniye içinde tekrar bildirim gönderme
+            last_notif = self._notified.get(symbol, 0)
+            if time.time() - last_notif < 60:
                 continue
 
             try:
@@ -572,16 +578,22 @@ class EdgeAgent:
                 sl = pos.get('sl_pct', 0) or 0
 
                 if tp > 0 and pct >= tp:
+                    self._notified[symbol] = time.time()
                     send_telegram(f'💚 <b>{symbol}</b> KÂR HEDEFİ +%{pct:.2f}')
-                    execute_sell(client, symbol, 100, source='EDGE TP', period='TP')
-                    self._record_exit(symbol, pos, pct, 'TP')
+                    res = execute_sell(client, symbol, 100, source='EDGE TP', period='TP')
+                    if res.get('ok'):
+                        self._notified.pop(symbol, None)
+                        self._record_exit(symbol, pos, pct, 'TP')
                     continue
 
                 if sl > 0 and pct <= -sl:
+                    self._notified[symbol] = time.time()
                     send_telegram(f'🔴 <b>{symbol}</b> STOP LOSS %{pct:.2f}')
-                    execute_sell(client, symbol, 100, source='EDGE SL', period='SL')
-                    self.blacklist[symbol] = time.time() + 6 * 3600
-                    self._record_exit(symbol, pos, pct, 'SL')
+                    res = execute_sell(client, symbol, 100, source='EDGE SL', period='SL')
+                    if res.get('ok'):
+                        self._notified.pop(symbol, None)
+                        self.blacklist[symbol] = time.time() + 6 * 3600
+                        self._record_exit(symbol, pos, pct, 'SL')
                     continue
 
                 # Trailing stop: %40 TP'de aktif, peak'ten %2.5 düşüşte çık
@@ -592,9 +604,12 @@ class EdgeAgent:
                 if tp > 0 and pct >= tp * 0.4:
                     drawdown = (price - peak) / peak * 100 if peak > 0 else 0
                     if drawdown <= -2.5:
+                        self._notified[symbol] = time.time()
                         send_telegram(f'🔁 <b>{symbol}</b> Trailing Stop %{pct:.2f} → çıkılıyor')
-                        execute_sell(client, symbol, 100, source='EDGE TRAIL', period='TRAIL')
-                        self._record_exit(symbol, pos, pct, 'TRAIL')
+                        res = execute_sell(client, symbol, 100, source='EDGE TRAIL', period='TRAIL')
+                        if res.get('ok'):
+                            self._notified.pop(symbol, None)
+                            self._record_exit(symbol, pos, pct, 'TRAIL')
                         continue
 
                 # Funding rejim değişimi: long tutarken funding çok pozitif → çık
@@ -602,11 +617,14 @@ class EdgeAgent:
                     f = _all_funding().get(symbol, 0)
                     fundings[symbol] = f
                 if fundings.get(symbol, 0) >= FUNDING_AVOID and pct > 0.5:
+                    self._notified[symbol] = time.time()
                     send_telegram(
                         f'⚠️ <b>{symbol}</b> Funding {fundings[symbol]*100:.3f}% → long riski, çıkılıyor'
                     )
-                    execute_sell(client, symbol, 100, source='EDGE FUNDING EXIT', period='FUND')
-                    self._record_exit(symbol, pos, pct, 'FUND_EXIT')
+                    res = execute_sell(client, symbol, 100, source='EDGE FUNDING EXIT', period='FUND')
+                    if res.get('ok'):
+                        self._notified.pop(symbol, None)
+                        self._record_exit(symbol, pos, pct, 'FUND_EXIT')
                     continue
 
                 # Max tutma süresi: 48 saat
