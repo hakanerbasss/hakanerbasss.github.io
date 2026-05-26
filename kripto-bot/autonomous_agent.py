@@ -316,7 +316,7 @@ class AutonomousAgent:
     MONITOR_INTERVAL = 3
     MOMENTUM_EVERY   = 20
     MAX_POSITIONS    = 6
-    MIN_SCORE        = 5.8
+    MIN_SCORE        = 5.2
     DAILY_LOSS_LIMIT = 8.0
 
     def __init__(self):

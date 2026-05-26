@@ -1,7 +1,10 @@
-import json, os, datetime, urllib.request, urllib.parse
+import json, os, datetime, threading, urllib.request, urllib.parse
 from binance.client import Client
 
 FEE_RATE = 0.001  # Binance spot %0.1 alım + %0.1 satım = %0.2 toplam
+
+# Tüm ajanlar bu kilidi kullanır — çakışan alım emirlerini önler
+_TRADE_LOCK = threading.Lock()
 
 CONFIG_FILE = 'config.json'
 TRADES_FILE = 'trades.json'
@@ -15,7 +18,8 @@ def load_config():
                 return json.load(f)
             except json.JSONDecodeError:
                 return {}
-    return {'testnet': True, 'api_key': '', 'api_secret': '', 'coins': [], 'webhook_secret': 'secret123'}
+    return {'testnet': True, 'api_key': '', 'api_secret': '', 'coins': [],
+            'webhook_secret': 'secret123', 'max_positions': 6}
 
 def save_config(data):
     with open(CONFIG_FILE, 'w') as f:
@@ -331,21 +335,37 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
         if balance < usdt_amount:
             return {'ok': False, 'error': f'Yetersiz bakiye: ${round(balance,2)} USDT'}
 
-        step = get_step_size(client, symbol)
-        qty = round_step(usdt_amount / price, step)
-        if qty <= 0:
-            return {'ok': False, 'error': f'Miktar çok küçük (step: {step})'}
-        order = client.order_market_buy(symbol=symbol, quantity=qty)
-        positions = load_positions()
-        pos = positions.get(symbol, {'qty': 0, 'avg_price': 0})
-        total_qty = pos['qty'] + qty
-        avg = ((pos['qty'] * pos['avg_price']) + (qty * price)) / total_qty
+        # ── Kritik bölge: çakışma önleyici kilit ────────────────────────────
+        with _TRADE_LOCK:
+            positions = load_positions()
 
-        positions[symbol] = {
-            'qty': total_qty, 'avg_price': avg,
-            'tp_pct': tp_pct, 'sl_pct': sl_pct,
-        }
-        save_positions(positions)
+            # Aynı coinde zaten aktif pozisyon var mı?
+            pos = positions.get(symbol, {'qty': 0, 'avg_price': 0})
+            if pos.get('qty', 0) > 0 and pos.get('qty', 0) * price >= 1.0:
+                return {'ok': False, 'error': f'{symbol} zaten açık pozisyon var'}
+
+            # Global maksimum pozisyon limiti (tüm ajanlar paylaşır)
+            max_pos = int(cfg_data.get('max_positions', 6))
+            open_count = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
+            if open_count >= max_pos:
+                return {'ok': False, 'error': f'Pozisyon limiti dolu: {open_count}/{max_pos}'}
+
+            step = get_step_size(client, symbol)
+            qty = round_step(usdt_amount / price, step)
+            if qty <= 0:
+                return {'ok': False, 'error': f'Miktar çok küçük (step: {step})'}
+
+            order = client.order_market_buy(symbol=symbol, quantity=qty)
+
+            total_qty = pos['qty'] + qty
+            avg = ((pos['qty'] * pos['avg_price']) + (qty * price)) / total_qty
+            positions[symbol] = {
+                'qty': total_qty, 'avg_price': avg,
+                'tp_pct': tp_pct, 'sl_pct': sl_pct,
+            }
+            save_positions(positions)
+        # ── Kilit bitti ─────────────────────────────────────────────────────
+
         trades = load_trades()
         trades.append({
             'type': 'buy', 'symbol': symbol, 'qty': qty,

@@ -260,6 +260,7 @@ def settings():
     cfg['check_interval']   = int(request.form.get('check_interval', 45))
     cfg['telegram_token']   = request.form.get('telegram_token', '')
     cfg['telegram_chat_id'] = request.form.get('telegram_chat_id', '')
+    cfg['max_positions']    = int(request.form.get('max_positions', 6))
     save_config(cfg)
     return jsonify({'ok': True})
 
