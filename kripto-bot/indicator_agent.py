@@ -2,8 +2,9 @@
 Indicator Agent — Otomatik UT Bot Tarayıcı
 ────────────────────────────────────────────
 • Manuel coin eklemeye gerek yok — top 50 coini kendisi tarar
+• Öncelik: kullanıcının dashboard'da ayarladığı parametreler
+• Fallback: varsayılan 4 kombinasyon (kullanıcı ayarı yoksa)
 • UT Bot sinyali + RSI filtresi + mini backtest (son 200 mum)
-• 4 farklı parametre kombinasyonunu aynı anda test eder
 • En yüksek backtest win rate'li kombinasyonu seçer
 • Kaynak: 'INDICATOR' — karşılaştırma tablosunda ayrı gösterilir
 """
@@ -25,13 +26,40 @@ SCAN_INTERVAL = 120   # saniye
 MONITOR_SEC   = 8
 MIN_VOLUME    = 3_000_000   # $3M günlük hacim
 
-# Test edilecek UT Bot parametre kombinasyonları
-UT_COMBOS = [
-    {'key': 1.0, 'atr': 7,  'period': '1h', 'label': 'UT(1.0,7,1h)'},
-    {'key': 2.0, 'atr': 7,  'period': '1h', 'label': 'UT(2.0,7,1h)'},
-    {'key': 3.0, 'atr': 10, 'period': '1h', 'label': 'UT(3.0,10,1h)'},
-    {'key': 2.0, 'atr': 7,  'period': '4h', 'label': 'UT(2.0,7,4h)'},
+# Kullanıcı henüz coin eklemediyse kullanılacak varsayılanlar
+DEFAULT_COMBOS = [
+    {'key': 1.0, 'atr': 7,  'period': '1h', 'mode': 'crossover', 'label': 'UT(1.0,7,1h)'},
+    {'key': 2.0, 'atr': 7,  'period': '1h', 'mode': 'crossover', 'label': 'UT(2.0,7,1h)'},
+    {'key': 3.0, 'atr': 10, 'period': '1h', 'mode': 'crossover', 'label': 'UT(3.0,10,1h)'},
+    {'key': 2.0, 'atr': 7,  'period': '4h', 'mode': 'crossover', 'label': 'UT(2.0,7,4h)'},
 ]
+
+
+def _user_combos(cfg):
+    """
+    Kullanıcının dashboard'da yapılandırdığı indikatör ayarlarını okur.
+    Her coin'in ut_key / ut_atr / period / ut_mode değerlerinden
+    benzersiz kombinasyonlar oluşturur — bunlar Indicator Agent'ın
+    tüm piyasaya uyguladığı parametreler olur.
+    Hiç coin eklenmemişse DEFAULT_COMBOS döner.
+    """
+    coins = cfg.get('coins', [])
+    seen, combos = set(), []
+    for coin in coins:
+        key    = float(coin.get('ut_key', 2.0))
+        atr    = int(coin.get('ut_atr', 7))
+        period = coin.get('period', '1h')
+        mode   = coin.get('ut_mode', 'crossover')
+        uid    = (key, atr, period, mode)
+        if uid in seen:
+            continue
+        seen.add(uid)
+        label = f'UT({key},{atr},{period})'
+        if mode != 'crossover':
+            label += f'[{mode}]'
+        combos.append({'key': key, 'atr': atr, 'period': period,
+                       'mode': mode, 'label': label})
+    return combos if combos else DEFAULT_COMBOS
 
 
 # ── Yardımcı Fonksiyonlar ─────────────────────────────────────────────────────
@@ -140,11 +168,10 @@ class IndicatorAgent:
             except Exception:
                 pass
         return {
-            'scan_count': 0,
-            'combo_stats': {c['label']: {'wins': 0, 'total': 0, 'pnl': 0.0}
-                            for c in UT_COMBOS},
-            'blacklist': {},
-            'total_pnl': 0.0,
+            'scan_count':  0,
+            'combo_stats': {},   # dinamik — her kombinasyon ilk kullanımda eklenir
+            'blacklist':   {},
+            'total_pnl':   0.0,
             'day_start_bal': 0.0,
         }
 
@@ -172,16 +199,18 @@ class IndicatorAgent:
             self.state['day_start_bal'] = bal
         except Exception:
             bal = 0
-        cfg  = load_config()
-        mode = '🧪 TESTNET' if cfg.get('testnet', True) else '🔴 GERÇEK'
+        cfg    = load_config()
+        mode   = '🧪 TESTNET' if cfg.get('testnet', True) else '🔴 GERÇEK'
+        combos = _user_combos(cfg)
+        src    = 'Sizin ayarlarınız' if cfg.get('coins') else 'Varsayılan (coin eklenmemiş)'
         send_telegram(
             f'{mode} <b>Indicator Agent AKTİF</b>\n'
             f'━━━━━━━━━━━━━━\n'
             f'💰 Bakiye: ${bal:.2f}\n'
-            f'🔍 Yöntem: UT Bot + RSI + Mini Backtest Filtresi\n'
+            f'🔍 Yöntem: UT Bot + RSI + Mini Backtest\n'
             f'⚡ Tarama: {SCAN_INTERVAL}s | Takip: {MONITOR_SEC}s\n'
-            f'📊 {len(UT_COMBOS)} Parametre Kombinasyonu Test Ediliyor\n'
-            + '\n'.join(f'  • {c["label"]}' for c in UT_COMBOS)
+            f'📐 Parametreler ({src}):\n'
+            + '\n'.join(f'  • {c["label"]}' for c in combos)
         )
         return True
 
@@ -218,6 +247,7 @@ class IndicatorAgent:
         btc_ok     = _btc_up(client)
         candidates = _scan_candidates(client)
         held       = {s for s, p in positions.items() if p.get('qty', 0) > 0}
+        combos     = _user_combos(cfg)   # kullanıcının kendi indikatör ayarları
 
         # Period'a göre klines önbelleği — aynı coini iki kez çekme
         klines_cache: dict = {}
@@ -227,7 +257,7 @@ class IndicatorAgent:
             if sym in held or self._bl(sym) or not btc_ok:
                 continue
 
-            for combo in UT_COMBOS:
+            for combo in combos:
                 cache_key = (sym, combo['period'])
                 if cache_key not in klines_cache:
                     try:
@@ -240,10 +270,11 @@ class IndicatorAgent:
                 if len(closes) < 50:
                     continue
 
-                # Mevcut UT Bot sinyali
+                # Mevcut UT Bot sinyali — kullanıcının mode ayarı dahil
                 signal = calc_ut_bot(closes, highs, lows,
                                      key_value=combo['key'],
-                                     atr_period=combo['atr'])
+                                     atr_period=combo['atr'],
+                                     mode=combo.get('mode', 'crossover'))
                 if signal != 'buy':
                     continue
 
