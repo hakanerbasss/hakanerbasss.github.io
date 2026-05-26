@@ -8,8 +8,9 @@ from signal_engine import start_engine
 from telegram_bot import start_telegram_bot
 from autonomous_agent import (start_autonomous_agent, stop_autonomous_agent,
                                agent_status)
+from edge_agent import start_edge_agent, stop_edge_agent, edge_agent_status
 
-app = Flask(__name__)
+app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
 app.permanent_session_lifetime = datetime.timedelta(days=30)
 
@@ -24,7 +25,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ── Auth ──────────────────────────────────────────────────
+# ── Auth ─────────────────────────────────────────
 @app.route('/login', methods=['GET','POST'])
 def login():
     error = None
@@ -43,14 +44,14 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# ── Ana Sayfa ────────────────────────────────────────────
+# ── Ana Sayfa ────────────────────────────────────
 @app.route('/')
 @login_required
 def index():
     cfg = load_config()
     return render_template('index.html', cfg=cfg)
 
-# ── API: Dashboard ───────────────────────────────────────
+# ── API: Dashboard ───────────────────────────────
 @app.route('/api/dashboard')
 @login_required
 def api_dashboard():
@@ -64,7 +65,7 @@ def api_dashboard():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
-# ── API: Trades ──────────────────────────────────────────
+# ── API: Trades ──────────────────────────────────
 @app.route('/api/trades')
 @login_required
 def api_trades():
@@ -78,7 +79,121 @@ def trades_reset():
     save_trades([])
     return jsonify({'ok': True})
 
-# ── API: Stats ──────────────────────────────────────────────
+# ── API: Smart Backtest ──────────────────────────
+@app.route('/api/smart_backtest')
+@login_required
+def smart_backtest():
+    try:
+        symbol = request.args.get('symbol', '').upper()
+        if not symbol:
+            return jsonify({'ok': False, 'error': 'Sembol gerekli'})
+
+        client = get_client()
+        from binance.client import Client as BClient
+        klines = client.get_klines(
+            symbol=symbol,
+            interval=BClient.KLINE_INTERVAL_1HOUR,
+            limit=180 * 24
+        )
+
+        opens   = [float(k[1]) for k in klines]
+        highs   = [float(k[2]) for k in klines]
+        lows    = [float(k[3]) for k in klines]
+        closes  = [float(k[4]) for k in klines]
+        volumes = [float(k[5]) for k in klines]
+
+        def calc_rsi(cls, period=14):
+            if len(cls) < period + 1:
+                return None
+            deltas = [cls[i] - cls[i-1] for i in range(1, len(cls))]
+            g = [max(d, 0) for d in deltas[-period:]]
+            l = [max(-d, 0) for d in deltas[-period:]]
+            ag, al = sum(g)/period, sum(l)/period
+            return round(100 - 100/(1 + ag/al), 1) if al > 0 else 100.0
+
+        def vol_ratio(vols, i, lb=20):
+            if i < lb: return 0
+            avg = sum(vols[i-lb:i]) / lb
+            return vols[i] / avg if avg > 0 else 0
+
+        def candle_pattern(i):
+            """Yükseliş dönüş formasyonu — son 3 mum"""
+            if i < 2:
+                return 0
+            from smart_strategy import detect_bullish_pattern
+            candles = [
+                {'o': opens[i-2], 'h': highs[i-2], 'l': lows[i-2], 'c': closes[i-2]},
+                {'o': opens[i-1], 'h': highs[i-1], 'l': lows[i-1], 'c': closes[i-1]},
+                {'o': opens[i],   'h': highs[i],   'l': lows[i],   'c': closes[i]},
+            ]
+            score, _ = detect_bullish_pattern(candles)
+            return score
+
+        EXIT_HOURS = [4, 8, 24, 48]
+        WARMUP     = 20
+
+        # 3 backtestlenebilir faktör: RSI + Volume + Formasyon
+        def run(min_score, exit_h, rsi_exit=True):
+            wins = total = 0
+            net  = 0.0
+            i    = WARMUP
+            while i < len(closes) - exit_h:
+                rsi = calc_rsi(closes[:i+1])
+                vr  = vol_ratio(volumes, i)
+                pat = candle_pattern(i)
+                if rsi is None:
+                    i += 1; continue
+
+                rsi_s = 1 if 30 <= rsi <= 65 else 0
+                vol_s = 1 if vr > 1.5 else 0
+                score = rsi_s + vol_s + pat
+
+                if score < min_score:
+                    i += 1; continue
+
+                buy_price = closes[i]
+                exit_i    = i + exit_h
+
+                if rsi_exit:
+                    for j in range(i+1, min(i+exit_h+1, len(closes))):
+                        r = calc_rsi(closes[:j+1])
+                        if r is not None and r > 72:
+                            exit_i = j; break
+
+                exit_i     = min(exit_i, len(closes)-1)
+                sell_price = closes[exit_i]
+                pnl = (sell_price - buy_price) / buy_price * 100 - 0.2
+                net += pnl; total += 1
+                if pnl > 0: wins += 1
+                i = exit_i + 1
+
+            return {
+                'trades': total,
+                'wr':  round(wins/total*100, 1) if total else 0,
+                'net': round(net, 2),
+                'avg': round(net/total, 2) if total else 0,
+            }
+
+        LABELS = {
+            0: 'Filtresiz',
+            1: 'Herhangi 1 faktör',
+            2: 'Herhangi 2 faktör',
+            3: 'RSI + Volume + Formasyon',
+        }
+        results = {}
+        for ms in [0, 1, 2, 3]:
+            label = LABELS[ms]
+            results[label] = {}
+            for eh in EXIT_HOURS:
+                results[label][f'{eh}s'] = run(ms, eh)
+            results[label]['RSI Çıkış'] = run(ms, 48, rsi_exit=True)
+
+        return jsonify({'ok': True, 'symbol': symbol, 'results': results,
+                        'note': 'Backtest: Formasyon + RSI + Volume (3 faktör). Funding Rate canlıda ek filtre.'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+# ── API: Stats (indikatör bazlı) ─────────────────
 @app.route('/api/stats')
 @login_required
 def api_stats():
@@ -87,15 +202,14 @@ def api_stats():
 
     def _normalize(source):
         s = (source or '').upper()
-        if 'UT' in s:      return 'UT BOT'
-        if 'SEANS' in s:   return 'SEANS'
-        if 'SMART' in s:   return 'SMART'
-        if 'OTONOM' in s:  return 'OTONOM'
-        if 'MANUEL' in s:  return 'MANUEL'
+        if 'UT' in s:     return 'UT BOT'
+        if 'SEANS' in s:  return 'SEANS'
+        if 'SMART' in s:  return 'SMART'
+        if 'MANUEL' in s: return 'MANUEL'
         return 'DİĞER'
 
-    last_buy_source = {}
-    by_ind = {}
+    last_buy_source = {}  # symbol → normalized indicator
+    by_ind = {}           # indicator → {wins, total, pnl}
 
     for t in trades_sorted:
         symbol = t.get('symbol', '')
@@ -124,7 +238,7 @@ def api_stats():
     }
     return jsonify({'ok': True, 'by_indicator': result})
 
-# ── Ayarlar ────────────────────────────────────────────────
+# ── Ayarlar ──────────────────────────────────────
 @app.route('/settings', methods=['POST'])
 @login_required
 def settings():
@@ -141,7 +255,7 @@ def settings():
     save_config(cfg)
     return jsonify({'ok': True})
 
-# ── Coin Yönetimi ────────────────────────────────────────────
+# ── Coin Yönetimi ────────────────────────────────
 @app.route('/coin/add', methods=['POST'])
 @login_required
 def coin_add():
@@ -158,12 +272,16 @@ def coin_add():
         'usdt_amount':         float(data.get('usdt_amount', 10)),
         'period':              data.get('period', '1h'),
         'signal_source':       data.get('signal_source', 'utbot'),
+        # UT Bot
         'ut_key':              float(data.get('ut_key', 2)),
         'ut_atr':              int(data.get('ut_atr', 7)),
         'ut_mode':             data.get('ut_mode', 'crossover'),
+        # Kapanış sinyali satış
         'close_sell_pct':      float(data.get('close_sell_pct', 100)),
+        # Kâr hedefi
         'take_profit_pct':     float(data.get('take_profit_pct', 0)),
         'take_profit_sell_pct':float(data.get('take_profit_sell_pct', 100)),
+        # Stop loss
         'stop_loss_pct':       float(data.get('stop_loss_pct', 0)),
         'stop_loss_sell_pct':  float(data.get('stop_loss_sell_pct', 100)),
         'seans_strategy':      data.get('seans_strategy', 'both'),
@@ -235,7 +353,7 @@ def coin_toggle():
     save_config(cfg)
     return jsonify({'ok': True})
 
-# ── Webhook ────────────────────────────────────────────────
+# ── Webhook ──────────────────────────────────────
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
@@ -248,12 +366,16 @@ def webhook():
     action = data.get('action', '').lower()
     if not symbol or action not in ['buy', 'sell']:
         return jsonify({'ok': False, 'error': 'Geçersiz veri'}), 400
+
     coin = next((c for c in cfg.get('coins', []) if c['symbol'] == symbol and c['active']), None)
     if not coin:
         return jsonify({'ok': False, 'error': 'Coin listede yok veya pasif'}), 400
+
+    # Sinyal kaynağı webhook veya both ise işle
     source = coin.get('signal_source', 'utbot')
     if source not in ['webhook', 'both']:
         return jsonify({'ok': False, 'error': f'Bu coin webhook sinyali kabul etmiyor (kaynak: {source})'}), 400
+
     try:
         client = get_client()
         if action == 'buy':
@@ -264,7 +386,7 @@ def webhook():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
-# ── Manuel İşlem ─────────────────────────────────────────────
+# ── Manuel İşlem ─────────────────────────────────
 @app.route('/manual/buy', methods=['POST'])
 @login_required
 def manual_buy():
@@ -294,7 +416,7 @@ def close_all():
             results.append({'symbol': symbol, 'result': result})
     return jsonify({'ok': True, 'results': results})
 
-# ── Grafik ───────────────────────────────────────────────────
+# ── Grafik Verisi ────────────────────────────────
 @app.route('/api/chart')
 @login_required
 def api_chart():
@@ -304,39 +426,440 @@ def api_chart():
         client = get_client()
         from signal_engine import get_klines, calc_ut_bot, calc_rma
         closes, highs, lows, last_candle_time = get_klines(client, symbol, interval, limit=100)
+
         from bot import load_config
         cfg = load_config()
         coin = next((c for c in cfg.get('coins',[]) if c['symbol']==symbol), {})
         key_value = float(request.args.get('key_value', coin.get('ut_key', 2)))
         atr_period = int(request.args.get('atr_period', coin.get('ut_atr', 7)))
+
         trs = []
         for i in range(1, len(closes)):
             tr = max(highs[i]-lows[i], abs(highs[i]-closes[i-1]), abs(lows[i]-closes[i-1]))
             trs.append(tr)
-        trails = []; signals = []
+
+        trails = []
+        signals = []
         if len(trs) >= atr_period:
             atr = calc_rma(trs, atr_period)
             n_loss = key_value * atr
-            trail = closes[0]; prev_close = closes[0]
+            trail = closes[0]
+            prev_close = closes[0]
             for i in range(1, len(closes)):
-                c = closes[i]; prev_trail = trail
-                if c > prev_trail: trail = max(prev_trail, c - n_loss)
-                else: trail = min(prev_trail, c + n_loss)
+                c = closes[i]
+                prev_trail = trail
+                if c > prev_trail:
+                    trail = max(prev_trail, c - n_loss)
+                else:
+                    trail = min(prev_trail, c + n_loss)
                 trails.append(round(trail, 8))
-                if prev_close <= prev_trail and c > trail: signals.append({'i': i, 'type': 'buy', 'price': c})
-                elif prev_close >= prev_trail and c < trail: signals.append({'i': i, 'type': 'sell', 'price': c})
+                if prev_close <= prev_trail and c > trail:
+                    signals.append({'i': i, 'type': 'buy', 'price': c})
+                elif prev_close >= prev_trail and c < trail:
+                    signals.append({'i': i, 'type': 'sell', 'price': c})
                 prev_close = c
+
         from binance.client import Client
-        interval_map = {'5m': Client.KLINE_INTERVAL_5MINUTE, '15m': Client.KLINE_INTERVAL_15MINUTE,
-                        '1h': Client.KLINE_INTERVAL_1HOUR, '4h': Client.KLINE_INTERVAL_4HOUR, '1d': Client.KLINE_INTERVAL_1DAY}
+        interval_map = {
+            '5m': Client.KLINE_INTERVAL_5MINUTE,
+            '15m': Client.KLINE_INTERVAL_15MINUTE,
+            '1h': Client.KLINE_INTERVAL_1HOUR,
+            '4h': Client.KLINE_INTERVAL_4HOUR,
+            '1d': Client.KLINE_INTERVAL_1DAY,
+        }
         kl = client.get_klines(symbol=symbol, interval=interval_map.get(interval, Client.KLINE_INTERVAL_5MINUTE), limit=100)
         kl = kl[:-1]
         candles = [{'t': int(k[0]), 'o': float(k[1]), 'h': float(k[2]), 'l': float(k[3]), 'c': float(k[4])} for k in kl]
+
         return jsonify({'ok': True, 'candles': candles, 'trails': trails, 'signals': signals})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
-# ── Otonom Ajan API ────────────────────────────────────────
+# ── Coin Seans Analiz ───────────────────────────
+@app.route('/api/seans_analiz')
+@login_required
+def seans_analiz():
+    try:
+        symbol = request.args.get('symbol', '').upper()
+        if not symbol:
+            return jsonify({'ok': False, 'error': 'Sembol gerekli'})
+
+        client = get_client()
+        from binance.client import Client as BClient
+        klines = client.get_klines(symbol=symbol, interval=BClient.KLINE_INTERVAL_1HOUR, limit=180*24)
+
+        import pytz, datetime
+        TR_TZ = pytz.timezone('Europe/Istanbul')
+        UTC_TZ = pytz.utc
+
+        candles = []
+        for k in klines:
+            dt_utc = datetime.datetime.fromtimestamp(k[0]/1000, tz=UTC_TZ)
+            dt_tr  = dt_utc.astimezone(TR_TZ)
+            candles.append({
+                'dt_tr':   dt_tr,
+                'hour_tr': dt_tr.hour,
+                'date_tr': dt_tr.strftime('%Y-%m-%d'),
+                'open':    float(k[1]),
+                'high':    float(k[2]),
+                'low':     float(k[3]),
+                'close':   float(k[4]),
+            })
+
+        days = {}
+        for c in candles:
+            d = c['date_tr']
+            if d not in days: days[d] = []
+            days[d].append(c)
+        dates = sorted(days.keys())
+
+        def day_chg(dc):
+            if not dc: return None
+            return (dc[-1]['close'] - dc[0]['open']) / dc[0]['open'] * 100
+
+        def abd_chg(dc):
+            h17 = [c for c in dc if c['hour_tr'] == 17]
+            h18 = [c for c in dc if c['hour_tr'] == 18]
+            if not h17 or not h18: return None
+            return (h18[-1]['close'] - h17[0]['open']) / h17[0]['open'] * 100
+
+        # Genel piyasa verisi — BTC proxy olarak kullan
+        btc_klines = client.get_klines(
+            symbol='BTCUSDT',
+            interval=BClient.KLINE_INTERVAL_1HOUR,
+            limit=180*24
+        )
+        btc_candles = []
+        for k in btc_klines:
+            dt_utc = datetime.datetime.fromtimestamp(k[0]/1000, tz=UTC_TZ)
+            dt_tr  = dt_utc.astimezone(TR_TZ)
+            btc_candles.append({
+                'dt_tr':   dt_tr,
+                'hour_tr': dt_tr.hour,
+                'date_tr': dt_tr.strftime('%Y-%m-%d'),
+                'open':    float(k[1]),
+                'close':   float(k[4]),
+            })
+        btc_days = {}
+        for c in btc_candles:
+            d = c['date_tr']
+            if d not in btc_days: btc_days[d] = []
+            btc_days[d].append(c)
+
+        def btc_day_chg(date_str):
+            dc = btc_days.get(date_str, [])
+            if not dc: return None
+            return (dc[-1]['close'] - dc[0]['open']) / dc[0]['open'] * 100
+
+        def btc_abd_chg(date_str):
+            dc = btc_days.get(date_str, [])
+            h17 = [c for c in dc if c['hour_tr'] == 17]
+            h18 = [c for c in dc if c['hour_tr'] == 18]
+            if not h17 or not h18: return None
+            return (h18[-1]['close'] - h17[0]['open']) / h17[0]['open'] * 100
+
+        def coin_today_chg(day_candles):
+            # Coinin bugün 17:00 açılışından şu ana kadarki değişim
+            h17 = [c for c in day_candles if c['hour_tr'] == 17]
+            h20 = [c for c in day_candles if c['hour_tr'] == 20]
+            if not h17 or not h20: return None
+            return (h20[0]['open'] - h17[0]['open']) / h17[0]['open'] * 100
+
+        def btc_today_chg(date_str):
+            dc = btc_days.get(date_str, [])
+            h17 = [c for c in dc if c['hour_tr'] == 17]
+            h20 = [c for c in dc if c['hour_tr'] == 20]
+            if not h17 or not h20: return None
+            return (h20[0]['open'] - h17[0]['open']) / h17[0]['open'] * 100
+
+        def run_backtest(buy_hour, sell_hour, btc_yesterday_fn, btc_today_fn, coin_today_fn):
+            # btc_yesterday_fn: True/False — BTC dünkü gün koşulu
+            # btc_today_fn: True/False — BTC bugünkü koşulu
+            # coin_today_fn: True/False — Coin bugünkü koşulu
+            total = wins = trades = 0
+            for i, date in enumerate(dates):
+                if i < 2: continue
+                today_dc = days[date]
+                prev_date = dates[i-1]
+
+                # BTC dün
+                btc_prev = btc_day_chg(prev_date)
+                if btc_prev is None: continue
+                if not btc_yesterday_fn(btc_prev): continue
+
+                # BTC bugün (17:00-20:00)
+                btc_tod = btc_today_chg(date)
+                if btc_tod is None: continue
+                if not btc_today_fn(btc_tod): continue
+
+                # Coin bugün (17:00-20:00)
+                coin_tod = coin_today_chg(today_dc)
+                if coin_tod is None: continue
+                if not coin_today_fn(coin_tod): continue
+
+                if i+1 >= len(dates): continue
+                bd = today_dc
+                sd = days[dates[i+1]]
+                bc = [c for c in bd if c['hour_tr'] == buy_hour]
+                sc = [c for c in sd if c['hour_tr'] == sell_hour]
+                if not bc or not sc: continue
+                pct = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100
+                net = pct - 0.2
+                total += net
+                trades += 1
+                if net > 0: wins += 1
+            wr = round(wins/trades*100,1) if trades > 0 else 0
+            avg = round(total/trades,2) if trades > 0 else 0
+            return {'trades': trades, 'wins': wins, 'wr': wr, 'net': round(total,2), 'avg': avg}
+
+        G = lambda x: x >= 0
+        R = lambda x: x < 0
+
+        # ── Yeni faktörler ────────────────────────────
+
+        def asian_chg(dc):
+            """Asya seansı 03:00-10:00 TR değişimi"""
+            h3  = [c for c in dc if c['hour_tr'] == 3]
+            h10 = [c for c in dc if c['hour_tr'] == 10]
+            if not h3 or not h10: return None
+            return (h10[-1]['close'] - h3[0]['open']) / h3[0]['open'] * 100
+
+        def run_composite(buy_h, sell_h, min_score):
+            """
+            Composite skor: 5 faktör her biri 1 puan
+              1. BTC dün >= 0
+              2. BTC 17:00-20:00 >= 0
+              3. Coin 17:00-20:00 >= 0
+              4. Coin dün >= 0
+              5. Asya seansı (önceki gün 03:00-10:00) >= 0
+            """
+            total = wins = trades = 0
+            for i, date in enumerate(dates):
+                if i < 2: continue
+                today_dc  = days[date]
+                prev_date = dates[i-1]
+
+                bp = btc_day_chg(prev_date)
+                bt = btc_today_chg(date)
+                ct = coin_today_chg(today_dc)
+                cp = day_chg(days.get(prev_date, []))
+                as_ = asian_chg(days.get(prev_date, []))
+
+                score = sum(1 for v in [bp, bt, ct, cp, as_] if v is not None and v >= 0)
+                if score < min_score: continue
+
+                if i + 1 >= len(dates): continue
+                sd = days[dates[i+1]]
+                bc = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc = [c for c in sd       if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                total += net; trades += 1
+                if net > 0: wins += 1
+            wr  = round(wins/trades*100, 1) if trades > 0 else 0
+            avg = round(total/trades,    2) if trades > 0 else 0
+            return {'trades': trades, 'wins': wins, 'wr': wr, 'net': round(total,2), 'avg': avg}
+
+        def run_rel_strong(buy_h, sell_h):
+            """Coin 17:00-20:00 hareketi BTC'den güçlü olduğunda al"""
+            total = wins = trades = 0
+            for i, date in enumerate(dates):
+                if i < 1: continue
+                today_dc = days[date]
+                ct = coin_today_chg(today_dc)
+                bt = btc_today_chg(date)
+                if ct is None or bt is None: continue
+                if ct - bt < 0: continue  # coin BTC'den zayıf → atla
+
+                if i + 1 >= len(dates): continue
+                sd = days[dates[i+1]]
+                bc = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc = [c for c in sd       if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                total += net; trades += 1
+                if net > 0: wins += 1
+            wr  = round(wins/trades*100, 1) if trades > 0 else 0
+            avg = round(total/trades,    2) if trades > 0 else 0
+            return {'trades': trades, 'wins': wins, 'wr': wr, 'net': round(total,2), 'avg': avg}
+
+        def run_dow(buy_h, sell_h):
+            """Haftanın günlerine göre performans analizi"""
+            DOW = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz']
+            by_dow = {d: [0, 0, 0.0] for d in range(7)}  # [trades, wins, total]
+            for i, date in enumerate(dates[:-1]):
+                today_dc = days[date]
+                dow = datetime.datetime.strptime(date, '%Y-%m-%d').weekday()
+                sd  = days[dates[i+1]]
+                bc  = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc  = [c for c in sd       if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                by_dow[dow][0] += 1
+                by_dow[dow][2] += net
+                if net > 0: by_dow[dow][1] += 1
+            result = {}
+            for d in range(7):
+                t, w, tot = by_dow[d]
+                result[DOW[d]] = {
+                    'trades': t,
+                    'wr':  round(w/t*100, 1) if t > 0 else 0,
+                    'avg': round(tot/t,   2) if t > 0 else 0,
+                    'net': round(tot,     2),
+                }
+            return result
+
+        def run_backtest_coin_only(buy_hour, sell_hour, coin_prev_fn, coin_today_fn):
+            total = wins = trades = 0
+            for i, date in enumerate(dates):
+                if i < 2: continue
+                today_dc = days[date]
+                prev_date = dates[i-1]
+                coin_prev = day_chg(days.get(prev_date, []))
+                if coin_prev is None: continue
+                if not coin_prev_fn(coin_prev): continue
+                coin_tod = coin_today_chg(today_dc)
+                if coin_tod is None: continue
+                if not coin_today_fn(coin_tod): continue
+                if i+1 >= len(dates): continue
+                bd = today_dc
+                sd = days[dates[i+1]]
+                bc = [c for c in bd if c['hour_tr'] == buy_hour]
+                sc = [c for c in sd if c['hour_tr'] == sell_hour]
+                if not bc or not sc: continue
+                pct = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100
+                net = pct - 0.2
+                total += net
+                trades += 1
+                if net > 0: wins += 1
+            wr = round(wins/trades*100,1) if trades > 0 else 0
+            avg = round(total/trades,2) if trades > 0 else 0
+            return {'trades': trades, 'wins': wins, 'wr': wr, 'net': round(total,2), 'avg': avg}
+
+        SELL_HOURS = [11, 12, 13, 19]
+
+        def run_all(buy_h, sell_h):
+            return {
+                'coin_yy':       run_backtest_coin_only(buy_h, sell_h, G, G),
+                'coin_ky':       run_backtest_coin_only(buy_h, sell_h, R, G),
+                'coin_kk':       run_backtest_coin_only(buy_h, sell_h, R, R),
+                'coin_yk':       run_backtest_coin_only(buy_h, sell_h, G, R),
+                'btc_yy_coin_y': run_backtest(buy_h, sell_h, G, G, G),
+                'btc_yy_coin_r': run_backtest(buy_h, sell_h, G, G, R),
+                'btc_rr_coin_y': run_backtest(buy_h, sell_h, R, R, G),
+                'btc_rr_coin_r': run_backtest(buy_h, sell_h, R, R, R),
+                'btc_yr_coin_y': run_backtest(buy_h, sell_h, G, R, G),
+                'btc_yr_coin_r': run_backtest(buy_h, sell_h, G, R, R),
+                'btc_ry_coin_y': run_backtest(buy_h, sell_h, R, G, G),
+                'btc_ry_coin_r': run_backtest(buy_h, sell_h, R, G, R),
+                'composite_3':   run_composite(buy_h, sell_h, 3),
+                'composite_4':   run_composite(buy_h, sell_h, 4),
+                'composite_5':   run_composite(buy_h, sell_h, 5),
+                'rel_strong':    run_rel_strong(buy_h, sell_h),
+            }
+
+        by_hour = {str(h): run_all(20, h) for h in SELL_HOURS}
+
+        # Varsayılan (13:00) sonuçları geriye dönük uyumluluk için
+        results = by_hour['13']
+
+        # Her satış saati için en iyi strateji — skor = wr * log(trades+1)
+        import math
+        def _best_for_hour(hour_results):
+            def _sc(k):
+                v = hour_results[k]
+                if v['trades'] == 0: return -999
+                return v['wr'] * math.log(v['trades'] + 1)
+            return max(hour_results, key=_sc)
+
+        best_by_hour = {str(h): _best_for_hour(by_hour[str(h)]) for h in SELL_HOURS}
+
+        # ── Oynaklık Analizi ─────────────────────────
+        # 20:00 alım → ertesi 13:00 arası max düşüş ve max yükseliş
+        drawdowns, gains = [], []
+        for i, date in enumerate(dates[:-1]):
+            today_dc = days[date]
+            next_dc  = days[dates[i + 1]]
+            buy_c    = [c for c in today_dc if c['hour_tr'] == 20]
+            if not buy_c:
+                continue
+            buy_price = buy_c[0]['open']
+            overnight = [c for c in today_dc if c['hour_tr'] >= 20] + \
+                        [c for c in next_dc   if c['hour_tr'] <= 13]
+            if len(overnight) < 2:
+                continue
+            min_low  = min(c['low']  for c in overnight)
+            max_high = max(c['high'] for c in overnight)
+            drawdowns.append((buy_price - min_low)  / buy_price * 100)
+            gains.append(    (max_high - buy_price) / buy_price * 100)
+
+        def _pct(lst, p):
+            if not lst:
+                return 0.0
+            s = sorted(lst)
+            return round(s[min(int(len(s) * p / 100), len(s) - 1)], 1)
+
+        volatility = {
+            'avg_drawdown':  round(sum(drawdowns) / len(drawdowns), 2) if drawdowns else 0,
+            'avg_gain':      round(sum(gains)     / len(gains),     2) if gains     else 0,
+            # %70 işlemde bu seviyenin üzerinde kalıyor → güvenli SL
+            'suggested_sl':  _pct(drawdowns, 70),
+            # %60 işlemde bu seviyeye ulaşıyor → gerçekçi TP
+            'suggested_tp':  _pct(gains, 60),
+            'count': len(drawdowns),
+        }
+
+        dow_analysis = run_dow(20, 13)
+
+        # ── Saat Matrisi: tüm alım × satım kombinasyonları ─
+        BUY_HOURS  = [16, 17, 18, 19, 20, 21, 22, 23]
+        SELL_HOURS_M = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+
+        def run_timing(buy_h, sell_h):
+            total = wins = trades = 0
+            for i, date in enumerate(dates[:-1]):
+                today_dc = days[date]
+                next_dc  = days[dates[i+1]]
+                bc = [c for c in today_dc if c['hour_tr'] == buy_h]
+                sc = [c for c in next_dc  if c['hour_tr'] == sell_h]
+                if not bc or not sc: continue
+                net = (sc[0]['open'] - bc[0]['open']) / bc[0]['open'] * 100 - 0.2
+                total += net; trades += 1
+                if net > 0: wins += 1
+            wr  = round(wins/trades*100, 1) if trades > 0 else 0
+            avg = round(total/trades,    2) if trades > 0 else 0
+            return {'wr': wr, 'avg': avg, 'trades': trades}
+
+        timing_matrix = {
+            str(bh): {str(sh): run_timing(bh, sh) for sh in SELL_HOURS_M}
+            for bh in BUY_HOURS
+        }
+
+        # En iyi saat kombinasyonu (min 20 işlem)
+        best_timing = max(
+            ((bh, sh) for bh in BUY_HOURS for sh in SELL_HOURS_M
+             if timing_matrix[str(bh)][str(sh)]['trades'] >= 20),
+            key=lambda x: timing_matrix[str(x[0])][str(x[1])]['wr'],
+            default=(20, 13)
+        )
+
+        return jsonify({
+            'ok': True,
+            'symbol': symbol,
+            'results': results,
+            'by_hour': by_hour,
+            'best_strategy': best_by_hour,
+            'volatility': volatility,
+            'dow_analysis': dow_analysis,
+            'timing_matrix': timing_matrix,
+            'best_timing': {'buy': best_timing[0], 'sell': best_timing[1]},
+            'timing_buy_hours': BUY_HOURS,
+            'timing_sell_hours': SELL_HOURS_M,
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+# ── Otonom Ajan API ──────────────────────────────
 @app.route('/agent/start', methods=['POST'])
 def agent_start():
     ok = start_autonomous_agent()
@@ -351,9 +874,24 @@ def agent_stop():
 def agent_status_api():
     return jsonify(agent_status())
 
-# ── Başlat ─────────────────────────────────────────────────
+# ── Edge Agent API ────────────────────────────────
+@app.route('/edge/start', methods=['POST'])
+def edge_start():
+    ok = start_edge_agent()
+    return jsonify({'ok': ok, 'msg': 'Edge Agent başlatıldı' if ok else 'Zaten çalışıyor'})
+
+@app.route('/edge/stop', methods=['POST'])
+def edge_stop():
+    stop_edge_agent()
+    return jsonify({'ok': True})
+
+@app.route('/edge/status')
+def edge_status_api():
+    return jsonify(edge_agent_status())
+
+# ── Başlat ───────────────────────────────────────
 if __name__ == '__main__':
     start_engine()
     start_telegram_bot()
-    start_autonomous_agent()
+    start_edge_agent()
     app.run(host='0.0.0.0', port=5000, debug=False)
