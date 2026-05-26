@@ -1,14 +1,17 @@
 """Seans (Session) Strategy — Türkiye saatine göre al/sat"""
 import datetime
-import pytz
 
-TR_TZ = pytz.timezone('Europe/Istanbul')
+# Türkiye UTC+3, 2016'dan beri yaz saati yok — pytz gerekmez
+_TR_TZ = datetime.timezone(datetime.timedelta(hours=3))
+
+
+def _now_tr():
+    return datetime.datetime.now(_TR_TZ)
 
 
 def check_seans_sell(sell_hour):
     """Şu an satış saatiyse True döner."""
-    now = datetime.datetime.now(TR_TZ)
-    return now.hour == sell_hour
+    return _now_tr().hour == sell_hour
 
 
 def check_seans_signal(client, symbol, strategy='both'):
@@ -18,7 +21,7 @@ def check_seans_signal(client, symbol, strategy='both'):
     """
     from binance.client import Client as BClient
 
-    now  = datetime.datetime.now(TR_TZ)
+    now  = _now_tr()
     hour = now.hour
 
     morning = 9 <= hour < 12
