@@ -84,7 +84,7 @@ class WyckoffAgent:
             f'🔍 Yöntem: Akümülasyon tespiti (Wyckoff)\n'
             f'⚡ Tarama: 4 saatte bir\n'
             f'📐 Kriterler:\n'
-            f'  • {BAND_DAYS} günlük dar bant (<%{BAND_THRESHOLD})\n'
+            f'  • {BAND_DAYS} günlük dar bant (%{BAND_THRESHOLD} altı)\n'
             f'  • Min {MIN_FAKE_PUMPS} sahte pump\n'
             f'  • Higher low oluşumu\n'
             f'  • Kırılış: bant üstü %{BREAKOUT_PCT} + hacim x{BREAKOUT_VOL}\n'
