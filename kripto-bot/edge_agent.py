@@ -577,6 +577,7 @@ class EdgeAgent:
                 from bot import save_positions
                 positions = load_positions()
                 if symbol in positions:
+                    positions[symbol]['agent']        = 'EDGE'
                     positions[symbol]['edge_signals'] = active_signals
                     positions[symbol]['edge_score']   = result['score']
                     positions[symbol]['open_time']    = time.time()
@@ -600,6 +601,8 @@ class EdgeAgent:
         for symbol, pos in list(positions.items()):
             qty = pos.get('qty', 0)
             if qty <= 0:
+                continue
+            if pos.get('agent', 'EDGE') != 'EDGE':
                 continue
 
             # Aynı sembol için 60 saniye içinde tekrar bildirim gönderme

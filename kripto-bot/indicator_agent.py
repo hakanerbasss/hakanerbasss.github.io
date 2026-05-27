@@ -202,6 +202,7 @@ class IndicatorAgent:
                 pos_now = load_positions()
                 if sym in pos_now:
                     pos_now[sym].update({
+                        'agent':          'INDICATOR',
                         'indicator_name': indicator,
                         'open_time':      time.time(),
                     })
@@ -258,7 +259,9 @@ class IndicatorAgent:
         positions = load_positions()
 
         for sym, pos in list(positions.items()):
-            if pos.get('qty', 0) <= 0 or not pos.get('indicator_name'):
+            if pos.get('qty', 0) <= 0:
+                continue
+            if pos.get('agent', 'INDICATOR') != 'INDICATOR':
                 continue
             try:
                 price = get_price(client, sym)

@@ -391,6 +391,7 @@ class AutonomousAgent:
 
                 for sym, pos in list(positions.items()):
                     if pos.get('qty', 0) <= 0: continue
+                    if pos.get('agent', 'OTONOM') != 'OTONOM': continue
                     pos['check_momentum'] = (self._mon_count % self.MOMENTUM_EVERY == 0)
                     reason = _exit_decision(client, sym, pos, regime)
                     if reason:
@@ -473,6 +474,7 @@ class AutonomousAgent:
                                 positions = load_positions()
                                 if best_sym in positions:
                                     positions[best_sym].update({
+                                        'agent': 'OTONOM',
                                         'tp_pct': tp, 'sl_pct': sl,
                                         'trail_active': False,
                                         'peak_price': res['price'],
