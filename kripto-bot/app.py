@@ -11,6 +11,8 @@ from autonomous_agent import (start_autonomous_agent, stop_autonomous_agent,
 from edge_agent import start_edge_agent, stop_edge_agent, edge_agent_status
 from indicator_agent import (start_indicator_agent, stop_indicator_agent,
                               indicator_agent_status)
+from wyckoff_agent import (start_wyckoff_agent, stop_wyckoff_agent,
+                            wyckoff_agent_status)
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -1016,4 +1018,5 @@ if __name__ == '__main__':
     start_autonomous_agent()  # Teknik analiz: RSI/MACD/BB/Trend (otonom)
     start_edge_agent()        # Piyasa mekaniği: Funding/OI/CVD/Sweep (otonom)
     start_indicator_agent()   # UT Bot tarayıcı: otomatik coin seçimi (otonom)
+    start_wyckoff_agent()     # Wyckoff akümülasyon: dar bant + sahte pump + kırılış
     app.run(host='0.0.0.0', port=5000, debug=False)
