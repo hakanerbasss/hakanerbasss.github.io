@@ -532,8 +532,11 @@ def _interruptible_sleep(seconds):
 
 def _run_once(api_key):
     try:
-        state        = _load_state()
-        data         = _collect_data()
+        state = _load_state()
+        data  = _collect_data()
+        if data['balance'] == 0 and data['btc_trend'] == '?':
+            send_telegram('⚠️ CEO: Binance verisi alınamadı, analiz iptal edildi.')
+            return
         prompt       = _build_prompt(data)
         response     = _call_deepseek(prompt, api_key)
         tool_results = _execute_tool_calls(response['tool_calls']) if response else []
@@ -573,7 +576,14 @@ def _run_loop():
 
         print(f'[CEO] Analiz başlıyor (#{state["review_count"] + 1})')
         try:
-            data         = _collect_data()
+            data = _collect_data()
+
+            # Binance bağlantısı henüz hazır değilse atla
+            if data['balance'] == 0 and data['btc_trend'] == '?':
+                print('[CEO] Veri alınamadı (Binance hazır değil), 2 dakika sonra tekrar deneniyor.')
+                _interruptible_sleep(120)
+                continue
+
             prompt       = _build_prompt(data)
             response     = _call_deepseek(prompt, api_key)
             tool_results = _execute_tool_calls(response['tool_calls']) if response else []
