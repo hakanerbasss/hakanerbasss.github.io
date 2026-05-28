@@ -454,6 +454,11 @@ class AutonomousAgent:
                     cfg    = load_config()
                     is_real = not cfg.get('testnet', True)
 
+                    if not cfg.get('otonom_enabled', True):
+                        print('[Otonom] CEO tarafından durduruldu, tarama atlandı')
+                        time.sleep(self.SCAN_INTERVAL)
+                        continue
+
                     balance = get_usdt_balance(client)
                     if not _daily_loss_ok({}, self.state.get('day_start_balance', balance),
                                           balance, self.DAILY_LOSS_LIMIT):
@@ -493,9 +498,11 @@ class AutonomousAgent:
                                 best_sym, best_sc = sym, sc
 
                     if best_sym:
-                        atr_pct = best_sc.get('atr_pct', 2.0)
-                        amount  = _position_size(balance, best_sc['total'],
-                                                 atr_pct, is_real, self.MAX_POSITIONS)
+                        atr_pct  = best_sc.get('atr_pct', 2.0)
+                        ceo_mult = cfg.get('ceo_position_mult', 1.0)
+                        amount   = _position_size(balance, best_sc['total'],
+                                                  atr_pct, is_real, self.MAX_POSITIONS)
+                        amount   = round(amount * ceo_mult, 2)
                         if amount <= balance * 0.95:
                             res = execute_buy(client, best_sym, amount,
                                               source='OTONOM', period='Ajan')

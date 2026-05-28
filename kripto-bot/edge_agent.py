@@ -479,6 +479,10 @@ class EdgeAgent:
         cfg    = load_config()
         client = get_client()
 
+        if not cfg.get('edge_enabled', True):
+            print('[Edge] CEO tarafından durduruldu, tarama atlandı')
+            return
+
         positions = load_positions()
         open_count = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
         if open_count >= MAX_POSITIONS:
@@ -561,7 +565,8 @@ class EdgeAgent:
         # Pozisyon büyüklüğü: skor bazlı Kelly
         risk = 0.015 if is_real else 0.025
         score_mult = max(0.5, min(1.0, (result['score'] - 5.0) / 4.0))
-        usdt = round(bal * risk * score_mult, 2)
+        ceo_mult   = cfg.get('ceo_position_mult', 1.0)
+        usdt = round(bal * risk * score_mult * ceo_mult, 2)
         usdt = max(5.0, min(usdt, bal * (0.05 if is_real else 0.10)))
 
         positions = load_positions()
