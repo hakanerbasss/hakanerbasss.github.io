@@ -324,8 +324,7 @@ def handle_command(cmd, chat_id):
 /edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff
 /rapor — Tüm ajanlardan anında rapor
 /rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
-/ceo — CEO Agent durumu
-/ceo ac | /ceo kapat | /ceo analiz
+/ceoon /ceooff /ceoanaliz
 /baslat — Botu başlat
 /durdur — Botu duraklat
 /restart — Botu yeniden başlat
