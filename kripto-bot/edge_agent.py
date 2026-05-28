@@ -562,7 +562,7 @@ class EdgeAgent:
         risk = 0.015 if is_real else 0.025
         score_mult = max(0.5, min(1.0, (result['score'] - 5.0) / 4.0))
         usdt = round(bal * risk * score_mult, 2)
-        usdt = max(5.0, min(usdt, bal * (0.12 if is_real else 0.20)))
+        usdt = max(5.0, min(usdt, bal * (0.05 if is_real else 0.10)))
 
         positions = load_positions()
         if len([p for p in positions.values() if p.get('qty', 0) > 0]) >= MAX_POSITIONS:

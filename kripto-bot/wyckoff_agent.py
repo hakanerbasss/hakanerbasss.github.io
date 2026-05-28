@@ -298,7 +298,7 @@ class WyckoffAgent:
 
         risk = 0.03 if is_real else 0.05
         usdt = round(bal * risk, 2)
-        usdt = max(10.0, min(usdt, bal * (0.15 if is_real else 0.25)))
+        usdt = max(10.0, min(usdt, bal * (0.05 if is_real else 0.10)))
 
         send_telegram(
             f'🏗 <b>WYCKOFF ALIM SİNYALİ</b>\n'

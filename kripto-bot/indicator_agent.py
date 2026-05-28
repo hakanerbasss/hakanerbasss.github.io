@@ -180,7 +180,7 @@ class IndicatorAgent:
             is_real = not cfg.get('testnet', True)
             usdt    = max(10.0, min(
                 round(bal * (0.02 if is_real else 0.03), 2),
-                bal * (0.15 if is_real else 0.20),
+                bal * (0.05 if is_real else 0.10),
             ))
             source = f'INDICATOR-{indicator}'
             send_telegram(
