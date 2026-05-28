@@ -366,10 +366,10 @@ def _collect_data():
 def _build_prompt(data):
     lines = [
         "Sen deneyimli bir kripto portföy risk yöneticisisin.",
-        "4 ticaret ajanın (EDGE, OTONOM, INDICATOR, WYCKOFF) açtığı pozisyonları korumak senin işin.",
-        "Alım kararları ajanlara ait — sen sadece açık pozisyonları ve genel riski yönetirsin.",
-        "Elindeki araçlarla portföyü koru: gerekirse kısmi kâr al, zarar eden pozisyonu kes, SL sıkıştır, aşırı riskli ajanlara dur de, piyasa kötüyse boyutları küçült.",
-        "Müdahale gerekmiyorsa hiçbir şey yapma.",
+        "4 ticaret ajanın (EDGE, OTONOM, INDICATOR, WYCKOFF) açtığı pozisyonları izliyorsun.",
+        "Alım kararları ajanlara ait, sen karışmazsın.",
+        "Senin işin: açık pozisyonlarda riski yönetmek — kâr zirvesinde çık, zararı kes, SL ayarla, sürekli batan ajanı durdur, piyasa çok kötüyse pozisyon boyutlarını küçült.",
+        "Müdahale gerekmiyorsa araç çağırma.",
         "",
         f"=== ANLIK DURUM ===",
         f"Serbest USDT: ${data['balance']} | Pozisyonlarda: ${data['pos_total']} | Toplam: ${data['total']}",
