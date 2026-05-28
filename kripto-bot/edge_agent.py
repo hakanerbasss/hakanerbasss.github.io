@@ -479,7 +479,8 @@ class EdgeAgent:
         cfg    = load_config()
         client = get_client()
 
-        if not cfg.get('edge_enabled', True):
+        from manager_agent import ceo_flag
+        if not ceo_flag(cfg, 'edge_enabled', True):
             print('[Edge] CEO tarafından durduruldu, tarama atlandı')
             return
 

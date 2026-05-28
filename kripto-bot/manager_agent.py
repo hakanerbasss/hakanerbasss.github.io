@@ -18,6 +18,21 @@ DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 DEFAULT_INTERVAL = 1   # saat
 
 
+def ceo_flag(cfg, key, default=True):
+    """
+    CEO flag okur ama CEO sessiz kaldıysa (kota/hata) default değeri döner.
+    CEO cevap vermezse ajanlar kendi kendine çalışmaya devam eder.
+    """
+    if not cfg.get('ceo_agent_enabled', False):
+        return default  # CEO kapalıysa flag'e bakma
+    interval  = cfg.get('ceo_interval_hours', DEFAULT_INTERVAL)
+    last_ok   = cfg.get('ceo_last_success', 0)
+    timeout   = interval * 3 * 3600   # 3 başarısız döngü = timeout
+    if time.time() - last_ok > timeout:
+        return default  # CEO süresi doldu, varsayılana dön
+    return cfg.get(key, default)
+
+
 def _load_state():
     if os.path.exists(STATE_FILE):
         try:
@@ -237,6 +252,11 @@ def _apply_changes(result):
 
     if applied:
         save_config(cfg)
+
+    # Başarılı analiz zaman damgası — ajanlar bu damgayı kontrol eder
+    cfg2 = load_config()
+    cfg2['ceo_last_success'] = time.time()
+    save_config(cfg2)
 
     return applied
 

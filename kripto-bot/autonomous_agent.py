@@ -454,7 +454,8 @@ class AutonomousAgent:
                     cfg    = load_config()
                     is_real = not cfg.get('testnet', True)
 
-                    if not cfg.get('otonom_enabled', True):
+                    from manager_agent import ceo_flag
+                    if not ceo_flag(cfg, 'otonom_enabled', True):
                         print('[Otonom] CEO tarafından durduruldu, tarama atlandı')
                         time.sleep(self.SCAN_INTERVAL)
                         continue
