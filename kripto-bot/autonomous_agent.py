@@ -121,7 +121,8 @@ def _top_100(client):
             if t['symbol'].endswith('USDT')
             and t['symbol'] not in STABLECOINS
             and float(t.get('quoteVolume', 0)) > 1_000_000
-            and float(t.get('lastPrice', 0)) > 0]
+            and float(t.get('lastPrice', 0)) > 0
+            and not (0.97 <= float(t.get('lastPrice', 0)) <= 1.03)]  # stablecoin fiyat aralığı
     usdt.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
     return [t['symbol'] for t in usdt[:100]]
 

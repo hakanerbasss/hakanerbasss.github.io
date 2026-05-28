@@ -530,6 +530,15 @@ class EdgeAgent:
             self.scan_log.appendleft(log_line)
 
             if result['signal'] == 'buy':
+                # Veto: yapısal aşağı trend + BTC zayıf → funding tek başına yetmez
+                d = result.get('details', {})
+                struct_score = d.get('struct', {}).get('score', 0)
+                btc_score    = d.get('btc_trend', {}).get('score', 0)
+                if struct_score < -0.5 and btc_score < 0:
+                    self.scan_log.appendleft(f'{sym} VETO: struct={struct_score} btc={btc_score}')
+                    checked += 1
+                    continue
+
                 self._do_buy(client, sym, result, cfg)
                 open_count += 1
                 if open_count >= MAX_POSITIONS:
