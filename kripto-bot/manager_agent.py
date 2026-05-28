@@ -226,17 +226,29 @@ def _calc_rsi(closes, period=14):
 
 
 def _position_technicals(client, symbol):
-    """Her zaman dilimi için RSI, trend ve son değişim hesapla."""
+    """RSI, trend, değişim ve bearish/bullish divergence hesapla."""
     from signal_engine import get_klines
     result = {}
     for tf, lookback in (('1h', 4), ('4h', 3)):
         try:
-            closes, _, _, _ = get_klines(client, symbol, tf, limit=30)
-            sma   = sum(closes[-20:]) / min(20, len(closes))
-            rsi   = _calc_rsi(closes)
-            trend = 'YUKARI' if closes[-1] > sma else 'ASAGI'
-            chg   = round((closes[-1] - closes[-lookback]) / closes[-lookback] * 100, 2) if len(closes) >= lookback else 0
-            result[tf] = {'rsi': rsi, 'trend': trend, 'chg': chg}
+            closes, _, _, _ = get_klines(client, symbol, tf, limit=35)
+            sma       = sum(closes[-20:]) / min(20, len(closes))
+            rsi_now   = _calc_rsi(closes)
+            rsi_prev  = _calc_rsi(closes[:-5])   # 5 mum önceki RSI
+            trend     = 'YUKARI' if closes[-1] > sma else 'ASAGI'
+            chg       = round((closes[-1] - closes[-lookback]) / closes[-lookback] * 100, 2) if len(closes) >= lookback else 0
+
+            # Bearish divergence: fiyat higher high ama RSI lower high
+            divergence = None
+            if rsi_now is not None and rsi_prev is not None:
+                price_up = closes[-1] > closes[-6]
+                rsi_down = rsi_now < rsi_prev
+                if price_up and rsi_down:
+                    divergence = 'BEARISH'   # momentum zayıflıyor
+                elif (not price_up) and (not rsi_down):
+                    divergence = 'BULLISH'   # düşüşe rağmen RSI yükseliyor
+
+            result[tf] = {'rsi': rsi_now, 'trend': trend, 'chg': chg, 'div': divergence}
         except Exception:
             result[tf] = None
     return result
@@ -295,13 +307,15 @@ def _collect_data():
                 else:
                     hours_held = '?'
 
-                tech = _position_technicals(client, sym)
+                tech      = _position_technicals(client, sym)
+                pos_value = round(price * pos.get('qty', 0), 2)
                 open_pos.append({
                     'symbol':     sym,
                     'agent':      pos.get('agent', '?'),
                     'pct':        round(pct, 2),
                     'entry':      round(avg, 6),
                     'price':      round(price, 6),
+                    'value':      pos_value,
                     'sl_pct':     pos.get('sl_pct', '?'),
                     'tp_pct':     pos.get('tp_pct', '?'),
                     'hours_held': hours_held,
@@ -309,9 +323,11 @@ def _collect_data():
                 })
             except Exception:
                 pass
+        pos_total = round(sum(p['value'] for p in open_pos), 2)
     except Exception:
-        balance  = 0
-        open_pos = []
+        balance   = 0
+        open_pos  = []
+        pos_total = 0
 
     # BTC durumu
     try:
@@ -334,6 +350,8 @@ def _collect_data():
 
     return {
         'balance':        round(balance, 2),
+        'pos_total':      pos_total,
+        'total':          round(balance + pos_total, 2),
         'btc_trend':      btc_trend,
         'btc_pct_1h':     btc_pct,
         'btc_vs_sma':     btc_vs_sma,
@@ -356,15 +374,16 @@ def _build_prompt(data):
         "- Sadece sürekli zarar eden ajanlara müdahale et.",
         "- BTC BEAR trendinde position_mult en fazla 0.7 olsun.",
         "- Pozisyon müdahalelerinde dikkatli ol, şüphede hareketsiz kal.",
-        "- Kısmi kâr alma için sabit eşik yok: RSI ve trendi birlikte değerlendir.",
-        "- RSI_1h > 75 VE pozisyon kârda → kısmi kâr almayı ciddi düşün.",
-        "- RSI_1h > 80 → mutlaka kısmi kâr al (fraction 0.5).",
-        "- RSI_4h > 70 VE BTC ASAGI trendi → daha agresif çık.",
-        "- Pozisyon zararda VE her iki RSI düşük VE trend ASAGI → SL sıkıştır ya da kapat.",
-        "- Pozisyon kârda VE trend YUKARI VE RSI < 65 → rahat bekle, dokunma.",
+        "- RSI tek başına yeterli değil; divergence ve trendi birlikte değerlendir.",
+        "- BEARISH divergence (fiyat ↑ ama RSI ↓): momentum zayıflıyor → kısmi kâr al.",
+        "- RSI > 80 VE BEARISH div VE kârda → mutlaka partial_take_profit(0.5).",
+        "- RSI > 80 ama divergence YOK VE trend YUKARI → sadece SL sıkıştır, beklemeye devam et.",
+        "- RSI > 75 VE BTC ASAGI VE BEARISH div → agresif çık.",
+        "- Pozisyon zararda VE trend ASAGI VE BULLISH div yok → SL sıkıştır ya da kapat.",
+        "- Pozisyon kârda VE trend YUKARI VE RSI < 70 VE div yok → dokunma.",
         "",
         f"=== ANLIK DURUM ===",
-        f"Bakiye: ${data['balance']}",
+        f"Serbest USDT: ${data['balance']} | Pozisyonlarda: ${data['pos_total']} | Toplam: ${data['total']}",
         f"BTC Trend: {data['btc_trend']} (SMA20'ye göre {data['btc_vs_sma']:+.2f}%, 1s değişim: {data['btc_pct_1h']:+.2f}%)",
         "",
         "=== AÇIK POZİSYONLAR ===",
@@ -383,8 +402,9 @@ def _build_prompt(data):
                 t = tech.get(tf)
                 if t:
                     rsi_str = f"RSI={t['rsi']}" if t['rsi'] else 'RSI=?'
+                    div_str = f" | DIV={t['div']}" if t.get('div') else ''
                     lines.append(
-                        f"   {tf}: {rsi_str} | Trend={t['trend']} | Değişim={t['chg']:+.2f}%"
+                        f"   {tf}: {rsi_str} | Trend={t['trend']} | Değişim={t['chg']:+.2f}%{div_str}"
                     )
     else:
         lines.append("Açık pozisyon yok.")
@@ -453,7 +473,7 @@ def _send_report(response, tool_results, data):
     lines = [
         '👔 <b>CEO Değerlendirmesi</b>',
         '━━━━━━━━━━━━━━',
-        f'📊 Bakiye: ${data["balance"]} | BTC: {data["btc_trend"]}',
+        f'📊 USDT: ${data["balance"]} | Poz: ${data["pos_total"]} | Toplam: ${data["total"]} | BTC: {data["btc_trend"]}',
     ]
 
     if response.get('content'):
