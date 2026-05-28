@@ -736,13 +736,14 @@ class EdgeAgent:
     # ── Saatlik Rapor ──────────────────────────────────────────────────────
     def _hourly_loop(self):
         now = datetime.datetime.now()
-        time.sleep((60 - now.minute) * 60 - now.second)
+        time.sleep(max(0, (60 - now.minute) * 60 - now.second))
         while self._running:
             try:
                 self._hourly_report()
             except Exception as e:
                 print(f'[Edge] Saatlik hata: {e}')
-            time.sleep(3600)
+            interval = int(load_config().get('report_interval_hours', 1))
+            time.sleep(interval * 3600)
 
     def _hourly_report(self):
         client    = get_client()
@@ -763,8 +764,9 @@ class EdgeAgent:
                 pct    = (price - avg) / avg * 100 if avg > 0 else 0
                 total_pnl += pct
                 icon   = '🟢' if pct > 0 else '🔴'
+                agent = pos.get('agent', 'EDGE')
                 pos_lines.append(
-                    f'{icon} {sym}: %{pct:+.2f} | Giriş: ${avg:.4f} | Şimdi: ${price:.4f}'
+                    f'{icon} {sym} [{agent}]: %{pct:+.2f} | Giriş: ${avg:.4f} | Şimdi: ${price:.4f}'
                 )
             except Exception:
                 pass
@@ -901,6 +903,13 @@ def stop_edge_agent():
     with _agent_lock:
         if _agent:
             _agent.stop()
+
+def trigger_edge_report():
+    if _agent and _agent._running:
+        try:
+            _agent._hourly_report()
+        except Exception as e:
+            print(f'[Edge] Manuel rapor hatası: {e}')
 
 def edge_agent_status():
     global _agent

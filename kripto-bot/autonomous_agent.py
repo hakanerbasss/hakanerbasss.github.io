@@ -594,50 +594,55 @@ class AutonomousAgent:
                 self._save()
             except Exception: pass
 
+    def _send_report(self):
+        client    = get_client()
+        positions = load_positions()
+        try:
+            balance = get_usdt_balance(client)
+        except Exception:
+            balance = 0
+        open_pos  = [(s,p) for s,p in positions.items() if p.get('qty',0)>0]
+        regime    = self.state.get('last_regime','?')
+        er        = {'BULL':'🟢','SIDEWAYS':'🟡','BEAR':'🔴'}.get(regime,'⚪')
+        day_bal   = self.state.get('day_start_balance', balance)
+        day_chg   = round((balance - day_bal) / day_bal * 100, 2) if day_bal else 0
+
+        lines = [
+            "🤖 <b>Otonom Ajan Rapor</b>",
+            f"━━━━━━━━━━━━━━",
+            f"💰 Bakiye: <b>${round(balance,2)}</b>  "
+            f"({'+' if day_chg>=0 else ''}{day_chg}% bugün)",
+            f"💹 Toplam PnL: ${round(self.state.get('total_pnl',0),2)}",
+            f"{er} Rejim: {regime}  |  🔍 Tarama: {self.state.get('scan_count',0)}x",
+            f"📦 Açık: {len(open_pos)}/{self.MAX_POSITIONS}",
+        ]
+        if open_pos:
+            lines.append("")
+            for sym, pos in open_pos:
+                try:
+                    price = get_price(client, sym)
+                    chg   = (price - pos['avg_price']) / pos['avg_price'] * 100
+                    icon  = '🟢' if chg >= 0 else '🔴'
+                    agent = pos.get('agent', 'OTONOM')
+                    trail = ' 🎯trail' if pos.get('trail_active') else ''
+                    lines.append(f"  {icon} {sym} [{agent}]: {'+' if chg>=0 else ''}{round(chg,2)}%{trail}")
+                except Exception:
+                    lines.append(f"  ⚪ {sym}: fiyat alınamadı")
+        bl = [k for k,v in self.state.get('blacklist',{}).items() if v > time.time()]
+        if bl:
+            lines.append(f"\n⛔ Kara liste ({len(bl)}): {', '.join(bl[:5])}")
+        send_telegram('\n'.join(lines))
+
     def _hourly_loop(self):
         now = datetime.datetime.now()
-        time.sleep((60 - now.minute) * 60 - now.second)
+        time.sleep(max(0, (60 - now.minute) * 60 - now.second))
         while self.running:
             try:
-                client    = get_client()
-                positions = load_positions()
-                try:
-                    balance = get_usdt_balance(client)
-                except Exception:
-                    balance = 0
-                open_pos  = [(s,p) for s,p in positions.items() if p.get('qty',0)>0]
-                regime    = self.state.get('last_regime','?')
-                er        = {'BULL':'🟢','SIDEWAYS':'🟡','BEAR':'🔴'}.get(regime,'⚪')
-                day_bal   = self.state.get('day_start_balance', balance)
-                day_chg   = round((balance - day_bal) / day_bal * 100, 2) if day_bal else 0
-
-                lines = [
-                    "🤖 <b>Otonom Ajan Saatlik Rapor</b>",
-                    f"━━━━━━━━━━━━━━",
-                    f"💰 Bakiye: <b>${round(balance,2)}</b>  "
-                    f"({'+' if day_chg>=0 else ''}{day_chg}% bugün)",
-                    f"💹 Toplam PnL: ${round(self.state.get('total_pnl',0),2)}",
-                    f"{er} Rejim: {regime}  |  🔍 Tarama: {self.state.get('scan_count',0)}x",
-                    f"📦 Açık: {len(open_pos)}/{self.MAX_POSITIONS}",
-                ]
-                if open_pos:
-                    lines.append("")
-                    for sym, pos in open_pos:
-                        try:
-                            price = get_price(client, sym)
-                            chg   = (price - pos['avg_price']) / pos['avg_price'] * 100
-                            icon  = '🟢' if chg >= 0 else '🔴'
-                            trail = ' 🎯trail' if pos.get('trail_active') else ''
-                            lines.append(f"  {icon} {sym}: {'+' if chg>=0 else ''}{round(chg,2)}%{trail}")
-                        except Exception:
-                            lines.append(f"  ⚪ {sym}: fiyat alınamadı")
-                bl = [k for k,v in self.state.get('blacklist',{}).items() if v > time.time()]
-                if bl:
-                    lines.append(f"\n⛔ Kara liste ({len(bl)}): {', '.join(bl[:5])}")
-                send_telegram('\n'.join(lines))
+                self._send_report()
             except Exception as e:
                 print(f'[Otonom Hourly] {e}')
-            time.sleep(3600)
+            interval = int(load_config().get('report_interval_hours', 1))
+            time.sleep(interval * 3600)
 
     def _daily_loop(self):
         while self.running:
@@ -704,6 +709,13 @@ def stop_autonomous_agent():
     if _agent: _agent.stop(); _agent.running = False
     return True
 
+
+def trigger_otonom_report():
+    if _agent and _agent.running:
+        try:
+            _agent._send_report()
+        except Exception as e:
+            print(f'[Otonom] Manuel rapor hatası: {e}')
 
 def agent_status():
     if not (_agent and _agent.running): return {'running': False}

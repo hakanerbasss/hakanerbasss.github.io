@@ -210,12 +210,43 @@ def handle_command(cmd, chat_id):
         except Exception as e:
             send_reply(chat_id, f'❌ Hata: {e}')
 
+    elif cmd == '/rapor':
+        try:
+            from autonomous_agent import trigger_otonom_report
+            from edge_agent import trigger_edge_report
+            from indicator_agent import trigger_indicator_report
+            from wyckoff_agent import trigger_wyckoff_report
+            send_reply(chat_id, '📋 Raporlar hazırlanıyor...')
+            for fn in [trigger_otonom_report, trigger_edge_report,
+                       trigger_indicator_report, trigger_wyckoff_report]:
+                try:
+                    fn()
+                except Exception:
+                    pass
+        except Exception as e:
+            send_reply(chat_id, f'❌ {e}')
+
+    elif cmd.startswith('/rapor_ayar'):
+        parts = cmd.split()
+        valid = {'1h': 1, '4h': 4, '12h': 12, '1d': 24}
+        if len(parts) < 2 or parts[1] not in valid:
+            send_reply(chat_id,
+                f'Kullanım: /rapor_ayar 1h|4h|12h|1d\n'
+                f'Şu an: {cfg.get("report_interval_hours", 1)}h')
+        else:
+            hours = valid[parts[1]]
+            cfg['report_interval_hours'] = hours
+            save_config(cfg)
+            send_reply(chat_id, f'✅ Rapor aralığı: her {parts[1]} — bir sonraki raporda geçerli')
+
     elif cmd in ['/start', '/yardim']:
         send_reply(chat_id, '''🤖 <b>Kripto Bot Komutları</b>
 
 /durum — Genel durum özeti
 /pozisyonlar — Açık pozisyonlar
-/ajanlar — Ajan durumları (BTC trend, rejim, tarama)
+/ajanlar — Ajan durumları
+/rapor — Tüm ajanlardan anında rapor
+/rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
 /baslat — Botu başlat
 /durdur — Botu duraklat
 /restart — Botu yeniden başlat

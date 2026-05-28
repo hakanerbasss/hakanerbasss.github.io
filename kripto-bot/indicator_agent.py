@@ -350,13 +350,14 @@ class IndicatorAgent:
     # ── Saatlik Rapor ─────────────────────────────────────────────────────────
     def _report_loop(self):
         now = datetime.datetime.now()
-        time.sleep((60 - now.minute) * 60 - now.second)
+        time.sleep(max(0, (60 - now.minute) * 60 - now.second))
         while self._running:
             try:
                 self._report()
             except Exception as e:
                 print(f'[Indicator] Rapor hata: {e}')
-            time.sleep(3600)
+            interval = int(load_config().get('report_interval_hours', 1))
+            time.sleep(interval * 3600)
 
     def _report(self):
         try:
@@ -444,6 +445,13 @@ def stop_indicator_agent():
         if _agent:
             _agent.stop()
 
+
+def trigger_indicator_report():
+    if _agent and _agent._running:
+        try:
+            _agent._report()
+        except Exception as e:
+            print(f'[Indicator] Manuel rapor hatası: {e}')
 
 def indicator_agent_status():
     global _agent
