@@ -102,6 +102,8 @@ def _exec_set_agent_enabled(agent, enabled):
     cfg = load_config()
     key = f'{agent}_enabled'
     old = cfg.get(key, True)
+    if old == bool(enabled):
+        return None  # değişiklik yok
     cfg[key] = bool(enabled)
     save_config(cfg)
     return f'{agent}_enabled: {old} → {bool(enabled)}'
@@ -111,6 +113,8 @@ def _exec_set_position_mult(value):
     value = round(max(0.3, min(1.5, float(value))), 2)
     cfg   = load_config()
     old   = cfg.get('ceo_position_mult', 1.0)
+    if old == value:
+        return None  # değişiklik yok
     cfg['ceo_position_mult'] = value
     save_config(cfg)
     return f'ceo_position_mult: {old} → {value}'
@@ -178,8 +182,9 @@ def _execute_tool_calls(tool_calls):
                 r = f'Bilinmeyen araç: {name}'
         except Exception as e:
             r = f'{name} hata: {e}'
-        print(f'[CEO] Araç: {name} → {r}')
-        results.append(r)
+        if r is not None:
+            print(f'[CEO] Araç: {name} → {r}')
+            results.append(r)
     return results
 
 
