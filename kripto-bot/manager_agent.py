@@ -15,7 +15,7 @@ from bot import (load_config, save_config, load_trades, load_positions,
 STATE_FILE = 'ceo_state.json'
 DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 
-DEFAULT_INTERVAL = 6   # saat
+DEFAULT_INTERVAL = 1   # saat
 
 
 def _load_state():
@@ -286,7 +286,8 @@ def _run_loop():
     global _running
     state = _load_state()
     print('[CEO] Başladı')
-    send_telegram('👔 <b>CEO Agent AKTİF</b>\nHer 6 saatte bir analiz yapacağım.')
+    interval_h = load_config().get('ceo_interval_hours', DEFAULT_INTERVAL)
+    send_telegram(f'👔 <b>CEO Agent AKTİF</b>\nHer {interval_h} saatte bir analiz yapacağım.')
 
     while _running:
         cfg      = load_config()
@@ -339,7 +340,18 @@ def start_ceo_agent():
 def stop_ceo_agent():
     global _running
     _running = False
-    send_telegram('👔 CEO Agent durduruldu.')
+    # CEO kapanınca tüm ajanları varsayılana döndür
+    cfg = load_config()
+    cfg['otonom_enabled']    = True
+    cfg['edge_enabled']      = True
+    cfg['indicator_enabled'] = True
+    cfg['wyckoff_enabled']   = True
+    cfg['ceo_position_mult'] = 1.0
+    save_config(cfg)
+    send_telegram(
+        '👔 CEO Agent durduruldu.\n'
+        '✅ Tüm ajanlar varsayılan duruma döndürüldü (hepsi açık, çarpan 1.0).'
+    )
 
 
 def ceo_agent_status():

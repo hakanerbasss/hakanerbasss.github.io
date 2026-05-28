@@ -229,6 +229,17 @@ def handle_command(cmd, chat_id):
         stop_ceo_agent()
         send_reply(chat_id, '👔 CEO Agent kapatıldı.')
 
+    elif cmd.startswith('/ceo_ayar') or cmd.startswith('/ceo ayar'):
+        parts = cmd.split()
+        valid = {'1h': 1, '2h': 2, '4h': 4, '6h': 6, '12h': 12}
+        val   = parts[-1] if parts else ''
+        if val not in valid:
+            send_reply(chat_id, f'Kullanım: /ceo_ayar 1h|2h|4h|6h|12h\nŞu an: {cfg.get("ceo_interval_hours", 1)}h')
+        else:
+            cfg['ceo_interval_hours'] = valid[val]
+            save_config(cfg)
+            send_reply(chat_id, f'✅ CEO analiz aralığı: her {val}')
+
     elif cmd in ['/ceo analiz', '/ceo_analiz']:
         from manager_agent import trigger_ceo_review, ceo_agent_status
         st = ceo_agent_status()
