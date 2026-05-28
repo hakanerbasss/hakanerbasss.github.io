@@ -121,17 +121,25 @@ def _exec_set_position_mult(value):
 
 
 def _resolve_symbol(symbol):
-    """positions.json'daki gerçek sembol anahtarını bul (0/O karışıklığına karşı)."""
+    """positions.json'daki gerçek sembol anahtarını bul.
+    0/O karışıklığı ve tek harf eksikliği/fazlalığı gibi model hatalarını düzeltir."""
+    from difflib import get_close_matches
     positions = load_positions()
     s = symbol.upper()
+    # 1. Birebir eşleşme
     if s in positions:
         return s
-    # 0 ↔ O karışıklığını gider
+    # 2. 0 ↔ O normalizasyonu
     normalized = s.replace('0', 'O')
     for key in positions:
         if key.upper().replace('0', 'O') == normalized:
             return key
-    return s  # bulunamazsa orijinali döndür
+    # 3. Fuzzy match — tek harf farkını da yakalar
+    keys = list(positions.keys())
+    matches = get_close_matches(s, keys, n=1, cutoff=0.85)
+    if matches:
+        return matches[0]
+    return s
 
 
 def _exec_close_position(symbol):
@@ -370,6 +378,7 @@ def _build_prompt(data):
         "Alım kararları ajanlara ait, sen karışmazsın.",
         "Senin işin: açık pozisyonlarda riski yönetmek — kâr zirvesinde çık, zararı kes, SL ayarla, sürekli batan ajanı durdur, piyasa çok kötüyse pozisyon boyutlarını küçült.",
         "Müdahale gerekmiyorsa araç çağırma.",
+        "KRİTİK: Araç çağırırken sembol adını aşağıdaki listede AYNEN göründüğü gibi yaz. Harfi değiştirme, eksiltme, ekleme yapma.",
         "",
         f"=== ANLIK DURUM ===",
         f"Serbest USDT: ${data['balance']} | Pozisyonlarda: ${data['pos_total']} | Toplam: ${data['total']}",
