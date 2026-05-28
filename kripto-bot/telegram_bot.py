@@ -294,27 +294,26 @@ def handle_command(cmd, chat_id):
             save_config(cfg)
             send_reply(chat_id, f'✅ Rapor aralığı: her {parts[1]} — bir sonraki raporda geçerli')
 
-    elif cmd.startswith('/ajan'):
-        # /ajan edge ac | /ajan otonom kapat | /ajan indicator ac | /ajan wyckoff kapat
-        parts   = cmd.split()
-        AGENTS  = {'edge': 'edge_enabled', 'otonom': 'otonom_enabled',
-                   'indicator': 'indicator_enabled', 'wyckoff': 'wyckoff_enabled'}
-        if len(parts) != 3 or parts[1] not in AGENTS or parts[2] not in ('ac', 'kapat'):
-            lines = ['ℹ️ Kullanım: /ajan <ad> ac|kapat\n']
-            cfg   = load_config()
-            for name, key in AGENTS.items():
-                icon = '🟢' if cfg.get(key, True) else '🔴'
-                lines.append(f'{icon} {name}: {"açık" if cfg.get(key, True) else "kapalı"}')
-            send_reply(chat_id, '\n'.join(lines))
-        else:
-            name    = parts[1]
-            enabled = parts[2] == 'ac'
-            key     = AGENTS[name]
-            cfg     = load_config()
-            cfg[key] = enabled
-            save_config(cfg)
-            icon = '🟢' if enabled else '🔴'
-            send_reply(chat_id, f'{icon} <b>{name}</b> ajanı {"açıldı" if enabled else "kapatıldı"}')
+    elif cmd in ('/edgeon', '/edgeoff', '/otonomон', '/otonomoff',
+                 '/indicatoron', '/indicatoroff', '/wyckoffon', '/wyckoffoff',
+                 '/otonomon'):
+        TOGGLE = {
+            '/edgeon':       ('edge_enabled',      True),
+            '/edgeoff':      ('edge_enabled',      False),
+            '/otonomon':     ('otonom_enabled',    True),
+            '/otonomoff':    ('otonom_enabled',    False),
+            '/indicatoron':  ('indicator_enabled', True),
+            '/indicatoroff': ('indicator_enabled', False),
+            '/wyckoffon':    ('wyckoff_enabled',   True),
+            '/wyckoffoff':   ('wyckoff_enabled',   False),
+        }
+        key, enabled = TOGGLE[cmd]
+        name = key.replace('_enabled', '')
+        cfg  = load_config()
+        cfg[key] = enabled
+        save_config(cfg)
+        icon = '🟢' if enabled else '🔴'
+        send_reply(chat_id, f'{icon} <b>{name}</b> ajanı {"açıldı" if enabled else "kapatıldı"}')
 
     elif cmd in ['/start', '/yardim']:
         send_reply(chat_id, '''🤖 <b>Kripto Bot Komutları</b>
@@ -322,7 +321,7 @@ def handle_command(cmd, chat_id):
 /durum — Genel durum özeti
 /pozisyonlar — Açık pozisyonlar
 /ajanlar — Ajan durumları
-/ajan edge ac|kapat — Ajan aç/kapat
+/edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff
 /rapor — Tüm ajanlardan anında rapor
 /rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
 /ceo — CEO Agent durumu
