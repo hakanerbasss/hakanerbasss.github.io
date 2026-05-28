@@ -24,20 +24,23 @@ def check_seans_signal(client, symbol, strategy='both'):
     now  = _now_tr()
     hour = now.hour
 
-    morning = 9 <= hour < 12
-    evening = 20 <= hour < 23
+    morning = 9 <= hour < 12    # Avrupa açılışı
+    evening = 20 <= hour < 23   # ABD seansı
+    asia    = 4 <= hour < 8     # Tokyo/Şangay (04:00-08:00 TR = 01:00-05:00 UTC)
 
     if strategy == 'morning':
         in_session = morning
     elif strategy == 'evening':
         in_session = evening
-    else:  # 'both' veya 'simple'
-        in_session = morning or evening
+    elif strategy == 'asia':
+        in_session = asia
+    else:  # 'both' veya 'simple' → tüm seanslar
+        in_session = morning or evening or asia
 
     if not in_session:
         return {'signal': '', 'reason': f'Seans dışı ({hour}:00 TR)'}
 
-    session_name = 'Sabah' if morning else 'Akşam'
+    session_name = 'Sabah' if morning else ('Akşam' if evening else 'Asya')
 
     if strategy == 'simple':
         return {'signal': 'buy', 'reason': f'{session_name} seansı ({hour}:00)'}

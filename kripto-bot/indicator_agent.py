@@ -36,7 +36,7 @@ UTBOT_PERIOD = '1h'
 UTBOT_MODE   = 'crossover'
 
 SMART_MIN_SCORE = 2    # 4 üzerinden en az 2 faktör
-SEANS_STRATEGY  = 'both'   # sabah (9-12) + akşam (20-23)
+SEANS_STRATEGY  = 'both'   # sabah (9-12) + akşam (20-23) + asya (04-08)
 
 INDICATORS = ['UTBOT', 'SMART', 'SEANS']
 
