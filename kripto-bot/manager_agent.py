@@ -302,6 +302,13 @@ _running = False
 _thread  = None
 
 
+def _interruptible_sleep(seconds):
+    """Sleep in 30s chunks so _running=False wakes us quickly."""
+    end = time.time() + seconds
+    while _running and time.time() < end:
+        time.sleep(30)
+
+
 def _run_loop():
     global _running
     state = _load_state()
@@ -321,7 +328,7 @@ def _run_loop():
 
         if not api_key:
             send_telegram('⚠️ CEO: deepseek_api_key config.json\'da tanımlı değil!')
-            time.sleep(3600)
+            _interruptible_sleep(3600)
             continue
 
         print(f'[CEO] Analiz başlıyor (#{state["review_count"] + 1})')
@@ -342,7 +349,7 @@ def _run_loop():
             print(f'[CEO] Analiz hata: {e}')
             send_telegram(f'⚠️ CEO hata: {e}')
 
-        time.sleep(interval * 3600)
+        _interruptible_sleep(interval * 3600)
 
 
 # ─── Public API ───────────────────────────────────────────────────────────────
@@ -353,6 +360,18 @@ def start_ceo_agent():
         return False
     _running = True
     _thread  = threading.Thread(target=_run_loop, daemon=True)
+    _thread.start()
+    return True
+
+
+def restart_ceo_agent():
+    """Restart loop after interval change — does NOT reset agent flags."""
+    global _running, _thread
+    _running = False
+    if _thread and _thread.is_alive():
+        _thread.join(timeout=2)
+    _running = True
+    _thread = threading.Thread(target=_run_loop, daemon=True)
     _thread.start()
     return True
 

@@ -14,7 +14,7 @@ from indicator_agent import (start_indicator_agent, stop_indicator_agent,
 from wyckoff_agent import (start_wyckoff_agent, stop_wyckoff_agent,
                             wyckoff_agent_status)
 from manager_agent import (start_ceo_agent, stop_ceo_agent, ceo_agent_status,
-                            trigger_ceo_review)
+                            trigger_ceo_review, restart_ceo_agent)
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -275,9 +275,12 @@ def settings():
     cfg['max_positions']        = int(request.form.get('max_positions', 6))
     if request.form.get('deepseek_api_key', '').strip():
         cfg['deepseek_api_key'] = request.form.get('deepseek_api_key', '').strip()
+    old_ceo_interval             = cfg.get('ceo_interval_hours', 1)
     cfg['ceo_interval_hours']    = int(request.form.get('ceo_interval_hours', 1))
     cfg['report_interval_hours'] = int(request.form.get('report_interval_hours', 1))
     save_config(cfg)
+    if old_ceo_interval != cfg['ceo_interval_hours'] and ceo_agent_status()['running']:
+        restart_ceo_agent()
     return jsonify({'ok': True})
 
 # ── Coin Yönetimi ────────────────────────────────
