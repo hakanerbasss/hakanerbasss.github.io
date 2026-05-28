@@ -22,7 +22,32 @@ STATE_FILE    = 'agent_state.json'
 STABLECOINS   = {
     'USDCUSDT','BUSDUSDT','TUSDUSDT','USDTUSDT','FDUSDUSDT',
     'EURUSDT','GBPUSDT','DAIUSDT','FRAXUSDT','USDPUSDT','PYUSDUSDT',
+    'UUSDT','USDEUSDT','SUSDEUSDT','CRVUSDUSDT','GHOUSDT','USDTBUSDT',
+    'AEURUSDT','EURSUSDT','IDRTUSDT','BIDRUSDT','BRLAUSDT','USDSBUSDT',
 }
+
+_stable_cache: set = set()
+
+def _build_stable_cache(client):
+    """Binance top 200'de fiyatı $0.90-$1.10 arası olan coinleri tespit eder."""
+    global _stable_cache
+    try:
+        tickers = client.get_ticker()
+        found = set()
+        for t in tickers:
+            sym = t.get('symbol', '')
+            if not sym.endswith('USDT'):
+                continue
+            price  = float(t.get('lastPrice', 0))
+            change = abs(float(t.get('priceChangePercent', 99)))
+            vol    = float(t.get('quoteVolume', 0))
+            if 0.90 <= price <= 1.10 and change < 1.0 and vol > 100_000:
+                found.add(sym)
+        _stable_cache = found
+        if found:
+            print(f'[Otonom] Stablecoin tespiti: {sorted(found)}')
+    except Exception as e:
+        print(f'[Otonom] Stablecoin tarama hatası: {e}')
 
 DEFAULT_WEIGHTS = {
     'trend': 2.5, 'momentum': 3.0, 'volume': 1.5,
@@ -117,12 +142,13 @@ def _klines(client, sym, interval='1h', limit=120):
 
 def _top_100(client):
     tickers = client.get_ticker()
+    all_stable = STABLECOINS | _stable_cache
     usdt = [t for t in tickers
             if t['symbol'].endswith('USDT')
-            and t['symbol'] not in STABLECOINS
+            and t['symbol'] not in all_stable
             and float(t.get('quoteVolume', 0)) > 1_000_000
             and float(t.get('lastPrice', 0)) > 0
-            and not (0.97 <= float(t.get('lastPrice', 0)) <= 1.03)]  # stablecoin fiyat aralığı
+            and not (0.90 <= float(t.get('lastPrice', 0)) <= 1.10)]
     usdt.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
     return [t['symbol'] for t in usdt[:100]]
 
@@ -371,6 +397,10 @@ class AutonomousAgent:
         )
 
         print('[Otonom] Başladı')
+        try:
+            _build_stable_cache(get_client())
+        except Exception:
+            pass
         threading.Thread(target=self._monitor_loop,  daemon=True).start()
         threading.Thread(target=self._scanner_loop,  daemon=True).start()
         threading.Thread(target=self._hourly_loop,   daemon=True).start()

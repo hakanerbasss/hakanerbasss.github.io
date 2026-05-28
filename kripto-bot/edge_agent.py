@@ -38,6 +38,8 @@ MIN_SCORE      = 4.5   # 0-10 — trend modda daha düşük eşik
 STABLECOINS = {
     'USDCUSDT','BUSDUSDT','TUSDUSDT','FDUSDUSDT','EURUSDT',
     'GBPUSDT','DAIUSDT','FRAXUSDT','USDPUSDT','PYUSDUSDT','USDTUSDT',
+    'UUSDT','USDEUSDT','SUSDEUSDT','CRVUSDUSDT','GHOUSDT','USDTBUSDT',
+    'AEURUSDT','EURSUSDT','IDRTUSDT','BIDRUSDT','BRLAUSDT','USDSBUSDT',
 }
 
 DEFAULT_WEIGHTS = {
@@ -88,6 +90,9 @@ def _futures_symbols(min_vol=30_000_000) -> list:
     for d in data:
         sym = d.get('symbol', '')
         if not sym.endswith('USDT') or sym in STABLECOINS:
+            continue
+        price = float(d.get('lastPrice', 0))
+        if 0.90 <= price <= 1.10:  # stablecoin fiyat aralığı
             continue
         if float(d.get('quoteVolume', 0)) > min_vol:
             out.append((sym, float(d.get('quoteVolume', 0))))
