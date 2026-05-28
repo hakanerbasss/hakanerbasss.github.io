@@ -264,9 +264,9 @@ def _position_size(balance, score, atr_pct, is_real, max_positions):
     raw_size       = balance * risk_per_trade / sl_pct_est
     multiplier = max(0.4, min(1.0, (score - 5.0) / 4.0))
     size       = raw_size * multiplier
-    max_pct  = 0.12 if is_real else 0.20
+    max_pct  = 0.05 if is_real else 0.10
     size     = min(size, balance * max_pct)
-    per_slot = balance / max_positions * 0.85
+    per_slot = balance / max_positions * 0.30
     size     = min(size, per_slot)
     return max(10.0, round(size, 2))
 
