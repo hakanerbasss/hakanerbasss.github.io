@@ -188,6 +188,43 @@ def _execute_tool_calls(tool_calls):
     return results
 
 
+# ─── Teknik Analiz Yardımcıları ──────────────────────────────────────────────
+
+def _calc_rsi(closes, period=14):
+    if len(closes) < period + 1:
+        return None
+    gains, losses = [], []
+    for i in range(1, len(closes)):
+        d = closes[i] - closes[i - 1]
+        gains.append(max(d, 0))
+        losses.append(max(-d, 0))
+    ag = sum(gains[:period]) / period
+    al = sum(losses[:period]) / period
+    for i in range(period, len(gains)):
+        ag = (ag * (period - 1) + gains[i]) / period
+        al = (al * (period - 1) + losses[i]) / period
+    if al == 0:
+        return 100.0
+    return round(100 - 100 / (1 + ag / al), 1)
+
+
+def _position_technicals(client, symbol):
+    """Her zaman dilimi için RSI, trend ve son değişim hesapla."""
+    from signal_engine import get_klines
+    result = {}
+    for tf, lookback in (('1h', 4), ('4h', 3)):
+        try:
+            closes, _, _, _ = get_klines(client, symbol, tf, limit=30)
+            sma   = sum(closes[-20:]) / min(20, len(closes))
+            rsi   = _calc_rsi(closes)
+            trend = 'YUKARI' if closes[-1] > sma else 'ASAGI'
+            chg   = round((closes[-1] - closes[-lookback]) / closes[-lookback] * 100, 2) if len(closes) >= lookback else 0
+            result[tf] = {'rsi': rsi, 'trend': trend, 'chg': chg}
+        except Exception:
+            result[tf] = None
+    return result
+
+
 # ─── Veri Toplama ─────────────────────────────────────────────────────────────
 
 def _collect_data():
@@ -241,6 +278,7 @@ def _collect_data():
                 else:
                     hours_held = '?'
 
+                tech = _position_technicals(client, sym)
                 open_pos.append({
                     'symbol':     sym,
                     'agent':      pos.get('agent', '?'),
@@ -250,6 +288,7 @@ def _collect_data():
                     'sl_pct':     pos.get('sl_pct', '?'),
                     'tp_pct':     pos.get('tp_pct', '?'),
                     'hours_held': hours_held,
+                    'tech':       tech,
                 })
             except Exception:
                 pass
@@ -299,8 +338,13 @@ def _build_prompt(data):
         "- Kârlı çalışan ajanlara dokunma.",
         "- Sadece sürekli zarar eden ajanlara müdahale et.",
         "- BTC BEAR trendinde position_mult en fazla 0.7 olsun.",
-        "- Pozisyon müdahalelerinde (sat, SL) dikkatli ol, şüphede hareketsiz kal.",
-        "- Pozisyon zaten +%8 üzerindeyse kısmi kâr almayı düşün.",
+        "- Pozisyon müdahalelerinde dikkatli ol, şüphede hareketsiz kal.",
+        "- Kısmi kâr alma için sabit eşik yok: RSI ve trendi birlikte değerlendir.",
+        "- RSI_1h > 75 VE pozisyon kârda → kısmi kâr almayı ciddi düşün.",
+        "- RSI_1h > 80 → mutlaka kısmi kâr al (fraction 0.5).",
+        "- RSI_4h > 70 VE BTC ASAGI trendi → daha agresif çık.",
+        "- Pozisyon zararda VE her iki RSI düşük VE trend ASAGI → SL sıkıştır ya da kapat.",
+        "- Pozisyon kârda VE trend YUKARI VE RSI < 65 → rahat bekle, dokunma.",
         "",
         f"=== ANLIK DURUM ===",
         f"Bakiye: ${data['balance']}",
@@ -317,6 +361,14 @@ def _build_prompt(data):
                 f"Giriş: {p['entry']} | SL: %{p['sl_pct']} | TP: %{p['tp_pct']} | "
                 f"Süredir: {p['hours_held']}s"
             )
+            tech = p.get('tech', {})
+            for tf in ('1h', '4h'):
+                t = tech.get(tf)
+                if t:
+                    rsi_str = f"RSI={t['rsi']}" if t['rsi'] else 'RSI=?'
+                    lines.append(
+                        f"   {tf}: {rsi_str} | Trend={t['trend']} | Değişim={t['chg']:+.2f}%"
+                    )
     else:
         lines.append("Açık pozisyon yok.")
 
