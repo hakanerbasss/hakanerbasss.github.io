@@ -154,6 +154,18 @@ def _exec_close_position(symbol):
         return f'{real} kapatma hata: {e}'
 
 
+def _stamp_ceo_action(symbol, action):
+    """Pozisyona CEO müdahale zaman damgası yaz."""
+    try:
+        positions = load_positions()
+        if symbol in positions:
+            positions[symbol]['ceo_last_action']      = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            positions[symbol]['ceo_last_action_type'] = action
+            save_positions(positions)
+    except Exception:
+        pass
+
+
 def _exec_partial_take_profit(symbol, fraction):
     real     = _resolve_symbol(symbol)
     fraction = max(0.1, min(0.9, float(fraction)))
@@ -162,8 +174,9 @@ def _exec_partial_take_profit(symbol, fraction):
         client = get_client()
         result = execute_sell(client, real, pct, source='CEO_KISMI_KAR')
         if result.get('ok'):
-            return f'{symbol} %{pct} satıldı (kısmi kâr)'
-        return f'{symbol} kısmi satış başarısız: {result.get("error", "?")}'
+            _stamp_ceo_action(real, 'partial_tp')
+            return f'{real} %{pct} satıldı (kısmi kâr)'
+        return f'{real} kısmi satış başarısız: {result.get("error", "?")}'
     except Exception as e:
         return f'{symbol} kısmi satış hata: {e}'
 
@@ -178,6 +191,7 @@ def _exec_set_stop_loss(symbol, pct):
         old = positions[real].get('sl_pct', '?')
         positions[real]['sl_pct'] = pct
         save_positions(positions)
+        _stamp_ceo_action(real, 'set_sl')
         return f'{real} SL: {old} → %{pct}'
     except Exception as e:
         return f'{symbol} SL güncelleme hata: {e}'
@@ -317,17 +331,31 @@ def _collect_data():
 
                 tech      = _position_technicals(client, sym)
                 pos_value = round(price * pos.get('qty', 0), 2)
+
+                # CEO'nun son müdahalesinden bu yana geçen süre
+                ceo_action_ago = None
+                ceo_action_type = pos.get('ceo_last_action_type')
+                last_act = pos.get('ceo_last_action', '')
+                if last_act:
+                    try:
+                        dt = datetime.datetime.strptime(last_act, '%Y-%m-%d %H:%M:%S')
+                        ceo_action_ago = round((datetime.datetime.now() - dt).total_seconds() / 60)
+                    except Exception:
+                        pass
+
                 open_pos.append({
-                    'symbol':     sym,
-                    'agent':      pos.get('agent', '?'),
-                    'pct':        round(pct, 2),
-                    'entry':      round(avg, 6),
-                    'price':      round(price, 6),
-                    'value':      pos_value,
-                    'sl_pct':     pos.get('sl_pct', '?'),
-                    'tp_pct':     pos.get('tp_pct', '?'),
-                    'hours_held': hours_held,
-                    'tech':       tech,
+                    'symbol':          sym,
+                    'agent':           pos.get('agent', '?'),
+                    'pct':             round(pct, 2),
+                    'entry':           round(avg, 6),
+                    'price':           round(price, 6),
+                    'value':           pos_value,
+                    'sl_pct':          pos.get('sl_pct', '?'),
+                    'tp_pct':          pos.get('tp_pct', '?'),
+                    'hours_held':      hours_held,
+                    'tech':            tech,
+                    'ceo_action_ago':  ceo_action_ago,
+                    'ceo_action_type': ceo_action_type,
                 })
             except Exception:
                 pass
@@ -390,10 +418,13 @@ def _build_prompt(data):
     if data['open_positions']:
         for p in data['open_positions']:
             icon = '🟢' if p['pct'] > 0 else '🔴'
+            ceo_note = ''
+            if p.get('ceo_action_ago') is not None:
+                ceo_note = f" | ⚠️ CEO {p['ceo_action_ago']}dk önce müdahale etti ({p['ceo_action_type']})"
             lines.append(
                 f"{icon} {p['symbol']} [{p['agent']}]: {p['pct']:+.2f}% | "
                 f"Giriş: {p['entry']} | SL: %{p['sl_pct']} | TP: %{p['tp_pct']} | "
-                f"Süredir: {p['hours_held']}s"
+                f"Süredir: {p['hours_held']}s{ceo_note}"
             )
             tech = p.get('tech', {})
             for tf in ('1h', '4h'):
