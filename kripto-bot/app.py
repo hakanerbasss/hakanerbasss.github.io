@@ -263,16 +263,19 @@ def api_stats():
 @login_required
 def settings():
     cfg = load_config()
-    cfg['api_key']          = request.form.get('api_key', '')
-    cfg['api_secret']       = request.form.get('api_secret', '')
-    cfg['real_api_key']     = request.form.get('real_api_key', '')
-    cfg['real_api_secret']  = request.form.get('real_api_secret', '')
-    cfg['testnet']          = request.form.get('testnet') == 'on'
-    cfg['webhook_secret']   = request.form.get('webhook_secret', 'secret123')
-    cfg['check_interval']   = int(request.form.get('check_interval', 45))
-    cfg['telegram_token']   = request.form.get('telegram_token', '')
-    cfg['telegram_chat_id'] = request.form.get('telegram_chat_id', '')
-    cfg['max_positions']    = int(request.form.get('max_positions', 6))
+    cfg['api_key']              = request.form.get('api_key', '')
+    cfg['api_secret']           = request.form.get('api_secret', '')
+    cfg['real_api_key']         = request.form.get('real_api_key', '')
+    cfg['real_api_secret']      = request.form.get('real_api_secret', '')
+    cfg['testnet']              = request.form.get('testnet') == 'on'
+    cfg['webhook_secret']       = request.form.get('webhook_secret', 'secret123')
+    cfg['check_interval']       = int(request.form.get('check_interval', 45))
+    cfg['telegram_token']       = request.form.get('telegram_token', '')
+    cfg['telegram_chat_id']     = request.form.get('telegram_chat_id', '')
+    cfg['max_positions']        = int(request.form.get('max_positions', 6))
+    if request.form.get('deepseek_api_key', '').strip():
+        cfg['deepseek_api_key'] = request.form.get('deepseek_api_key', '').strip()
+    cfg['ceo_interval_hours']   = int(request.form.get('ceo_interval_hours', 1))
     save_config(cfg)
     return jsonify({'ok': True})
 
