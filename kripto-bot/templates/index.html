@@ -395,6 +395,18 @@ input:focus,select:focus{border-color:#f0a500;}
       </div>
     </div>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
+      <h3 style="font-size:14px;margin-bottom:12px;color:#f0c040;">📊 Rapor Ayarları</h3>
+      <div class="form-group">
+        <label>Rapor Sıklığı</label>
+        <select id="cfgReportInterval">
+          <option value="1" {% if cfg.get('report_interval_hours',1)==1 %}selected{% endif %}>Her saat</option>
+          <option value="4" {% if cfg.get('report_interval_hours',1)==4 %}selected{% endif %}>4 saatte bir</option>
+          <option value="12" {% if cfg.get('report_interval_hours',1)==12 %}selected{% endif %}>12 saatte bir</option>
+          <option value="24" {% if cfg.get('report_interval_hours',1)==24 %}selected{% endif %}>Günde bir</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
       <h3 style="font-size:14px;margin-bottom:12px;color:#f0c040;">👔 CEO Agent</h3>
       <div class="form-group" style="margin-bottom:12px;">
         <label>DeepSeek API Key</label>
@@ -1023,6 +1035,7 @@ function saveSettings() {
   data.append('telegram_chat_id', document.getElementById('cfgTelegramChatId').value);
   data.append('deepseek_api_key', document.getElementById('cfgDeepseekKey').value);
   data.append('ceo_interval_hours', document.getElementById('cfgCeoInterval').value);
+  data.append('report_interval_hours', document.getElementById('cfgReportInterval').value);
   fetch('/settings',{method:'POST',body:data}).then(r=>r.json())
     .then(d=>{ if(d.ok) toast('Ayarlar kaydedildi'); else toast(d.error,false); });
 }

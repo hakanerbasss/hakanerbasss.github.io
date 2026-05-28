@@ -275,7 +275,8 @@ def settings():
     cfg['max_positions']        = int(request.form.get('max_positions', 6))
     if request.form.get('deepseek_api_key', '').strip():
         cfg['deepseek_api_key'] = request.form.get('deepseek_api_key', '').strip()
-    cfg['ceo_interval_hours']   = int(request.form.get('ceo_interval_hours', 1))
+    cfg['ceo_interval_hours']    = int(request.form.get('ceo_interval_hours', 1))
+    cfg['report_interval_hours'] = int(request.form.get('report_interval_hours', 1))
     save_config(cfg)
     return jsonify({'ok': True})
 
