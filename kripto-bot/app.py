@@ -13,6 +13,8 @@ from indicator_agent import (start_indicator_agent, stop_indicator_agent,
                               indicator_agent_status)
 from wyckoff_agent import (start_wyckoff_agent, stop_wyckoff_agent,
                             wyckoff_agent_status)
+from manager_agent import (start_ceo_agent, stop_ceo_agent, ceo_agent_status,
+                            trigger_ceo_review)
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -1019,4 +1021,7 @@ if __name__ == '__main__':
     start_edge_agent()        # Piyasa mekaniği: Funding/OI/CVD/Sweep (otonom)
     start_indicator_agent()   # UT Bot tarayıcı: otomatik coin seçimi (otonom)
     start_wyckoff_agent()     # Wyckoff akümülasyon: dar bant + sahte pump + kırılış
+    cfg = load_config()
+    if cfg.get('ceo_agent_enabled', False):
+        start_ceo_agent()     # CEO: ajan performans analizi + parametre optimizasyonu
     app.run(host='0.0.0.0', port=5000, debug=False)

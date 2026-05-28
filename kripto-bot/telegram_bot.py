@@ -210,6 +210,50 @@ def handle_command(cmd, chat_id):
         except Exception as e:
             send_reply(chat_id, f'❌ Hata: {e}')
 
+    elif cmd in ['/ceo ac', '/ceo_ac']:
+        cfg['ceo_agent_enabled'] = True
+        api_key = cfg.get('deepseek_api_key', '')
+        if not api_key:
+            send_reply(chat_id, '⚠️ Önce DeepSeek API key gerekli!\nconfig.json\'a deepseek_api_key ekle.')
+        else:
+            save_config(cfg)
+            from manager_agent import start_ceo_agent, _running as ceo_running
+            if not ceo_running:
+                start_ceo_agent()
+            send_reply(chat_id, '👔 CEO Agent açıldı. İlk analiz başlıyor...')
+
+    elif cmd in ['/ceo kapat', '/ceo_kapat']:
+        cfg['ceo_agent_enabled'] = False
+        save_config(cfg)
+        from manager_agent import stop_ceo_agent
+        stop_ceo_agent()
+        send_reply(chat_id, '👔 CEO Agent kapatıldı.')
+
+    elif cmd in ['/ceo analiz', '/ceo_analiz']:
+        from manager_agent import trigger_ceo_review, ceo_agent_status
+        st = ceo_agent_status()
+        if not st.get('enabled'):
+            send_reply(chat_id, '⚠️ CEO kapalı. /ceo ac ile aç.')
+        else:
+            send_reply(chat_id, '👔 Manuel analiz başlatıldı...')
+            trigger_ceo_review()
+
+    elif cmd == '/ceo':
+        from manager_agent import ceo_agent_status
+        st = ceo_agent_status()
+        icon = '🟢' if st.get('running') else '🔴'
+        send_reply(chat_id,
+            f'👔 <b>CEO Agent</b>\n'
+            f'{icon} Durum: {"Aktif" if st.get("running") else "Kapalı"}\n'
+            f'🔍 Analiz sayısı: {st.get("review_count", 0)}\n'
+            f'⏱ Son analiz: {st.get("last_review", "Henüz yok")}\n'
+            f'⏰ Aralık: her {st.get("interval_hours", 6)} saat\n\n'
+            f'Komutlar:\n'
+            f'/ceo ac — başlat\n'
+            f'/ceo kapat — durdur\n'
+            f'/ceo analiz — hemen analiz et'
+        )
+
     elif cmd == '/rapor':
         try:
             from autonomous_agent import trigger_otonom_report
@@ -247,6 +291,8 @@ def handle_command(cmd, chat_id):
 /ajanlar — Ajan durumları
 /rapor — Tüm ajanlardan anında rapor
 /rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
+/ceo — CEO Agent durumu
+/ceo ac | /ceo kapat | /ceo analiz
 /baslat — Botu başlat
 /durdur — Botu duraklat
 /restart — Botu yeniden başlat
