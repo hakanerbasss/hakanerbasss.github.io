@@ -120,23 +120,39 @@ def _exec_set_position_mult(value):
     return f'ceo_position_mult: {old} → {value}'
 
 
+def _resolve_symbol(symbol):
+    """positions.json'daki gerçek sembol anahtarını bul (0/O karışıklığına karşı)."""
+    positions = load_positions()
+    s = symbol.upper()
+    if s in positions:
+        return s
+    # 0 ↔ O karışıklığını gider
+    normalized = s.replace('0', 'O')
+    for key in positions:
+        if key.upper().replace('0', 'O') == normalized:
+            return key
+    return s  # bulunamazsa orijinali döndür
+
+
 def _exec_close_position(symbol):
+    real = _resolve_symbol(symbol)
     try:
         client = get_client()
-        result = execute_sell(client, symbol, 100, source='CEO_KAPAT')
+        result = execute_sell(client, real, 100, source='CEO_KAPAT')
         if result.get('ok'):
-            return f'{symbol} tamamen kapatıldı'
-        return f'{symbol} kapatma başarısız: {result.get("error", "?")}'
+            return f'{real} tamamen kapatıldı'
+        return f'{real} kapatma başarısız: {result.get("error", "?")}'
     except Exception as e:
-        return f'{symbol} kapatma hata: {e}'
+        return f'{real} kapatma hata: {e}'
 
 
 def _exec_partial_take_profit(symbol, fraction):
+    real     = _resolve_symbol(symbol)
     fraction = max(0.1, min(0.9, float(fraction)))
     pct      = round(fraction * 100, 1)
     try:
         client = get_client()
-        result = execute_sell(client, symbol, pct, source='CEO_KISMI_KAR')
+        result = execute_sell(client, real, pct, source='CEO_KISMI_KAR')
         if result.get('ok'):
             return f'{symbol} %{pct} satıldı (kısmi kâr)'
         return f'{symbol} kısmi satış başarısız: {result.get("error", "?")}'
@@ -145,15 +161,16 @@ def _exec_partial_take_profit(symbol, fraction):
 
 
 def _exec_set_stop_loss(symbol, pct):
-    pct = max(0.5, min(15.0, float(pct)))
+    real = _resolve_symbol(symbol)
+    pct  = max(0.5, min(15.0, float(pct)))
     try:
         positions = load_positions()
-        if symbol not in positions:
-            return f'{symbol} açık pozisyon yok'
-        old = positions[symbol].get('sl_pct', '?')
-        positions[symbol]['sl_pct'] = pct
+        if real not in positions:
+            return f'{real} açık pozisyon yok'
+        old = positions[real].get('sl_pct', '?')
+        positions[real]['sl_pct'] = pct
         save_positions(positions)
-        return f'{symbol} SL: {old} → %{pct}'
+        return f'{real} SL: {old} → %{pct}'
     except Exception as e:
         return f'{symbol} SL güncelleme hata: {e}'
 
