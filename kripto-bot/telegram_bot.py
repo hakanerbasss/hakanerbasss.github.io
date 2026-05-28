@@ -210,7 +210,7 @@ def handle_command(cmd, chat_id):
         except Exception as e:
             send_reply(chat_id, f'❌ Hata: {e}')
 
-    elif cmd in ['/ceo ac', '/ceo_ac']:
+    elif cmd in ['/ceo ac', '/ceo_ac', '/ceoon']:
         cfg['ceo_agent_enabled'] = True
         api_key = cfg.get('deepseek_api_key', '')
         if not api_key:
@@ -222,7 +222,7 @@ def handle_command(cmd, chat_id):
                 start_ceo_agent()
             send_reply(chat_id, '👔 CEO Agent açıldı. İlk analiz başlıyor...')
 
-    elif cmd in ['/ceo kapat', '/ceo_kapat']:
+    elif cmd in ['/ceo kapat', '/ceo_kapat', '/ceooff']:
         cfg['ceo_agent_enabled'] = False
         save_config(cfg)
         from manager_agent import stop_ceo_agent
@@ -240,7 +240,7 @@ def handle_command(cmd, chat_id):
             save_config(cfg)
             send_reply(chat_id, f'✅ CEO analiz aralığı: her {val}')
 
-    elif cmd in ['/ceo analiz', '/ceo_analiz']:
+    elif cmd in ['/ceo analiz', '/ceo_analiz', '/ceoanaliz']:
         from manager_agent import trigger_ceo_review, ceo_agent_status
         st = ceo_agent_status()
         if not st.get('enabled'):
