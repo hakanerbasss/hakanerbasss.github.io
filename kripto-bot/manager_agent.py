@@ -304,6 +304,8 @@ def _collect_data():
         if t.get('type') != 'sell':
             continue
         source = t.get('source', 'UNKNOWN')
+        if source.startswith('CEO_'):
+            continue  # CEO satışlarını ajan istatistiğine sayma
         agent  = ('EDGE'      if 'EDGE'      in source else
                   'INDICATOR' if 'INDICATOR' in source else
                   'WYCKOFF'   if 'WYCKOFF'   in source else 'OTONOM')

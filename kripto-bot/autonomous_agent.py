@@ -658,7 +658,9 @@ class AutonomousAgent:
             try:
                 trades  = load_trades()
                 today   = datetime.datetime.now().strftime('%Y-%m-%d')
-                recent  = [t for t in trades if t.get('type')=='sell' and t.get('time','')[:10]==today]
+                recent  = [t for t in trades if t.get('type')=='sell'
+                           and t.get('time','')[:10]==today
+                           and not t.get('source','').startswith('CEO_')]
                 if not recent: continue
                 wins     = [t for t in recent if t.get('pnl',0) > 0]
                 pnl_sum  = sum(t.get('pnl',0) for t in recent)
