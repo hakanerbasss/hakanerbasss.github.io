@@ -44,6 +44,7 @@ def _scan_candidates(client):
         and t['symbol'] not in STABLECOINS
         and float(t.get('quoteVolume', 0)) > MIN_VOLUME
         and float(t.get('lastPrice', 0)) > 0
+        and float(t.get('priceChangePercent', 0)) <= 20.0  # zirve sonrası alım engeli
     ]
     usdt.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
     return [t['symbol'] for t in usdt[:50]]

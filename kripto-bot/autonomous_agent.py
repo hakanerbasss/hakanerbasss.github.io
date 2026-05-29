@@ -148,7 +148,8 @@ def _top_100(client):
             and t['symbol'] not in all_stable
             and float(t.get('quoteVolume', 0)) > 1_000_000
             and float(t.get('lastPrice', 0)) > 0
-            and not (0.90 <= float(t.get('lastPrice', 0)) <= 1.10)]
+            and not (0.90 <= float(t.get('lastPrice', 0)) <= 1.10)
+            and float(t.get('priceChangePercent', 0)) <= 20.0]  # zirve sonrası alım engeli
     usdt.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
     return [t['symbol'] for t in usdt[:100]]
 

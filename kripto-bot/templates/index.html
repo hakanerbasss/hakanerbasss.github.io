@@ -447,18 +447,18 @@ input:focus,select:focus{border-color:#f0a500;}
         ] %}
         {% for key, cfg_key, def_val, label, desc in agent_rows %}
           {% set en = cfg.get(cfg_key, def_val) %}
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a2035;border-radius:8px;">
-            <div>
-              <span style="font-weight:bold;font-size:13px;">{{ label }}</span>
-              <span style="font-size:11px;color:#666;margin-left:6px;">{{ desc }}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+            <div style="min-width:0;">
+              <span style="font-weight:bold;font-size:13px;color:#e2e8f0;">{{ label }}</span>
+              <span style="font-size:11px;color:#94a3b8;margin-left:6px;">{{ desc }}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span id="agentStatus_{{ key }}" style="font-size:12px;color:{{ '#4ade80' if en else '#ef4444' }};">
-                {{ '🟢 Açık' if en else '🔴 Kapalı' }}
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px;">
+              <span id="agentStatus_{{ key }}" style="font-size:12px;font-weight:bold;color:{{ '#4ade80' if en else '#f87171' }};">
+                {{ '● Açık' if en else '● Kapalı' }}
               </span>
-              <button id="agentBtn_{{ key }}" class="btn btn-sm"
+              <button id="agentBtn_{{ key }}"
                 onclick="toggleAgent('{{ key }}', {{ 'false' if en else 'true' }})"
-                style="background:{{ '#dc262622' if en else '#16a34a22' }};color:{{ '#ef4444' if en else '#4ade80' }};border:1px solid {{ '#ef4444' if en else '#4ade80' }};">
+                class="btn btn-sm {{ 'btn-red' if en else 'btn-green' }}">
                 {{ 'Kapat' if en else 'Aç' }}
               </button>
             </div>
@@ -467,7 +467,7 @@ input:focus,select:focus{border-color:#f0a500;}
       </div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-sm" onclick="ceoAnalyze()"
-          style="background:#7c3aed;color:#fff;border:none;">
+          style="background:#7c3aed;color:#fff;">
           👔 CEO Manuel Analiz
         </button>
       </div>
@@ -476,7 +476,7 @@ input:focus,select:focus{border-color:#f0a500;}
     <!-- ── Bot Kontrolü ────────────────────────── -->
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
       <h3 style="font-size:14px;margin-bottom:8px;color:#f0c040;">⏯ Bot Kontrolü</h3>
-      <p style="font-size:11px;color:#666;margin-bottom:10px;">Bot sinyal alımını durdur/başlat. Yeniden Başlat, servisi yeniden yükler.</p>
+      <p style="font-size:11px;color:#94a3b8;margin-bottom:10px;">Bot sinyal alımını durdur/başlat. Yeniden Başlat, servisi yeniden yükler.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-green btn-sm" onclick="botControl('start')">▶️ Başlat</button>
         <button class="btn btn-red btn-sm" onclick="botControl('stop')">⏸ Duraklat</button>
@@ -1116,20 +1116,16 @@ function toggleAgent(agent, enable) {
     const btnEl    = document.getElementById('agentBtn_' + agent);
     if (!statusEl || !btnEl) return;
     if (d.enabled) {
-      statusEl.textContent = '🟢 Açık';
+      statusEl.textContent = '● Açık';
       statusEl.style.color = '#4ade80';
       btnEl.textContent = 'Kapat';
-      btnEl.style.background = '#dc262622';
-      btnEl.style.color = '#ef4444';
-      btnEl.style.borderColor = '#ef4444';
+      btnEl.className = 'btn btn-sm btn-red';
       btnEl.setAttribute('onclick', `toggleAgent('${agent}', false)`);
     } else {
-      statusEl.textContent = '🔴 Kapalı';
-      statusEl.style.color = '#ef4444';
+      statusEl.textContent = '● Kapalı';
+      statusEl.style.color = '#f87171';
       btnEl.textContent = 'Aç';
-      btnEl.style.background = '#16a34a22';
-      btnEl.style.color = '#4ade80';
-      btnEl.style.borderColor = '#4ade80';
+      btnEl.className = 'btn btn-sm btn-green';
       btnEl.setAttribute('onclick', `toggleAgent('${agent}', true)`);
     }
     const labels = {edge:'Edge',otonom:'Otonom',indicator:'Indicator',wyckoff:'Wyckoff',ceo:'CEO'};
