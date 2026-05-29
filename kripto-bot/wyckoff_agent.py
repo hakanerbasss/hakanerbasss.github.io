@@ -373,6 +373,16 @@ class WyckoffAgent:
                         self.state['blacklist'][sym] = time.time() + 48 * 3600
                         self._save()
 
+                # 7 gün timeout — pozisyon ne TP'ye ne SL'ye ulaşmadıysa çık
+                elif time.time() - pos.get('open_time', time.time()) > 7 * 24 * 3600:
+                    send_telegram(f'🏗⏰ <b>WYCKOFF TIMEOUT</b> {sym} %{pct:.2f} (7 gün)')
+                    res = execute_sell(client, sym, 100, source='WYCKOFF TIMEOUT', period='TIME')
+                    if res.get('ok'):
+                        pos['qty'] = 0
+                        self.state['total_pnl'] = round(
+                            self.state.get('total_pnl', 0) + res.get('pnl', 0), 2)
+                        self._save()
+
             except Exception as e:
                 print(f'[Wyckoff] Monitor {sym}: {e}')
 

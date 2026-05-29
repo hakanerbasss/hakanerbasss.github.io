@@ -188,6 +188,11 @@ class BreakoutAgent:
         self._running = True
         self._stop_event.clear()
         self.state['running'] = True
+        # Günlük başlangıç bakiyesini kaydet
+        try:
+            self.state['day_start_bal'] = get_usdt_balance(get_client())
+        except Exception:
+            pass
         _save_state(self.state)
         threading.Thread(target=self._scan_loop,    daemon=True).start()
         threading.Thread(target=self._monitor_loop, daemon=True).start()
@@ -235,6 +240,16 @@ class BreakoutAgent:
         if not _btc_ok(client):
             print('[Breakout] BTC düşüşte — tarama atlandı')
             return
+
+        # Günlük zarar limiti: -%8
+        try:
+            bal       = get_usdt_balance(client)
+            start_bal = self.state.get('day_start_bal', bal) or bal
+            if start_bal > 0 and (bal - start_bal) / start_bal * 100 < -8.0:
+                print('[Breakout] Günlük zarar limiti aşıldı, tarama durduruldu')
+                return
+        except Exception:
+            pass
 
         candidates = _detect_breakouts(client)
         scan_no    = self.state.get('scan_count', 0) + 1

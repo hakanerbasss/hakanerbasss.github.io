@@ -279,9 +279,11 @@ class IndicatorAgent:
                         save_positions(pos_now)
                         peak = price
 
-                if tp > 0 and pct >= tp * 0.4:
+                # Trail: TP'nin %50'sine ulaşınca aktif, peak'ten -%3 düşüşte çık
+                # (önceki: %40 / -%2 → çok erken çıkıyordu, net kazanç ~%0.4'e düşüyordu)
+                if tp > 0 and pct >= tp * 0.5:
                     drawdown = (price - peak) / peak * 100 if peak > 0 else 0
-                    if drawdown <= -2.0:
+                    if drawdown <= -3.0:
                         res = execute_sell(client, sym, 100,
                                            source=f'INDICATOR-{ind} TRAIL', period='TRAIL')
                         if res.get('ok'):
