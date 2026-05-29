@@ -398,7 +398,7 @@ input:focus,select:focus{border-color:#f0a500;}
     </div>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
       <h3 style="font-size:14px;margin-bottom:12px;color:#f0c040;">📊 Rapor Ayarları</h3>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:8px;">
         <label>Rapor Sıklığı</label>
         <select id="cfgReportInterval">
           <option value="1" {% if cfg.get('report_interval_hours',1)==1 %}selected{% endif %}>Her saat</option>
@@ -406,6 +406,10 @@ input:focus,select:focus{border-color:#f0a500;}
           <option value="12" {% if cfg.get('report_interval_hours',1)==12 %}selected{% endif %}>12 saatte bir</option>
           <option value="24" {% if cfg.get('report_interval_hours',1)==24 %}selected{% endif %}>Günde bir</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label>Maks. Açık Pozisyon</label>
+        <input type="number" id="cfgMaxPositions" value="{{ cfg.get('max_positions', 6) }}" min="1" max="20">
       </div>
     </div>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
@@ -428,7 +432,59 @@ input:focus,select:focus{border-color:#f0a500;}
         </select>
       </div>
     </div>
-    <button class="btn btn-blue" onclick="saveSettings()">💾 Kaydet</button>
+
+    <!-- ── Ajan Açma/Kapama ────────────────────── -->
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
+      <h3 style="font-size:14px;margin-bottom:12px;color:#f0c040;">🤖 Ajan Kontrolü</h3>
+      <div style="display:grid;gap:6px;">
+        {% set agent_rows = [
+          ('edge',      'edge_enabled',      True,  '⚡ Edge Agent',     'Funding/OI/CVD/Sweep tarama'),
+          ('otonom',    'otonom_enabled',     True,  '🤖 Otonom Ajan',    'BTC rejim + teknik analiz'),
+          ('indicator', 'indicator_enabled',  True,  '📐 Indicator',      'UT Bot otomatik tarama'),
+          ('wyckoff',   'wyckoff_enabled',    True,  '📈 Wyckoff',        'Akümülasyon deseni tespiti'),
+          ('ceo',       'ceo_agent_enabled',  False, '👔 CEO Agent',      'Risk yöneticisi (DeepSeek)'),
+        ] %}
+        {% for key, cfg_key, def_val, label, desc in agent_rows %}
+          {% set en = cfg.get(cfg_key, def_val) %}
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a2035;border-radius:8px;">
+            <div>
+              <span style="font-weight:bold;font-size:13px;">{{ label }}</span>
+              <span style="font-size:11px;color:#666;margin-left:6px;">{{ desc }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="agentStatus_{{ key }}" style="font-size:12px;color:{{ '#4ade80' if en else '#ef4444' }};">
+                {{ '🟢 Açık' if en else '🔴 Kapalı' }}
+              </span>
+              <button id="agentBtn_{{ key }}" class="btn btn-sm"
+                onclick="toggleAgent('{{ key }}', {{ 'false' if en else 'true' }})"
+                style="background:{{ '#dc262622' if en else '#16a34a22' }};color:{{ '#ef4444' if en else '#4ade80' }};border:1px solid {{ '#ef4444' if en else '#4ade80' }};">
+                {{ 'Kapat' if en else 'Aç' }}
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="ceoAnalyze()"
+          style="background:#7c3aed;color:#fff;border:none;">
+          👔 CEO Manuel Analiz
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Bot Kontrolü ────────────────────────── -->
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
+      <h3 style="font-size:14px;margin-bottom:8px;color:#f0c040;">⏯ Bot Kontrolü</h3>
+      <p style="font-size:11px;color:#666;margin-bottom:10px;">Bot sinyal alımını durdur/başlat. Yeniden Başlat, servisi yeniden yükler.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-green btn-sm" onclick="botControl('start')">▶️ Başlat</button>
+        <button class="btn btn-red btn-sm" onclick="botControl('stop')">⏸ Duraklat</button>
+        <button class="btn btn-gray btn-sm" onclick="botControl('restart')">🔄 Yeniden Başlat</button>
+        <span id="botCtrlStatus" style="font-size:12px;color:#999;"></span>
+      </div>
+    </div>
+
+    <button class="btn btn-blue" style="margin-top:16px;" onclick="saveSettings()">💾 Kaydet</button>
   </div>
   <div class="section">
     <h2>🗂 Veri Yönetimi</h2>
@@ -1043,11 +1099,60 @@ function saveSettings() {
   data.append('deepseek_api_key', document.getElementById('cfgDeepseekKey').value);
   data.append('ceo_interval_hours', document.getElementById('cfgCeoInterval').value);
   data.append('report_interval_hours', document.getElementById('cfgReportInterval').value);
+  data.append('max_positions', document.getElementById('cfgMaxPositions').value);
   fetch('/settings',{method:'POST',body:data}).then(r=>r.json())
     .then(d=>{ if(d.ok) toast('Ayarlar kaydedildi'); else toast(d.error,false); });
 }
 
+function toggleAgent(agent, enable) {
+  fetch('/api/agent_toggle', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({agent, enabled: enable})
+  }).then(r => r.json()).then(d => {
+    if (!d.ok) { toast(d.error || 'Hata', false); return; }
+    const statusEl = document.getElementById('agentStatus_' + agent);
+    const btnEl    = document.getElementById('agentBtn_' + agent);
+    if (!statusEl || !btnEl) return;
+    if (d.enabled) {
+      statusEl.textContent = '🟢 Açık';
+      statusEl.style.color = '#4ade80';
+      btnEl.textContent = 'Kapat';
+      btnEl.style.background = '#dc262622';
+      btnEl.style.color = '#ef4444';
+      btnEl.style.borderColor = '#ef4444';
+      btnEl.setAttribute('onclick', `toggleAgent('${agent}', false)`);
+    } else {
+      statusEl.textContent = '🔴 Kapalı';
+      statusEl.style.color = '#ef4444';
+      btnEl.textContent = 'Aç';
+      btnEl.style.background = '#16a34a22';
+      btnEl.style.color = '#4ade80';
+      btnEl.style.borderColor = '#4ade80';
+      btnEl.setAttribute('onclick', `toggleAgent('${agent}', true)`);
+    }
+    const labels = {edge:'Edge',otonom:'Otonom',indicator:'Indicator',wyckoff:'Wyckoff',ceo:'CEO'};
+    toast((d.enabled ? '🟢 ' : '🔴 ') + (labels[agent]||agent) + (d.enabled ? ' açıldı' : ' kapatıldı'));
+  });
+}
 
+function botControl(action) {
+  fetch('/api/bot_control', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action})
+  }).then(r => r.json()).then(d => {
+    const el = document.getElementById('botCtrlStatus');
+    if (el) el.textContent = d.msg || d.error || '';
+    if (d.ok) toast(d.msg); else toast(d.error, false);
+  });
+}
+
+function ceoAnalyze() {
+  fetch('/api/ceo_analyze_now', {method:'POST'})
+    .then(r => r.json())
+    .then(d => { if(d.ok) toast(d.msg); else toast(d.error, false); });
+}
 
 function drawChart(candles, trails, signals) {
   const canvas = document.getElementById('chartCanvas');

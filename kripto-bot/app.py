@@ -1037,6 +1037,78 @@ def edge_stop():
 def edge_status_api():
     return jsonify(edge_agent_status())
 
+# ── Ajan Aç/Kapat API ────────────────────────────
+@app.route('/api/agent_toggle', methods=['POST'])
+@login_required
+def api_agent_toggle():
+    data = request.get_json()
+    agent   = data.get('agent', '')
+    enabled = bool(data.get('enabled', True))
+
+    KEY_MAP = {
+        'edge':      'edge_enabled',
+        'otonom':    'otonom_enabled',
+        'indicator': 'indicator_enabled',
+        'wyckoff':   'wyckoff_enabled',
+        'ceo':       'ceo_agent_enabled',
+    }
+    if agent not in KEY_MAP:
+        return jsonify({'ok': False, 'error': 'Bilinmeyen ajan'})
+
+    cfg = load_config()
+    cfg[KEY_MAP[agent]] = enabled
+    save_config(cfg)
+
+    if agent == 'edge':
+        if enabled: start_edge_agent()
+        else: stop_edge_agent()
+    elif agent == 'otonom':
+        if enabled: start_autonomous_agent()
+        else: stop_autonomous_agent()
+    elif agent == 'indicator':
+        if enabled: start_indicator_agent()
+        else: stop_indicator_agent()
+    elif agent == 'wyckoff':
+        if enabled: start_wyckoff_agent()
+        else: stop_wyckoff_agent()
+    elif agent == 'ceo':
+        if enabled: start_ceo_agent()
+        else: stop_ceo_agent()
+
+    return jsonify({'ok': True, 'agent': agent, 'enabled': enabled})
+
+# ── Bot Kontrolü API ──────────────────────────────
+@app.route('/api/bot_control', methods=['POST'])
+@login_required
+def api_bot_control():
+    data   = request.get_json()
+    action = data.get('action', '')
+    cfg    = load_config()
+
+    if action == 'start':
+        cfg['bot_paused'] = False
+        save_config(cfg)
+        return jsonify({'ok': True, 'msg': '▶️ Bot başlatıldı'})
+    elif action == 'stop':
+        cfg['bot_paused'] = True
+        save_config(cfg)
+        return jsonify({'ok': True, 'msg': '⏸ Bot duraklatıldı'})
+    elif action == 'restart':
+        import subprocess
+        subprocess.Popen(['systemctl', 'restart', 'kripto-bot'])
+        return jsonify({'ok': True, 'msg': '🔄 Bot yeniden başlatılıyor...'})
+    return jsonify({'ok': False, 'error': 'Bilinmeyen eylem'})
+
+# ── CEO Manuel Analiz API ─────────────────────────
+@app.route('/api/ceo_analyze_now', methods=['POST'])
+@login_required
+def api_ceo_analyze_now():
+    st = ceo_agent_status()
+    if not st.get('enabled'):
+        return jsonify({'ok': False, 'error': 'CEO kapalı. Önce açın.'})
+    trigger_ceo_review()
+    return jsonify({'ok': True, 'msg': '👔 CEO analizi başlatıldı'})
+
 # ── Başlat ───────────────────────────────────────
 if __name__ == '__main__':
     start_engine()            # UT Bot + Seans + Smart (manuel coinler)
