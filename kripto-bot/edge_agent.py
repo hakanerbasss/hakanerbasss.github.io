@@ -558,17 +558,12 @@ class EdgeAgent:
 
     def _do_buy(self, client, symbol, result, cfg):
         is_real  = not cfg.get('testnet', True)
-        try:
-            bal = get_usdt_balance(client)
-        except Exception:
-            bal = 100.0
 
-        # Pozisyon büyüklüğü: skor bazlı Kelly
-        risk = 0.015 if is_real else 0.025
-        score_mult = max(0.5, min(1.0, (result['score'] - 5.0) / 4.0))
-        ceo_mult   = cfg.get('ceo_position_mult', 1.0)
-        usdt = round(bal * risk * score_mult * ceo_mult, 2)
-        usdt = max(5.0, min(usdt, bal * (0.05 if is_real else 0.10)))
+        # Pozisyon büyüklüğü: ORTAK skor-bazlı kural (tüm ajanlarda aynı)
+        from bot import get_total_equity, position_size_by_score
+        equity   = get_total_equity(client)
+        ceo_mult = cfg.get('ceo_position_mult', 1.0)
+        usdt = position_size_by_score(equity, result['score'], mult=ceo_mult)
 
         positions = load_positions()
         if len([p for p in positions.values() if p.get('qty', 0) > 0]) >= MAX_POSITIONS:

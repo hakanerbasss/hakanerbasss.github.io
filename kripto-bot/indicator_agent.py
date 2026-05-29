@@ -178,11 +178,11 @@ class IndicatorAgent:
                 continue
 
             indicator, reason = sig_result
-            is_real = not cfg.get('testnet', True)
-            usdt    = max(10.0, min(
-                round(bal * (0.02 if is_real else 0.03), 2),
-                bal * (0.05 if is_real else 0.10),
-            ))
+            # ORTAK skor-bazlı boyutlama. UT Bot'un skoru yok → nötr 6.0 (~%1.2)
+            from bot import get_total_equity, position_size_by_score
+            equity   = get_total_equity(client)
+            ceo_mult = cfg.get('ceo_position_mult', 1.0)
+            usdt = position_size_by_score(equity, 6.0, mult=ceo_mult)
             source = f'INDICATOR-{indicator}'
             send_telegram(
                 f'📐 <b>INDICATOR ALIM</b>\n'

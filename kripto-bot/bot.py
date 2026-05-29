@@ -121,6 +121,45 @@ def get_usdt_balance(client):
     except:
         return 0.0
 
+
+def get_total_equity(client):
+    """Serbest USDT + tüm açık pozisyonların güncel piyasa değeri.
+    Pozisyon boyutlama bunun üzerinden yapılır (cash daraldıkça boyut da
+    daralmasın, gerçek sermaye baz alınsın)."""
+    try:
+        total = get_usdt_balance(client)
+    except Exception:
+        total = 0.0
+    try:
+        for sym, pos in load_positions().items():
+            q = pos.get('qty', 0)
+            if q > 0:
+                try:
+                    total += q * get_price(client, sym)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return total
+
+
+def position_size_by_score(equity, score, mult=1.0,
+                           lo_pct=0.01, hi_pct=0.03, min_usd=10.0):
+    """Skora göre değişken pozisyon boyutu — tüm ajanlar için ORTAK kural.
+    Güçlü sinyalde büyük, zayıfta küçük:
+       skor 5  → %1   (lo_pct)
+       skor 7.5→ %2
+       skor 10 → %3   (hi_pct)
+    Skor 0–10 ölçeğinde beklenir; skoru olmayan ajan (UT Bot) ~6 geçer.
+    `mult`: CEO pozisyon çarpanı (bear'de küçültür)."""
+    try:
+        frac = max(0.0, min(1.0, (float(score) - 5.0) / 5.0))
+    except Exception:
+        frac = 0.0
+    pct  = lo_pct + (hi_pct - lo_pct) * frac
+    size = equity * pct * max(0.0, float(mult))
+    return max(min_usd, round(size, 2))
+
 # ── Portfolio ────────────────────────────────────
 def get_portfolio_summary(client):
     positions = load_positions()

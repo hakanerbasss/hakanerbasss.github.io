@@ -297,15 +297,11 @@ class WyckoffAgent:
             self._do_buy(client, best_sym, best_result, cfg)
 
     def _do_buy(self, client, sym, result, cfg):
-        is_real = not cfg.get('testnet', True)
-        try:
-            bal = get_usdt_balance(client)
-        except Exception:
-            bal = 100.0
-
-        risk = 0.03 if is_real else 0.05
-        usdt = round(bal * risk, 2)
-        usdt = max(10.0, min(usdt, bal * (0.05 if is_real else 0.10)))
+        # ORTAK skor-bazlı boyutlama (tüm ajanlarda aynı kural)
+        from bot import get_total_equity, position_size_by_score
+        equity   = get_total_equity(client)
+        ceo_mult = cfg.get('ceo_position_mult', 1.0)
+        usdt = position_size_by_score(equity, result.get('score', 6.0), mult=ceo_mult)
 
         send_telegram(
             f'🏗 <b>WYCKOFF ALIM SİNYALİ</b>\n'

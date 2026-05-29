@@ -511,9 +511,10 @@ class AutonomousAgent:
                     if best_sym:
                         atr_pct  = best_sc.get('atr_pct', 2.0)
                         ceo_mult = cfg.get('ceo_position_mult', 1.0)
-                        amount   = _position_size(balance, best_sc['total'],
-                                                  atr_pct, is_real, self.MAX_POSITIONS)
-                        amount   = round(amount * ceo_mult, 2)
+                        # ORTAK skor-bazlı boyutlama (tüm ajanlarda aynı kural)
+                        from bot import get_total_equity, position_size_by_score
+                        equity   = get_total_equity(client)
+                        amount   = position_size_by_score(equity, best_sc['total'], mult=ceo_mult)
                         if amount <= balance * 0.95:
                             res = execute_buy(client, best_sym, amount,
                                               source='OTONOM', period='Ajan')
