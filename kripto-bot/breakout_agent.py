@@ -198,6 +198,19 @@ class BreakoutAgent:
         threading.Thread(target=self._monitor_loop, daemon=True).start()
         threading.Thread(target=self._report_loop,  daemon=True).start()
         print('[Breakout] Agent başladı')
+        cfg  = load_config()
+        mode = '🧪 TESTNET' if cfg.get('testnet', True) else '🔴 GERÇEK'
+        bal  = self.state.get('day_start_bal', 0)
+        send_telegram(
+            f'{mode} <b>Breakout Agent AKTİF</b>\n'
+            f'━━━━━━━━━━━━━━\n'
+            f'💰 Bakiye: ${bal:.2f}\n'
+            f'📡 Yöntem: Hacim spike + fiyat kırılımı (2s)\n'
+            f'⚡ Tarama: {SCAN_INTERVAL//60}dk | Takip: {MONITOR_SEC}s\n'
+            f'🎯 Min Hareket: +%{MIN_PRICE_CHG_2H} | Vol Spike: {MIN_VOL_SPIKE}x\n'
+            f'🔒 Trail: -%{TRAIL_DISTANCE_PCT} (peak\'ten) | Stop: -%{HARD_STOP_PCT}\n'
+            f'⚠️ Sabit TP YOK — trailing ile çıkış'
+        )
         return True
 
     def stop(self):
@@ -403,15 +416,17 @@ class BreakoutAgent:
     # ── Rapor Döngüsü ────────────────────────────────────────────────────────
 
     def _report_loop(self):
-        """Periyodik durum raporu."""
+        """Periyodik durum raporu — her saat (report_interval_hours ayarına uyar)."""
+        import datetime as _dt
+        now = _dt.datetime.now()
+        self._stop_event.wait(max(0, (60 - now.minute) * 60 - now.second))
         while not self._stop_event.is_set():
-            self._stop_event.wait(3600)
-            if self._stop_event.is_set():
-                break
             try:
                 self._send_report()
             except Exception as e:
                 print(f'[Breakout] Rapor hatası: {e}')
+            interval = int(load_config().get('report_interval_hours', 1))
+            self._stop_event.wait(interval * 3600)
 
     def _send_report(self):
         cfg = load_config()
@@ -425,28 +440,40 @@ class BreakoutAgent:
             if p.get('agent') == 'BREAKOUT' and p.get('qty', 0) > 0
         ]
 
-        if not open_pos:
-            return
+        try:
+            bal = get_usdt_balance(client)
+        except Exception:
+            bal = 0
 
-        lines = ['🚀 <b>Breakout Agent Raporu</b>']
+        lines = [
+            f'🚀 <b>Breakout Agent Raporu</b>\n'
+            f'━━━━━━━━━━━━━━\n'
+            f'💰 Bakiye: ${bal:.2f}\n'
+            f'📦 Açık: {len(open_pos)}/{MAX_BREAKOUT_POS} | 🔍 Tarama: {self.state.get("scan_count",0)}x'
+        ]
+
         total_pnl = 0.0
         for sym, pos in open_pos:
             try:
-                price   = get_price(client, sym)
-                entry   = pos.get('avg_price', price)
-                peak    = pos.get('peak_price', entry)
-                pnl_pct = (price - entry) / entry * 100
+                price    = get_price(client, sym)
+                entry    = pos.get('avg_price', price)
+                peak     = pos.get('peak_price', entry)
+                pnl_pct  = (price - entry) / entry * 100
                 peak_pct = (peak - entry) / entry * 100
                 trail_ok = '🔒' if pos.get('trail_active') else '⏳'
+                icon     = '🟢' if pnl_pct >= 0 else '🔴'
                 lines.append(
-                    f'{trail_ok} {sym}: {"+"+str(round(pnl_pct,1)) if pnl_pct>=0 else str(round(pnl_pct,1))}% '
+                    f'{icon} {trail_ok} {sym}: %{pnl_pct:+.2f} '
                     f'(peak +{round(peak_pct,1)}%)'
                 )
                 total_pnl += (price - entry) * pos.get('qty', 0)
             except Exception:
                 pass
 
-        lines.append(f'─────\n📊 Tarama: {self.state.get("scan_count",0)}x')
+        if not open_pos:
+            lines.append('📭 Açık pozisyon yok — kırılım bekleniyor')
+
+        lines.append(f'━━━━━━━━━━━━━━\n💹 Toplam PnL: ${total_pnl:+.2f}')
         send_telegram('\n'.join(lines))
 
 
