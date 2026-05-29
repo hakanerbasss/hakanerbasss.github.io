@@ -172,14 +172,26 @@ def _exec_partial_take_profit(symbol, fraction):
     # Hard cooldown: CEO interval dolmadan aynı pozisyona tekrar basma
     try:
         positions = load_positions()
-        last_act  = (positions.get(real) or {}).get('ceo_last_action', '')
+        pos       = positions.get(real) or {}
+
+        # 1. Pozisyon yaşı: en az 2 saat olmadan CEO müdahale edemez
+        buy_time = pos.get('buy_time', '')
+        if buy_time:
+            dt_buy   = datetime.datetime.strptime(buy_time, '%Y-%m-%d %H:%M:%S')
+            age_h    = (datetime.datetime.now() - dt_buy).total_seconds() / 3600
+            if age_h < 2:
+                print(f'[CEO] {real} partial_tp atlandı (pozisyon çok yeni: {age_h:.1f}s)')
+                return None
+
+        # 2. CEO son müdahalesi: interval dolmadan tekrar basma
+        last_act = pos.get('ceo_last_action', '')
         if last_act:
-            dt          = datetime.datetime.strptime(last_act, '%Y-%m-%d %H:%M:%S')
-            mins_ago    = (datetime.datetime.now() - dt).total_seconds() / 60
-            cooldown    = load_config().get('ceo_interval_hours', 1) * 60
+            dt_act   = datetime.datetime.strptime(last_act, '%Y-%m-%d %H:%M:%S')
+            mins_ago = (datetime.datetime.now() - dt_act).total_seconds() / 60
+            cooldown = load_config().get('ceo_interval_hours', 1) * 60
             if mins_ago < cooldown:
                 print(f'[CEO] {real} partial_tp cooldown ({int(mins_ago)}dk < {int(cooldown)}dk)')
-                return None  # sessizce atla
+                return None
     except Exception:
         pass
 
