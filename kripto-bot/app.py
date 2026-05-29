@@ -13,6 +13,8 @@ from indicator_agent import (start_indicator_agent, stop_indicator_agent,
                               indicator_agent_status)
 from wyckoff_agent import (start_wyckoff_agent, stop_wyckoff_agent,
                             wyckoff_agent_status)
+from breakout_agent import (start_breakout_agent, stop_breakout_agent,
+                             breakout_agent_status)
 from manager_agent import (start_ceo_agent, stop_ceo_agent, ceo_agent_status,
                             trigger_ceo_review, restart_ceo_agent)
 
@@ -1050,6 +1052,7 @@ def api_agent_toggle():
         'otonom':    'otonom_enabled',
         'indicator': 'indicator_enabled',
         'wyckoff':   'wyckoff_enabled',
+        'breakout':  'breakout_enabled',
         'ceo':       'ceo_agent_enabled',
     }
     if agent not in KEY_MAP:
@@ -1071,6 +1074,9 @@ def api_agent_toggle():
     elif agent == 'wyckoff':
         if enabled: start_wyckoff_agent()
         else: stop_wyckoff_agent()
+    elif agent == 'breakout':
+        if enabled: start_breakout_agent()
+        else: stop_breakout_agent()
     elif agent == 'ceo':
         if enabled: start_ceo_agent()
         else: stop_ceo_agent()
@@ -1117,6 +1123,7 @@ if __name__ == '__main__':
     start_edge_agent()        # Piyasa mekaniği: Funding/OI/CVD/Sweep (otonom)
     start_indicator_agent()   # UT Bot tarayıcı: otomatik coin seçimi (otonom)
     start_wyckoff_agent()     # Wyckoff akümülasyon: dar bant + sahte pump + kırılış
+    start_breakout_agent()    # Momentum kırılım: hacim spike + trailing stop (sabit TP yok)
     cfg = load_config()
     if cfg.get('ceo_agent_enabled', False):
         start_ceo_agent()     # CEO: ajan performans analizi + parametre optimizasyonu

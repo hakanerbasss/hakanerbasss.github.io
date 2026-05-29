@@ -271,9 +271,11 @@ def handle_command(cmd, chat_id):
             from edge_agent import trigger_edge_report
             from indicator_agent import trigger_indicator_report
             from wyckoff_agent import trigger_wyckoff_report
+            from breakout_agent import trigger_breakout_report
             send_reply(chat_id, '📋 Raporlar hazırlanıyor...')
             for fn in [trigger_otonom_report, trigger_edge_report,
-                       trigger_indicator_report, trigger_wyckoff_report]:
+                       trigger_indicator_report, trigger_wyckoff_report,
+                       trigger_breakout_report]:
                 try:
                     fn()
                 except Exception:
@@ -296,6 +298,7 @@ def handle_command(cmd, chat_id):
 
     elif cmd in ('/edgeon', '/edgeoff', '/otonomон', '/otonomoff',
                  '/indicatoron', '/indicatoroff', '/wyckoffon', '/wyckoffoff',
+                 '/breakouton', '/breakoutoff',
                  '/otonomon'):
         TOGGLE = {
             '/edgeon':       ('edge_enabled',      True),
@@ -306,6 +309,8 @@ def handle_command(cmd, chat_id):
             '/indicatoroff': ('indicator_enabled', False),
             '/wyckoffon':    ('wyckoff_enabled',   True),
             '/wyckoffoff':   ('wyckoff_enabled',   False),
+            '/breakouton':   ('breakout_enabled',  True),
+            '/breakoutoff':  ('breakout_enabled',  False),
         }
         key, enabled = TOGGLE[cmd]
         name = key.replace('_enabled', '')
@@ -321,7 +326,7 @@ def handle_command(cmd, chat_id):
 /durum — Genel durum özeti
 /pozisyonlar — Açık pozisyonlar
 /ajanlar — Ajan durumları
-/edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff
+/edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff /breakouton /breakoutoff
 /rapor — Tüm ajanlardan anında rapor
 /rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
 /ceoon /ceooff /ceoanaliz

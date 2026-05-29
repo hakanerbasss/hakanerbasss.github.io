@@ -1,0 +1,474 @@
+"""
+Breakout Agent — Momentum Kırılım Tespiti
+──────────────────────────────────────────
+Diğer ajanlar hacme göre sıralar → HEIUSDT +141%, ALLOUSDT +113% kaçırılır.
+
+Bu ajan tam tersini yapar:
+  1. Tüm USDT spot çiftlerini tara (hacim sıralaması yok)
+  2. Son 2 saatte fiyat %4+ hareket edenleri bul
+  3. Hacim spike > 2x olmalı (sahte hareket filtresi)
+  4. SATIN AL
+
+Çıkış — Sabit TP KESİNLİKLE YOK:
+  • Hard stop:  -%5   (yanlış kırılım koruması)
+  • Trail:       +%3 kazanında aktif, peak'ten -%15 takip
+  • Sonuç: %141 hareket → bot %120+ yakalar, %8'de erken çıkmaz
+"""
+
+import time, datetime, threading, json, os
+from collections import deque
+from binance.client import Client as BC
+from bot import (load_config, get_client, execute_buy, execute_sell,
+                 load_positions, save_positions, load_trades, get_price,
+                 send_telegram, get_usdt_balance, get_total_equity,
+                 position_size_by_score)
+
+STATE_FILE = 'breakout_state.json'
+
+STABLECOINS = {
+    'USDCUSDT','BUSDUSDT','TUSDUSDT','USDTUSDT','FDUSDUSDT',
+    'EURUSDT','GBPUSDT','DAIUSDT','FRAXUSDT','USDPUSDT','PYUSDUSDT',
+    'UUSDT','USDEUSDT','SUSDEUSDT','CRVUSDUSDT','GHOUSDT','USDTBUSDT',
+    'AEURUSDT','EURSUSDT','IDRTUSDT','BIDRUSDT','BRLAUSDT','USDSBUSDT',
+}
+
+SCAN_INTERVAL    = 600      # saniye (10 dakika)
+MONITOR_SEC      = 5        # saniye
+MIN_VOL_24H      = 500_000  # $500K minimum 24h hacim (illiquid filtre)
+MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
+
+# Kırılım kriterleri
+MIN_PRICE_CHG_2H = 4.0   # son 2 saatte min %4 fiyat hareketi
+MIN_VOL_SPIKE    = 2.0   # son 2 saatlik hacim, saatlik ortalamanın 2x'i
+
+# Çıkış parametreleri — SABİT TP YOK
+TRAIL_ACTIVATE_PCT = 3.0   # bu kadar kazanç → trailing başlasın
+TRAIL_DISTANCE_PCT = 15.0  # peak'ten bu kadar düşerse çık
+HARD_STOP_PCT      = 5.0   # bu kadar zarar → anında çık
+
+
+# ─── Yardımcı Fonksiyonlar ────────────────────────────────────────────────────
+
+def _load_state():
+    try:
+        with open(STATE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {'scan_count': 0, 'running': False}
+
+
+def _save_state(state):
+    with open(STATE_FILE, 'w') as f:
+        json.dump(state, f, indent=2)
+
+
+def _klines_with_vol(client, symbol, limit=26):
+    """1h kline: close + quoteVolume (USDT bazlı). Son açık mumu çıkarır."""
+    kl = client.get_klines(
+        symbol=symbol,
+        interval=BC.KLINE_INTERVAL_1HOUR,
+        limit=limit + 1
+    )
+    kl = kl[:-1]  # son açık mumu çıkar
+    closes = [float(k[4]) for k in kl]
+    vols   = [float(k[7]) for k in kl]  # quoteAssetVolume (USDT)
+    return closes, vols
+
+
+def _btc_ok(client):
+    """BTC son 3 saatte negatif değilse True (hafif filtre, genişletildi)."""
+    try:
+        kl = client.get_klines(symbol='BTCUSDT', interval=BC.KLINE_INTERVAL_1HOUR, limit=5)
+        kl = kl[:-1]
+        closes = [float(k[4]) for k in kl]
+        # Son mum, 3 mum öncesinden yüksekse ok
+        return closes[-1] >= closes[-4] * 0.97
+    except Exception:
+        return True
+
+
+def _detect_breakouts(client):
+    """
+    2 aşamalı tarama:
+    Aşama 1 — Ticker: 24h değişim > MIN_PRICE_CHG_2H olan top-50 aday
+    Aşama 2 — Kline:  son 2 saatin hareketi ve hacim spike kontrolü
+    """
+    try:
+        tickers = client.get_ticker()
+    except Exception as e:
+        print(f'[Breakout] Ticker hatası: {e}')
+        return []
+
+    # Aşama 1: Hızlı ön filtre
+    candidates = []
+    for t in tickers:
+        sym = t.get('symbol', '')
+        if not sym.endswith('USDT') or sym in STABLECOINS:
+            continue
+        try:
+            price = float(t.get('lastPrice', 0))
+            vol24 = float(t.get('quoteVolume', 0))
+            chg24 = float(t.get('priceChangePercent', 0))
+        except (ValueError, TypeError):
+            continue
+        if 0.85 <= price <= 1.15:   # stablecoin fiyat aralığı
+            continue
+        if vol24 < MIN_VOL_24H:     # çok illiquid
+            continue
+        if chg24 < MIN_PRICE_CHG_2H:
+            continue
+        candidates.append({'symbol': sym, 'price': price, 'chg24': chg24, 'vol24': vol24})
+
+    # En çok yükselenden başlayarak ilk 50 aday
+    candidates.sort(key=lambda x: x['chg24'], reverse=True)
+    candidates = candidates[:50]
+
+    # Aşama 2: Kline ile son 2 saatlik hacim spike kontrolü
+    results = []
+    for c in candidates:
+        sym = c['symbol']
+        try:
+            closes, vols = _klines_with_vol(client, sym, limit=24)
+            if len(closes) < 6 or len(vols) < 6:
+                continue
+
+            # Son 2 saatin ortalama saatlik hacmi
+            recent_avg_vol = (vols[-1] + vols[-2]) / 2
+            # Önceki 20 saatin ortalama saatlik hacmi
+            baseline_vol   = sum(vols[:-2]) / max(len(vols[:-2]), 1)
+
+            if baseline_vol <= 0:
+                continue
+
+            vol_spike = recent_avg_vol / baseline_vol
+
+            # Son 2 saatin fiyat hareketi (kapanış bazlı)
+            price_2h_ago = closes[-3]
+            price_now    = closes[-1]
+            pct_2h       = (price_now - price_2h_ago) / price_2h_ago * 100
+
+            if pct_2h < MIN_PRICE_CHG_2H:
+                continue
+            if vol_spike < MIN_VOL_SPIKE:
+                continue
+
+            # Skor: kırılım gücü (0-10)
+            # pct_2h=4% vol=2x → skor~5  |  pct_2h=10% vol=5x → skor~9
+            price_component = min(5.0, pct_2h / 4.0 * 2.0)
+            vol_component   = min(5.0, (vol_spike - 1.0) / 3.0 * 5.0)
+            score           = round(price_component + vol_component, 2)
+
+            results.append({
+                'symbol':    sym,
+                'price':     c['price'],
+                'pct_2h':    round(pct_2h, 2),
+                'vol_spike': round(vol_spike, 2),
+                'vol24':     c['vol24'],
+                'score':     score,
+            })
+        except Exception:
+            continue
+
+    results.sort(key=lambda x: x['score'], reverse=True)
+    return results
+
+
+# ─── Agent Sınıfı ─────────────────────────────────────────────────────────────
+
+class BreakoutAgent:
+    def __init__(self):
+        self.state       = _load_state()
+        self._running    = False
+        self._stop_event = threading.Event()
+        self.scan_log    = deque(maxlen=30)
+
+    def start(self):
+        if self._running:
+            return False
+        self._running = True
+        self._stop_event.clear()
+        self.state['running'] = True
+        _save_state(self.state)
+        threading.Thread(target=self._scan_loop,    daemon=True).start()
+        threading.Thread(target=self._monitor_loop, daemon=True).start()
+        threading.Thread(target=self._report_loop,  daemon=True).start()
+        print('[Breakout] Agent başladı')
+        return True
+
+    def stop(self):
+        self._running = False
+        self._stop_event.set()
+        self.state['running'] = False
+        _save_state(self.state)
+        print('[Breakout] Agent durduruldu')
+
+    # ── Tarama Döngüsü ────────────────────────────────────────────────────────
+
+    def _scan_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                self._scan()
+            except Exception as e:
+                print(f'[Breakout] Tarama hatası: {e}')
+            self._stop_event.wait(SCAN_INTERVAL)
+
+    def _scan(self):
+        from manager_agent import ceo_flag
+        cfg = load_config()
+        if not ceo_flag(cfg, 'breakout_enabled', True):
+            print('[Breakout] Kapalı (breakout_enabled=false)')
+            return
+        if cfg.get('bot_paused'):
+            return
+
+        client    = get_client()
+        positions = load_positions()
+
+        breakout_open = [
+            s for s, p in positions.items()
+            if p.get('agent') == 'BREAKOUT' and p.get('qty', 0) > 0
+        ]
+        if len(breakout_open) >= MAX_BREAKOUT_POS:
+            print(f'[Breakout] Maks pozisyon ({MAX_BREAKOUT_POS}) doldu')
+            return
+
+        if not _btc_ok(client):
+            print('[Breakout] BTC düşüşte — tarama atlandı')
+            return
+
+        candidates = _detect_breakouts(client)
+        scan_no    = self.state.get('scan_count', 0) + 1
+        self.state['scan_count'] = scan_no
+        print(f'[Breakout] Tarama #{scan_no}: {len(candidates)} kırılım adayı')
+
+        max_total = cfg.get('max_positions', 6)
+        already_open = set(positions.keys())
+
+        for r in candidates:
+            sym = r['symbol']
+            if sym in already_open:
+                continue
+            total_open = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
+            if total_open >= max_total or len(breakout_open) >= MAX_BREAKOUT_POS:
+                break
+
+            log = (f"{sym} +{r['pct_2h']}% "
+                   f"vol={r['vol_spike']}x "
+                   f"score={r['score']}")
+            self.scan_log.appendleft(log)
+            print(f'[Breakout] ✅ {log}')
+            self._do_buy(client, sym, r, cfg)
+            breakout_open.append(sym)
+            already_open.add(sym)
+            positions = load_positions()
+
+        _save_state(self.state)
+
+    def _do_buy(self, client, symbol, result, cfg):
+        equity   = get_total_equity(client)
+        ceo_mult = cfg.get('ceo_position_mult', 1.0)
+        usdt     = position_size_by_score(equity, result['score'], mult=ceo_mult)
+
+        res = execute_buy(client, symbol, usdt, source='BREAKOUT', period='1h')
+        if not res.get('ok'):
+            print(f'[Breakout] Alım başarısız: {symbol} — {res.get("error")}')
+            return
+
+        # Pozisyona trailing meta verisi ekle
+        positions = load_positions()
+        if symbol in positions:
+            pos = positions[symbol]
+            pos['agent']        = 'BREAKOUT'
+            pos['peak_price']   = pos.get('avg_price', result['price'])
+            pos['trail_active'] = False
+            save_positions(positions)
+
+        send_telegram(
+            f'🚀 <b>BREAKOUT ALIM</b>\n'
+            f'💎 {symbol}\n'
+            f'📈 Son 2s hareket: +{result["pct_2h"]}%\n'
+            f'📊 Hacim spike: {result["vol_spike"]}x\n'
+            f'🎯 Skor: {result["score"]}/10\n'
+            f'💵 Tutar: ${usdt}\n'
+            f'🔒 Trail -%{TRAIL_DISTANCE_PCT} | Stop -%{HARD_STOP_PCT}\n'
+            f'⚠️ Sabit TP YOK — trailing stop ile çıkış\n'
+            f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
+        )
+
+    # ── İzleme Döngüsü (Trailing Stop) ───────────────────────────────────────
+
+    def _monitor_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                self._monitor()
+            except Exception as e:
+                print(f'[Breakout] Monitor hatası: {e}')
+            self._stop_event.wait(MONITOR_SEC)
+
+    def _monitor(self):
+        client    = get_client()
+        positions = load_positions()
+        changed   = False
+
+        for sym, pos in list(positions.items()):
+            if pos.get('agent') != 'BREAKOUT':
+                continue
+            qty = pos.get('qty', 0)
+            if qty <= 0:
+                continue
+
+            try:
+                price = get_price(client, sym)
+            except Exception:
+                continue
+
+            entry       = pos.get('avg_price', price)
+            if entry <= 0:
+                continue
+
+            peak         = pos.get('peak_price', entry)
+            trail_active = pos.get('trail_active', False)
+            pnl_pct      = (price - entry) / entry * 100
+
+            # Peak güncelle ve kaydet
+            if price > peak:
+                peak = price
+                pos['peak_price'] = peak
+                changed = True
+
+            # Trailing stop'u aktif et
+            if not trail_active and pnl_pct >= TRAIL_ACTIVATE_PCT:
+                trail_active = True
+                pos['trail_active'] = True
+                changed = True
+                peak_pct = round((peak - entry) / entry * 100, 1)
+                print(f'[Breakout] {sym} trailing aktif '
+                      f'(pnl={pnl_pct:.1f}% peak=+{peak_pct}%)')
+
+            reason = None
+
+            # 1. Hard stop: -%5
+            if pnl_pct <= -HARD_STOP_PCT:
+                reason = f'HARD STOP ({pnl_pct:.1f}%)'
+
+            # 2. Trailing stop: peak'ten -%15 düşüş
+            elif trail_active:
+                trail_price = peak * (1 - TRAIL_DISTANCE_PCT / 100)
+                if price <= trail_price:
+                    peak_pct = round((peak - entry) / entry * 100, 1)
+                    reason = (f'TRAIL STOP | peak=+{peak_pct}% '
+                              f'pnl=+{pnl_pct:.1f}%')
+
+            if reason:
+                if changed:
+                    save_positions(positions)
+                    changed = False
+
+                print(f'[Breakout] {sym} ÇIKIŞ: {reason}')
+                res = execute_sell(client, sym, 100,
+                                   source='BREAKOUT', period='trail')
+                if res.get('ok'):
+                    pnl = res.get('pnl', 0)
+                    peak_pct = round((peak - entry) / entry * 100, 1)
+                    send_telegram(
+                        f'🏁 <b>BREAKOUT ÇIKIŞ</b>\n'
+                        f'💎 {sym}\n'
+                        f'💰 K/Z: {"+" if pnl >= 0 else ""}{round(pnl, 2)}$\n'
+                        f'📈 Peak: +{peak_pct}% → Çıkış: {pnl_pct:.1f}%\n'
+                        f'🔒 Sebep: {reason.split("|")[0].strip()}\n'
+                        f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
+                    )
+                # Pozisyon listesini tazele
+                positions = load_positions()
+                changed   = False
+
+        if changed:
+            save_positions(positions)
+
+    # ── Rapor Döngüsü ────────────────────────────────────────────────────────
+
+    def _report_loop(self):
+        """Periyodik durum raporu."""
+        while not self._stop_event.is_set():
+            self._stop_event.wait(3600)
+            if self._stop_event.is_set():
+                break
+            try:
+                self._send_report()
+            except Exception as e:
+                print(f'[Breakout] Rapor hatası: {e}')
+
+    def _send_report(self):
+        cfg = load_config()
+        if not cfg.get('breakout_enabled', True):
+            return
+        positions = load_positions()
+        client    = get_client()
+
+        open_pos = [
+            (s, p) for s, p in positions.items()
+            if p.get('agent') == 'BREAKOUT' and p.get('qty', 0) > 0
+        ]
+
+        if not open_pos:
+            return
+
+        lines = ['🚀 <b>Breakout Agent Raporu</b>']
+        total_pnl = 0.0
+        for sym, pos in open_pos:
+            try:
+                price   = get_price(client, sym)
+                entry   = pos.get('avg_price', price)
+                peak    = pos.get('peak_price', entry)
+                pnl_pct = (price - entry) / entry * 100
+                peak_pct = (peak - entry) / entry * 100
+                trail_ok = '🔒' if pos.get('trail_active') else '⏳'
+                lines.append(
+                    f'{trail_ok} {sym}: {"+"+str(round(pnl_pct,1)) if pnl_pct>=0 else str(round(pnl_pct,1))}% '
+                    f'(peak +{round(peak_pct,1)}%)'
+                )
+                total_pnl += (price - entry) * pos.get('qty', 0)
+            except Exception:
+                pass
+
+        lines.append(f'─────\n📊 Tarama: {self.state.get("scan_count",0)}x')
+        send_telegram('\n'.join(lines))
+
+
+# ─── Singleton & Public API ───────────────────────────────────────────────────
+
+_agent: BreakoutAgent = None
+
+
+def start_breakout_agent():
+    global _agent
+    if _agent is None:
+        _agent = BreakoutAgent()
+    return _agent.start()
+
+
+def stop_breakout_agent():
+    global _agent
+    if _agent:
+        _agent.stop()
+
+
+def breakout_agent_status():
+    global _agent
+    if _agent is None:
+        s = _load_state()
+        return {'running': False, 'scan_count': s.get('scan_count', 0), 'log': []}
+    return {
+        'running':    _agent._running,
+        'scan_count': _agent.state.get('scan_count', 0),
+        'log':        list(_agent.scan_log),
+    }
+
+
+def trigger_breakout_report():
+    global _agent
+    if _agent:
+        try:
+            _agent._send_report()
+        except Exception as e:
+            print(f'[Breakout] Manuel rapor hatası: {e}')
