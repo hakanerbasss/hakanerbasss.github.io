@@ -663,7 +663,10 @@ class EdgeAgent:
                 # Trailing stop: %40 TP'de aktif, peak'ten %2.5 düşüşte çık
                 peak = pos.get('peak_price', avg_price)
                 if price > peak:
+                    peak = price
                     positions[symbol]['peak_price'] = price
+                    from bot import save_positions
+                    save_positions(positions)   # zirveyi kalıcı yap (yoksa trailing çalışmaz)
 
                 if tp > 0 and pct >= tp * 0.4:
                     drawdown = (price - peak) / peak * 100 if peak > 0 else 0

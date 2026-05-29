@@ -424,7 +424,17 @@ class AutonomousAgent:
                     if pos.get('qty', 0) <= 0: continue
                     if pos.get('agent', 'OTONOM') != 'OTONOM': continue
                     pos['check_momentum'] = (self._mon_count % self.MOMENTUM_EVERY == 0)
+
+                    # Trailing stop'un çalışması için zirve/trail durumunu kalıcı yap
+                    pre_peak  = pos.get('peak_price')
+                    pre_trail = pos.get('trail_active')
+
                     reason = _exit_decision(client, sym, pos, regime)
+
+                    # _exit_decision peak_price/trail_active'i güncellediyse diske yaz
+                    if pos.get('peak_price') != pre_peak or pos.get('trail_active') != pre_trail:
+                        changed = True
+
                     if reason:
                         positions[sym] = pos
                         res = execute_sell(client, sym, 100, source='OTONOM', period=reason)

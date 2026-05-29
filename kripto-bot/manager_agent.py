@@ -3,8 +3,10 @@ CEO Agent — Yönetici Yapay Zeka
 ────────────────────────────────────────────────────────────────
 • Her N saatte bir tüm ajanların performansını analiz eder
 • DeepSeek function calling ile araç tabanlı karar verir
-• 5 araç: set_agent_enabled, set_position_mult,
-          close_position, partial_take_profit, set_stop_loss
+• ROL: Risk yöneticisi (trader DEĞİL). Tek pozisyona dokunmaz —
+  ajanlar kendi giriş VE çıkışlarını (TP/SL/trailing) yönetir.
+• 2 araç: set_agent_enabled (batan ajanı kapat),
+          set_position_mult (bear'de pozisyon boyutunu küçült)
 • config.json → ceo_agent_enabled: true/false ile açılır
 """
 
@@ -49,50 +51,6 @@ TOOLS = [
             },
         },
     },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'close_position',
-            'description': 'Açık bir pozisyonu tamamen kapat (piyasa fiyatından sat).',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'symbol': {'type': 'string', 'description': 'Örn: XLMUSDT'},
-                },
-                'required': ['symbol'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'partial_take_profit',
-            'description': 'Açık pozisyonun bir kısmını sat, kalanı tut (kademeli kâr alma).',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'symbol':   {'type': 'string',  'description': 'Örn: XLMUSDT'},
-                    'fraction': {'type': 'number',  'description': '0.1–0.9 arası, örn 0.5 = yarısını sat'},
-                },
-                'required': ['symbol', 'fraction'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'set_stop_loss',
-            'description': "Açık pozisyonun stop-loss yüzdesini güncelle (giriş fiyatına göre %).",
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'symbol': {'type': 'string', 'description': 'Örn: XLMUSDT'},
-                    'pct':    {'type': 'number', 'description': 'Giriş fiyatından % düşüş, örn 3.0 = %3 SL'},
-                },
-                'required': ['symbol', 'pct'],
-            },
-        },
-    },
 ]
 
 
@@ -120,110 +78,6 @@ def _exec_set_position_mult(value):
     return f'ceo_position_mult: {old} → {value}'
 
 
-def _resolve_symbol(symbol):
-    """positions.json'daki gerçek sembol anahtarını bul.
-    0/O karışıklığı ve tek harf eksikliği/fazlalığı gibi model hatalarını düzeltir."""
-    from difflib import get_close_matches
-    positions = load_positions()
-    s = symbol.upper()
-    # 1. Birebir eşleşme
-    if s in positions:
-        return s
-    # 2. 0 ↔ O normalizasyonu
-    normalized = s.replace('0', 'O')
-    for key in positions:
-        if key.upper().replace('0', 'O') == normalized:
-            return key
-    # 3. Fuzzy match — tek harf farkını da yakalar
-    keys = list(positions.keys())
-    matches = get_close_matches(s, keys, n=1, cutoff=0.85)
-    if matches:
-        return matches[0]
-    return s
-
-
-def _exec_close_position(symbol):
-    real = _resolve_symbol(symbol)
-    try:
-        client = get_client()
-        result = execute_sell(client, real, 100, source='CEO_KAPAT')
-        if result.get('ok'):
-            return f'{real} tamamen kapatıldı'
-        return f'{real} kapatma başarısız: {result.get("error", "?")}'
-    except Exception as e:
-        return f'{real} kapatma hata: {e}'
-
-
-def _stamp_ceo_action(symbol, action):
-    """Pozisyona CEO müdahale zaman damgası yaz."""
-    try:
-        positions = load_positions()
-        if symbol in positions:
-            positions[symbol]['ceo_last_action']      = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            positions[symbol]['ceo_last_action_type'] = action
-            save_positions(positions)
-    except Exception:
-        pass
-
-
-def _exec_partial_take_profit(symbol, fraction):
-    real = _resolve_symbol(symbol)
-
-    # Hard cooldown: CEO interval dolmadan aynı pozisyona tekrar basma
-    try:
-        positions = load_positions()
-        pos       = positions.get(real) or {}
-
-        # 1. Pozisyon yaşı: en az 2 saat olmadan CEO müdahale edemez
-        buy_time = pos.get('buy_time', '')
-        if buy_time:
-            dt_buy   = datetime.datetime.strptime(buy_time, '%Y-%m-%d %H:%M:%S')
-            age_h    = (datetime.datetime.now() - dt_buy).total_seconds() / 3600
-            if age_h < 2:
-                print(f'[CEO] {real} partial_tp atlandı (pozisyon çok yeni: {age_h:.1f}s)')
-                return None
-
-        # 2. CEO son müdahalesi: interval dolmadan tekrar basma
-        last_act = pos.get('ceo_last_action', '')
-        if last_act:
-            dt_act   = datetime.datetime.strptime(last_act, '%Y-%m-%d %H:%M:%S')
-            mins_ago = (datetime.datetime.now() - dt_act).total_seconds() / 60
-            cooldown = load_config().get('ceo_interval_hours', 1) * 60
-            if mins_ago < cooldown:
-                print(f'[CEO] {real} partial_tp cooldown ({int(mins_ago)}dk < {int(cooldown)}dk)')
-                return None
-    except Exception:
-        pass
-
-    fraction = max(0.1, min(0.9, float(fraction)))
-    pct      = round(fraction * 100, 1)
-    try:
-        client = get_client()
-        result = execute_sell(client, real, pct, source='CEO_KISMI_KAR')
-        if result.get('ok'):
-            _stamp_ceo_action(real, 'partial_tp')
-            return f'{real} %{pct} satıldı (kısmi kâr)'
-        return f'{real} kısmi satış başarısız: {result.get("error", "?")}'
-    except Exception as e:
-        return f'{symbol} kısmi satış hata: {e}'
-
-
-def _exec_set_stop_loss(symbol, pct):
-    real = _resolve_symbol(symbol)
-    pct  = max(0.5, min(15.0, float(pct)))
-    try:
-        positions = load_positions()
-        if real not in positions:
-            return f'{real} açık pozisyon yok'
-        old = positions[real].get('sl_pct', '?')
-        positions[real]['sl_pct'] = pct
-        save_positions(positions)
-        _stamp_ceo_action(real, 'set_sl')
-        return f'{real} SL: {old} → %{pct}'
-    except Exception as e:
-        return f'{symbol} SL güncelleme hata: {e}'
-
-
 def _execute_tool_calls(tool_calls):
     """Modelin istediği araç çağrılarını sırayla yürüt."""
     results = []
@@ -238,12 +92,6 @@ def _execute_tool_calls(tool_calls):
                 r = _exec_set_agent_enabled(args['agent'], args['enabled'])
             elif name == 'set_position_mult':
                 r = _exec_set_position_mult(args['value'])
-            elif name == 'close_position':
-                r = _exec_close_position(args['symbol'])
-            elif name == 'partial_take_profit':
-                r = _exec_partial_take_profit(args['symbol'], args['fraction'])
-            elif name == 'set_stop_loss':
-                r = _exec_set_stop_loss(args['symbol'], args['pct'])
             else:
                 r = f'Bilinmeyen araç: {name}'
         except Exception as e:
@@ -432,12 +280,13 @@ def _collect_data():
 
 def _build_prompt(data):
     lines = [
-        "Sen deneyimli bir kripto portföy risk yöneticisisin.",
-        "4 ticaret ajanın (EDGE, OTONOM, INDICATOR, WYCKOFF) açtığı pozisyonları izliyorsun.",
-        "Alım kararları ajanlara ait, sen karışmazsın.",
-        "Senin işin: açık pozisyonlarda riski yönetmek — kâr zirvesinde çık, zararı kes, SL ayarla, sürekli batan ajanı durdur, piyasa çok kötüyse pozisyon boyutlarını küçült.",
-        "Müdahale gerekmiyorsa araç çağırma.",
-        "KRİTİK: Araç çağırırken sembol adını aşağıdaki listede AYNEN göründüğü gibi yaz. Harfi değiştirme, eksiltme, ekleme yapma.",
+        "Sen bir kripto portföy RİSK YÖNETİCİSİSİN — trader değilsin.",
+        "4 ticaret ajanı var: EDGE, OTONOM, INDICATOR, WYCKOFF.",
+        "Her ajan kendi giriş VE çıkışını (TP/SL/trailing) kendi yönetir. Tek tek pozisyonlara ASLA karışmazsın.",
+        "Senin SADECE iki yetkin var:",
+        "  1) set_agent_enabled — bir ajan uzun vadede (yeterli işlem sayısıyla) sürekli zarar ediyorsa kapat. Tek kötü işleme bakıp kapatma.",
+        "  2) set_position_mult — BTC bear trendindeyse veya portföy genel zarardaysa tüm pozisyon boyutlarını küçült (0.3–1.0); güçlü bull'da normale döndür (1.0).",
+        "Sabırlı ol: az işlemle veya tek pozisyonun anlık zararına bakıp karar verme. Müdahale gerekmiyorsa hiç araç çağırma.",
         "",
         f"=== ANLIK DURUM ===",
         f"Serbest USDT: ${data['balance']} | Pozisyonlarda: ${data['pos_total']} | Toplam: ${data['total']}",

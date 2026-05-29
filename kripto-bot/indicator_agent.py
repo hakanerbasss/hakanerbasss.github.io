@@ -2,20 +2,16 @@
 Indicator Agent — Kodlanmış İndikatörler ile Otonom Tarayıcı
 ─────────────────────────────────────────────────────────────
 • Top 50 coin hacme göre otomatik taranır — kullanıcı seçimi yok
-• 3 kodlu indikatör sırayla uygulanır:
-    1. UT Bot   → signal_engine.calc_ut_bot
-    2. Smart    → smart_strategy.check_smart_signal
-    3. Seans    → seans_strategy.check_seans_signal
-• Her indikatör için ayrı performans takibi
-• İşlemler 'INDICATOR-UTBOT' | 'INDICATOR-SMART' | 'INDICATOR-SEANS' kaynağıyla etiketlenir
+• Tek indikatör: UT Bot → signal_engine.calc_ut_bot
+  (Smart ve Seans kaldırıldı — 0% kazanma oranı, toplam -$292 zarar)
+• İşlemler 'INDICATOR-UTBOT' kaynağıyla etiketlenir
 """
 
 import time, threading, json, os, datetime
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, get_price, send_telegram, get_usdt_balance)
 from signal_engine import calc_ut_bot, get_klines
-from smart_strategy import check_smart_signal, check_smart_sell
-from seans_strategy import check_seans_signal
+from smart_strategy import check_smart_sell   # sadece açık SMART pozisyonların çıkışı için
 
 STATE_FILE = 'indicator_state.json'
 
@@ -35,10 +31,9 @@ UTBOT_ATR    = 7
 UTBOT_PERIOD = '1h'
 UTBOT_MODE   = 'crossover'
 
-SMART_MIN_SCORE = 2    # 4 üzerinden en az 2 faktör
-SEANS_STRATEGY  = 'both'   # sabah (9-12) + akşam (20-23) + asya (04-08)
-
-INDICATORS = ['UTBOT', 'SMART', 'SEANS']
+# NOT: SMART ve SEANS stratejileri kaldırıldı (0% kazanma oranı, toplam -$292 zarar).
+# Sadece UT Bot bırakıldı — net trend takibi, tek sağlam indikatör.
+INDICATORS = ['UTBOT']
 
 
 def _scan_candidates(client):
@@ -123,12 +118,11 @@ class IndicatorAgent:
             f'{mode} <b>Indicator Agent AKTİF</b>\n'
             f'━━━━━━━━━━━━━━\n'
             f'💰 Bakiye: ${bal:.2f}\n'
-            f'🔍 Yöntem: Kodlu İndikatörler (UT Bot + Smart + Seans)\n'
+            f'🔍 Yöntem: UT Bot (ATR trailing crossover)\n'
             f'⚡ Tarama: {SCAN_INTERVAL}s | Takip: {MONITOR_SEC}s\n'
-            f'📐 Aktif İndikatörler:\n'
+            f'📐 Aktif İndikatör:\n'
             f'  • UT Bot (key={UTBOT_KEY}, atr={UTBOT_ATR}, {UTBOT_PERIOD}, {UTBOT_MODE})\n'
-            f'  • Smart Composite (min skor {SMART_MIN_SCORE}/4)\n'
-            f'  • Seans Stratejisi ({SEANS_STRATEGY}: sabah 9-12 + akşam 20-23)\n'
+            f'  ⓘ Smart + Seans kaldırıldı (0% kazanma, -$292)\n'
             f'🪙 Evren: Top 50 coin (hacme göre, otomatik)'
         )
         return True
@@ -213,8 +207,7 @@ class IndicatorAgent:
         self._save()
 
     def _check_all_indicators(self, client, sym):
-        """Tüm indikatörleri dene — ilk buy sinyalini (indikatör, neden) olarak döndür."""
-        # 1. UT Bot
+        """UT Bot sinyalini kontrol et — buy ise (indikatör, neden) döndür."""
         try:
             closes, highs, lows, _ = get_klines(client, sym, UTBOT_PERIOD, limit=100)
             if len(closes) >= 20:
@@ -226,22 +219,6 @@ class IndicatorAgent:
                     return ('UTBOT', f'UT Bot crossover ({UTBOT_PERIOD})')
         except Exception as e:
             print(f'[Indicator] UTBOT {sym}: {e}')
-
-        # 2. Smart Composite
-        try:
-            sig = check_smart_signal(client, sym, SMART_MIN_SCORE)
-            if sig.get('signal') == 'buy':
-                return ('SMART', sig.get('detail', 'Smart sinyal'))
-        except Exception as e:
-            print(f'[Indicator] SMART {sym}: {e}')
-
-        # 3. Seans Stratejisi
-        try:
-            sig = check_seans_signal(client, sym, SEANS_STRATEGY)
-            if sig.get('signal') == 'buy':
-                return ('SEANS', sig.get('reason', 'Seans alımı'))
-        except Exception as e:
-            print(f'[Indicator] SEANS {sym}: {e}')
 
         return None
 
