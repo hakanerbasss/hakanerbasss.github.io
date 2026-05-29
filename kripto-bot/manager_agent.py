@@ -167,7 +167,22 @@ def _stamp_ceo_action(symbol, action):
 
 
 def _exec_partial_take_profit(symbol, fraction):
-    real     = _resolve_symbol(symbol)
+    real = _resolve_symbol(symbol)
+
+    # Hard cooldown: CEO interval dolmadan aynı pozisyona tekrar basma
+    try:
+        positions = load_positions()
+        last_act  = (positions.get(real) or {}).get('ceo_last_action', '')
+        if last_act:
+            dt          = datetime.datetime.strptime(last_act, '%Y-%m-%d %H:%M:%S')
+            mins_ago    = (datetime.datetime.now() - dt).total_seconds() / 60
+            cooldown    = load_config().get('ceo_interval_hours', 1) * 60
+            if mins_ago < cooldown:
+                print(f'[CEO] {real} partial_tp cooldown ({int(mins_ago)}dk < {int(cooldown)}dk)')
+                return None  # sessizce atla
+    except Exception:
+        pass
+
     fraction = max(0.1, min(0.9, float(fraction)))
     pct      = round(fraction * 100, 1)
     try:
