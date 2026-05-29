@@ -330,7 +330,8 @@ def _collect_data():
                     hours_held = '?'
 
                 tech      = _position_technicals(client, sym)
-                pos_value = round(price * pos.get('qty', 0), 2)
+                pos_value  = round(price * pos.get('qty', 0), 2)
+                net_pct    = round(pct - 0.2, 2)  # brüt % - alım(%0.1) - satım(%0.1)
 
                 # CEO'nun son müdahalesinden bu yana geçen süre
                 ceo_action_ago = None
@@ -347,6 +348,7 @@ def _collect_data():
                     'symbol':          sym,
                     'agent':           pos.get('agent', '?'),
                     'pct':             round(pct, 2),
+                    'net_pct':         net_pct,
                     'entry':           round(avg, 6),
                     'price':           round(price, 6),
                     'value':           pos_value,
@@ -422,7 +424,7 @@ def _build_prompt(data):
             if p.get('ceo_action_ago') is not None:
                 ceo_note = f" | ⚠️ CEO {p['ceo_action_ago']}dk önce müdahale etti ({p['ceo_action_type']})"
             lines.append(
-                f"{icon} {p['symbol']} [{p['agent']}]: {p['pct']:+.2f}% | "
+                f"{icon} {p['symbol']} [{p['agent']}]: brüt {p['pct']:+.2f}% | net {p['net_pct']:+.2f}% | "
                 f"Giriş: {p['entry']} | SL: %{p['sl_pct']} | TP: %{p['tp_pct']} | "
                 f"Süredir: {p['hours_held']}s{ceo_note}"
             )
