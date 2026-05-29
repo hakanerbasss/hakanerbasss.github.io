@@ -95,7 +95,47 @@ def api_dashboard():
 @login_required
 def api_trades():
     trades = load_trades()
-    return jsonify(list(reversed(trades[-50:])))
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify(list(reversed(trades[-limit:])))
+
+@app.route('/api/trades/telegram', methods=['POST'])
+@login_required
+def api_trades_telegram():
+    """Son N işlemi Telegram'a gönder (varsayılan 30)."""
+    n = request.json.get('n', 30) if request.is_json else 30
+    trades = load_trades()
+    recent = list(reversed(trades[-n:]))
+
+    sells  = [t for t in recent if t.get('type') == 'sell']
+    buys   = [t for t in recent if t.get('type') == 'buy']
+    pnl_sum = sum(float(t.get('pnl_usdt', t.get('pnl', 0)) or 0) for t in sells)
+    wins    = sum(1 for t in sells if float(t.get('pnl_usdt', t.get('pnl', 0)) or 0) > 0)
+    losses  = len(sells) - wins
+
+    lines = [
+        f'📊 <b>Son {len(recent)} İşlem</b>',
+        f'💰 Net PNL: <b>{"+" if pnl_sum >= 0 else ""}${pnl_sum:.2f}</b>',
+        f'✅ Kazanan: {wins} | ❌ Kaybeden: {losses} | 🛒 Alış: {len(buys)}',
+        '━━━━━━━━━━━━━━━━━━',
+    ]
+    for t in recent:
+        tp   = t.get('type', '')
+        sym  = t.get('symbol', '?')
+        src  = t.get('source', '?')
+        time = (t.get('time', ''))[5:]   # MM-DD HH:MM kısat
+        pnl  = float(t.get('pnl_usdt', t.get('pnl', 0)) or 0)
+        qty  = t.get('qty', 0)
+        price = t.get('price', 0)
+        if tp == 'buy':
+            lines.append(f'🛒 {time} | <b>{sym}</b> [{src}] ${float(qty)*float(price):.1f}')
+        else:
+            sign = '+' if pnl >= 0 else ''
+            col  = '' if pnl >= 0 else ''
+            lines.append(f'{"🟢" if pnl>=0 else "🔴"} {time} | <b>{sym}</b> [{src}] <b>{sign}${pnl:.2f}</b>')
+
+    from bot import send_telegram
+    send_telegram('\n'.join(lines))
+    return jsonify({'ok': True, 'sent': len(recent)})
 
 @app.route('/trades/reset', methods=['POST'])
 @login_required

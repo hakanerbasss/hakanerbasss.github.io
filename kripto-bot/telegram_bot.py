@@ -265,6 +265,41 @@ def handle_command(cmd, chat_id):
             f'/ceo analiz — hemen analiz et'
         )
 
+    elif cmd.startswith('/trades'):
+        try:
+            parts = cmd.split()
+            n = int(parts[1]) if len(parts) > 1 else 30
+            n = min(n, 100)
+            trades = load_trades()
+            recent = list(reversed(trades[-n:]))
+            sells   = [t for t in recent if t.get('type') == 'sell']
+            buys    = [t for t in recent if t.get('type') == 'buy']
+            pnl_sum = sum(float(t.get('pnl_usdt', t.get('pnl', 0)) or 0) for t in sells)
+            wins    = sum(1 for t in sells if float(t.get('pnl_usdt', t.get('pnl', 0)) or 0) > 0)
+            losses  = len(sells) - wins
+            lines = [
+                f'📊 <b>Son {len(recent)} İşlem</b>  (toplam: {len(trades)})',
+                f'💰 Net PNL: <b>{"+" if pnl_sum>=0 else ""}${pnl_sum:.2f}</b>',
+                f'✅ Kazanan: {wins} | ❌ Kaybeden: {losses} | 🛒 Alış: {len(buys)}',
+                '━━━━━━━━━━━━━━━━━━',
+            ]
+            for t in recent:
+                tp    = t.get('type', '')
+                sym   = t.get('symbol', '?')
+                src   = t.get('source', '?')
+                zaman = (t.get('time', ''))[5:]
+                pnl   = float(t.get('pnl_usdt', t.get('pnl', 0)) or 0)
+                qty   = float(t.get('qty', 0) or 0)
+                price = float(t.get('price', 0) or 0)
+                if tp == 'buy':
+                    lines.append(f'🛒 {zaman} | <b>{sym}</b> [{src}] ${qty*price:.1f}')
+                else:
+                    sign = '+' if pnl >= 0 else ''
+                    lines.append(f'{"🟢" if pnl>=0 else "🔴"} {zaman} | <b>{sym}</b> [{src}] <b>{sign}${pnl:.2f}</b>')
+            send_reply(chat_id, '\n'.join(lines))
+        except Exception as e:
+            send_reply(chat_id, f'❌ Hata: {e}')
+
     elif cmd == '/rapor':
         try:
             from autonomous_agent import trigger_otonom_report
@@ -326,9 +361,10 @@ def handle_command(cmd, chat_id):
 /durum — Genel durum özeti
 /pozisyonlar — Açık pozisyonlar
 /ajanlar — Ajan durumları
-/edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff /breakouton /breakoutoff
+/trades [n] — Son N işlemi gönder (varsayılan 30)
 /rapor — Tüm ajanlardan anında rapor
 /rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
+/edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff /breakouton /breakoutoff
 /ceoon /ceooff /ceoanaliz
 /baslat — Botu başlat
 /durdur — Botu duraklat

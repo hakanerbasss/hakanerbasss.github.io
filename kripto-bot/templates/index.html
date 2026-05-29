@@ -318,10 +318,22 @@ input:focus,select:focus{border-color:#f0a500;}
     <div id="agentTable">Yükleniyor...</div>
   </div>
   <div class="section">
-    <h2>📋 İşlem Geçmişi</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <h2 style="margin:0;">📋 İşlem Geçmişi</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="tradesLimit" onchange="loadTrades()" style="width:110px;padding:5px 8px;font-size:12px;">
+          <option value="30">Son 30</option>
+          <option value="50" selected>Son 50</option>
+          <option value="100">Son 100</option>
+          <option value="500">Tümü (500)</option>
+        </select>
+        <button class="btn btn-sm" style="background:#0088cc;color:#fff;" onclick="sendTradesToTelegram()">📤 Telegram</button>
+      </div>
+    </div>
+    <div id="tradesSummary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"></div>
     <table>
       <thead><tr><th>Tarih</th><th>Tür</th><th>Kaynak</th><th>Coin</th><th>Miktar</th><th>Fiyat</th><th>K/Z</th></tr></thead>
-      <tbody id="tradesTable"><tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">Yükleniyor...</td></tr></tbody>
+      <tbody id="tradesTable"><tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Yükleniyor...</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -1012,9 +1024,16 @@ function _agentColor(name) {
   return IND_COLORS[name] || '#6b7280';
 }
 
+function sendTradesToTelegram() {
+  const n = parseInt(document.getElementById('tradesLimit').value) || 30;
+  fetch('/api/trades/telegram', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({n})})
+    .then(r=>r.json()).then(d => toast(d.ok ? `📤 ${d.sent} işlem Telegram'a gönderildi` : '❌ Hata', d.ok));
+}
+
 function loadTrades() {
+  const limit = document.getElementById('tradesLimit') ? document.getElementById('tradesLimit').value : 50;
   Promise.all([
-    fetch('/api/trades').then(r=>r.json()),
+    fetch(`/api/trades?limit=${limit}`).then(r=>r.json()),
     fetch('/api/agent_comparison').then(r=>r.json()),
   ]).then(([trades, cmp]) => {
 
@@ -1062,6 +1081,28 @@ function loadTrades() {
           </tbody>
         </table></div>`;
     }
+
+    // ── Özet kartlar ──
+    const sells = trades.filter(t => t.type === 'sell');
+    const buys  = trades.filter(t => t.type === 'buy');
+    const totalPnl = sells.reduce((s,t) => s + (t.pnl||0), 0);
+    const wins   = sells.filter(t => (t.pnl||0) > 0).length;
+    const losses = sells.length - wins;
+    const wr     = sells.length ? Math.round(wins/sells.length*100) : 0;
+    const bestTrade  = sells.length ? Math.max(...sells.map(t=>t.pnl||0)) : 0;
+    const worstTrade = sells.length ? Math.min(...sells.map(t=>t.pnl||0)) : 0;
+    document.getElementById('tradesSummary').innerHTML = [
+      ['Net PNL', `${totalPnl>=0?'+':''}$${totalPnl.toFixed(2)}`, totalPnl>=0?'#16a34a':'#dc2626'],
+      ['Kazanma', `%${wr}`, wr>=60?'#16a34a':wr>=50?'#f0a500':'#dc2626'],
+      ['K/Z', `${wins}✅ / ${losses}❌`, '#374151'],
+      ['En İyi', `+$${bestTrade.toFixed(2)}`, '#16a34a'],
+      ['En Kötü', `$${worstTrade.toFixed(2)}`, '#dc2626'],
+    ].map(([label,val,col]) =>
+      `<div style="background:#f8f9fa;border-radius:8px;padding:8px 12px;text-align:center;min-width:80px;">
+        <div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.5px;">${label}</div>
+        <div style="font-size:15px;font-weight:bold;color:${col};margin-top:2px;">${val}</div>
+      </div>`
+    ).join('');
 
     // ── İşlem geçmişi tablosu ──
     const tbody = document.getElementById('tradesTable');
