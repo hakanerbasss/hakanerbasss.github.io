@@ -3,7 +3,7 @@ from functools import wraps
 import json, os, hashlib, datetime
 from bot import (load_config, save_config, get_client, get_market_summary,
                  get_fear_greed, get_portfolio_summary, execute_buy, execute_sell,
-                 load_trades, load_positions, get_usdt_balance)
+                 load_trades, load_positions, get_usdt_balance, get_price)
 from signal_engine import start_engine
 from telegram_bot import start_telegram_bot
 from autonomous_agent import (start_autonomous_agent, stop_autonomous_agent,
@@ -62,12 +62,29 @@ def index():
 @login_required
 def api_dashboard():
     try:
-        client = get_client()
-        market = get_market_summary(client)
-        fg = get_fear_greed()
-        portfolio = get_portfolio_summary(client)
+        client       = get_client()
+        market       = get_market_summary(client)
+        fg           = get_fear_greed()
+        portfolio    = get_portfolio_summary(client)
         usdt_balance = get_usdt_balance(client)
-        return jsonify({'ok': True, 'market': market, 'fear_greed': fg, 'portfolio': portfolio, 'usdt_balance': usdt_balance})
+
+        # Açık pozisyonların anlık değeri
+        positions  = load_positions()
+        pos_value  = 0.0
+        for sym, pos in positions.items():
+            if pos.get('qty', 0) > 0:
+                try:
+                    pos_value += get_price(client, sym) * pos['qty']
+                except Exception:
+                    pass
+        pos_value   = round(pos_value, 2)
+        total_value = round(usdt_balance + pos_value, 2)
+
+        return jsonify({
+            'ok': True, 'market': market, 'fear_greed': fg,
+            'portfolio': portfolio, 'usdt_balance': usdt_balance,
+            'pos_value': pos_value, 'total_value': total_value,
+        })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
