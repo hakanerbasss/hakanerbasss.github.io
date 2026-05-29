@@ -194,11 +194,7 @@ class IndicatorAgent:
             )
             res = execute_buy(client, sym, usdt, source=source, period=indicator)
             if res.get('ok'):
-                with self._lock:
-                    stats    = self.state.setdefault('indicator_stats', {})
-                    ind_stat = stats.setdefault(indicator, {'wins': 0, 'total': 0, 'pnl': 0.0})
-                    ind_stat['total'] = ind_stat.get('total', 0) + 1
-
+                # NOT: total burada sayılmaz — _record() satışta sayar (çift sayım önlenir)
                 from bot import save_positions
                 pos_now = load_positions()
                 if sym in pos_now:

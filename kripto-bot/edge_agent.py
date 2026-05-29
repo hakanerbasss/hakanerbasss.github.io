@@ -82,7 +82,8 @@ def _liquidations(symbol):
     return _pub('/fapi/v1/allForceOrders', {'symbol': symbol, 'limit': 200}) or []
 
 def _futures_symbols(min_vol=30_000_000) -> list:
-    """Son 24 saatte quoteVolume > $30M olan futures semboller."""
+    """Son 24 saatte quoteVolume > $30M olan futures semboller.
+    24s'te >%20 yükselen coinler hariç (zirveye yakın alımı önler)."""
     data = _pub('/fapi/v1/ticker/24hr')
     if not data:
         return []
@@ -92,7 +93,11 @@ def _futures_symbols(min_vol=30_000_000) -> list:
         if not sym.endswith('USDT') or sym in STABLECOINS:
             continue
         price = float(d.get('lastPrice', 0))
-        if 0.90 <= price <= 1.10:  # stablecoin fiyat aralığı
+        if 0.90 <= price <= 1.10:
+            continue
+        chg24 = float(d.get('priceChangePercent', 0))
+        if chg24 > 20.0:
+            # Zaten çok pompalanmış — geç giriş riski yüksek
             continue
         if float(d.get('quoteVolume', 0)) > min_vol:
             out.append((sym, float(d.get('quoteVolume', 0))))
