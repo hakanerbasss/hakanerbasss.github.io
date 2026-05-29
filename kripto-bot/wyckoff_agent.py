@@ -220,6 +220,13 @@ class WyckoffAgent:
     def _scan(self):
         client    = get_client()
         cfg       = load_config()
+
+        # CEO veya kullanıcı bu ajanı kapattıysa yeni alım yapma
+        from manager_agent import ceo_flag
+        if not ceo_flag(cfg, 'wyckoff_enabled', True):
+            print('[Wyckoff] Kapalı (wyckoff_enabled=false), tarama atlandı')
+            return
+
         positions = load_positions()
         open_cnt  = sum(
             1 for p in positions.values()

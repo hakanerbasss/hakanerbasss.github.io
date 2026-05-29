@@ -486,13 +486,13 @@ def _run_loop():
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def ceo_flag(cfg, key, default=True):
-    """CEO sessiz kaldıysa (kota/hata) default döner — ajanlar kendi çalışır."""
-    if not cfg.get('ceo_agent_enabled', False):
-        return default
-    interval = cfg.get('ceo_interval_hours', DEFAULT_INTERVAL)
-    last_ok  = cfg.get('ceo_last_success', 0)
-    if time.time() - last_ok > interval * 3 * 3600:
-        return default
+    """Ajanın açık/kapalı bayrağını döndür.
+    Hem kullanıcının manuel toggle'ı (/indicatoroff vb.) hem CEO'nun
+    set_agent_enabled'ı AYNI bayrağı yazar; ikisine de saygı duyulur.
+    Bayrak False ise ajan yeni alım yapmaz (açık pozisyonlar izlenmeye
+    devam eder, çıkışlar normal işler).
+    NOT: Eskiden CEO kapalıyken bu fonksiyon bayrağı yok sayıp default
+    dönüyordu — bu yüzden manuel kapatma çalışmıyordu. Düzeltildi."""
     return cfg.get(key, default)
 
 
