@@ -51,11 +51,20 @@ def _scan_candidates(client):
 
 
 def _btc_up(client):
+    """BTC rejimi BEAR ise alım yapma. OTONOM ile aynı rejim tanımı
+    (EMA20/50 + RSI + ADX) — basit SMA20 kontrolünden çok daha sağlam,
+    SMA20 etrafında gidip gelen 'sahte yukarı' sinyallerini eler."""
     try:
-        closes, _, _, _ = get_klines(client, 'BTCUSDT', '1h', limit=25)
-        return closes[-1] > sum(closes[-20:]) / 20
+        from autonomous_agent import _regime
+        regime = _regime(client)
+        return regime != 'BEAR'   # BULL ve SIDEWAYS'te alım serbest, BEAR'de dur
     except Exception:
-        return True
+        # Yedek: basit SMA20 kontrolü
+        try:
+            closes, _, _, _ = get_klines(client, 'BTCUSDT', '1h', limit=25)
+            return closes[-1] > sum(closes[-20:]) / 20
+        except Exception:
+            return True
 
 
 class IndicatorAgent:

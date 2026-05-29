@@ -300,6 +300,34 @@ def handle_command(cmd, chat_id):
         except Exception as e:
             send_reply(chat_id, f'❌ Hata: {e}')
 
+    elif cmd == '/toztemizle':
+        try:
+            from bot import save_positions, get_price
+            client = get_client()
+            positions = load_positions()
+            removed = []
+            for sym in list(positions.keys()):
+                p = positions[sym]
+                qty = p.get('qty', 0)
+                if qty <= 0:
+                    del positions[sym]
+                    continue
+                try:
+                    price = get_price(client, sym)
+                except Exception:
+                    price = p.get('avg_price', 0)
+                val = qty * price
+                if val < 2.0:
+                    removed.append(f'{sym} (${val:.2f})')
+                    del positions[sym]
+            save_positions(positions)
+            if removed:
+                send_reply(chat_id, '🧹 Toz temizlendi:\n' + '\n'.join(removed))
+            else:
+                send_reply(chat_id, '✅ Temizlenecek toz pozisyon yok')
+        except Exception as e:
+            send_reply(chat_id, f'❌ Hata: {e}')
+
     elif cmd == '/rapor':
         try:
             from autonomous_agent import trigger_otonom_report
@@ -362,6 +390,7 @@ def handle_command(cmd, chat_id):
 /pozisyonlar — Açık pozisyonlar
 /ajanlar — Ajan durumları
 /trades [n] — Son N işlemi gönder (varsayılan 30)
+/toztemizle — $2 altı kalıntı pozisyonları sil
 /rapor — Tüm ajanlardan anında rapor
 /rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
 /edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff /breakouton /breakoutoff

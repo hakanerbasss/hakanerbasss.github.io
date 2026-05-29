@@ -9,10 +9,13 @@ Bu ajan tam tersini yapar:
   3. Hacim spike > 2x olmalı (sahte hareket filtresi)
   4. SATIN AL
 
-Çıkış — Sabit TP KESİNLİKLE YOK:
+Çıkış — Sabit TP KESİNLİKLE YOK, KADEMELİ TRAIL:
   • Hard stop:  -%5   (yanlış kırılım koruması)
-  • Trail:       +%3 kazanında aktif, peak'ten -%15 takip
-  • Sonuç: %141 hareket → bot %120+ yakalar, %8'de erken çıkmaz
+  • Trail +%3'te aktif, peak kârına göre daralan mesafe:
+      +3-10%  → peak'ten -%3  (küçük kârı hemen kilitle)
+      +10-25% → peak'ten -%8  (orta)
+      +25%+   → peak'ten -%15 (büyük trendi sür)
+  • Sonuç: %6 pump'ta +%3 kâr kilitlenir, %141 hareket → %120+ yakalanır
 """
 
 import time, datetime, threading, json, os
@@ -41,10 +44,17 @@ MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 MIN_PRICE_CHG_2H = 4.0   # son 2 saatte min %4 fiyat hareketi
 MIN_VOL_SPIKE    = 2.0   # son 2 saatlik hacim, saatlik ortalamanın 2x'i
 
-# Çıkış parametreleri — SABİT TP YOK
+# Çıkış parametreleri — SABİT TP YOK, KADEMELİ TRAIL
+# Kâr arttıkça trail daralır → küçük kârı kilitle, büyük pump'a yer aç
 TRAIL_ACTIVATE_PCT = 3.0   # bu kadar kazanç → trailing başlasın
-TRAIL_DISTANCE_PCT = 15.0  # peak'ten bu kadar düşerse çık
 HARD_STOP_PCT      = 5.0   # bu kadar zarar → anında çık
+
+def _trail_distance(peak_pct):
+    """Peak kâr yüzdesine göre trail mesafesi (peak'ten % düşüş).
+    Küçük pump'larda dar (kârı kilitle), büyük pump'larda geniş (moon'a izin ver)."""
+    if peak_pct >= 25:   return 15.0   # +25%+ : geniş trail, büyük trendi sür
+    if peak_pct >= 10:   return 8.0    # +10-25% : orta
+    return 3.0                          # +3-10% : dar, küçük kârı hemen kilitle
 
 
 # ─── Yardımcı Fonksiyonlar ────────────────────────────────────────────────────
@@ -208,8 +218,9 @@ class BreakoutAgent:
             f'📡 Yöntem: Hacim spike + fiyat kırılımı (2s)\n'
             f'⚡ Tarama: {SCAN_INTERVAL//60}dk | Takip: {MONITOR_SEC}s\n'
             f'🎯 Min Hareket: +%{MIN_PRICE_CHG_2H} | Vol Spike: {MIN_VOL_SPIKE}x\n'
-            f'🔒 Trail: -%{TRAIL_DISTANCE_PCT} (peak\'ten) | Stop: -%{HARD_STOP_PCT}\n'
-            f'⚠️ Sabit TP YOK — trailing ile çıkış'
+            f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-8% | +25%+→-15%\n'
+            f'🛑 Hard Stop: -%{HARD_STOP_PCT}\n'
+            f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler'
         )
         return True
 
@@ -318,8 +329,8 @@ class BreakoutAgent:
             f'📊 Hacim spike: {result["vol_spike"]}x\n'
             f'🎯 Skor: {result["score"]}/10\n'
             f'💵 Tutar: ${usdt}\n'
-            f'🔒 Trail -%{TRAIL_DISTANCE_PCT} | Stop -%{HARD_STOP_PCT}\n'
-            f'⚠️ Sabit TP YOK — trailing stop ile çıkış\n'
+            f'🔒 Kademeli Trail | Hard Stop -%{HARD_STOP_PCT}\n'
+            f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler\n'
             f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
         )
 
@@ -374,17 +385,18 @@ class BreakoutAgent:
                       f'(pnl={pnl_pct:.1f}% peak=+{peak_pct}%)')
 
             reason = None
+            peak_pct = (peak - entry) / entry * 100
 
             # 1. Hard stop: -%5
             if pnl_pct <= -HARD_STOP_PCT:
                 reason = f'HARD STOP ({pnl_pct:.1f}%)'
 
-            # 2. Trailing stop: peak'ten -%15 düşüş
+            # 2. Kademeli trailing stop: peak kârına göre daralan mesafe
             elif trail_active:
-                trail_price = peak * (1 - TRAIL_DISTANCE_PCT / 100)
+                trail_dist  = _trail_distance(peak_pct)
+                trail_price = peak * (1 - trail_dist / 100)
                 if price <= trail_price:
-                    peak_pct = round((peak - entry) / entry * 100, 1)
-                    reason = (f'TRAIL STOP | peak=+{peak_pct}% '
+                    reason = (f'TRAIL STOP -{trail_dist:.0f}% | peak=+{peak_pct:.1f}% '
                               f'pnl=+{pnl_pct:.1f}%')
 
             if reason:

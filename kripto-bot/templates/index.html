@@ -503,6 +503,8 @@ input:focus,select:focus{border-color:#f0a500;}
     <h2>🗂 Veri Yönetimi</h2>
     <p style="font-size:12px;color:#666;margin-bottom:12px;">İşlem geçmişini sıfırlamak istatistikleri ve başarı oranını temizler. Açık pozisyonlar ve bakiye etkilenmez.</p>
     <button class="btn btn-red" onclick="resetTrades()">🗑 İşlem Geçmişini Sıfırla</button>
+    <p style="font-size:12px;color:#666;margin:14px 0 12px;">Toz temizleme, değeri $2 altındaki kalıntı pozisyonları (testnet artığı) siler. Gerçek pozisyonlara dokunmaz, sadece boşa işgal edilen slotları açar.</p>
+    <button class="btn btn-orange" onclick="clearDust()">🧹 Toz Pozisyonları Temizle</button>
   </div>
 </div>
 
@@ -1806,6 +1808,16 @@ function resetTrades() {
     .then(d => {
       if (d.ok) { loadTrades(); loadDashboard(); toast('İşlem geçmişi sıfırlandı'); }
       else toast(d.error, false);
+    });
+}
+
+function clearDust() {
+  if (!confirm('$2 altındaki toz pozisyonlar silinecek.\nGerçek pozisyonlara dokunulmaz. Devam?')) return;
+  fetch('/positions/clear_dust', {method:'POST'})
+    .then(r=>r.json())
+    .then(d => {
+      if (d.ok) { loadDashboard(); toast(d.msg); }
+      else toast(d.error||'Hata', false);
     });
 }
 

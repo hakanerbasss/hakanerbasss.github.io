@@ -394,8 +394,11 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
                 return {'ok': False, 'error': f'{symbol} zaten açık pozisyon var'}
 
             # Global maksimum pozisyon limiti (tüm ajanlar paylaşır)
+            # Toz pozisyonlar (<$2 — testnet kalıntısı) slot işgal etmesin
             max_pos = int(cfg_data.get('max_positions', 6))
-            open_count = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
+            open_count = sum(1 for p in positions.values()
+                             if p.get('qty', 0) > 0
+                             and p.get('qty', 0) * p.get('avg_price', 0) >= 2.0)
             if open_count >= max_pos:
                 return {'ok': False, 'error': f'Pozisyon limiti dolu: {open_count}/{max_pos}'}
 
