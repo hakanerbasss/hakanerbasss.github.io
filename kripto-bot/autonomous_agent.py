@@ -423,7 +423,7 @@ class AutonomousAgent:
 
                 for sym, pos in list(positions.items()):
                     if pos.get('qty', 0) <= 0: continue
-                    if pos.get('agent', 'OTONOM') != 'OTONOM': continue
+                    if pos.get('agent') != 'OTONOM': continue
                     pos['check_momentum'] = (self._mon_count % self.MOMENTUM_EVERY == 0)
 
                     # Trailing stop'un çalışması için zirve/trail durumunu kalıcı yap
@@ -518,7 +518,7 @@ class AutonomousAgent:
                         amount   = position_size_by_score(equity, best_sc['total'], mult=ceo_mult)
                         if amount <= balance * 0.95:
                             res = execute_buy(client, best_sym, amount,
-                                              source='OTONOM', period='Ajan')
+                                              source='OTONOM', period='Ajan', agent='OTONOM')
                             if res.get('ok'):
                                 sl  = max(1.5, min(6.0, atr_pct * 1.5))
                                 tp  = max(3.0, min(18.0, atr_pct * 3.0))

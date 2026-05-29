@@ -193,7 +193,7 @@ class IndicatorAgent:
                 f'📊 Neden: {reason}\n'
                 f'💰 Miktar: ${usdt:.2f}'
             )
-            res = execute_buy(client, sym, usdt, source=source, period=indicator)
+            res = execute_buy(client, sym, usdt, source=source, period=indicator, agent='INDICATOR')
             if res.get('ok'):
                 # NOT: total burada sayılmaz — _record() satışta sayar (çift sayım önlenir)
                 from bot import save_positions
@@ -242,7 +242,7 @@ class IndicatorAgent:
         for sym, pos in list(positions.items()):
             if pos.get('qty', 0) <= 0:
                 continue
-            if pos.get('agent', 'INDICATOR') != 'INDICATOR':
+            if pos.get('agent') != 'INDICATOR':
                 continue
             try:
                 price = get_price(client, sym)

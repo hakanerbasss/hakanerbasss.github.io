@@ -332,7 +332,7 @@ def _check_sl_cooldown(symbol, cooldown_hours=4):
     except:
         return True
 
-def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
+def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agent=None):
     try:
         price = get_price(client, symbol)
         if price <= 0:
@@ -411,6 +411,7 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—'):
             positions[symbol] = {
                 'qty': total_qty, 'avg_price': avg,
                 'tp_pct': tp_pct, 'sl_pct': sl_pct,
+                'agent': agent,
             }
             save_positions(positions)
         # ── Kilit bitti ─────────────────────────────────────────────────────

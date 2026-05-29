@@ -591,7 +591,7 @@ class EdgeAgent:
             f'📈 Fiyat: ${result["price"]:.4f}'
         )
 
-        res = execute_buy(client, symbol, usdt, source='EDGE', period=result['session'])
+        res = execute_buy(client, symbol, usdt, source='EDGE', period=result['session'], agent='EDGE')
         if res.get('ok'):
             with self._lock:
                 from bot import save_positions
@@ -622,7 +622,7 @@ class EdgeAgent:
             qty = pos.get('qty', 0)
             if qty <= 0:
                 continue
-            if pos.get('agent', 'EDGE') != 'EDGE':
+            if pos.get('agent') != 'EDGE':
                 continue
 
             # Aynı sembol için 60 saniye içinde tekrar bildirim gönderme

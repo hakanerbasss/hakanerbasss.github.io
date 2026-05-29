@@ -297,7 +297,7 @@ class BreakoutAgent:
         ceo_mult = cfg.get('ceo_position_mult', 1.0)
         usdt     = position_size_by_score(equity, result['score'], mult=ceo_mult)
 
-        res = execute_buy(client, symbol, usdt, source='BREAKOUT', period='1h')
+        res = execute_buy(client, symbol, usdt, source='BREAKOUT', period='1h', agent='BREAKOUT')
         if not res.get('ok'):
             print(f'[Breakout] Alım başarısız: {symbol} — {res.get("error")}')
             return

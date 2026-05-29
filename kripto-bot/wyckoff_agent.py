@@ -313,7 +313,7 @@ class WyckoffAgent:
             f'🎯 TP: %25 | SL: -%8'
         )
 
-        res = execute_buy(client, sym, usdt, source='WYCKOFF', period='Akümülasyon')
+        res = execute_buy(client, sym, usdt, source='WYCKOFF', period='Akümülasyon', agent='WYCKOFF')
         if res.get('ok'):
             from bot import save_positions
             pos = load_positions()
