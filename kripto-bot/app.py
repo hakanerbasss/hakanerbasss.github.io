@@ -155,27 +155,11 @@ def positions_clear():
 @app.route('/positions/clear_dust', methods=['POST'])
 @login_required
 def positions_clear_dust():
-    """Toz pozisyonları temizle — değeri <$2 olan kalıntılar (testnet artığı).
+    """MIN_NOTIONAL altındaki toz pozisyonları temizle (gerçek Binance eşiği).
     Gerçek pozisyonlara dokunmaz, sadece slot işgal eden tozları siler."""
-    from bot import save_positions, get_client, get_price
+    from bot import cleanup_dust_positions, get_client
     client = get_client()
-    positions = load_positions()
-    removed = []
-    for sym in list(positions.keys()):
-        p = positions[sym]
-        qty = p.get('qty', 0)
-        if qty <= 0:
-            del positions[sym]
-            continue
-        try:
-            price = get_price(client, sym)
-        except Exception:
-            price = p.get('avg_price', 0)
-        val = qty * price
-        if val < 2.0:
-            removed.append(f'{sym} (${val:.2f})')
-            del positions[sym]
-    save_positions(positions)
+    removed = cleanup_dust_positions(client)
     msg = ('Temizlendi: ' + ', '.join(removed)) if removed else 'Temizlenecek toz pozisyon yok'
     return jsonify({'ok': True, 'msg': msg, 'removed': removed})
 

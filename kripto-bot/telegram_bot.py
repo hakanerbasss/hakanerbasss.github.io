@@ -302,27 +302,11 @@ def handle_command(cmd, chat_id):
 
     elif cmd == '/toztemizle':
         try:
-            from bot import save_positions, get_price
+            from bot import cleanup_dust_positions
             client = get_client()
-            positions = load_positions()
-            removed = []
-            for sym in list(positions.keys()):
-                p = positions[sym]
-                qty = p.get('qty', 0)
-                if qty <= 0:
-                    del positions[sym]
-                    continue
-                try:
-                    price = get_price(client, sym)
-                except Exception:
-                    price = p.get('avg_price', 0)
-                val = qty * price
-                if val < 2.0:
-                    removed.append(f'{sym} (${val:.2f})')
-                    del positions[sym]
-            save_positions(positions)
+            removed = cleanup_dust_positions(client)
             if removed:
-                send_reply(chat_id, '🧹 Toz temizlendi:\n' + '\n'.join(removed))
+                send_reply(chat_id, '🧹 Toz temizlendi (MIN_NOTIONAL bazlı):\n' + '\n'.join(removed))
             else:
                 send_reply(chat_id, '✅ Temizlenecek toz pozisyon yok')
         except Exception as e:

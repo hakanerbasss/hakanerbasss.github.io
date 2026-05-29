@@ -616,6 +616,16 @@ class AutonomousAgent:
 
     def _send_report(self):
         client    = get_client()
+        # Saatlik rapor öncesi toz temizliği — MIN_NOTIONAL altı pozisyonlar silinir
+        try:
+            from bot import cleanup_dust_positions
+            removed = cleanup_dust_positions(client)
+            if removed:
+                print(f'[Otonom] Toz temizlendi: {removed}')
+                from bot import send_telegram
+                send_telegram('🧹 Toz pozisyonlar temizlendi: ' + ', '.join(removed))
+        except Exception as e:
+            print(f'[Otonom] Toz temizlik hatası: {e}')
         positions = load_positions()
         try:
             balance = get_usdt_balance(client)

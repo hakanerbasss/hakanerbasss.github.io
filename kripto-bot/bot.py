@@ -121,6 +121,34 @@ def get_usdt_balance(client):
     except:
         return 0.0
 
+def cleanup_dust_positions(client):
+    """MIN_NOTIONAL altındaki toz pozisyonları positions.json'dan siler.
+    Saatlik raporlarda otomatik çağrılır; /toztemizle ve web butonu da bunu kullanır.
+    Returns: temizlenen sembol listesi (boşsa [])."""
+    positions = load_positions()
+    removed = []
+    changed = False
+    for sym in list(positions.keys()):
+        p = positions[sym]
+        qty = p.get('qty', 0)
+        if qty <= 0:
+            del positions[sym]
+            changed = True
+            continue
+        try:
+            _, mn = get_symbol_filters(client, sym)
+            price  = get_price(client, sym)
+            val    = qty * price
+            if val < mn:
+                removed.append(f'{sym} (${val:.2f}<${mn:.0f}min)')
+                del positions[sym]
+                changed = True
+        except Exception:
+            pass
+    if changed:
+        save_positions(positions)
+    return removed
+
 
 def get_total_equity(client):
     """Serbest USDT + tüm açık pozisyonların güncel piyasa değeri.
@@ -388,13 +416,22 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
         with _TRADE_LOCK:
             positions = load_positions()
 
-            # Aynı coinde zaten aktif pozisyon var mı?
+            # Binance min satış tutarını al — toz tespiti için gerçek eşik
+            step, min_notional = get_symbol_filters(client, symbol)
             pos = positions.get(symbol, {'qty': 0, 'avg_price': 0})
-            if pos.get('qty', 0) > 0 and pos.get('qty', 0) * price >= 1.0:
+            pos_value = pos.get('qty', 0) * price
+
+            if pos_value >= min_notional:
+                # Gerçek açık pozisyon — engelle
                 return {'ok': False, 'error': f'{symbol} zaten açık pozisyon var'}
+            elif pos_value > 0:
+                # Toz pozisyon (MIN_NOTIONAL altı → Binance satmaya izin vermiyor)
+                # Yeni alımla sıfırdan başlat; ortalama hesabını bozmamak için sıfırla
+                print(f'[Bot] {symbol} toz pozisyon (${pos_value:.2f} < ${min_notional} min) yoksayıldı')
+                pos = {'qty': 0, 'avg_price': 0}
 
             # Global maksimum pozisyon limiti (tüm ajanlar paylaşır)
-            # Toz pozisyonlar (<$2 — testnet kalıntısı) slot işgal etmesin
+            # Slot sayımında MIN_NOTIONAL altı tozlar sayılmaz
             max_pos = int(cfg_data.get('max_positions', 6))
             open_count = sum(1 for p in positions.values()
                              if p.get('qty', 0) > 0
@@ -402,7 +439,6 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
             if open_count >= max_pos:
                 return {'ok': False, 'error': f'Pozisyon limiti dolu: {open_count}/{max_pos}'}
 
-            step = get_step_size(client, symbol)
             qty = round_step(usdt_amount / price, step)
             if qty <= 0:
                 return {'ok': False, 'error': f'Miktar çok küçük (step: {step})'}
