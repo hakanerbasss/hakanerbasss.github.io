@@ -278,7 +278,9 @@ def api_stats():
         if 'INDICATOR-UTBOT' in s:  return 'INDICATOR-UTBOT'
         if 'INDICATOR-SMART' in s:  return 'INDICATOR-SMART'
         if 'INDICATOR-SEANS' in s:  return 'INDICATOR-SEANS'
-        if 'INDICATOR' in s:        return 'INDICATOR-UTBOT'
+        if 'INDICATOR' in s:        return 'INDICATOR-UTBOT'  # eski kayıtlar UTBOT'a düşsün
+        if 'BREAKOUT' in s:         return 'BREAKOUT'
+        if 'WYCKOFF' in s:          return 'WYCKOFF'
         if 'EDGE' in s:             return 'EDGE'
         if 'OTONOM' in s:           return 'OTONOM'
         if 'UT' in s:               return 'UT BOT'
@@ -956,7 +958,7 @@ def agent_comparison():
 
     AGENTS = [
         'INDICATOR-UTBOT', 'INDICATOR-SMART', 'INDICATOR-SEANS',
-        'EDGE', 'OTONOM', 'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER',
+        'BREAKOUT', 'WYCKOFF', 'EDGE', 'OTONOM', 'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER',
     ]
 
     def _normalize(source):
@@ -965,6 +967,8 @@ def agent_comparison():
         if 'INDICATOR-SMART' in s:  return 'INDICATOR-SMART'
         if 'INDICATOR-SEANS' in s:  return 'INDICATOR-SEANS'
         if 'INDICATOR' in s:        return 'INDICATOR-UTBOT'  # eski kayıtlar UTBOT'a düşsün
+        if 'BREAKOUT' in s:         return 'BREAKOUT'
+        if 'WYCKOFF' in s:          return 'WYCKOFF'
         if 'EDGE' in s:             return 'EDGE'
         if 'OTONOM' in s:           return 'OTONOM'
         if 'UT' in s:               return 'UT BOT'

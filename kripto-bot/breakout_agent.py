@@ -393,8 +393,11 @@ class BreakoutAgent:
                     changed = False
 
                 print(f'[Breakout] {sym} ÇIKIŞ: {reason}')
+                # 'HARD STOP' veya 'TRAIL STOP' — her ikisi de 'STOP' içeriyor
+                # böylece bot.py'nin _check_sl_cooldown() mekanizması çalışır
+                sell_source = 'BREAKOUT HARD_STOP' if 'HARD STOP' in reason else 'BREAKOUT TRAIL_STOP'
                 res = execute_sell(client, sym, 100,
-                                   source='BREAKOUT', period='trail')
+                                   source=sell_source, period='trail')
                 if res.get('ok'):
                     pnl = res.get('pnl', 0)
                     peak_pct = round((peak - entry) / entry * 100, 1)
