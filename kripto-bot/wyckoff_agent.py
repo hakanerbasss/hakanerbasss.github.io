@@ -34,6 +34,12 @@ BREAKOUT_PCT     = 3         # Bant üstünde %3 kırılış
 BREAKOUT_VOL     = 1.5       # Hacim ortalamanın 1.5x üstünde
 MIN_SCORE        = 6.0       # Alım için minimum skor
 
+# ── Kâr koruması: kazanan pozisyon zarara (komisyon dahil) dönmesin ──
+BE_ARM_PCT     = 4.0   # +%4 görüldüyse başabaş koruması devreye girer
+BE_FLOOR_PCT   = 0.3   # bu seviyeye düşerse çık — komisyonu (~%0.2) çıkarır, NET ZARAR YOK
+TRAIL_ARM_PCT  = 10.0  # +%10'dan sonra zirve takibi (büyük Wyckoff hareketini sür)
+TRAIL_DIST_PCT = 5.0   # zirveden %5 düşünce çık
+
 
 class WyckoffAgent:
 
@@ -349,34 +355,51 @@ class WyckoffAgent:
                 tp  = pos.get('tp_pct', 25.0)
                 sl  = pos.get('sl_pct',  8.0)
 
+                # ── Zirve + koruma bayraklarını izle (kilit altında, tek sembol) ──
+                peak     = pos.get('peak_price', avg_price)
+                be_armed = pos.get('be_armed', False)
+                tr_armed = pos.get('trail_active', False)
+                meta = {}
+                if price > peak:
+                    peak = price
+                    meta['peak_price'] = peak
+                peak_pct = (peak - avg_price) / avg_price * 100
+                # +%BE_ARM görüldüyse başabaş koruması açılır → artık zarara dönemez
+                if not be_armed and pct >= BE_ARM_PCT:
+                    be_armed = True
+                    meta['be_armed'] = True
+                # +%TRAIL_ARM'dan sonra zirve takibi başlar
+                if not tr_armed and pct >= TRAIL_ARM_PCT:
+                    tr_armed = True
+                    meta['trail_active'] = True
+                if meta:
+                    update_position(sym, **meta)
+
+                # ── Çıkış kararı (öncelik sırasıyla) ──
+                reason = src = None
                 if pct >= tp:
-                    send_telegram(f'🏗✅ <b>WYCKOFF KÂR</b> {sym} +%{pct:.2f}')
-                    res = execute_sell(client, sym, 100, source='WYCKOFF TP', period='TP')
-                    if res.get('ok'):
-                        pos['qty'] = 0
-                        self.state['total_pnl'] = round(
-                            self.state.get('total_pnl', 0) + res.get('pnl', 0), 2)
-                        self.state['blacklist'][sym] = time.time() + 24 * 3600
-                        self._save()
-
+                    reason, src = f'+%{pct:.2f}', 'WYCKOFF TP'
                 elif pct <= -sl:
-                    send_telegram(f'🏗🔴 <b>WYCKOFF STOP</b> {sym} %{pct:.2f}')
-                    res = execute_sell(client, sym, 100, source='WYCKOFF SL', period='SL')
-                    if res.get('ok'):
-                        pos['qty'] = 0
-                        self.state['total_pnl'] = round(
-                            self.state.get('total_pnl', 0) + res.get('pnl', 0), 2)
-                        self.state['blacklist'][sym] = time.time() + 48 * 3600
-                        self._save()
-
-                # 7 gün timeout — pozisyon ne TP'ye ne SL'ye ulaşmadıysa çık
+                    reason, src = f'%{pct:.2f}', 'WYCKOFF SL'
+                elif tr_armed and (peak - price) / peak * 100 >= TRAIL_DIST_PCT:
+                    reason, src = f'+%{pct:.2f} (zirve +%{peak_pct:.1f})', 'WYCKOFF TRAIL'
+                elif be_armed and pct <= BE_FLOOR_PCT:
+                    # Başabaş: kâr eridi ama komisyon korundu → net zarar yok
+                    reason, src = f'+%{pct:.2f} (başabaş, komisyon korundu)', 'WYCKOFF BE'
                 elif time.time() - pos.get('open_time', time.time()) > 7 * 24 * 3600:
-                    send_telegram(f'🏗⏰ <b>WYCKOFF TIMEOUT</b> {sym} %{pct:.2f} (7 gün)')
-                    res = execute_sell(client, sym, 100, source='WYCKOFF TIMEOUT', period='TIME')
+                    reason, src = f'%{pct:.2f} (7 gün)', 'WYCKOFF TIMEOUT'
+
+                if reason:
+                    label = src.split()[-1]   # TP / SL / TRAIL / BE / TIMEOUT
+                    icon  = '✅' if pct >= 0 else '🔴'
+                    send_telegram(f'🏗{icon} <b>WYCKOFF {label}</b> {sym} {reason}')
+                    res = execute_sell(client, sym, 100, source=src, period=label)
                     if res.get('ok'):
-                        pos['qty'] = 0
                         self.state['total_pnl'] = round(
                             self.state.get('total_pnl', 0) + res.get('pnl', 0), 2)
+                        # Zararla (SL) çıkışta daha uzun bekleme; diğerlerinde kısa
+                        bl_h = 48 if src == 'WYCKOFF SL' else 24
+                        self.state['blacklist'][sym] = time.time() + bl_h * 3600
                         self._save()
 
             except Exception as e:
