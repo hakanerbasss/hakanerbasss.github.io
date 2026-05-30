@@ -262,7 +262,8 @@ def _collect_data():
         'otonom_enabled':    cfg.get('otonom_enabled', True),
         'indicator_enabled': cfg.get('indicator_enabled', True),
         'wyckoff_enabled':   cfg.get('wyckoff_enabled', True),
-        'breakout_enabled':  cfg.get('breakout_enabled', True),
+        'breakout_enabled':     cfg.get('breakout_enabled', True),
+        'accumulation_enabled': cfg.get('accumulation_enabled', True),
     }
 
     return {
@@ -524,11 +525,12 @@ def stop_ceo_agent():
     global _running
     _running = False
     cfg = load_config()
-    cfg['otonom_enabled']    = True
-    cfg['edge_enabled']      = True
-    cfg['indicator_enabled'] = True
-    cfg['wyckoff_enabled']   = True
-    cfg['breakout_enabled']  = True
+    cfg['otonom_enabled']       = True
+    cfg['edge_enabled']         = True
+    cfg['indicator_enabled']    = True
+    cfg['wyckoff_enabled']      = True
+    cfg['breakout_enabled']     = True
+    cfg['accumulation_enabled'] = True
     cfg['ceo_position_mult'] = 1.0
     save_config(cfg)
     send_telegram(

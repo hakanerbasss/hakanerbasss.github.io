@@ -460,8 +460,9 @@ input:focus,select:focus{border-color:#f0a500;}
           ('otonom',    'otonom_enabled',     True,  '🤖 Otonom Ajan',    'BTC rejim + teknik analiz'),
           ('indicator', 'indicator_enabled',  True,  '📐 Indicator',      'UT Bot otomatik tarama'),
           ('wyckoff',   'wyckoff_enabled',    True,  '📈 Wyckoff',        'Akümülasyon deseni tespiti'),
-          ('breakout',  'breakout_enabled',   True,  '🚀 Breakout',       'Hacim spike + trailing stop (sabit TP yok)'),
-          ('ceo',       'ceo_agent_enabled',  False, '👔 CEO Agent',      'Risk yöneticisi (DeepSeek)'),
+          ('breakout',     'breakout_enabled',    True,  '🚀 Breakout',       'Hacim spike + trailing stop (sabit TP yok)'),
+          ('accumulation', 'accumulation_enabled', True, '🔍 Birikim',        'Sessiz birikim: hacim squeeze + BB sıkışması'),
+          ('ceo',          'ceo_agent_enabled',   False, '👔 CEO Agent',      'Risk yöneticisi (DeepSeek)'),
         ] %}
         {% for key, cfg_key, def_val, label, desc in agent_rows %}
           {% set en = cfg.get(cfg_key, def_val) %}
@@ -1018,6 +1019,7 @@ const IND_COLORS = {
   'EDGE':             '#7c3aed',
   'OTONOM':           '#0891b2',
   'BREAKOUT':         '#dc2626',
+  'ACCUMULATION':     '#d97706',
   'WYCKOFF':          '#16a34a',
   'INDICATOR-UTBOT':  '#1d4ed8',
   'INDICATOR-SMART':  '#0369a1',
@@ -1031,7 +1033,7 @@ const IND_COLORS = {
 };
 
 const AGENT_ORDER = [
-  'EDGE', 'OTONOM', 'BREAKOUT', 'WYCKOFF',
+  'EDGE', 'OTONOM', 'BREAKOUT', 'ACCUMULATION', 'WYCKOFF',
   'INDICATOR-UTBOT', 'INDICATOR-SMART', 'INDICATOR-SEANS',
   'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER',
 ];
