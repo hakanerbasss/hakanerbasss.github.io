@@ -35,7 +35,7 @@ STABLECOINS = {
     'AEURUSDT','EURSUSDT','IDRTUSDT','BIDRUSDT','BRLAUSDT','USDSBUSDT',
 }
 
-SCAN_INTERVAL    = 600      # saniye (10 dakika)
+SCAN_INTERVAL    = 180      # saniye (3 dakika) — pump genellikle 10-30dk sürer, 3dk'da içerideyiz
 MONITOR_SEC      = 5        # saniye
 MIN_VOL_24H      = 500_000  # $500K minimum 24h hacim (illiquid filtre)
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
