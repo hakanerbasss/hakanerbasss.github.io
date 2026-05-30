@@ -400,6 +400,7 @@ class AutonomousAgent:
         threading.Thread(target=self._scanner_loop,  daemon=True).start()
         threading.Thread(target=self._hourly_loop,   daemon=True).start()
         threading.Thread(target=self._daily_loop,    daemon=True).start()
+        threading.Thread(target=self._weekly_loop,   daemon=True).start()
         threading.Thread(target=self._weight_loop,   daemon=True).start()
         threading.Thread(target=self._day_reset_loop, daemon=True).start()
 
@@ -699,6 +700,96 @@ class AutonomousAgent:
                 send_telegram('\n'.join(lines))
             except Exception as e:
                 print(f'[Daily] {e}')
+
+    def _weekly_loop(self):
+        """Her Pazar 09:00 (sunucu saati) haftalık performans raporu gönderir."""
+        now = datetime.datetime.now()
+        days_until_sunday = (6 - now.weekday()) % 7
+        if days_until_sunday == 0 and now.hour >= 9:
+            days_until_sunday = 7
+        next_sunday = (now + datetime.timedelta(days=days_until_sunday)).replace(
+            hour=9, minute=0, second=0, microsecond=0)
+        time.sleep(max(0, (next_sunday - now).total_seconds()))
+        while self.running:
+            try:
+                self._send_weekly_report()
+            except Exception as e:
+                print(f'[Weekly] {e}')
+            time.sleep(7 * 24 * 3600)
+
+    def _send_weekly_report(self):
+        trades   = load_trades()
+        week_ago = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+        sells    = [t for t in trades
+                    if t.get('type') == 'sell'
+                    and t.get('time', '') >= week_ago
+                    and not t.get('source', '').startswith('CEO_')]
+
+        if not sells:
+            send_telegram('📅 <b>HAFTALIK ÖZET</b>\n━━━━━━━━━━━━━━\nBu hafta kapalı işlem yok.')
+            return
+
+        wins      = [t for t in sells if t.get('pnl', 0) > 0]
+        losses    = [t for t in sells if t.get('pnl', 0) <= 0]
+        total_pnl = sum(t.get('pnl', 0) for t in sells)
+        gross_win = sum(t.get('pnl', 0) for t in wins)
+        gross_loss = abs(sum(t.get('pnl', 0) for t in losses))
+        pf        = round(gross_win / gross_loss, 2) if gross_loss > 0 else 99.0
+        wr        = round(len(wins) / len(sells) * 100, 1)
+        avg_win   = round(gross_win  / len(wins),   2) if wins   else 0
+        avg_loss  = round(gross_loss / len(losses), 2) if losses else 0
+
+        # Kümülatif PnL eğrisinden max drawdown
+        sorted_sells = sorted(sells, key=lambda x: x.get('time', ''))
+        equity = peak = max_dd = 0.0
+        for t in sorted_sells:
+            equity += t.get('pnl', 0)
+            if equity > peak: peak = equity
+            dd = peak - equity
+            if dd > max_dd: max_dd = dd
+
+        # Ajan bazında kırılım
+        buckets = {}
+        for t in sells:
+            src = (t.get('source') or '').upper()
+            if   'OTONOM'    in src: ag = 'OTONOM'
+            elif 'EDGE'      in src: ag = 'EDGE'
+            elif 'BREAKOUT'  in src: ag = 'BREAKOUT'
+            elif 'INDICATOR' in src: ag = 'INDICATOR'
+            elif 'WYCKOFF'   in src: ag = 'WYCKOFF'
+            else:                    ag = 'DİĞER'
+            b = buckets.setdefault(ag, {'n': 0, 'w': 0, 'pnl': 0.0})
+            b['n'] += 1
+            if t.get('pnl', 0) > 0: b['w'] += 1
+            b['pnl'] += t.get('pnl', 0)
+
+        pnl_str = f"+${round(total_pnl,2)}" if total_pnl >= 0 else f"-${abs(round(total_pnl,2))}"
+        lines = [
+            "📅 <b>HAFTALIK PERFORMANS ÖZETI</b>",
+            "━━━━━━━━━━━━━━",
+            f"📊 {len(sells)} işlem  |  %{wr} kazanma",
+            f"💹 Net PnL: <b>{pnl_str}</b>",
+            f"⚖️ Profit Factor: <b>{pf}</b>  (>1 = kârlı)",
+            f"📈 Ort Kazanç: +${avg_win}  |  📉 Ort Kayıp: -${avg_loss}",
+            f"🕳 Max Drawdown: -${round(max_dd,2)}",
+            "",
+            "🤖 <b>Ajan Kırılımı:</b>",
+        ]
+        for ag, b in sorted(buckets.items(), key=lambda x: x[1]['pnl'], reverse=True):
+            ag_wr  = round(b['w'] / b['n'] * 100) if b['n'] else 0
+            p      = b['pnl']
+            p_str  = f"+${round(p,2)}" if p >= 0 else f"-${abs(round(p,2))}"
+            em     = '🟢' if p >= 0 else '🔴'
+            lines.append(f"  {em} {ag}: {b['n']}iş  %{ag_wr}WR  {p_str}")
+
+        if total_pnl > 0 and pf >= 1.3:
+            lines += ["", "✅ <b>Yorum:</b> Edge pozitif, strateji çalışıyor."]
+        elif total_pnl >= 0 and pf < 1.3:
+            lines += ["", "⚠️ <b>Yorum:</b> Kârlı ama profit factor zayıf — kayıplar büyük."]
+        else:
+            lines += ["", "🔴 <b>Yorum:</b> Zarar hafta — en çok kaybeden ajanı gözden geçir."]
+
+        send_telegram('\n'.join(lines))
 
     def _track_signal(self, pos, pnl):
         key  = f"sc_{int(pos.get('open_score',0))}"
