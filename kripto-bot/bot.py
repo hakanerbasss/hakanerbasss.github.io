@@ -279,6 +279,9 @@ def get_portfolio_summary(client):
     closed = [t for t in trades if t.get('type') == 'sell']
     wins = [t for t in closed if t.get('pnl', 0) > 0]
     success_rate = round(len(wins) / len(closed) * 100, 1) if closed else 0
+    # Gerçekleşen net K/Z: kapanan tüm işlemlerin net PnL toplamı (botun gerçekten
+    # kazandığı/kaybettiği para — total_pnl ise açık pozisyonların kâğıt K/Z'si).
+    realized_pnl = round(sum(t.get('pnl', 0) for t in closed), 2)
 
     return {
         'positions': result,
@@ -286,6 +289,7 @@ def get_portfolio_summary(client):
         'total_current': round(total_current, 2),
         'total_pnl': round(total_current - total_invested, 2),
         'total_pnl_pct': round((total_current - total_invested) / total_invested * 100, 1) if total_invested > 0 else 0,
+        'realized_pnl': realized_pnl,
         'success_rate': success_rate,
         'total_trades': len(closed),
         'win_trades': len(wins),
