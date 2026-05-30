@@ -37,12 +37,12 @@ STABLECOINS = {
 
 SCAN_INTERVAL    = 180      # saniye (3 dakika) — pump genellikle 10-30dk sürer, 3dk'da içerideyiz
 MONITOR_SEC      = 5        # saniye
-MIN_VOL_24H      = 500_000  # $500K minimum 24h hacim (illiquid filtre)
+MIN_VOL_24H      = 200_000  # $200K minimum 24h hacim — düşük hacimli pumpler de yakalansın
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 
 # Kırılım kriterleri
 MIN_PRICE_CHG_2H = 4.0   # son 2 saatte min %4 fiyat hareketi
-MIN_VOL_SPIKE    = 2.0   # son 2 saatlik hacim, saatlik ortalamanın 2x'i
+MIN_VOL_SPIKE    = 3.0   # 2x→3x: daha düşük hacim tabanını daha güçlü spike ile dengele
 MAX_CHG_24H      = 35.0  # 24s'te bundan fazla pompalanmış → geç giriş/pump-dump riski, atla
 
 # Çıkış parametreleri — SABİT TP YOK, KADEMELİ TRAIL
