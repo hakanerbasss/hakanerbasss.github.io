@@ -501,6 +501,11 @@ class EdgeAgent:
             print('[Edge] CEO tarafından durduruldu, tarama atlandı')
             return
 
+        from bot import is_trading_halted
+        if is_trading_halted(client):
+            print('[Edge] Global devre kesici aktif — yeni alım yok')
+            return
+
         positions = load_positions()
         open_count = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
         if open_count >= MAX_POSITIONS:
@@ -651,6 +656,8 @@ class EdgeAgent:
 
             try:
                 price     = get_price(client, symbol)
+                if price <= 0:        # ağ hatası → 0.0; sahte SL tetiklemesini önle
+                    continue
                 avg_price = pos.get('avg_price', price)
                 if avg_price <= 0:
                     continue

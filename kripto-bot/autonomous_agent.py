@@ -466,6 +466,12 @@ class AutonomousAgent:
                         time.sleep(self.SCAN_INTERVAL)
                         continue
 
+                    from bot import is_trading_halted
+                    if is_trading_halted(client):
+                        print('[Otonom] Global devre kesici aktif — yeni alım yok')
+                        time.sleep(self.SCAN_INTERVAL)
+                        continue
+
                     balance = get_usdt_balance(client)
                     if not _daily_loss_ok({}, self.state.get('day_start_balance', balance),
                                           balance, self.DAILY_LOSS_LIMIT):

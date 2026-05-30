@@ -234,6 +234,11 @@ class WyckoffAgent:
             print('[Wyckoff] Kapalı (wyckoff_enabled=false), tarama atlandı')
             return
 
+        from bot import is_trading_halted
+        if is_trading_halted(client):
+            print('[Wyckoff] Global devre kesici aktif — yeni alım yok')
+            return
+
         positions = load_positions()
         open_cnt  = sum(
             1 for p in positions.values()
@@ -348,6 +353,8 @@ class WyckoffAgent:
                 continue
             try:
                 price     = get_price(client, sym)
+                if price <= 0:        # ağ hatası → 0.0; sahte SL tetiklemesini önle
+                    continue
                 avg_price = pos.get('avg_price', price)
                 if avg_price <= 0:
                     continue

@@ -296,6 +296,11 @@ class AccumulationAgent:
         if not ceo_flag(cfg, 'accumulation_enabled', True):
             return
 
+        from bot import is_trading_halted
+        if is_trading_halted(client):
+            print('[Accum] Global devre kesici aktif — yeni alım yok')
+            return
+
         positions  = load_positions()
         open_all   = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
         open_mine  = sum(1 for p in positions.values()
@@ -366,6 +371,8 @@ class AccumulationAgent:
                 continue
             try:
                 price = get_price(client, sym)
+                if price <= 0:        # ağ hatası → 0.0; sahte SL tetiklemesini önle
+                    continue
                 avg   = pos.get('avg_price', price)
                 if avg <= 0:
                     continue

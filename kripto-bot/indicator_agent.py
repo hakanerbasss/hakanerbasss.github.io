@@ -163,6 +163,11 @@ class IndicatorAgent:
             print('[Indicator] Kapalı (indicator_enabled=false), tarama atlandı')
             return
 
+        from bot import is_trading_halted
+        if is_trading_halted(client):
+            print('[Indicator] Global devre kesici aktif — yeni alım yok')
+            return
+
         positions = load_positions()
         open_cnt  = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
         if open_cnt >= MAX_POSITIONS:
@@ -269,6 +274,8 @@ class IndicatorAgent:
                 continue
             try:
                 price = get_price(client, sym)
+                if price <= 0:        # ağ hatası → 0.0; sahte SL tetiklemesini önle
+                    continue
                 avg   = pos.get('avg_price', price)
                 if avg <= 0:
                     continue

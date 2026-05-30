@@ -245,6 +245,72 @@ def check_breakeven(symbol, pos, pct, arm=BE_ARM_PCT, floor=BE_FLOOR_PCT):
     except Exception:
         return False
 
+# ── Global Devre Kesici (gün-içi felaket stopu) ──
+# Tüm ajanlar bir gün içinde toplam equity'nin belli bir %'sini kaybederse YENİ
+# alımlar durur (açık pozisyonlar SL/TP/trailing ile yönetilmeye devam eder).
+# Her ajanın ayrı -%8 limiti vardı; bunlar üst üste binip toplam düşüşü aşabiliyordu.
+# Bu, portföy seviyesinde tek bir koruma. Bir kez tetiklenince gün boyu kapalı
+# kalır (revenge-trading önlemi); gece yarısı baz çizgisi sıfırlanır.
+GLOBAL_HALT_PCT_DEFAULT = 10.0   # config'den 'global_halt_pct' ile değişir; 0 = kapalı
+_HALT = {'date': None, 'baseline': 0.0, 'tripped': False, 'notified': False, 'last_check': 0.0}
+
+def is_trading_halted(client=None):
+    """Gün-içi toplam düşüş eşiği aşıldıysa True (yeni alım yapma). 30s cache'li."""
+    try:
+        halt_pct = float(load_config().get('global_halt_pct', GLOBAL_HALT_PCT_DEFAULT))
+        if halt_pct <= 0:
+            return False
+        now   = time.time()
+        today = datetime.date.today().isoformat()
+        if client is None:
+            client = get_client()
+
+        # Yeni gün → baz çizgisini sıfırla
+        if _HALT['date'] != today:
+            try:
+                _HALT['baseline'] = get_total_equity(client)
+            except Exception:
+                _HALT['baseline'] = 0.0
+            _HALT.update({'date': today, 'tripped': False, 'notified': False, 'last_check': now})
+            return False
+
+        if _HALT['tripped']:
+            return True   # gün boyu kapalı kal
+
+        if now - _HALT['last_check'] < 30:   # her taramada equity hesaplama
+            return False
+        _HALT['last_check'] = now
+
+        baseline = _HALT['baseline']
+        if baseline <= 0:
+            try:
+                _HALT['baseline'] = get_total_equity(client)
+            except Exception:
+                pass
+            return False
+
+        try:
+            equity = get_total_equity(client)
+        except Exception:
+            return False
+        dd = (equity - baseline) / baseline * 100
+        if dd <= -halt_pct:
+            _HALT['tripped'] = True
+            if not _HALT['notified']:
+                _HALT['notified'] = True
+                send_telegram(
+                    f'🛑 <b>GLOBAL DEVRE KESİCİ TETİKLENDİ</b>\n'
+                    f'━━━━━━━━━━━━━━\n'
+                    f'📉 Gün-içi toplam düşüş: %{dd:.1f} (eşik: -%{halt_pct:.0f})\n'
+                    f'⛔ Tüm ajanlarda YENİ alımlar durduruldu.\n'
+                    f'✅ Açık pozisyonlar SL/TP/trailing ile yönetilmeye devam ediyor.\n'
+                    f'🔄 Gece yarısı otomatik sıfırlanır.'
+                )
+            return True
+        return False
+    except Exception:
+        return False
+
 # ── Portfolio ────────────────────────────────────
 def get_portfolio_summary(client):
     positions = load_positions()

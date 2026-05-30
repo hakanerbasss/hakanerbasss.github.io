@@ -257,6 +257,10 @@ class BreakoutAgent:
             return
 
         client    = get_client()
+        from bot import is_trading_halted
+        if is_trading_halted(client):
+            print('[Breakout] Global devre kesici aktif — yeni alım yok')
+            return
         positions = load_positions()
 
         breakout_open = [
@@ -362,6 +366,8 @@ class BreakoutAgent:
             try:
                 price = get_price(client, sym)
             except Exception:
+                continue
+            if price <= 0:            # ağ hatası → 0.0; sahte hard-stop tetiklemesini önle
                 continue
 
             entry       = pos.get('avg_price', price)
