@@ -223,6 +223,28 @@ def position_size_by_score(equity, score, mult=1.0,
     size = equity * pct * max(0.0, float(mult))
     return max(min_usd, round(size, 2))
 
+
+# ── Başabaş koruması (TÜM ajanlar için ortak) ────
+# Felsefe: bir işlem bir kez anlamlı yeşile geçtiyse, bir daha NET zarara
+# dönmemeli. Trailing'e EK güvenlik ağıdır (trailing tek başına zirveden geri
+# çekilirken hâlâ küçük zarara izin verebilir). Eşik bilinçli olarak çok düşük
+# DEĞİL — yoksa her ufak dalgada satıp komisyona boğar (tutarlı kazancın düşmanı).
+BE_ARM_PCT   = 2.0   # +%2 görülünce koruma kurulur
+BE_FLOOR_PCT = 0.3   # +%0.3 altına düşerse çık → round-trip komisyon (~%0.2) üstü, net zarar yok
+
+def check_breakeven(symbol, pos, pct, arm=BE_ARM_PCT, floor=BE_FLOOR_PCT):
+    """+arm% bir kez görüldüyse 'be_armed' bayrağını kalıcı kurar; sonra fiyat
+    +floor% altına düşerse True döner (çağıran %100 satmalı). floor komisyonun
+    üstünde olduğundan tetiklenince kazanan işlem net zarara dönmez.
+    pos: ajanın elindeki canlı sözlük (bayrak hem bellekte hem diske yazılır)."""
+    try:
+        if not pos.get('be_armed') and pct >= arm:
+            pos['be_armed'] = True
+            update_position(symbol, be_armed=True)
+        return bool(pos.get('be_armed') and pct <= floor)
+    except Exception:
+        return False
+
 # ── Portfolio ────────────────────────────────────
 def get_portfolio_summary(client):
     positions = load_positions()

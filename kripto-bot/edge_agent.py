@@ -19,7 +19,7 @@ from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
                  send_telegram, get_usdt_balance,
-                 update_position, clear_position)
+                 update_position, clear_position, check_breakeven)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE   = 'edge_state.json'
@@ -677,6 +677,16 @@ class EdgeAgent:
                     self._force_clear(symbol, res)
                     self.blacklist[symbol] = time.time() + 6 * 3600
                     self._record_exit(symbol, pos, pct, 'SL')
+                    continue
+
+                # Başabaş koruması: +%2 görüldüyse bir daha net zarara dönmesin
+                if check_breakeven(symbol, pos, pct):
+                    self._notified[symbol] = time.time()
+                    send_telegram(f'🟦 <b>{symbol}</b> BAŞABAŞ +%{pct:.2f} → kâr korundu')
+                    res = execute_sell(client, symbol, 100, source='EDGE BE', period='BE')
+                    self._notified.pop(symbol, None)
+                    self._force_clear(symbol, res)
+                    self._record_exit(symbol, pos, pct, 'BE')
                     continue
 
                 # Trailing stop: %40 TP'de aktif, peak'ten %2.5 düşüşte çık

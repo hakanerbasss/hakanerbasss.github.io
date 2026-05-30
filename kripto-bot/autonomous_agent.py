@@ -15,7 +15,7 @@ import time, datetime, threading, json, os, math
 from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
-                 send_telegram, get_usdt_balance, update_position)
+                 send_telegram, get_usdt_balance, update_position, check_breakeven)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE    = 'agent_state.json'
@@ -296,6 +296,9 @@ def _exit_decision(client, sym, pos, regime, live_price=None):
 
         if change >= tp:         return 'KAR HEDEFİ'
         if change <= -sl:        return 'STOP LOSS'
+
+        # Başabaş koruması: +%2 görüldüyse bir daha net zarara dönmesin
+        if check_breakeven(sym, pos, change): return 'BAŞABAŞ'
 
         if pos.get('check_momentum', False):
             try:

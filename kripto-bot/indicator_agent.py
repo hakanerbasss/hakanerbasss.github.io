@@ -10,7 +10,7 @@ Indicator Agent — Kodlanmış İndikatörler ile Otonom Tarayıcı
 import time, threading, json, os, datetime
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, get_price, send_telegram, get_usdt_balance,
-                 update_position)
+                 update_position, check_breakeven)
 from signal_engine import calc_ut_bot, get_klines
 from smart_strategy import check_smart_sell   # sadece açık SMART pozisyonların çıkışı için
 
@@ -272,6 +272,14 @@ class IndicatorAgent:
                     if res.get('ok'):
                         self._add_bl(sym, 6)
                         self._record(sym, pos, pct, False)
+                    continue
+
+                # Başabaş koruması: +%2 görüldüyse bir daha net zarara dönmesin
+                if check_breakeven(sym, pos, pct):
+                    res = execute_sell(client, sym, 100,
+                                       source=f'INDICATOR-{ind} BE', period='BE')
+                    if res.get('ok'):
+                        self._record(sym, pos, pct, pct > 0)
                     continue
 
                 # Trailing stop — TP'nin %40'ına ulaşınca aktif, peak'ten -%2 düşüşte çık

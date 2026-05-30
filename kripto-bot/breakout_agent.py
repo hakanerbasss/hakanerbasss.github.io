@@ -24,7 +24,7 @@ from binance.client import Client as BC
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
                  send_telegram, get_usdt_balance, get_total_equity,
-                 position_size_by_score, update_position)
+                 position_size_by_score, update_position, check_breakeven)
 
 STATE_FILE = 'breakout_state.json'
 
@@ -401,11 +401,20 @@ class BreakoutAgent:
                     reason = (f'TRAIL STOP -{trail_dist:.0f}% | peak=+{peak_pct:.1f}% '
                               f'pnl=+{pnl_pct:.1f}%')
 
+            # 3. Başabaş koruması: +%2 görüldüyse net zarara dönmesin
+            #    (trailing daha yüksekte yakalamadıysa devreye girer)
+            if not reason and check_breakeven(sym, pos, pnl_pct):
+                reason = f'BAŞABAŞ +{pnl_pct:.1f}%'
+
             if reason:
                 print(f'[Breakout] {sym} ÇIKIŞ: {reason}')
-                # Kaynak etiketi (HARD_STOP / TRAIL_STOP) raporlama içindir;
-                # cooldown artık gerçekleşen PnL'e bakar (kârlı trail cezalanmaz).
-                sell_source = 'BREAKOUT HARD_STOP' if 'HARD STOP' in reason else 'BREAKOUT TRAIL_STOP'
+                # Kaynak etiketi raporlama içindir; cooldown gerçekleşen PnL'e bakar.
+                if 'HARD STOP' in reason:
+                    sell_source = 'BREAKOUT HARD_STOP'
+                elif 'BAŞABAŞ' in reason:
+                    sell_source = 'BREAKOUT BE'
+                else:
+                    sell_source = 'BREAKOUT TRAIL_STOP'
                 res = execute_sell(client, sym, 100,
                                    source=sell_source, period='trail')
                 if res.get('ok'):
