@@ -42,7 +42,7 @@ MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 
 # Kırılım kriterleri
 MIN_PRICE_CHG_2H = 4.0   # son 2 saatte min %4 fiyat hareketi
-MIN_VOL_SPIKE    = 2.5   # 2x çok gevşek (pump-dump), 3x çok sıkı (0 hit) → 2.5x denge
+MIN_VOL_SPIKE    = 3.0   # 2x→3x: $200K hacim tabanını daha güçlü spike ile dengele
 MAX_CHG_24H      = 35.0  # 24s'te bundan fazla pompalanmış → geç giriş/pump-dump riski, atla
 
 # Çıkış parametreleri — SABİT TP YOK, KADEMELİ TRAIL
