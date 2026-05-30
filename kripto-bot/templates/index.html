@@ -423,6 +423,11 @@ input:focus,select:focus{border-color:#f0a500;}
         <label>Maks. Açık Pozisyon</label>
         <input type="number" id="cfgMaxPositions" value="{{ cfg.get('max_positions', 6) }}" min="1" max="20">
       </div>
+      <div class="form-group">
+        <label>SL Sonrası Cooldown (saat)</label>
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">SL yendikten sonra aynı coinde yeniden alım yapılmaz. Tüm ajanlar için geçerli; coin bazında ayar varsa o önceliklidir.</div>
+        <input type="number" id="cfgSlCooldown" value="{{ cfg.get('sl_cooldown_hours', 3) }}" min="0" max="48" step="0.5">
+      </div>
     </div>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;">
       <h3 style="font-size:14px;margin-bottom:12px;color:#f0c040;">👔 CEO Agent</h3>
@@ -1146,6 +1151,7 @@ function saveSettings() {
   data.append('ceo_interval_hours', document.getElementById('cfgCeoInterval').value);
   data.append('report_interval_hours', document.getElementById('cfgReportInterval').value);
   data.append('max_positions', document.getElementById('cfgMaxPositions').value);
+  data.append('sl_cooldown_hours', document.getElementById('cfgSlCooldown').value);
   fetch('/settings',{method:'POST',body:data}).then(r=>r.json())
     .then(d=>{ if(d.ok) toast('Ayarlar kaydedildi'); else toast(d.error,false); });
 }

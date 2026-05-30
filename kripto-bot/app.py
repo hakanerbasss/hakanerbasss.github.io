@@ -345,6 +345,7 @@ def settings():
     cfg['telegram_token']       = request.form.get('telegram_token', '')
     cfg['telegram_chat_id']     = request.form.get('telegram_chat_id', '')
     cfg['max_positions']        = int(request.form.get('max_positions', 6))
+    cfg['sl_cooldown_hours']    = float(request.form.get('sl_cooldown_hours', 3))
     if request.form.get('deepseek_api_key', '').strip():
         cfg['deepseek_api_key'] = request.form.get('deepseek_api_key', '').strip()
     old_ceo_interval             = cfg.get('ceo_interval_hours', 1)

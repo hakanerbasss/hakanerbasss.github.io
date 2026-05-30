@@ -372,10 +372,11 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
         if price <= 0:
             return {'ok': False, 'error': 'Fiyat alınamadı'}
 
-        # SL cooldown kontrolü
+        # SL cooldown kontrolü — öncelik: coin ayarı > global ayar > hardcoded default (3s)
         cfg_data   = load_config()
         coin_cfg   = next((c for c in cfg_data.get('coins', []) if c['symbol'] == symbol), {})
-        cooldown_h = float(coin_cfg.get('sl_cooldown_hours', 3))
+        global_cd  = float(cfg_data.get('sl_cooldown_hours', 3))
+        cooldown_h = float(coin_cfg.get('sl_cooldown_hours', global_cd))
         if cooldown_h > 0 and not _check_sl_cooldown(symbol, cooldown_h):
             trades_tmp = load_trades()
             last_sl = next((t for t in reversed(trades_tmp)
