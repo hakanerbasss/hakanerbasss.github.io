@@ -396,7 +396,7 @@ class IndicatorAgent:
         )
         if pos_lines:
             msg += '\n'.join(pos_lines) + '\n'
-        msg += '━━━━━━━━━━━━━━\n📊 <b>İndikatör Performansı:</b>\n'
+        msg += '━━━━━━━━━━━━━━\n📊 <b>İndikatör Performansı</b> (kapalı işlemler):\n'
         msg += '\n'.join(ind_lines)
         send_telegram(msg)
 

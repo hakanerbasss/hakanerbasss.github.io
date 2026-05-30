@@ -780,7 +780,9 @@ class EdgeAgent:
     def _hourly_report(self):
         client    = get_client()
         positions = load_positions()
-        open_pos  = {s: p for s, p in positions.items() if p.get('qty', 0) > 0}
+        # Tüm pozisyonlar (diğer ajanların görünmesi için) — ama sayımda sadece EDGE'inkiler
+        all_pos  = {s: p for s, p in positions.items() if p.get('qty', 0) > 0}
+        edge_pos = {s: p for s, p in all_pos.items() if p.get('agent') == 'EDGE'}
 
         try:
             bal = get_usdt_balance(client)
@@ -789,7 +791,7 @@ class EdgeAgent:
 
         pos_lines = []
         total_pnl = 0.0
-        for sym, pos in open_pos.items():
+        for sym, pos in all_pos.items():
             try:
                 price  = get_price(client, sym)
                 avg    = pos.get('avg_price', price)
@@ -810,7 +812,7 @@ class EdgeAgent:
             f'📊 <b>Edge Agent Saatlik Rapor</b>\n'
             f'━━━━━━━━━━━━━━\n'
             f'💰 Bakiye: ${bal:.2f}\n'
-            f'📦 Açık Pozisyon: {len(open_pos)}/{MAX_POSITIONS}\n'
+            f'📦 Edge Pozisyon: {len(edge_pos)}/{MAX_POSITIONS} | Tümü: {len(all_pos)}\n'
         )
         if pos_lines:
             msg += '\n'.join(pos_lines) + '\n'
