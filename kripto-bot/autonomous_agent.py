@@ -14,8 +14,8 @@ Otonom Kripto Ajan v2 — Gerçek Zamanlı
 import time, datetime, threading, json, os, math
 from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
-                 load_positions, save_positions, load_trades, get_price,
-                 send_telegram, get_usdt_balance)
+                 load_positions, load_trades, get_price,
+                 send_telegram, get_usdt_balance, update_position)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE    = 'agent_state.json'
@@ -259,17 +259,8 @@ def _score(client, sym, regime, weights):
 
 # ─── Risk Yönetimi ────────────────────────────────────────────────────────────
 
-def _position_size(balance, score, atr_pct, is_real, max_positions):
-    risk_per_trade = 0.01 if is_real else 0.02
-    sl_pct_est     = max(atr_pct * 1.5, 1.5) / 100
-    raw_size       = balance * risk_per_trade / sl_pct_est
-    multiplier = max(0.4, min(1.0, (score - 5.0) / 4.0))
-    size       = raw_size * multiplier
-    max_pct  = 0.05 if is_real else 0.10
-    size     = min(size, balance * max_pct)
-    per_slot = balance / max_positions * 0.30
-    size     = min(size, per_slot)
-    return max(10.0, round(size, 2))
+# NOT: Eski Kelly tabanlı _position_size kaldırıldı — artık tüm ajanlar
+# bot.position_size_by_score (ortak skor-bazlı kural) kullanıyor. Ölü koddu.
 
 
 def _daily_loss_ok(trades, balance_start, balance_now, max_loss_pct=8.0):
@@ -419,7 +410,7 @@ class AutonomousAgent:
                 client    = get_client()
                 positions = load_positions()
                 regime    = self.state.get('last_regime', 'SIDEWAYS')
-                changed   = False
+                state_dirty = False
 
                 for sym, pos in list(positions.items()):
                     if pos.get('qty', 0) <= 0: continue
@@ -432,27 +423,25 @@ class AutonomousAgent:
 
                     reason = _exit_decision(client, sym, pos, regime)
 
-                    # _exit_decision peak_price/trail_active'i güncellediyse diske yaz
+                    # _exit_decision peak_price/trail_active'i güncellediyse SADECE
+                    # bu sembolü kilit altında yaz (tüm dict'i yazmak lost-update yapardı)
                     if pos.get('peak_price') != pre_peak or pos.get('trail_active') != pre_trail:
-                        changed = True
+                        update_position(sym, peak_price=pos.get('peak_price'),
+                                        trail_active=pos.get('trail_active', False))
 
                     if reason:
-                        positions[sym] = pos
-                        is_sl = 'STOP' in reason
-                        src   = 'OTONOM SL' if is_sl else 'OTONOM'
-                        res = execute_sell(client, sym, 100, source=src, period=reason)
+                        # SL etiketi/blacklist süresi GERÇEKLEŞEN PnL'e göre belirlenir;
+                        # kârlı bir 'TRAIL STOP' artık SL gibi cezalandırılmaz.
+                        res = execute_sell(client, sym, 100, source='OTONOM', period=reason)
                         if res.get('ok'):
-                            positions[sym]['qty'] = 0  # local dict'i hemen güncelle
                             pnl = res.get('pnl', 0)
+                            is_loss = pnl < 0
                             self.state['total_pnl'] = round(self.state.get('total_pnl',0) + pnl, 2)
-                            self._add_bl(sym, 8 if is_sl else 2)
+                            self._add_bl(sym, 8 if is_loss else 2)
                             self._track_signal(pos, pnl)
-                        changed = True
-                    else:
-                        positions[sym] = pos
+                            state_dirty = True
 
-                if changed:
-                    save_positions(positions)
+                if state_dirty:
                     self._save()
 
             except Exception as e:
@@ -524,17 +513,15 @@ class AutonomousAgent:
                             if res.get('ok'):
                                 sl  = max(1.5, min(6.0, atr_pct * 1.5))
                                 tp  = max(3.0, min(18.0, atr_pct * 3.0))
-                                positions = load_positions()
-                                if best_sym in positions:
-                                    positions[best_sym].update({
-                                        'agent': 'OTONOM',
-                                        'tp_pct': tp, 'sl_pct': sl,
-                                        'trail_active': False,
-                                        'peak_price': res['price'],
-                                        'buy_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                        'open_score': best_sc['total'],
-                                    })
-                                save_positions(positions)
+                                update_position(
+                                    best_sym,
+                                    agent='OTONOM',
+                                    tp_pct=tp, sl_pct=sl,
+                                    trail_active=False,
+                                    peak_price=res['price'],
+                                    buy_time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                    open_score=best_sc['total'],
+                                )
                                 self._send_buy_rationale(best_sym, best_sc, amount, tp, sl, regime, is_real)
 
                     self.state['scan_count'] += 1

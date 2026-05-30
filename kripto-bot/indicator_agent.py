@@ -9,7 +9,8 @@ Indicator Agent — Kodlanmış İndikatörler ile Otonom Tarayıcı
 
 import time, threading, json, os, datetime
 from bot import (load_config, get_client, execute_buy, execute_sell,
-                 load_positions, get_price, send_telegram, get_usdt_balance)
+                 load_positions, get_price, send_telegram, get_usdt_balance,
+                 update_position)
 from signal_engine import calc_ut_bot, get_klines
 from smart_strategy import check_smart_sell   # sadece açık SMART pozisyonların çıkışı için
 
@@ -205,15 +206,10 @@ class IndicatorAgent:
             res = execute_buy(client, sym, usdt, source=source, period=indicator, agent='INDICATOR')
             if res.get('ok'):
                 # NOT: total burada sayılmaz — _record() satışta sayar (çift sayım önlenir)
-                from bot import save_positions
-                pos_now = load_positions()
-                if sym in pos_now:
-                    pos_now[sym].update({
-                        'agent':          'INDICATOR',
-                        'indicator_name': indicator,
-                        'open_time':      time.time(),
-                    })
-                    save_positions(pos_now)
+                update_position(sym,
+                                agent='INDICATOR',
+                                indicator_name=indicator,
+                                open_time=time.time())
                 break  # Tek taramada bir alım yeter
 
         self.state['scan_count'] = self.state.get('scan_count', 0) + 1
@@ -281,12 +277,8 @@ class IndicatorAgent:
                 # Trailing stop — TP'nin %40'ına ulaşınca aktif, peak'ten -%2 düşüşte çık
                 peak = pos.get('peak_price', avg)
                 if price > peak:
-                    from bot import save_positions
-                    pos_now = load_positions()
-                    if sym in pos_now:
-                        pos_now[sym]['peak_price'] = price
-                        save_positions(pos_now)
-                        peak = price
+                    update_position(sym, peak_price=price)  # kilit altında, tek sembol
+                    peak = price
 
                 # Trail: TP'nin %50'sine ulaşınca aktif, peak'ten -%3 düşüşte çık
                 # (önceki: %40 / -%2 → çok erken çıkıyordu, net kazanç ~%0.4'e düşüyordu)

@@ -10,7 +10,8 @@ Wyckoff Akümülasyon Ajanı
 
 import time, threading, datetime, json, os
 from bot import (load_config, get_client, execute_buy, execute_sell,
-                 load_positions, get_price, send_telegram, get_usdt_balance)
+                 load_positions, get_price, send_telegram, get_usdt_balance,
+                 update_position)
 from binance.client import Client as BClient
 
 STATE_FILE = 'wyckoff_state.json'
@@ -315,17 +316,12 @@ class WyckoffAgent:
 
         res = execute_buy(client, sym, usdt, source='WYCKOFF', period='Akümülasyon', agent='WYCKOFF')
         if res.get('ok'):
-            from bot import save_positions
-            pos = load_positions()
-            if sym in pos:
-                pos[sym].update({
-                    'agent':         'WYCKOFF',
-                    'open_time':     time.time(),
-                    'wyckoff_score': result['score'],
-                    'tp_pct':        25.0,
-                    'sl_pct':         8.0,
-                })
-                save_positions(pos)
+            update_position(sym,
+                            agent='WYCKOFF',
+                            open_time=time.time(),
+                            wyckoff_score=result['score'],
+                            tp_pct=25.0,
+                            sl_pct=8.0)
 
     # ── Pozisyon İzleme ──────────────────────────────────────────────────────
 

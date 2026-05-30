@@ -22,9 +22,9 @@ import time, datetime, threading, json, os
 from collections import deque
 from binance.client import Client as BC
 from bot import (load_config, get_client, execute_buy, execute_sell,
-                 load_positions, save_positions, load_trades, get_price,
+                 load_positions, load_trades, get_price,
                  send_telegram, get_usdt_balance, get_total_equity,
-                 position_size_by_score)
+                 position_size_by_score, update_position)
 
 STATE_FILE = 'breakout_state.json'
 
@@ -43,6 +43,7 @@ MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 # Kırılım kriterleri
 MIN_PRICE_CHG_2H = 4.0   # son 2 saatte min %4 fiyat hareketi
 MIN_VOL_SPIKE    = 2.0   # son 2 saatlik hacim, saatlik ortalamanın 2x'i
+MAX_CHG_24H      = 35.0  # 24s'te bundan fazla pompalanmış → geç giriş/pump-dump riski, atla
 
 # Çıkış parametreleri — SABİT TP YOK, KADEMELİ TRAIL
 # Kâr arttıkça trail daralır → küçük kârı kilitle, büyük pump'a yer aç
@@ -126,6 +127,8 @@ def _detect_breakouts(client):
         if vol24 < MIN_VOL_24H:     # çok illiquid
             continue
         if chg24 < MIN_PRICE_CHG_2H:
+            continue
+        if chg24 > MAX_CHG_24H:     # zaten aşırı pompalanmış → tepeden alma
             continue
         candidates.append({'symbol': sym, 'price': price, 'chg24': chg24, 'vol24': vol24})
 
@@ -313,14 +316,12 @@ class BreakoutAgent:
             print(f'[Breakout] Alım başarısız: {symbol} — {res.get("error")}')
             return
 
-        # Pozisyona trailing meta verisi ekle
-        positions = load_positions()
-        if symbol in positions:
-            pos = positions[symbol]
-            pos['agent']        = 'BREAKOUT'
-            pos['peak_price']   = pos.get('avg_price', result['price'])
-            pos['trail_active'] = False
-            save_positions(positions)
+        # Pozisyona trailing meta verisi ekle (tek sembol, kilit altında)
+        pos_now = load_positions().get(symbol, {})
+        update_position(symbol,
+                        agent='BREAKOUT',
+                        peak_price=pos_now.get('avg_price', result['price']),
+                        trail_active=False)
 
         send_telegram(
             f'🚀 <b>BREAKOUT ALIM</b>\n'
@@ -347,7 +348,6 @@ class BreakoutAgent:
     def _monitor(self):
         client    = get_client()
         positions = load_positions()
-        changed   = False
 
         for sym, pos in list(positions.items()):
             if pos.get('agent') != 'BREAKOUT':
@@ -368,21 +368,23 @@ class BreakoutAgent:
             peak         = pos.get('peak_price', entry)
             trail_active = pos.get('trail_active', False)
             pnl_pct      = (price - entry) / entry * 100
+            meta_update  = {}
 
-            # Peak güncelle ve kaydet
+            # Peak güncelle (yalnız bu sembol, kilit altında — lost-update yok)
             if price > peak:
                 peak = price
-                pos['peak_price'] = peak
-                changed = True
+                meta_update['peak_price'] = peak
 
             # Trailing stop'u aktif et
             if not trail_active and pnl_pct >= TRAIL_ACTIVATE_PCT:
                 trail_active = True
-                pos['trail_active'] = True
-                changed = True
+                meta_update['trail_active'] = True
                 peak_pct = round((peak - entry) / entry * 100, 1)
                 print(f'[Breakout] {sym} trailing aktif '
                       f'(pnl={pnl_pct:.1f}% peak=+{peak_pct}%)')
+
+            if meta_update:
+                update_position(sym, **meta_update)
 
             reason = None
             peak_pct = (peak - entry) / entry * 100
@@ -400,13 +402,9 @@ class BreakoutAgent:
                               f'pnl=+{pnl_pct:.1f}%')
 
             if reason:
-                if changed:
-                    save_positions(positions)
-                    changed = False
-
                 print(f'[Breakout] {sym} ÇIKIŞ: {reason}')
-                # 'HARD STOP' veya 'TRAIL STOP' — her ikisi de 'STOP' içeriyor
-                # böylece bot.py'nin _check_sl_cooldown() mekanizması çalışır
+                # Kaynak etiketi (HARD_STOP / TRAIL_STOP) raporlama içindir;
+                # cooldown artık gerçekleşen PnL'e bakar (kârlı trail cezalanmaz).
                 sell_source = 'BREAKOUT HARD_STOP' if 'HARD STOP' in reason else 'BREAKOUT TRAIL_STOP'
                 res = execute_sell(client, sym, 100,
                                    source=sell_source, period='trail')
@@ -421,12 +419,6 @@ class BreakoutAgent:
                         f'🔒 Sebep: {reason.split("|")[0].strip()}\n'
                         f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
                     )
-                # Pozisyon listesini tazele
-                positions = load_positions()
-                changed   = False
-
-        if changed:
-            save_positions(positions)
 
     # ── Rapor Döngüsü ────────────────────────────────────────────────────────
 

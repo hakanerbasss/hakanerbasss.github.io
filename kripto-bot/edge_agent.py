@@ -18,7 +18,8 @@ import time, datetime, threading, json, os, math, requests
 from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
-                 send_telegram, get_usdt_balance)
+                 send_telegram, get_usdt_balance,
+                 update_position, clear_position)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE   = 'edge_state.json'
@@ -593,15 +594,11 @@ class EdgeAgent:
 
         res = execute_buy(client, symbol, usdt, source='EDGE', period=result['session'], agent='EDGE')
         if res.get('ok'):
-            with self._lock:
-                from bot import save_positions
-                positions = load_positions()
-                if symbol in positions:
-                    positions[symbol]['agent']        = 'EDGE'
-                    positions[symbol]['edge_signals'] = active_signals
-                    positions[symbol]['edge_score']   = result['score']
-                    positions[symbol]['open_time']    = time.time()
-                    save_positions(positions)
+            update_position(symbol,
+                            agent='EDGE',
+                            edge_signals=active_signals,
+                            edge_score=result['score'],
+                            open_time=time.time())
 
     # ── Pozisyon Takibi ────────────────────────────────────────────────────
     def _monitor_loop(self):
@@ -664,9 +661,7 @@ class EdgeAgent:
                 peak = pos.get('peak_price', avg_price)
                 if price > peak:
                     peak = price
-                    positions[symbol]['peak_price'] = price
-                    from bot import save_positions
-                    save_positions(positions)   # zirveyi kalıcı yap (yoksa trailing çalışmaz)
+                    update_position(symbol, peak_price=price)  # zirveyi kilit altında kalıcı yap
 
                 if tp > 0 and pct >= tp * 0.4:
                     drawdown = (price - peak) / peak * 100 if peak > 0 else 0
@@ -708,12 +703,8 @@ class EdgeAgent:
         """Satış başarısız olsa bile pozisyonu sıfırla (elle silinen pozisyonlar için)."""
         if not sell_result.get('ok'):
             try:
-                from bot import save_positions
-                positions = load_positions()
-                if symbol in positions:
-                    positions[symbol]['qty'] = 0
-                    save_positions(positions)
-                    print(f'[Edge] {symbol} zorla sıfırlandı (satış başarısız ama pozisyon temizlendi)')
+                clear_position(symbol)
+                print(f'[Edge] {symbol} zorla temizlendi (satış başarısız ama pozisyon kaldırıldı)')
             except Exception as e:
                 print(f'[Edge] force_clear hata {symbol}: {e}')
 

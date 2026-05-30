@@ -12,7 +12,7 @@ CEO Agent — Yönetici Yapay Zeka
 
 import time, datetime, json, threading, os, requests
 from bot import (load_config, save_config, load_trades, load_positions,
-                 save_positions, get_price, send_telegram, get_usdt_balance,
+                 get_price, send_telegram, get_usdt_balance,
                  get_client, execute_sell)
 
 STATE_FILE   = 'ceo_state.json'
@@ -30,7 +30,7 @@ TOOLS = [
             'parameters': {
                 'type': 'object',
                 'properties': {
-                    'agent':   {'type': 'string', 'enum': ['edge', 'otonom', 'indicator', 'wyckoff']},
+                    'agent':   {'type': 'string', 'enum': ['edge', 'otonom', 'indicator', 'wyckoff', 'breakout']},
                     'enabled': {'type': 'boolean'},
                 },
                 'required': ['agent', 'enabled'],
@@ -168,7 +168,8 @@ def _collect_data():
             continue  # CEO satışlarını ajan istatistiğine sayma
         agent  = ('EDGE'      if 'EDGE'      in source else
                   'INDICATOR' if 'INDICATOR' in source else
-                  'WYCKOFF'   if 'WYCKOFF'   in source else 'OTONOM')
+                  'WYCKOFF'   if 'WYCKOFF'   in source else
+                  'BREAKOUT'  if 'BREAKOUT'  in source else 'OTONOM')
         if agent not in agent_stats:
             agent_stats[agent] = {'wins': 0, 'losses': 0, 'total_pnl': 0.0, 'trades': []}
         pnl = t.get('pnl', 0)
@@ -261,6 +262,7 @@ def _collect_data():
         'otonom_enabled':    cfg.get('otonom_enabled', True),
         'indicator_enabled': cfg.get('indicator_enabled', True),
         'wyckoff_enabled':   cfg.get('wyckoff_enabled', True),
+        'breakout_enabled':  cfg.get('breakout_enabled', True),
     }
 
     return {
@@ -281,7 +283,7 @@ def _collect_data():
 def _build_prompt(data):
     lines = [
         "Sen bir kripto portföy RİSK YÖNETİCİSİSİN — trader değilsin.",
-        "4 ticaret ajanı var: EDGE, OTONOM, INDICATOR, WYCKOFF.",
+        "5 ticaret ajanı var: EDGE, OTONOM, INDICATOR, WYCKOFF, BREAKOUT.",
         "Her ajan kendi giriş VE çıkışını (TP/SL/trailing) kendi yönetir. Tek tek pozisyonlara ASLA karışmazsın.",
         "Senin SADECE iki yetkin var:",
         "  1) set_agent_enabled — bir ajan uzun vadede (yeterli işlem sayısıyla) sürekli zarar ediyorsa kapat. Tek kötü işleme bakıp kapatma.",
@@ -526,6 +528,7 @@ def stop_ceo_agent():
     cfg['edge_enabled']      = True
     cfg['indicator_enabled'] = True
     cfg['wyckoff_enabled']   = True
+    cfg['breakout_enabled']  = True
     cfg['ceo_position_mult'] = 1.0
     save_config(cfg)
     send_telegram(
