@@ -83,7 +83,10 @@ def _accumulation_score(client, symbol):
       BB squeeze       → 0–30 puan  (BB genişliği tarihsel ne kadar altta)
     """
     try:
-        closes, highs, lows, vols = _klines_vol(client, symbol, '1d', limit=23)
+        # 60 günlük: BB genişliği tarihsel yüzdelik hesabı için yeterli geçmiş
+        # (eski limit=23 → 22 mum kalıyordu; len>=25 şartı sağlanmayıp bb_rank
+        # daima 50 sabit kalıyordu → BB sıkışması filtresi ölüydü).
+        closes, highs, lows, vols = _klines_vol(client, symbol, '1d', limit=60)
         if len(closes) < 15:
             return None
 
@@ -190,8 +193,8 @@ class AccumulationAgent:
         try:
             with open(STATE_FILE, 'w') as f:
                 json.dump(self.state, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f'[Accum] state kaydı başarısız: {e}')
 
     def _bl(self, sym):
         return time.time() < self.state['blacklist'].get(sym, 0)

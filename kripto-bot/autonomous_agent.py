@@ -363,7 +363,7 @@ class AutonomousAgent:
     def _save(self):
         try:
             with open(STATE_FILE, 'w') as f: json.dump(self.state, f, indent=2)
-        except Exception: pass
+        except Exception as e: print(f'[Otonom] state kaydı başarısız: {e}')
 
     def _bl(self, sym): return time.time() < self.state['blacklist'].get(sym, 0)
     def _add_bl(self, sym, h=4): self.state['blacklist'][sym] = time.time() + h * 3600
@@ -644,6 +644,15 @@ class AutonomousAgent:
                 send_telegram('🧹 Toz pozisyonlar temizlendi: ' + ', '.join(removed))
         except Exception as e:
             print(f'[Otonom] Toz temizlik hatası: {e}')
+        # Gerçek bakiyeyle uzlaştırma — hayalet pozisyonları temizle (gerçek hesapta kritik)
+        try:
+            from bot import reconcile_positions, send_telegram
+            ghosts = reconcile_positions(client)
+            if ghosts:
+                send_telegram('🔧 Hayalet pozisyon düzeltildi (gerçek bakiye ≠ defter): '
+                              + ', '.join(ghosts))
+        except Exception as e:
+            print(f'[Otonom] Reconcile hatası: {e}')
         positions = load_positions()
         try:
             balance = get_usdt_balance(client)
@@ -777,12 +786,13 @@ class AutonomousAgent:
         buckets = {}
         for t in sells:
             src = (t.get('source') or '').upper()
-            if   'OTONOM'    in src: ag = 'OTONOM'
-            elif 'EDGE'      in src: ag = 'EDGE'
-            elif 'BREAKOUT'  in src: ag = 'BREAKOUT'
-            elif 'INDICATOR' in src: ag = 'INDICATOR'
-            elif 'WYCKOFF'   in src: ag = 'WYCKOFF'
-            else:                    ag = 'DİĞER'
+            if   'OTONOM'       in src: ag = 'OTONOM'
+            elif 'EDGE'         in src: ag = 'EDGE'
+            elif 'BREAKOUT'     in src: ag = 'BREAKOUT'
+            elif 'INDICATOR'    in src: ag = 'INDICATOR'
+            elif 'WYCKOFF'      in src: ag = 'WYCKOFF'
+            elif 'ACCUMULATION' in src: ag = 'BİRİKİM'
+            else:                       ag = 'DİĞER'
             b = buckets.setdefault(ag, {'n': 0, 'w': 0, 'pnl': 0.0})
             b['n'] += 1
             if t.get('pnl', 0) > 0: b['w'] += 1

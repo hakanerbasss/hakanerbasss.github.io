@@ -102,8 +102,8 @@ class IndicatorAgent:
         try:
             with open(STATE_FILE, 'w') as f:
                 json.dump(self.state, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f'[Indicator] state kaydı başarısız: {e}')
 
     def _bl(self, sym):
         return time.time() < self.state['blacklist'].get(sym, 0)

@@ -185,6 +185,35 @@ def cleanup_dust_positions(client):
     return removed
 
 
+def reconcile_positions(client):
+    """positions.json'daki miktarları GERÇEK Binance bakiyesiyle karşılaştırır.
+    Bir pozisyonun gerçek bakiyesi defterin %50'sinden azsa → o pozisyon gerçekte
+    yok demektir (elle satılmış / hiç açılmamış / testnet→gerçek geçiş kalıntısı)
+    → defterden silinir. SADECE aşağı yönde düzeltir; manuel tuttuğun fazladan
+    bakiyeye DOKUNMAZ. Gerçek hesapta 'hayalet pozisyon' kaynaklı yanlış satış
+    denemelerini ve bozuk istatistiği önler. Returns: düzeltilen sembol listesi."""
+    try:
+        account = client.get_account()
+        bal = {b['asset']: float(b.get('free', 0)) + float(b.get('locked', 0))
+               for b in account.get('balances', [])}
+    except Exception as e:
+        print(f'[Bot] Reconcile: bakiye alınamadı: {e}')
+        return []
+    fixed = []
+    for sym, pos in list(load_positions().items()):
+        qty = pos.get('qty', 0)
+        if qty <= 0 or not sym.endswith('USDT'):
+            continue
+        asset = sym[:-4]
+        real  = bal.get(asset, 0.0)
+        if real < qty * 0.5:   # defter ile gerçek ciddi uyuşmuyor → hayalet pozisyon
+            clear_position(sym)
+            fixed.append(f'{sym} (defter {qty} ↔ gerçek {real:.6f})')
+            print(f'[Bot] Reconcile: {sym} hayalet pozisyon silindi '
+                  f'(defter {qty}, gerçek {real:.6f})')
+    return fixed
+
+
 def get_total_equity(client):
     """Serbest USDT + tüm açık pozisyonların güncel piyasa değeri.
     Pozisyon boyutlama bunun üzerinden yapılır (cash daraldıkça boyut da
@@ -207,14 +236,23 @@ def get_total_equity(client):
 
 
 def position_size_by_score(equity, score, mult=1.0,
-                           lo_pct=0.01, hi_pct=0.03, min_usd=10.0):
+                           lo_pct=0.01, hi_pct=0.03, min_usd=None):
     """Skora göre değişken pozisyon boyutu — tüm ajanlar için ORTAK kural.
     Güçlü sinyalde büyük, zayıfta küçük:
        skor 5  → %1   (lo_pct)
        skor 7.5→ %2
        skor 10 → %3   (hi_pct)
     Skor 0–10 ölçeğinde beklenir; skoru olmayan ajan (UT Bot) ~6 geçer.
-    `mult`: CEO pozisyon çarpanı (bear'de küçültür)."""
+    `mult`: CEO pozisyon çarpanı (bear'de küçültür).
+    min_usd: taban tutar. None ise config'den 'min_position_usd' (vars. 10).
+    KÜÇÜK HESAP NOTU: equity düşükken %-bazlı boyut bu tabanın altında kalır →
+    tüm işlemler tabana sabitlenir. Küçük sermayede bu knob'u düşürmek (ör. 6,
+    Binance min ~$5-10 sınırına yakın) daha fazla/çeşitli pozisyon açtırır."""
+    if min_usd is None:
+        try:
+            min_usd = float(load_config().get('min_position_usd', 10.0))
+        except Exception:
+            min_usd = 10.0
     try:
         frac = max(0.0, min(1.0, (float(score) - 5.0) / 5.0))
     except Exception:
