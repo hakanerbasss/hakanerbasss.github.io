@@ -502,14 +502,14 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
                     return {'ok': False, 'error': msg}
         elif not coin_cfg:
             # Otonom ajan tarafından bulunan coin — config yok, ATR ile otomatik belirle
-            # TP max %6: trailing %2.4'te aktif olur → hızlı küçük kâr kilitleme
+            # Scanner loop'taki caps ile aynı (max SL %6, max TP %18) — tutarlı bildirim
             atr = _calc_atr_pct(client, symbol, 7)
             if atr:
-                sl_pct = max(1.5, min(5.0, round(atr * 1.5, 2)))
-                tp_pct = max(3.0, min(6.0, round(atr * 3.0, 2)))
+                sl_pct = max(1.5, min(6.0, round(atr * 1.5, 2)))
+                tp_pct = max(3.0, min(18.0, round(atr * 3.0, 2)))
             else:
-                sl_pct = 2.5   # varsayılan: -%2.5
-                tp_pct = 5.0   # varsayılan: +%5.0
+                sl_pct = 2.5
+                tp_pct = 5.0
             print(f'[Bot] {symbol} otonom ajan — ATR TP/SL: +%{tp_pct} / -%{sl_pct}')
 
         # ── Kritik bölge: çakışma önleyici kilit ────────────────────────────

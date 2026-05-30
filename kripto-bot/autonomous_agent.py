@@ -510,6 +510,10 @@ class AutonomousAgent:
                         if sc.get('vol_ratio', 0) > 8:
                             print(f'[Otonom] {sym} veto: hacim={sc["vol_ratio"]:.1f}x (>8x geç giriş)')
                             continue
+                        # Veto 3: Hacim verisi sıfır → API/testnet veri hatası, güvenilmez
+                        if sc.get('vol_ratio', -1) == 0:
+                            print(f'[Otonom] {sym} veto: hacim=0 (veri hatası)')
+                            continue
                         if best_sc is None or sc['total'] > best_sc['total']:
                             best_sym, best_sc = sym, sc
 
@@ -524,12 +528,14 @@ class AutonomousAgent:
                             res = execute_buy(client, best_sym, amount,
                                               source='OTONOM', period='Ajan', agent='OTONOM')
                             if res.get('ok'):
-                                sl  = max(1.5, min(6.0, atr_pct * 1.5))
-                                tp  = max(3.0, min(18.0, atr_pct * 3.0))
+                                # TP/SL execute_buy içinde hesaplanıp positions.json'a yazıldı.
+                                # Sadece agent meta alanlarını ekle (tp/sl yeniden hesaplama yok).
+                                pos = load_positions().get(best_sym, {})
+                                tp  = pos.get('tp_pct', 5.0)
+                                sl  = pos.get('sl_pct', 2.5)
                                 update_position(
                                     best_sym,
                                     agent='OTONOM',
-                                    tp_pct=tp, sl_pct=sl,
                                     trail_active=False,
                                     peak_price=res['price'],
                                     buy_time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
