@@ -184,6 +184,24 @@ class IndicatorAgent:
             if sym in held or self._bl(sym) or not btc_ok:
                 continue
 
+            # RSI > 65 veto: aşırı alım bölgesinde UTBOT sinyali güvenilmez
+            try:
+                from signal_engine import get_klines as _gk
+                import numpy as np
+                _c, _, _, _ = _gk(client, sym, '1h', limit=20)
+                if len(_c) >= 15:
+                    _d = np.diff(_c)
+                    _g = np.where(_d > 0, _d, 0)
+                    _l = np.where(_d < 0, -_d, 0)
+                    _ag = np.mean(_g[-14:]) if len(_g) >= 14 else np.mean(_g)
+                    _al = np.mean(_l[-14:]) if len(_l) >= 14 else np.mean(_l)
+                    _rsi = 100 - (100 / (1 + _ag / _al)) if _al > 0 else 50
+                    if _rsi > 65:
+                        print(f'[Indicator] {sym} RSI1h={_rsi:.0f}>65, veto')
+                        continue
+            except Exception:
+                pass
+
             sig_result = self._check_all_indicators(client, sym)
             if not sig_result:
                 continue
@@ -313,12 +331,22 @@ class IndicatorAgent:
                     except Exception:
                         pass
 
-                # 36 saat timeout
-                if time.time() - pos.get('open_time', time.time()) > 36 * 3600:
+                # 8 saat timeout: UTBOT 1h sinyali 8 mumda çalışmıyorsa geçersiz
+                open_secs = time.time() - pos.get('open_time', time.time())
+                if open_secs > 8 * 3600:
                     res = execute_sell(client, sym, 100,
                                        source=f'INDICATOR-{ind} TIME', period='TIMEOUT')
                     if res.get('ok'):
                         self._record(sym, pos, pct, pct > 0)
+                    continue
+
+                # Stale-loss exit: 6 saatten eski + %-1.5 altı → sinyal ölmüş, çık
+                if open_secs > 6 * 3600 and pct < -1.5:
+                    res = execute_sell(client, sym, 100,
+                                       source=f'INDICATOR-{ind} STALE', period='STALE')
+                    if res.get('ok'):
+                        self._record(sym, pos, pct, False)
+                        self._add_bl(sym, 8)
 
             except Exception as e:
                 print(f'[Indicator] Monitor {sym}: {e}')
