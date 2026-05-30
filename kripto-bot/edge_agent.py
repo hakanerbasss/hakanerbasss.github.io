@@ -675,7 +675,24 @@ class EdgeAgent:
                     res = execute_sell(client, symbol, 100, source='EDGE SL', period='SL')
                     self._notified.pop(symbol, None)
                     self._force_clear(symbol, res)
-                    self.blacklist[symbol] = time.time() + 6 * 3600
+                    # Tekrar SL yenildiyse ceza katlanır: 1.SL=8s, 2.SL=24s, 3.SL+=48s
+                    prev_bl = self.blacklist.get(symbol, 0)
+                    prev_remaining = max(0, prev_bl - time.time())
+                    if prev_remaining > 0:
+                        # Hâlâ cezalıyken tekrar SL → coin ısrarcı, çok uzat
+                        penalty = 48 * 3600
+                    else:
+                        # Normal SL: son 24s içinde kaç kez SL yendi?
+                        trades_tmp = load_trades()
+                        cutoff = datetime.datetime.now() - datetime.timedelta(hours=24)
+                        sl_count = sum(1 for t in trades_tmp
+                                      if t.get('symbol') == symbol
+                                      and t.get('type') == 'sell'
+                                      and 'SL' in (t.get('source') or '')
+                                      and t.get('time', '') >= cutoff.strftime('%Y-%m-%d %H:%M:%S'))
+                        penalty = {1: 8, 2: 24, 3: 48}.get(min(sl_count, 3), 48) * 3600
+                    self.blacklist[symbol] = time.time() + penalty
+                    print(f'[Edge] {symbol} blacklist: {int(penalty/3600)}s')
                     self._record_exit(symbol, pos, pct, 'SL')
                     continue
 
