@@ -39,7 +39,7 @@ SCAN_INTERVAL    = 180      # saniye (3 dakika) — pump genellikle 10-30dk sür
 MONITOR_SEC      = 5        # saniye
 MIN_VOL_24H      = 200_000  # $200K minimum 24h hacim — düşük hacimli pumpler de yakalansın
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
-MIN_COIN_PRICE   = 0.005    # $0.005 altı coinler: step size granülaritesi %10+ → stop güvenilmez
+MIN_COIN_PRICE   = 0.01     # $0.01 altı coinler: step size granülaritesi %10+ → stop güvenilmez
 
 # Kırılım kriterleri
 MIN_PRICE_CHG_2H = 4.0   # son 2 saatte min %4 fiyat hareketi
