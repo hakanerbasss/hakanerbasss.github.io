@@ -341,14 +341,20 @@ def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, fee, source, hold):
         f'\n💸 Komisyon: -${round(fee,3)}{hold_line}'
     )
 
-def _check_sl_cooldown(symbol, cooldown_hours=4):
+def _is_sl_source(source: str) -> bool:
+    """Trade kaydının bir SL/STOP satışı olup olmadığını tespit eder.
+    'EDGE SL', 'INDICATOR-X SL', 'BREAKOUT TRAIL_STOP', 'OTONOM SL' hepsini yakalar."""
+    s = source.upper()
+    return 'STOP' in s or s.endswith(' SL') or ' SL ' in s
+
+def _check_sl_cooldown(symbol, cooldown_hours=3):
     """SL'den sonra cooldown süresi geçti mi? True = alım yapılabilir."""
     trades = load_trades()
     last_sl = next(
         (t for t in reversed(trades)
          if t.get('symbol') == symbol
          and t.get('type') == 'sell'
-         and 'STOP' in (t.get('source', '').upper())),
+         and _is_sl_source(t.get('source', ''))),
         None
     )
     if not last_sl:
@@ -369,12 +375,12 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
         # SL cooldown kontrolü
         cfg_data   = load_config()
         coin_cfg   = next((c for c in cfg_data.get('coins', []) if c['symbol'] == symbol), {})
-        cooldown_h = float(coin_cfg.get('sl_cooldown_hours', 4))
+        cooldown_h = float(coin_cfg.get('sl_cooldown_hours', 3))
         if cooldown_h > 0 and not _check_sl_cooldown(symbol, cooldown_h):
             trades_tmp = load_trades()
             last_sl = next((t for t in reversed(trades_tmp)
                             if t.get('symbol') == symbol and t.get('type') == 'sell'
-                            and 'STOP' in (t.get('source','').upper())), None)
+                            and _is_sl_source(t.get('source', ''))), None)
             if last_sl:
                 sl_time = datetime.datetime.strptime(last_sl['time'], '%Y-%m-%d %H:%M:%S')
                 elapsed = (datetime.datetime.now() - sl_time).total_seconds() / 3600

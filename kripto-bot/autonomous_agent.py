@@ -438,12 +438,14 @@ class AutonomousAgent:
 
                     if reason:
                         positions[sym] = pos
-                        res = execute_sell(client, sym, 100, source='OTONOM', period=reason)
+                        is_sl = 'STOP' in reason
+                        src   = 'OTONOM SL' if is_sl else 'OTONOM'
+                        res = execute_sell(client, sym, 100, source=src, period=reason)
                         if res.get('ok'):
                             positions[sym]['qty'] = 0  # local dict'i hemen güncelle
                             pnl = res.get('pnl', 0)
                             self.state['total_pnl'] = round(self.state.get('total_pnl',0) + pnl, 2)
-                            self._add_bl(sym, 8 if 'STOP' in reason else 2)
+                            self._add_bl(sym, 8 if is_sl else 2)
                             self._track_signal(pos, pnl)
                         changed = True
                     else:
