@@ -514,6 +514,10 @@ class AutonomousAgent:
                         if sc.get('vol_ratio', -1) == 0:
                             print(f'[Otonom] {sym} veto: hacim=0 (veri hatası)')
                             continue
+                        # Veto 4: ADX < 18 → trend yok, yatay piyasa gürültüsü
+                        if sc.get('adx', 0) < 18:
+                            print(f'[Otonom] {sym} veto: ADX={sc["adx"]:.0f} (<18 trend yok)')
+                            continue
                         if best_sc is None or sc['total'] > best_sc['total']:
                             best_sym, best_sc = sym, sc
 
