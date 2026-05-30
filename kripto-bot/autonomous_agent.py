@@ -500,9 +500,18 @@ class AutonomousAgent:
                     best_sym, best_sc = None, None
                     for sym in candidates[:55]:
                         sc = _score(client, sym, regime, w)
-                        if sc and sc['total'] >= self.MIN_SCORE:
-                            if best_sc is None or sc['total'] > best_sc['total']:
-                                best_sym, best_sc = sym, sc
+                        if not sc or sc['total'] < self.MIN_SCORE:
+                            continue
+                        # Veto 1: RSI aşırı alım → pump tepesine alım riski
+                        if sc.get('rsi1h', 0) > 70:
+                            print(f'[Otonom] {sym} veto: RSI1h={sc["rsi1h"]} (>70 aşırı alım)')
+                            continue
+                        # Veto 2: Hacim çok yüksek → pump zaten olmuş, geç kalındı
+                        if sc.get('vol_ratio', 0) > 8:
+                            print(f'[Otonom] {sym} veto: hacim={sc["vol_ratio"]:.1f}x (>8x geç giriş)')
+                            continue
+                        if best_sc is None or sc['total'] > best_sc['total']:
+                            best_sym, best_sc = sym, sc
 
                     if best_sym:
                         atr_pct  = best_sc.get('atr_pct', 2.0)
