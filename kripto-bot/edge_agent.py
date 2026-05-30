@@ -35,6 +35,9 @@ MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 60    # saniye
 MONITOR_SEC    = 5
 MIN_SCORE      = 4.5   # 0-10 — trend modda daha düşük eşik
+# Dinamik eşik: belirsiz koşullarda daha seçici ol (teyitsiz girişleri ele)
+ASIA_MIN_SCORE     = 5.5   # ASIA seansı (ajanın kendi etiketi: "sahte hareket riski")
+BTC_WEAK_MIN_SCORE = 5.5   # BTC SMA altında / zayıfken
 
 STABLECOINS = {
     'USDCUSDT','BUSDUSDT','TUSDUSDT','FDUSDUSDT','EURUSDT',
@@ -356,13 +359,21 @@ def _score(client, symbol, funding, weights, cfg):
         (raw + max_raw * 0.35) / (max_raw * 1.35) * 10
     )), 2)
 
-    signal = 'buy' if score >= MIN_SCORE else None
+    # Dinamik eşik: ASIA seansında veya BTC zayıfken (SMA altı) daha yüksek skor iste
+    eff_min = MIN_SCORE
+    if sess == 'ASIA':
+        eff_min = max(eff_min, ASIA_MIN_SCORE)
+    if parts['btc_trend'][0] < 0:
+        eff_min = max(eff_min, BTC_WEAK_MIN_SCORE)
+
+    signal = 'buy' if score >= eff_min else None
 
     reason_parts = [v[1] for k, v in parts.items() if abs(v[0]) > 0.4 and v[1]]
     reason = ' | '.join(reason_parts)[:350]
 
     return {
         'score':   score,
+        'min_req': eff_min,
         'signal':  signal,
         'price':   price,
         'reason':  reason,
@@ -546,12 +557,23 @@ class EdgeAgent:
             self.scan_log.appendleft(log_line)
 
             if result['signal'] == 'buy':
-                # Veto: yapısal aşağı trend + BTC zayıf → funding tek başına yetmez
                 d = result.get('details', {})
-                struct_score = d.get('struct', {}).get('score', 0)
-                btc_score    = d.get('btc_trend', {}).get('score', 0)
+                struct_score  = d.get('struct', {}).get('score', 0)
+                btc_score     = d.get('btc_trend', {}).get('score', 0)
+                funding_score = d.get('funding', {}).get('score', 0)
+                sweep_score   = d.get('sweep', {}).get('score', 0)
+
+                # Veto 1: yapısal aşağı trend + BTC zayıf → funding tek başına yetmez
                 if struct_score < -0.5 and btc_score < 0:
                     self.scan_log.appendleft(f'{sym} VETO: struct={struct_score} btc={btc_score}')
+                    checked += 1
+                    continue
+
+                # Veto 2: SADECE funding pozitif, geri kalan teyit (struct/btc/sweep)
+                # hepsi ≤0 → teyitsiz funding bahsi; özellikle ASIA/zayıf BTC'de coin flip.
+                if funding_score > 0 and struct_score <= 0 and btc_score <= 0 and sweep_score <= 0:
+                    self.scan_log.appendleft(
+                        f'{sym} VETO: sadece-funding (struct={struct_score} btc={btc_score} sweep={sweep_score})')
                     checked += 1
                     continue
 
