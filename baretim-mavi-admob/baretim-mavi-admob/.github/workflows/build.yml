@@ -1,0 +1,27 @@
+name: Build APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    - run: |
+        BUILD_NUM=$(git rev-list --count HEAD)
+        sed -i "s/versionCode .*/versionCode $BUILD_NUM/" app/build.gradle
+        sed -i "s/versionName .*/versionName \"1.$BUILD_NUM\"/" app/build.gradle
+        echo "versionCode: $BUILD_NUM"
+    - run: chmod +x gradlew
+    - run: ./gradlew assembleDebug
+    - uses: actions/upload-artifact@v4
+      with:
+        name: bcf-app-debug
+        path: app/build/outputs/apk/debug/app-debug.apk

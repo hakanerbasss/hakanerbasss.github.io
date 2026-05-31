@@ -1,0 +1,1304 @@
+==== MAIN ACTIVITY ====
+package com.bluechip.finance
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.bluechip.finance.ui.screens.*
+import com.bluechip.finance.ui.theme.BlueChipTheme
+import com.bluechip.finance.ui.theme.LocalAppColors
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        setContent {
+            BlueChipTheme {
+                BlueChipApp()
+            }
+        }
+    }
+}
+
+data class NavItem(val route: String, val label: String, val icon: ImageVector)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BlueChipApp() {
+    val navController = rememberNavController()
+    val colors = LocalAppColors.current
+    val items = listOf(
+        NavItem("home", "Ana Sayfa", Icons.Default.Home),
+        NavItem("overtime", "Mesai", Icons.Default.AccessTime),
+        NavItem("severance", "Kıdem", Icons.Default.AccountBalance),
+        NavItem("tax", "Vergi", Icons.Default.Receipt),
+        NavItem("leave", "İzin", Icons.Default.DateRange)
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Baretim Mavi", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = colors.textPrimary) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        },
+        bottomBar = {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                val navBackStack by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStack?.destination?.route
+                items.forEach { item ->
+                    NavigationBarItem(
+                        icon = { Icon(item.icon, item.label) },
+                        label = { Text(item.label, fontSize = 10.sp) },
+                        selected = currentRoute == item.route,
+                        onClick = {
+                            if (currentRoute != item.route) {
+                                navController.navigate(item.route) {
+                                    // DÜZELTME: Doğru navigation davranışı
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = "home",
+            modifier = Modifier.padding(padding)
+        ) {
+            composable("home") {
+                HomeScreen(onNavigate = { route ->
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                })
+            }
+            composable("overtime") { OvertimeScreen() }
+            composable("severance") { SeveranceScreen() }
+            composable("tax") { TaxScreen() }
+            composable("leave") { AnnualLeaveScreen() }
+        }
+    }
+}
+
+
+==== COMPOSE SCREENS ====
+
+--- app/src/main/java/com/bluechip/finance/ui/screens/HomeScreen.kt ---
+package com.bluechip.finance.ui.screens
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.bluechip.finance.data.Article
+import com.bluechip.finance.data.NewsApiService
+import com.bluechip.finance.ui.components.formatMoney
+import com.bluechip.finance.ui.components.formatNumber
+import com.bluechip.finance.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.*
+
+@Composable
+fun HomeScreen(onNavigate: (String) -> Unit) {
+    val context = LocalContext.current
+    val colors = LocalAppColors.current
+
+    var usdRate by remember { mutableDoubleStateOf(0.0) }
+    var eurRate by remember { mutableDoubleStateOf(0.0) }
+    var goldUSD by remember { mutableDoubleStateOf(0.0) }
+    var btcUSD by remember { mutableDoubleStateOf(0.0) }
+    var ethUSD by remember { mutableDoubleStateOf(0.0) }
+    var isTL by remember { mutableStateOf(true) }
+    var updateTime by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
+
+    var articles by remember { mutableStateOf<List<Article>>(emptyList()) }
+    var newsStatus by remember { mutableStateOf("Haberler yükleniyor...") }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val tcmb = URL("https://www.tcmb.gov.tr/kurlar/today.xml").readText()
+                val usdMatch = Regex("<Currency[^>]*CurrencyCode=\"USD\"[^>]*>.*?<ForexSelling>([0-9.]+)</ForexSelling>", RegexOption.DOT_MATCHES_ALL).find(tcmb)
+                val eurMatch = Regex("<Currency[^>]*CurrencyCode=\"EUR\"[^>]*>.*?<ForexSelling>([0-9.]+)</ForexSelling>", RegexOption.DOT_MATCHES_ALL).find(tcmb)
+                if (usdMatch != null) usdRate = usdMatch.groupValues[1].toDouble()
+                if (eurMatch != null) eurRate = eurMatch.groupValues[1].toDouble()
+            } catch (_: Exception) { usdRate = 32.5; eurRate = 35.2 }
+            try {
+                val crypto = URL("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether-gold&vs_currencies=usd").readText()
+                val json = JSONObject(crypto)
+                btcUSD = json.getJSONObject("bitcoin").getDouble("usd")
+                ethUSD = json.getJSONObject("ethereum").getDouble("usd")
+                goldUSD = json.getJSONObject("tether-gold").getDouble("usd")
+            } catch (_: Exception) { btcUSD = 64200.0; ethUSD = 3100.0; goldUSD = 2650.0 }
+            isLoading = false
+            updateTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        }
+        withContext(Dispatchers.IO) {
+            try {
+                val response = NewsApiService.create().getNews()
+                articles = response.articles.take(3)
+                newsStatus = "Son ${articles.size} haber (${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())})"
+            } catch (e: Exception) { newsStatus = "Haber yüklenemedi" }
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Piyasa Verileri
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(4.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBg)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.TrendingUp, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Piyasa Verileri", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                    Text(if (isTL) "₺ TL" else "$ USD", fontSize = 12.sp, color = colors.textSecondary)
+                    Switch(checked = !isTL, onCheckedChange = { isTL = !it }, modifier = Modifier.padding(start = 4.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                } else {
+                    val s = if (isTL) "₺" else "$"
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        PriceChip("USD", "${formatMoney(if (isTL) usdRate else 1.0)}$s", Color(0xFF4CAF50))
+                        PriceChip("EUR", "${formatMoney(if (isTL) eurRate else eurRate/usdRate)}$s", Color(0xFF2196F3))
+                        PriceChip("Altın", "${formatMoney(if (isTL) goldUSD*usdRate else goldUSD)}$s", Color(0xFFFF9800))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        PriceChip("BTC", "${formatNumber(if (isTL) btcUSD*usdRate else btcUSD)}$s", Color(0xFFF7931A))
+                        PriceChip("ETH", "${formatNumber(if (isTL) ethUSD*usdRate else ethUSD)}$s", Color(0xFF627EEA))
+                    }
+                }
+                if (updateTime.isNotEmpty()) {
+                    Text("Son güncelleme: $updateTime", fontSize = 11.sp, color = colors.textSecondary, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        }
+
+        // Hesaplama Kartları - DÜZELTME: Kenarlıklar küçültüldü
+        Text("Hesaplamalar", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = colors.textPrimary)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            CalcCard("Fazla Mesai", Icons.Default.AccessTime, Color(0xFF1565C0), Modifier.weight(1f)) { onNavigate("overtime") }
+            CalcCard("Kıdem/İhbar", Icons.Default.AccountBalance, Color(0xFF2E7D32), Modifier.weight(1f)) { onNavigate("severance") }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            CalcCard("Vergi Dilimi", Icons.Default.Receipt, Color(0xFFE65100), Modifier.weight(1f)) { onNavigate("tax") }
+            CalcCard("Yıllık İzin", Icons.Default.DateRange, Color(0xFF6A1B9A), Modifier.weight(1f)) { onNavigate("leave") }
+        }
+
+        // Haberler
+        Text("Ekonomi Haberleri", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = colors.textPrimary)
+        Text(newsStatus, fontSize = 12.sp, color = colors.textSecondary)
+
+        articles.forEach { article ->
+            NewsCard(article = article, onClick = {
+                // DÜZELTME: Tam ekran browser aç (dialog yerine)
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(article.url))
+                context.startActivity(intent)
+            })
+        }
+
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun PriceChip(name: String, price: String, color: Color) {
+    val colors = LocalAppColors.current
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(name, fontSize = 11.sp, color = colors.textSecondary)
+        Text(price, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+@Composable
+private fun CalcCard(title: String, icon: ImageVector, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val appColors = LocalAppColors.current
+    val bgColor = if (appColors.isDark) color.copy(alpha = 0.15f) else color.copy(alpha = 0.08f)
+
+    Card(
+        modifier = modifier.height(80.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor)
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.Center) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color)
+        }
+    }
+}
+
+@Composable
+private fun NewsCard(article: Article, onClick: () -> Unit) {
+    val colors = LocalAppColors.current
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBg)
+    ) {
+        Column {
+            if (!article.urlToImage.isNullOrEmpty() && article.urlToImage != "null") {
+                AsyncImage(
+                    model = article.urlToImage, contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(article.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = colors.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                Text(article.description ?: "Detaylar için tıklayın", fontSize = 12.sp, color = colors.info, maxLines = 2)
+            }
+        }
+    }
+}
+
+--- app/src/main/java/com/bluechip/finance/ui/screens/OvertimeScreen.kt ---
+package com.bluechip.finance.ui.screens
+
+import android.content.Intent
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bluechip.finance.ui.components.*
+import com.bluechip.finance.ui.theme.*
+import kotlinx.coroutines.launch
+
+data class OvertimeType(val pct: String, val name: String, val mult: Double, val law: String, val desc: String)
+
+@Composable
+fun OvertimeScreen() {
+    val context = LocalContext.current
+    val colors = LocalAppColors.current
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    var salary by remember { mutableStateOf("") }
+    var hours by remember { mutableStateOf("") }
+    var showResult by remember { mutableStateOf(false) }
+    var showTypeSheet by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+
+    val types = remember { listOf(
+        OvertimeType("%25", "Gece Çalışması", 1.25, "Mad. 69", "20:00-06:00 gece çalışması"),
+        OvertimeType("%50", "Fazla Çalışma", 1.5, "Mad. 41", "Haftalık 45 saati aşan çalışma"),
+        OvertimeType("%75", "Gece + Fazla", 1.75, "Mad. 41+69", "Gece saatlerinde fazla çalışma"),
+        OvertimeType("%100", "Bayram/Tatil", 2.0, "Mad. 47", "Ulusal bayram ve genel tatil"),
+        OvertimeType("%125", "Gece + Tatil", 2.25, "Mad. 47+69", "Tatil günü gece çalışması")
+    )}
+    var selectedType by remember { mutableStateOf(types[1]) }
+    var resultText by remember { mutableStateOf("") }
+
+    fun calculate() {
+        val sal = salary.toDoubleOrNull() ?: return
+        val h = hours.toDoubleOrNull() ?: 10.0
+        val isExample = hours.isEmpty()
+        val base = sal / 225.0
+        val rate = base * selectedType.mult
+        val total = rate * h
+        resultText = buildString {
+            append("━━━━━━━━━━━━━━━━━━━━\n")
+            append("💰  NET MAAŞ: ${formatMoney(sal)} TL\n")
+            append("⚙️  Hesaplama: 225 saat\n")
+            append("━━━━━━━━━━━━━━━━━━━━\n\n")
+            append("💵  Birim Ücret: ${formatMoney(base)} TL/saat\n\n")
+            append("📌  ${selectedType.pct} - ${selectedType.name}\n")
+            append("    İş Kanunu ${selectedType.law}\n\n")
+            append("💎  Saatlik: ${formatMoney(rate)} TL/saat\n\n")
+            append(if (isExample) "📈  Örnek (${h.toInt()} saat)\n" else "📈  Toplam (${h.toInt()} saat)\n")
+            append("    ${formatMoney(total)} TL\n")
+            append("━━━━━━━━━━━━━━━━━━━━")
+        }
+        showResult = true
+        scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SectionHeader("FAZLA MESAİ HESAPLAMA", Icons.Default.AccessTime, onInfoClick = { showInfoDialog = true })
+        CurrencyField(value = salary, onValueChange = { salary = it }, label = "Net Maaş (₺)")
+        NumberField(value = hours, onValueChange = { hours = it }, label = "Fazla Mesai Saati (boş = 10 örnek)")
+        SelectorButton("${selectedType.pct} - ${selectedType.name}") { showTypeSheet = true }
+        ActionButtons(onCalculate = { calculate() }, onReset = { salary = ""; hours = ""; showResult = false; selectedType = types[1] })
+        ResultCard(visible = showResult) {
+            Text("SONUÇ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = colors.textPrimary)
+            Spacer(Modifier.height(8.dp))
+            Text(resultText, fontSize = 13.sp, lineHeight = 20.sp, color = colors.textPrimary)
+            Spacer(Modifier.height(12.dp))
+            ShareButton {
+                val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "💰 FAZLA MESAİ\n\n$resultText\n\n📱 Baretim Mavi") }
+                context.startActivity(Intent.createChooser(intent, "Paylaş"))
+            }
+        }
+    }
+
+    if (showTypeSheet) {
+        AlertDialog(onDismissRequest = { showTypeSheet = false }, title = { Text("Fazla Mesai Türü") }, text = {
+            Column { types.forEach { type -> Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                RadioButton(selected = selectedType == type, onClick = { selectedType = type; showTypeSheet = false })
+                Spacer(Modifier.width(8.dp))
+                Column { Text("${type.pct} - ${type.name}", fontWeight = FontWeight.Bold, fontSize = 14.sp); Text(type.desc, fontSize = 12.sp, color = colors.textSecondary) }
+            } } }
+        }, confirmButton = { TextButton(onClick = { showTypeSheet = false }) { Text("Kapat") } })
+    }
+
+    if (showInfoDialog) {
+        AlertDialog(onDismissRequest = { showInfoDialog = false }, title = { Text("Fazla Mesai Bilgileri") }, text = {
+            Text("%25 Gece (Mad.69) × 1.25\n%50 Fazla (Mad.41) × 1.50\n%75 Gece+Fazla × 1.75\n%100 Bayram (Mad.47) × 2.00\n%125 Gece+Tatil × 2.25\n\n⚠️ Net tutar için vergi/SGK düşülmelidir.", fontSize = 13.sp)
+        }, confirmButton = { TextButton(onClick = { showInfoDialog = false }) { Text("Tamam") } })
+    }
+}
+
+--- app/src/main/java/com/bluechip/finance/ui/screens/SeveranceScreen.kt ---
+package com.bluechip.finance.ui.screens
+
+import android.app.DatePickerDialog
+import android.content.Intent
+import android.widget.Toast
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bluechip.finance.ui.components.*
+import com.bluechip.finance.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.*
+
+@Composable
+fun SeveranceScreen() {
+    val context = LocalContext.current
+    val colors = LocalAppColors.current
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+
+    var startDate by remember { mutableStateOf<Calendar?>(null) }
+    var endDate by remember { mutableStateOf<Calendar?>(null) }
+    var startText by remember { mutableStateOf("Tarih Seç") }
+    var endText by remember { mutableStateOf("Tarih Seç") }
+    var salary by remember { mutableStateOf("") }
+    var showResult by remember { mutableStateOf(false) }
+    var showReasonDialog by remember { mutableStateOf(false) }
+    var showNoticeDialog by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+    var noticeGiven by remember { mutableStateOf(false) }
+
+    val reasons = listOf("İşveren Feshi", "İşçi Haklı Feshi", "Emeklilik", "Askerlik", "Evlilik (Kadın, 1 Yıl İçinde)", "İşçi Haksız Feshi", "Deneme Süresi Feshi")
+    var selectedReason by remember { mutableStateOf(reasons[0]) }
+
+    var severanceCeiling by remember { mutableDoubleStateOf(64948.77) }
+    var stampTaxRate by remember { mutableDoubleStateOf(0.00759) }
+    var lastUpdate by remember { mutableStateOf("2026-02-02") }
+
+    var resultDuration by remember { mutableStateOf("") }
+    var resultSevGross by remember { mutableStateOf("") }
+    var resultSevTax by remember { mutableStateOf("") }
+    var resultSevNet by remember { mutableStateOf("") }
+    var resultNoticePeriod by remember { mutableStateOf("") }
+    var resultNotGross by remember { mutableStateOf("") }
+    var resultNotTax by remember { mutableStateOf("") }
+    var resultNotNet by remember { mutableStateOf("") }
+    var resultTotal by remember { mutableStateOf("") }
+    var resultInfo by remember { mutableStateOf("") }
+
+    fun fetchParams() {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val json = URL("https://raw.githubusercontent.com/hakanerbasss/baretim-mavi/main/tax_parameters.json?t=${System.currentTimeMillis()}").readText()
+                    val obj = JSONObject(json)
+                    severanceCeiling = obj.getDouble("severance_ceiling")
+                    stampTaxRate = obj.getDouble("stamp_tax_rate")
+                    lastUpdate = obj.getString("last_update")
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { fetchParams() }
+
+    fun showPicker(isStart: Boolean) {
+        val cal = Calendar.getInstance()
+        DatePickerDialog(context, { _, y, m, d ->
+            val sel = Calendar.getInstance().apply { set(y, m, d) }
+            if (isStart) { startDate = sel; startText = dateFormat.format(sel.time) }
+            else { endDate = sel; endText = dateFormat.format(sel.time) }
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
+    fun calculate() {
+        val sd = startDate ?: return; val ed = endDate ?: return; val sal = salary.toDoubleOrNull() ?: return
+        val diffMillis = ed.timeInMillis - sd.timeInMillis + 86400000
+        val totalDays = (diffMillis / 86400000).toInt()
+        val years = totalDays / 365; val months = (totalDays % 365) / 30; val days = (totalDays % 365) % 30
+        resultDuration = "$years yıl $months ay $days gün"
+        val sevEligible = !selectedReason.contains("Haksız") && !selectedReason.contains("Deneme")
+        var sevGross = 0.0; var sevTax = 0.0; var sevNet = 0.0
+        if (sevEligible) { sevGross = minOf(sal, severanceCeiling) * (totalDays / 365.0); sevTax = sevGross * stampTaxRate; sevNet = sevGross - sevTax }
+        resultSevGross = "${formatMoney(sevGross)}₺"; resultSevTax = "${formatMoney(sevTax)}₺"; resultSevNet = "${formatMoney(sevNet)}₺"
+        val noticeDays = when { totalDays < 180 -> 14; totalDays < 547 -> 28; totalDays < 1095 -> 42; else -> 56 }
+        var notGross = 0.0; var notTax = 0.0; var notNet = 0.0
+        if (!noticeGiven) { notGross = (sal / 30.0) * noticeDays; notTax = notGross * stampTaxRate; notNet = notGross - notTax }
+        resultNoticePeriod = "${noticeDays/7} hafta ($noticeDays gün)" + if (noticeGiven) " - Verildi" else ""
+        resultNotGross = "${formatMoney(notGross)}₺"; resultNotTax = "${formatMoney(notTax)}₺"; resultNotNet = "${formatMoney(notNet)}₺"
+        resultTotal = "${formatMoney(sevNet + notNet)}₺"
+        resultInfo = buildString {
+            if (!sevEligible) append("⚠️ $selectedReason durumunda kıdem hakkı yoktur.\n")
+            else if (sal > severanceCeiling) append("ℹ️ Tavan üzerinden hesaplandı (${formatMoney(severanceCeiling)}₺)\n")
+            if (noticeGiven) append("✓ İhbar verildiği için ihbar tazminatı yok.")
+        }
+        showResult = true
+        scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SectionHeader("KIDEM & İHBAR TAZMİNATI", Icons.Default.AccountBalance, onInfoClick = { showInfoDialog = true })
+        UpdateStatusBar(lastUpdate) {
+            fetchParams()
+            Toast.makeText(context, "Güncelleniyor...", Toast.LENGTH_SHORT).show()
+        }
+        Text("İşe Giriş Tarihi", fontSize = 14.sp, color = colors.textPrimary)
+        DatePickerButton(startText) { showPicker(true) }
+        Text("İşten Çıkış Tarihi", fontSize = 14.sp, color = colors.textPrimary)
+        DatePickerButton(endText) { showPicker(false) }
+        CurrencyField(value = salary, onValueChange = { salary = it }, label = "Brüt Maaş (₺)")
+        SelectorButton(selectedReason) { showReasonDialog = true }
+        SelectorButton(if (noticeGiven) "Evet (İhbar verildi)" else "Hayır (İhbar verilmedi)") { showNoticeDialog = true }
+        ActionButtons(onCalculate = { calculate() }, onReset = {
+            startDate = null; endDate = null; startText = "Tarih Seç"; endText = "Tarih Seç"; salary = ""; selectedReason = reasons[0]; noticeGiven = false; showResult = false
+        })
+        ResultCard(visible = showResult) {
+            Text("SONUÇ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = colors.textPrimary)
+            Spacer(Modifier.height(8.dp))
+            Text("Çalışma: $resultDuration", fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Text("🎁 KIDEM TAZMİNATI", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Brüt: $resultSevGross", color = colors.textPrimary); Text("Damga: $resultSevTax", color = colors.textSecondary)
+            Text("Net: $resultSevNet", fontWeight = FontWeight.Bold, color = colors.success)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Text("⚖️ İHBAR TAZMİNATI", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Süre: $resultNoticePeriod", color = colors.textPrimary)
+            Text("Brüt: $resultNotGross", color = colors.textPrimary); Text("Damga: $resultNotTax", color = colors.textSecondary)
+            Text("Net: $resultNotNet", fontWeight = FontWeight.Bold, color = colors.success)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            BigResult("TOPLAM NET", resultTotal)
+            if (resultInfo.isNotEmpty()) Text(resultInfo, fontSize = 12.sp, color = colors.warning)
+            Spacer(Modifier.height(8.dp))
+            ShareButton {
+                val text = "🎁 KIDEM & İHBAR\nSüre: $resultDuration\nKıdem Net: $resultSevNet\nİhbar Net: $resultNotNet\nTOPLAM: $resultTotal\n📱 Baretim Mavi"
+                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }, "Paylaş"))
+            }
+        }
+    }
+
+    if (showReasonDialog) {
+        AlertDialog(onDismissRequest = { showReasonDialog = false }, title = { Text("Çıkış Nedeni") }, text = {
+            Column { reasons.forEach { r -> Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                RadioButton(selected = selectedReason == r, onClick = { selectedReason = r; showReasonDialog = false })
+                Spacer(Modifier.width(8.dp)); Text(r, fontSize = 14.sp) } } }
+        }, confirmButton = { TextButton(onClick = { showReasonDialog = false }) { Text("Kapat") } })
+    }
+    if (showNoticeDialog) {
+        AlertDialog(onDismissRequest = { showNoticeDialog = false }, title = { Text("İhbar Verildi mi?") }, text = {
+            Column { listOf(false to "Hayır", true to "Evet").forEach { (v, l) -> Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                RadioButton(selected = noticeGiven == v, onClick = { noticeGiven = v; showNoticeDialog = false })
+                Spacer(Modifier.width(8.dp)); Text(l) } } }
+        }, confirmButton = { TextButton(onClick = { showNoticeDialog = false }) { Text("Kapat") } })
+    }
+    if (showInfoDialog) {
+        AlertDialog(onDismissRequest = { showInfoDialog = false }, title = { Text("Kıdem & İhbar Nedir?") }, text = {
+            Text("🎁 KIDEM: 1+ yıl çalışana her yıl 30 günlük brüt.\nTavan: ${formatMoney(severanceCeiling)}₺\n\n⚖️ İHBAR SÜRELERİ:\n<6 ay: 2 hafta\n6ay-1.5yıl: 4 hafta\n1.5-3 yıl: 6 hafta\n3+ yıl: 8 hafta", fontSize = 13.sp)
+        }, confirmButton = { TextButton(onClick = { showInfoDialog = false }) { Text("Tamam") } })
+    }
+}
+
+--- app/src/main/java/com/bluechip/finance/ui/screens/TaxScreen.kt ---
+package com.bluechip.finance.ui.screens
+
+import android.content.Intent
+import android.widget.Toast
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bluechip.finance.ui.components.*
+import com.bluechip.finance.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
+import java.util.*
+
+data class TaxBracket(val limit: Double, val rate: Double)
+
+@Composable
+fun TaxScreen() {
+    val context = LocalContext.current
+    val colors = LocalAppColors.current
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    var salary by remember { mutableStateOf("") }
+    var selectedMonth by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
+    var showResult by remember { mutableStateOf(false) }
+    var showMonthDialog by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+
+    var minWageGross by remember { mutableDoubleStateOf(33030.0) }
+    var sgkRate by remember { mutableDoubleStateOf(0.14) }
+    var unemploymentRate by remember { mutableDoubleStateOf(0.01) }
+    var stampTaxRate by remember { mutableDoubleStateOf(0.00759) }
+    var taxBrackets by remember { mutableStateOf(listOf(
+        TaxBracket(190000.0, 0.15), TaxBracket(550000.0, 0.20),
+        TaxBracket(1900000.0, 0.27), TaxBracket(6600000.0, 0.35), TaxBracket(999999999.0, 0.40)
+    )) }
+    var lastUpdate by remember { mutableStateOf("2026-02-02") }
+
+    // DÜZELTME: Aralık dahil 12 ay
+    val months = remember { listOf("Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık") }
+
+    var rGross by remember { mutableStateOf("") }
+    var rSgk by remember { mutableStateOf("") }
+    var rUnemp by remember { mutableStateOf("") }
+    var rBase by remember { mutableStateOf("") }
+    var rExempt by remember { mutableStateOf("") }
+    var rTaxable by remember { mutableStateOf("") }
+    var rCumul by remember { mutableStateOf("") }
+    var rMonthInfo by remember { mutableStateOf("") }
+    var rBracket by remember { mutableStateOf("") }
+    var rBracketInfo by remember { mutableStateOf("") }
+    var rIncome by remember { mutableStateOf("") }
+    var rStamp by remember { mutableStateOf("") }
+    var rNet by remember { mutableStateOf("") }
+
+    fun fetchParams() {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val json = URL("https://raw.githubusercontent.com/hakanerbasss/baretim-mavi/main/tax_parameters.json?t=${System.currentTimeMillis()}").readText()
+                    val obj = JSONObject(json)
+                    lastUpdate = obj.getString("last_update")
+                    minWageGross = obj.getDouble("min_wage_gross")
+                    sgkRate = obj.getDouble("sgk_employee_rate")
+                    unemploymentRate = obj.getDouble("unemployment_rate")
+                    stampTaxRate = obj.getDouble("stamp_tax_rate")
+                    val arr = obj.getJSONArray("tax_brackets")
+                    val list = mutableListOf<TaxBracket>()
+                    for (i in 0 until arr.length()) { val b = arr.getJSONObject(i); list.add(TaxBracket(b.getDouble("limit"), b.getDouble("rate"))) }
+                    taxBrackets = list
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { fetchParams() }
+
+    fun calculate() {
+        val gross = salary.toDoubleOrNull() ?: return
+        val monthIdx = selectedMonth + 1
+        val sgk = gross * sgkRate; val unemp = gross * unemploymentRate
+        val baseMatrah = gross - sgk - unemp
+        val exempt = minOf(baseMatrah, minWageGross - (minWageGross * sgkRate) - (minWageGross * unemploymentRate))
+        val taxable = maxOf(0.0, baseMatrah - exempt)
+        val cumul = taxable * monthIdx
+        var bRate = 0.15; var bInfo = ""
+        for (i in taxBrackets.indices) {
+            if (cumul <= taxBrackets[i].limit) {
+                bRate = taxBrackets[i].rate; val lower = if (i == 0) 0.0 else taxBrackets[i-1].limit
+                bInfo = "${formatMoney(lower)} - ${formatMoney(taxBrackets[i].limit)} arası"; break
+            }
+        }
+        val incomeTax = taxable * bRate; val stampTax = gross * stampTaxRate
+        val net = gross - sgk - unemp - incomeTax - stampTax
+
+        rGross = "${formatMoney(gross)}₺"; rSgk = "-${formatMoney(sgk)}₺"
+        rUnemp = "-${formatMoney(unemp)}₺"; rBase = "${formatMoney(baseMatrah)}₺"
+        rExempt = "-${formatMoney(exempt)}₺"; rTaxable = "${formatMoney(taxable)}₺"
+        rCumul = "${formatMoney(cumul)}₺"; rMonthInfo = "$monthIdx aylık toplam"
+        rBracket = "%${(bRate*100).toInt()}"; rBracketInfo = "($bInfo)"
+        rIncome = "-${formatMoney(incomeTax)}₺"; rStamp = "-${formatMoney(stampTax)}₺"
+        rNet = "${formatMoney(net)}₺"
+        showResult = true
+        scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SectionHeader("VERGİ DİLİMİ HESAPLAMA", Icons.Default.Receipt, onInfoClick = { showInfoDialog = true })
+        UpdateStatusBar(lastUpdate) {
+            fetchParams()
+            Toast.makeText(context, "Güncelleniyor...", Toast.LENGTH_SHORT).show()
+        }
+        CurrencyField(value = salary, onValueChange = { salary = it }, label = "Brüt Maaş (₺)")
+        SelectorButton("Ay: ${months[selectedMonth]}") { showMonthDialog = true }
+        ActionButtons(onCalculate = { calculate() }, onReset = {
+            salary = ""; selectedMonth = Calendar.getInstance().get(Calendar.MONTH); showResult = false
+        })
+        ResultCard(visible = showResult) {
+            Text("SONUÇ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = colors.textPrimary)
+            Spacer(Modifier.height(8.dp))
+            Text("Brüt Maaş: $rGross", fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Text("SGK (%${(sgkRate*100).toInt()}): $rSgk", color = colors.error)
+            Text("İşsizlik (%${(unemploymentRate*100).toInt()}): $rUnemp", color = colors.error)
+            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+            Text("Matrah: $rBase", color = colors.textPrimary)
+            Text("Muafiyet: $rExempt", color = colors.success)
+            Text("Vergiye Tabi: $rTaxable", fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+            Text("Kümülatif: $rCumul", color = colors.textPrimary)
+            Text("ℹ️ $rMonthInfo", fontSize = 12.sp, color = colors.textSecondary)
+            Text("🎯 Vergi Dilimi: $rBracket", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(rBracketInfo, fontSize = 12.sp, color = colors.textSecondary)
+            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+            Text("Gelir Vergisi: $rIncome", color = colors.error)
+            Text("Damga Vergisi: $rStamp", color = colors.error)
+            Spacer(Modifier.height(8.dp))
+            BigResult("NET MAAŞ", "💰 $rNet")
+            ShareButton {
+                val text = "💰 VERGİ\nBrüt: $rGross\nSGK: $rSgk\nDilim: $rBracket\nNet: $rNet\n📱 Baretim Mavi"
+                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }, "Paylaş"))
+            }
+        }
+    }
+
+    // DÜZELTME: Aralık görünen ay seçim dialogu
+    if (showMonthDialog) {
+        AlertDialog(onDismissRequest = { showMonthDialog = false }, title = { Text("Ay Seçin") }, text = {
+            Column {
+                months.forEachIndexed { i, m ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        RadioButton(selected = selectedMonth == i, onClick = { selectedMonth = i; showMonthDialog = false })
+                        Spacer(Modifier.width(8.dp))
+                        Text(m, fontSize = 14.sp)
+                    }
+                }
+            }
+        }, confirmButton = { TextButton(onClick = { showMonthDialog = false }) { Text("Kapat") } })
+    }
+
+    if (showInfoDialog) {
+        AlertDialog(onDismissRequest = { showInfoDialog = false }, title = { Text("Vergi Dilimi Rehberi") }, text = {
+            Text(buildString {
+                append("📊 $lastUpdate Vergi Dilimleri:\n\n")
+                var prev = 0.0
+                taxBrackets.forEach { b -> val lim = if (b.limit >= 999999999) "+" else formatMoney(b.limit)
+                    append("${formatMoney(prev)} - ${lim}₺ → %${(b.rate*100).toInt()}\n"); prev = b.limit }
+                append("\n❌ Asgari ücretliler muaf (${formatMoney(minWageGross)}₺ altı)")
+            }, fontSize = 13.sp)
+        }, confirmButton = { TextButton(onClick = { showInfoDialog = false }) { Text("Tamam") } })
+    }
+}
+
+--- app/src/main/java/com/bluechip/finance/ui/screens/AnnualLeaveScreen.kt ---
+package com.bluechip.finance.ui.screens
+
+import android.app.DatePickerDialog
+import android.content.Intent
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bluechip.finance.ui.components.*
+import com.bluechip.finance.ui.theme.*
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
+
+@Composable
+fun AnnualLeaveScreen() {
+    val context = LocalContext.current
+    val colors = LocalAppColors.current
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+
+    var startDate by remember { mutableStateOf<Calendar?>(null) }
+    var calcDate by remember { mutableStateOf(Calendar.getInstance()) }
+    var startText by remember { mutableStateOf("Tarih Seç") }
+    var calcText by remember { mutableStateOf(dateFormat.format(Calendar.getInstance().time)) }
+    var age by remember { mutableStateOf("") }
+    var underground by remember { mutableStateOf(false) }
+    var showResult by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+    var resultDuration by remember { mutableStateOf("") }
+    var resultLeave by remember { mutableStateOf("") }
+    var resultInfo by remember { mutableStateOf("") }
+
+    fun showPicker(isStart: Boolean) {
+        val cal = if (isStart) Calendar.getInstance() else calcDate
+        DatePickerDialog(context, { _, y, m, d ->
+            val sel = Calendar.getInstance().apply { set(y, m, d) }
+            if (isStart) { startDate = sel; startText = dateFormat.format(sel.time) }
+            else { calcDate = sel; calcText = dateFormat.format(sel.time) }
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
+    fun calculate() {
+        val sd = startDate ?: return
+        val diff = calcDate.timeInMillis - sd.timeInMillis + 86400000
+        val totalDays = (diff / 86400000).toInt()
+        val years = totalDays / 365; val months = (totalDays % 365) / 30; val days = (totalDays % 365) % 30
+        resultDuration = "$years yıl $months ay $days gün"
+        val ageVal = age.toIntOrNull()
+        var leave = when {
+            ageVal != null && ageVal < 18 -> 20; ageVal != null && ageVal >= 50 -> 20
+            years < 5 -> 14; years < 15 -> 20; else -> 26
+        }
+        if (underground) leave += 4
+        resultLeave = "$leave gün"
+        resultInfo = buildString {
+            when { ageVal != null && ageVal < 18 -> append("ℹ️ 18 yaş altı: 20 gün\n"); ageVal != null && ageVal >= 50 -> append("ℹ️ 50+ yaş: 20 gün\n")
+                years < 5 -> append("ℹ️ 0-5 yıl: 14 gün\n"); years < 15 -> append("ℹ️ 5-15 yıl: 20 gün\n"); else -> append("ℹ️ 15+ yıl: 26 gün\n") }
+            if (underground) append("ℹ️ Yer altı: +4 gün")
+        }
+        showResult = true
+        scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SectionHeader("YILLIK İZİN HESAPLAMA", Icons.Default.DateRange, onInfoClick = { showInfoDialog = true })
+        Text("İşe Başlama Tarihi", fontSize = 14.sp, color = colors.textPrimary)
+        DatePickerButton(startText) { showPicker(true) }
+        Text("Hesaplama Tarihi", fontSize = 14.sp, color = colors.textPrimary)
+        DatePickerButton(calcText) { showPicker(false) }
+        NumberField(value = age, onValueChange = { age = it }, label = "Yaşınız (opsiyonel)")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = underground, onCheckedChange = { underground = it })
+            Spacer(Modifier.width(4.dp)); Text("Yer altı işçisiyim (+4 gün)", color = colors.textPrimary)
+        }
+        ActionButtons(onCalculate = { calculate() }, onReset = {
+            startDate = null; calcDate = Calendar.getInstance(); startText = "Tarih Seç"
+            calcText = dateFormat.format(Calendar.getInstance().time); age = ""; underground = false; showResult = false
+        })
+        ResultCard(visible = showResult) {
+            Text("SONUÇ", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = colors.textPrimary)
+            Spacer(Modifier.height(8.dp))
+            Text("Çalışma: $resultDuration", fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Spacer(Modifier.height(8.dp))
+            BigResult("Yıllık İzin Hakkı", resultLeave, MaterialTheme.colorScheme.primary)
+            if (resultInfo.isNotEmpty()) Text(resultInfo, fontSize = 12.sp, color = colors.textSecondary)
+            Spacer(Modifier.height(8.dp))
+            ShareButton {
+                val text = "📅 YILLIK İZİN\nSüre: $resultDuration\nİzin: $resultLeave\n$resultInfo\n📱 Baretim Mavi"
+                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }, "Paylaş"))
+            }
+        }
+    }
+
+    if (showInfoDialog) {
+        AlertDialog(onDismissRequest = { showInfoDialog = false }, title = { Text("İzin Rehberi") }, text = {
+            Text("📜 4857 İş Kanunu Mad. 53\n\n• 1 yıl sonra hak kazanılır\n• 0-5 yıl: 14 gün\n• 5-15 yıl: 20 gün\n• 15+ yıl: 26 gün\n• 18 yaş altı: 20 gün\n• 50+ yaş: 20 gün\n• Yer altı: +4 gün\n\n🤰 Doğum: 16 hafta\n👨 Babalık: 5 gün\n💒 Evlenme: 3 gün", fontSize = 13.sp)
+        }, confirmButton = { TextButton(onClick = { showInfoDialog = false }) { Text("Tamam") } })
+    }
+}
+
+
+==== UI COMPONENTS & VIEWMODELS ====
+
+--- app/src/main/java/com/bluechip/finance/ui/theme/Color.kt ---
+package com.bluechip.finance.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+// Light
+val BluePrimary = Color(0xFF1565C0)
+val BluePrimaryDark = Color(0xFF0D47A1)
+val BluePrimaryLight = Color(0xFF42A5F5)
+val BlueAccent = Color(0xFF1976D2)
+val GoldAccent = Color(0xFFFFB300)
+val SurfaceLight = Color(0xFFF8F9FA)
+val CardLight = Color(0xFFFFFFFF)
+val CardGrayLight = Color(0xFFF5F5F5)
+val TextPrimaryLight = Color(0xFF212121)
+val TextSecondaryLight = Color(0xFF757575)
+
+// Dark
+val BluePrimaryDarkTheme = Color(0xFF90CAF9)
+val SurfaceDark = Color(0xFF121212)
+val CardDark = Color(0xFF1E1E1E)
+val CardGrayDark = Color(0xFF2C2C2C)
+val TextPrimaryDark = Color(0xFFE0E0E0)
+val TextSecondaryDark = Color(0xFFB0B0B0)
+
+val SuccessGreen = Color(0xFF4CAF50)
+val SuccessGreenDark = Color(0xFF81C784)
+val ErrorRed = Color(0xFFC62828)
+val ErrorRedDark = Color(0xFFEF9A9A)
+val WarningOrange = Color(0xFFE65100)
+val WarningOrangeDark = Color(0xFFFFCC80)
+val InfoBlue = Color(0xFF1976D2)
+val InfoBlueDark = Color(0xFF90CAF9)
+
+--- app/src/main/java/com/bluechip/finance/ui/theme/Theme.kt ---
+package com.bluechip.finance.ui.theme
+
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+
+private val LightColorScheme = lightColorScheme(
+    primary = BluePrimary,
+    onPrimary = Color.White,
+    secondary = GoldAccent,
+    surface = SurfaceLight,
+    background = SurfaceLight,
+    error = ErrorRed,
+    surfaceVariant = CardGrayLight,
+    onSurface = TextPrimaryLight,
+    onBackground = TextPrimaryLight,
+    outline = Color(0xFFBDBDBD)
+)
+
+private val DarkColorScheme = darkColorScheme(
+    primary = BluePrimaryDarkTheme,
+    onPrimary = Color.Black,
+    secondary = GoldAccent,
+    surface = SurfaceDark,
+    background = SurfaceDark,
+    error = ErrorRedDark,
+    surfaceVariant = CardGrayDark,
+    onSurface = TextPrimaryDark,
+    onBackground = TextPrimaryDark,
+    outline = Color(0xFF616161)
+)
+
+data class AppColors(
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val cardBg: Color,
+    val cardGray: Color,
+    val success: Color,
+    val error: Color,
+    val warning: Color,
+    val info: Color,
+    val isDark: Boolean
+)
+
+val LocalAppColors = compositionLocalOf {
+    AppColors(
+        textPrimary = TextPrimaryLight,
+        textSecondary = TextSecondaryLight,
+        cardBg = CardLight,
+        cardGray = CardGrayLight,
+        success = SuccessGreen,
+        error = ErrorRed,
+        warning = WarningOrange,
+        info = InfoBlue,
+        isDark = false
+    )
+}
+
+@Composable
+fun BlueChipTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+
+    val appColors = if (darkTheme) {
+        AppColors(TextPrimaryDark, TextSecondaryDark, CardDark, CardGrayDark, SuccessGreenDark, ErrorRedDark, WarningOrangeDark, InfoBlueDark, true)
+    } else {
+        AppColors(TextPrimaryLight, TextSecondaryLight, CardLight, CardGrayLight, SuccessGreen, ErrorRed, WarningOrange, InfoBlue, false)
+    }
+
+    androidx.compose.runtime.CompositionLocalProvider(LocalAppColors provides appColors) {
+        MaterialTheme(colorScheme = colorScheme, content = content)
+    }
+}
+
+--- app/src/main/java/com/bluechip/finance/ui/components/CommonComponents.kt ---
+package com.bluechip.finance.ui.components
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bluechip.finance.ui.theme.*
+
+@Composable
+fun SectionHeader(title: String, icon: ImageVector? = null, onInfoClick: (() -> Unit)? = null, onRefreshClick: (() -> Unit)? = null) {
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon != null) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary, modifier = Modifier.weight(1f))
+        if (onRefreshClick != null) {
+            IconButton(onClick = onRefreshClick) {
+                Icon(Icons.Default.Refresh, "Güncelle", tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+        if (onInfoClick != null) {
+            IconButton(onClick = onInfoClick) {
+                Icon(Icons.Default.Info, "Bilgi", tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
+fun CurrencyField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { new -> if (new.isEmpty() || new.matches(Regex("^\\d*\\.?\\d{0,2}$"))) onValueChange(new) },
+        label = { Text(label) },
+        leadingIcon = { Text("₺", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary) },
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp)
+    )
+}
+
+@Composable
+fun NumberField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { new -> if (new.isEmpty() || new.matches(Regex("^\\d*\\.?\\d*$"))) onValueChange(new) },
+        label = { Text(label) },
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp)
+    )
+}
+
+@Composable
+fun ActionButtons(onCalculate: () -> Unit, onReset: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Button(
+            onClick = onCalculate,
+            modifier = Modifier.weight(1f).height(52.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.Calculate, null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("HESAPLA", fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(
+            onClick = onReset,
+            modifier = Modifier.weight(1f).height(52.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) { Text("TEMİZLE") }
+    }
+}
+
+@Composable
+fun ResultCard(visible: Boolean, content: @Composable ColumnScope.() -> Unit) {
+    val colors = LocalAppColors.current
+    AnimatedVisibility(visible = visible, enter = fadeIn() + expandVertically()) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardGray)
+        ) {
+            Column(modifier = Modifier.padding(20.dp), content = content)
+        }
+    }
+}
+
+@Composable
+fun ResultLine(label: String, value: String, color: Color = LocalAppColors.current.textPrimary, bold: Boolean = false) {
+    Text(
+        text = "$label $value",
+        fontSize = if (bold) 16.sp else 14.sp,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+        color = color,
+        modifier = Modifier.padding(vertical = 2.dp)
+    )
+}
+
+@Composable
+fun BigResult(label: String, value: String, color: Color = LocalAppColors.current.success) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(label, fontSize = 13.sp, color = color)
+        Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+@Composable
+fun ShareButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) { Text("PAYLAŞ 📤") }
+}
+
+@Composable
+fun DatePickerButton(text: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Icon(Icons.Default.DateRange, null, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text)
+    }
+}
+
+@Composable
+fun SelectorButton(text: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) { Text(text) }
+}
+
+@Composable
+fun UpdateStatusBar(lastUpdate: String, onRefresh: () -> Unit) {
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("📅 Son güncelleme: $lastUpdate", fontSize = 12.sp, color = colors.success, modifier = Modifier.weight(1f))
+        IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Refresh, "Güncelle", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+fun formatMoney(amount: Double): String {
+    return String.format("%,.2f", amount).replace(',', 'X').replace('.', ',').replace('X', '.')
+}
+
+fun formatNumber(amount: Double): String {
+    return String.format("%,.0f", amount).replace(',', '.')
+}
+
+
+==== ANDROID MANIFEST & GRADLE ====
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+</manifest>
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.bluechip.finance'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.bluechip.finance"
+        minSdk 24
+        targetSdk 34
+        versionCode 43
+        versionName "2.0-compose"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        compose true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.5.4'
+    }
+}
+
+dependencies {
+    // Core
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
+
+    // Compose BOM
+    def composeBom = platform('androidx.compose:compose-bom:2024.02.00')
+    implementation composeBom
+
+    // Compose
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.compose.animation:animation'
+
+    // Activity & Navigation Compose
+    implementation 'androidx.activity:activity-compose:1.8.2'
+    implementation 'androidx.navigation:navigation-compose:2.7.7'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // Retrofit (API için)
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+
+    // Coil Compose (görseller için)
+    implementation 'io.coil-kt:coil-compose:2.6.0'
+
+    // Debug
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+}

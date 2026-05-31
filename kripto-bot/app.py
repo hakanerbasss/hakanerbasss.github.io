@@ -15,6 +15,8 @@ from wyckoff_agent import (start_wyckoff_agent, stop_wyckoff_agent,
                             wyckoff_agent_status)
 from breakout_agent import (start_breakout_agent, stop_breakout_agent,
                              breakout_agent_status)
+from accumulation_agent import (start_accumulation_agent, stop_accumulation_agent,
+                                 accumulation_agent_status)
 from manager_agent import (start_ceo_agent, stop_ceo_agent, ceo_agent_status,
                             trigger_ceo_review, restart_ceo_agent)
 
@@ -290,6 +292,7 @@ def api_stats():
         if 'INDICATOR-SMART' in s:  return 'INDICATOR-SMART'
         if 'INDICATOR-SEANS' in s:  return 'INDICATOR-SEANS'
         if 'INDICATOR' in s:        return 'INDICATOR-UTBOT'  # eski kayıtlar UTBOT'a düşsün
+        if 'ACCUMULATION' in s:     return 'ACCUMULATION'
         if 'BREAKOUT' in s:         return 'BREAKOUT'
         if 'WYCKOFF' in s:          return 'WYCKOFF'
         if 'EDGE' in s:             return 'EDGE'
@@ -979,6 +982,7 @@ def agent_comparison():
         if 'INDICATOR-SMART' in s:  return 'INDICATOR-SMART'
         if 'INDICATOR-SEANS' in s:  return 'INDICATOR-SEANS'
         if 'INDICATOR' in s:        return 'INDICATOR-UTBOT'  # eski kayıtlar UTBOT'a düşsün
+        if 'ACCUMULATION' in s:     return 'ACCUMULATION'
         if 'BREAKOUT' in s:         return 'BREAKOUT'
         if 'WYCKOFF' in s:          return 'WYCKOFF'
         if 'EDGE' in s:             return 'EDGE'
@@ -1108,8 +1112,9 @@ def api_agent_toggle():
         'otonom':    'otonom_enabled',
         'indicator': 'indicator_enabled',
         'wyckoff':   'wyckoff_enabled',
-        'breakout':  'breakout_enabled',
-        'ceo':       'ceo_agent_enabled',
+        'breakout':     'breakout_enabled',
+        'accumulation': 'accumulation_enabled',
+        'ceo':          'ceo_agent_enabled',
     }
     if agent not in KEY_MAP:
         return jsonify({'ok': False, 'error': 'Bilinmeyen ajan'})
@@ -1133,6 +1138,9 @@ def api_agent_toggle():
     elif agent == 'breakout':
         if enabled: start_breakout_agent()
         else: stop_breakout_agent()
+    elif agent == 'accumulation':
+        if enabled: start_accumulation_agent()
+        else: stop_accumulation_agent()
     elif agent == 'ceo':
         if enabled: start_ceo_agent()
         else: stop_ceo_agent()
@@ -1171,6 +1179,57 @@ def api_ceo_analyze_now():
     trigger_ceo_review()
     return jsonify({'ok': True, 'msg': '👔 CEO analizi başlatıldı'})
 
+
+# ── Otomatik Yedekleme ────────────────────────────────────────────────────────
+def _backup_loop():
+    """Her gece 02:00'de veri dosyalarını yedekler, son 7 günü saklar."""
+    import shutil, glob, threading
+    BACKUP_DIR  = 'backups'
+    BACKUP_FILES = ['trades.json', 'positions.json', 'config.json',
+                    'agent_state.json', 'edge_state.json',
+                    'indicator_state.json', 'accumulation_state.json']
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+    while True:
+        now = datetime.datetime.now()
+        # Gece 02:00'e kadar bekle
+        target = now.replace(hour=2, minute=0, second=0, microsecond=0)
+        if now >= target:
+            target += datetime.timedelta(days=1)
+        time.sleep((target - now).total_seconds())
+
+        # Yedek al
+        stamp = datetime.datetime.now().strftime('%Y%m%d_%H%M')
+        backed = []
+        for fname in BACKUP_FILES:
+            if os.path.exists(fname):
+                dst = os.path.join(BACKUP_DIR, f'{stamp}_{fname}')
+                try:
+                    shutil.copy2(fname, dst)
+                    backed.append(fname)
+                except Exception as e:
+                    print(f'[Backup] {fname} hata: {e}')
+
+        # 7 günden eski yedekleri sil
+        cutoff = datetime.datetime.now() - datetime.timedelta(days=7)
+        for old in glob.glob(os.path.join(BACKUP_DIR, '*.json')):
+            try:
+                mtime = datetime.datetime.fromtimestamp(os.path.getmtime(old))
+                if mtime < cutoff:
+                    os.remove(old)
+            except Exception:
+                pass
+
+        print(f'[Backup] Yedeklendi: {backed}')
+        send_telegram(f'💾 Otomatik yedek alındı ({stamp}): {len(backed)} dosya')
+
+        import time as _t
+        _t.sleep(60)  # çift tetikleme önlemi
+
+
+import time as time_mod
+import threading as threading_mod
+
 # ── Başlat ───────────────────────────────────────
 if __name__ == '__main__':
     start_engine()            # UT Bot + Seans + Smart (manuel coinler)
@@ -1179,7 +1238,9 @@ if __name__ == '__main__':
     start_edge_agent()        # Piyasa mekaniği: Funding/OI/CVD/Sweep (otonom)
     start_indicator_agent()   # UT Bot tarayıcı: otomatik coin seçimi (otonom)
     start_wyckoff_agent()     # Wyckoff akümülasyon: dar bant + sahte pump + kırılış
-    start_breakout_agent()    # Momentum kırılım: hacim spike + trailing stop (sabit TP yok)
+    start_breakout_agent()       # Momentum kırılım: hacim spike + trailing stop (sabit TP yok)
+    start_accumulation_agent()   # Sessiz birikim: hacim squeeze + BB sıkışması → tetik girişi
+    threading_mod.Thread(target=_backup_loop, daemon=True).start()  # gece 02:00 otomatik yedek
     cfg = load_config()
     if cfg.get('ceo_agent_enabled', False):
         start_ceo_agent()     # CEO: ajan performans analizi + parametre optimizasyonu

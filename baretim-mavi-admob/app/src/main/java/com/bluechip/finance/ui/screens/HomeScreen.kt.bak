@@ -1,0 +1,427 @@
+package com.bluechip.finance.ui.screens
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.bluechip.finance.data.Article
+import com.bluechip.finance.data.PaymentManager
+import com.bluechip.finance.data.ProfileManager
+import com.bluechip.finance.data.NewsApiService
+import com.bluechip.finance.ui.components.TipCard
+import com.bluechip.finance.ui.components.formatMoney
+import com.bluechip.finance.ui.components.formatNumber
+import com.bluechip.finance.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.*
+
+@Composable
+fun HomeScreen(onNavigate: (String) -> Unit) {
+    val context = LocalContext.current
+    val colors  = LocalAppColors.current
+
+    var usdRate    by remember { mutableDoubleStateOf(0.0) }
+    var eurRate    by remember { mutableDoubleStateOf(0.0) }
+    var goldUSD    by remember { mutableDoubleStateOf(0.0) }
+    var btcUSD     by remember { mutableDoubleStateOf(0.0) }
+    var ethUSD     by remember { mutableDoubleStateOf(0.0) }
+    var isTL       by remember { mutableStateOf(true) }
+    var updateTime by remember { mutableStateOf("") }
+    var isLoading  by remember { mutableStateOf(true) }
+    var marketExpanded by remember { mutableStateOf(true) }
+
+    var articles    by remember { mutableStateOf<List<Article>>(emptyList()) }
+    var newsStatus  by remember { mutableStateOf("Haberler yukleniyor...") }
+    var showAllNews by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val tcmb = URL("https://www.tcmb.gov.tr/kurlar/today.xml").readText()
+                val usdMatch = Regex("<Currency[^>]*CurrencyCode=\"USD\"[^>]*>.*?<ForexSelling>([0-9.]+)</ForexSelling>", RegexOption.DOT_MATCHES_ALL).find(tcmb)
+                val eurMatch = Regex("<Currency[^>]*CurrencyCode=\"EUR\"[^>]*>.*?<ForexSelling>([0-9.]+)</ForexSelling>", RegexOption.DOT_MATCHES_ALL).find(tcmb)
+                if (usdMatch != null) usdRate = usdMatch.groupValues[1].toDouble()
+                if (eurMatch != null) eurRate = eurMatch.groupValues[1].toDouble()
+            } catch (_: Exception) { usdRate = 32.5; eurRate = 35.2 }
+            try {
+                val crypto = URL("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether-gold&vs_currencies=usd").readText()
+                val json = JSONObject(crypto)
+                btcUSD  = json.getJSONObject("bitcoin").getDouble("usd")
+                ethUSD  = json.getJSONObject("ethereum").getDouble("usd")
+                goldUSD = json.getJSONObject("tether-gold").getDouble("usd")
+            } catch (_: Exception) { btcUSD = 64200.0; ethUSD = 3100.0; goldUSD = 2650.0 }
+            isLoading  = false
+            updateTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        }
+        withContext(Dispatchers.IO) {
+            try {
+                val response = NewsApiService.instance.getNews()
+                articles    = response.articles.take(6)
+                newsStatus  = "Son guncelleme: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())}"
+            } catch (_: Exception) { newsStatus = "Haber yuklenemedi" }
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+
+        // ── 0a. Maaş & Kullanıcı kartı ─────────────────────────────
+        SalaryCard(context)
+
+        // ── 0b. Yaklaşan Ödemeler kartı ──────────────────────────
+        UpcomingPaymentsCard(context = context, onNavigate = onNavigate)
+
+        // ── 1. Piyasa Karti (Collapsible) ────────────────────────
+        Card(
+            shape  = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(4.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBg)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+
+                // Baslik + toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { marketExpanded = !marketExpanded },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.TrendingUp, null,
+                        tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Piyasa Verileri",
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                        color = colors.textPrimary, modifier = Modifier.weight(1f))
+                    if (updateTime.isNotEmpty()) {
+                        Text(updateTime, fontSize = 10.sp, color = colors.textSecondary)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Icon(
+                        if (marketExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        null, tint = colors.textSecondary, modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // TL/USD toggle → küçük pill
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
+                            )
+                            .padding(2.dp)
+                    ) {
+                        listOf("TL", "USD").forEach { label ->
+                            val selected = (label == "TL") == isTL
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary
+                                        else androidx.compose.ui.graphics.Color.Transparent,
+                                        androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
+                                    )
+                                    .clickable { isTL = (label == "TL") }
+                                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                    color = if (selected) androidx.compose.ui.graphics.Color.White
+                                            else colors.textSecondary)
+                            }
+                        }
+                    }
+                }
+
+                // Animasyonlu icerik
+                AnimatedVisibility(
+                    visible = marketExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit  = shrinkVertically() + fadeOut()
+                ) {
+                    Column {
+                        Spacer(Modifier.height(8.dp))
+                        if (isLoading) {
+                            // Skeleton loader
+                            SkeletonLoader()
+                        } else {
+                            val s = if (isTL) "TL" else "$"
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                PriceChip("USD",  "${formatMoney(if (isTL) usdRate else 1.0)}$s",            Color(0xFF4CAF50))
+                                PriceChip("EUR",  "${formatMoney(if (isTL) eurRate else eurRate/usdRate)}$s", Color(0xFF2196F3))
+                                PriceChip("Altin","${formatMoney(if (isTL) goldUSD*usdRate else goldUSD)}$s", Color(0xFFFF9800))
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                PriceChip("BTC", "${formatNumber(if (isTL) btcUSD*usdRate else btcUSD)}$s", Color(0xFFF7931A))
+                                PriceChip("ETH", "${formatNumber(if (isTL) ethUSD*usdRate else ethUSD)}$s", Color(0xFF627EEA))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 2. Bilgi Karti ───────────────────────────────────────
+        TipCard()
+
+        // ── 3. Ekonomi Haberleri ─────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Newspaper, null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Ekonomi Haberleri",
+                fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                color = colors.textPrimary, modifier = Modifier.weight(1f))
+            Text(newsStatus, fontSize = 10.sp, color = colors.textSecondary)
+        }
+
+        val visibleArticles = if (showAllNews) articles else articles.take(3)
+
+        visibleArticles.forEach { article ->
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)))
+                },
+                shape  = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(2.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.cardBg)
+            ) {
+                Column {
+                    if (!article.urlToImage.isNullOrEmpty() && article.urlToImage != "null") {
+                        AsyncImage(
+                            model = article.urlToImage, contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth().height(160.dp)
+                                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(article.title,
+                            fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                            color = colors.textPrimary, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(4.dp))
+                        Text(article.description ?: "Detaylar icin tiklayin",
+                            fontSize = 12.sp, color = colors.info, maxLines = 2)
+                    }
+                }
+            }
+        }
+
+        // "Daha Fazla / Daha Az" butonu
+        if (articles.size > 3) {
+            OutlinedButton(
+                onClick = { showAllNews = !showAllNews },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    if (showAllNews) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    null, modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(if (showAllNews) "Daha Az Goster" else "Daha Fazla Haber")
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+// ── Skeleton Loader ───────────────────────────────────────────────
+@Composable
+private fun SkeletonLoader() {
+    val colors = LocalAppColors.current
+    val shimmer = colors.cardGray
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            repeat(3) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(modifier = Modifier
+                        .width(40.dp).height(10.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer))
+                    Spacer(Modifier.height(4.dp))
+                    Box(modifier = Modifier
+                        .width(60.dp).height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer))
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            repeat(2) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(modifier = Modifier
+                        .width(40.dp).height(10.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer))
+                    Spacer(Modifier.height(4.dp))
+                    Box(modifier = Modifier
+                        .width(70.dp).height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer))
+                }
+            }
+        }
+    }
+}
+
+// ── Fiyat Chip ───────────────────────────────────────────────────
+@Composable
+private fun PriceChip(name: String, price: String, color: Color) {
+    val colors = LocalAppColors.current
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(name,  fontSize = 11.sp, color = colors.textSecondary)
+        Text(price, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+
+// ── Maaş & Kullanıcı kartı ───────────────────────────────────────
+@Composable
+private fun SalaryCard(context: android.content.Context) {
+    val colors = LocalAppColors.current
+    val profile = remember { ProfileManager(context).load() }
+    if (!profile.isLoggedIn) return
+
+    val cal = Calendar.getInstance()
+    val today = cal.get(Calendar.DAY_OF_MONTH)
+
+    // Maaş gününe kalan hesapla
+    val salaryDay = profile.salaryDay
+    val daysToSalary: Int? = if (salaryDay > 0) {
+        val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        when {
+            salaryDay >= today -> salaryDay - today
+            else -> {
+                val nextMonth = Calendar.getInstance().apply { add(Calendar.MONTH, 1) }
+                val nextMax = nextMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
+                (nextMax - today) + minOf(salaryDay, nextMax)
+            }
+        }
+    } else null
+
+    Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(3.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBg),
+        modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Avatar
+            Box(modifier = Modifier.size(48.dp).background(
+                androidx.compose.ui.graphics.Brush.radialGradient(listOf(com.bluechip.finance.ui.theme.PurplePrimaryLight, com.bluechip.finance.ui.theme.PurplePrimary)),
+                androidx.compose.foundation.shape.CircleShape),
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(26.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                if (profile.name.isNotBlank())
+                    Text("Merhaba, ${profile.name.split(" ").first()} 👋", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = colors.textPrimary)
+                if (profile.netSalary > 0)
+                    Text("Net Maaş: ${formatMoney(profile.netSalary)} ₺", fontSize = 12.sp, color = colors.textSecondary)
+            }
+            if (daysToSalary != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("💰", fontSize = 18.sp, textAlign = TextAlign.Center)
+                    Text(if (daysToSalary == 0) "Bugün!" else "$daysToSalary gün", fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                        color = if (daysToSalary <= 3) com.bluechip.finance.ui.theme.PurplePrimary else colors.textSecondary)
+                    Text("maaş", fontSize = 10.sp, color = colors.textSecondary)
+                }
+            }
+        }
+    }
+}
+
+// ── Yaklaşan Ödemeler kartı ──────────────────────────────────────
+@Composable
+private fun UpcomingPaymentsCard(context: android.content.Context, onNavigate: (String) -> Unit) {
+    val colors = LocalAppColors.current
+    val upcoming = remember { PaymentManager.getUpcomingThisMonth(context).take(2) }
+    val thisMonthTotal = remember { PaymentManager.getThisMonthTotal(context) }
+    if (PaymentManager.getActivePayments(context).isEmpty()) return
+
+    Card(shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(3.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBg),
+        modifier = Modifier.fillMaxWidth().clickable { onNavigate("payments") }) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Payment, null, tint = com.bluechip.finance.ui.theme.PurplePrimary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Yaklaşan Ödemeler", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, null, tint = colors.textSecondary, modifier = Modifier.size(18.dp))
+            }
+            if (upcoming.isEmpty()) {
+                Text("Bu ay kalan ödeme yok 🎉", fontSize = 13.sp, color = colors.textSecondary)
+            } else {
+                upcoming.forEach { p ->
+                    val today = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+                    val daysLeft = p.dueDayOfMonth - today
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(p.category.emoji, fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(p.name, fontSize = 13.sp, color = colors.textPrimary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("${formatMoney(p.amount)} ₺", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = com.bluechip.finance.ui.theme.PurplePrimary)
+                            Text(if (daysLeft <= 0) "Bugün!" else "$daysLeft gün", fontSize = 10.sp, color = if (daysLeft <= 3) colors.warning else colors.textSecondary)
+                        }
+                    }
+                }
+                HorizontalDivider(color = colors.cardGray, modifier = Modifier.padding(vertical = 2.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Bu ay toplam:", fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.weight(1f))
+                    Text("${formatMoney(thisMonthTotal)} ₺", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.warning)
+                }
+            }
+        }
+    }
+}
+
