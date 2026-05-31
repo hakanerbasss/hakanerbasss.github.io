@@ -794,19 +794,44 @@ def execute_sell(client, symbol, sell_pct, source='MANUEL', period='—'):
 
 
 
+# Telegram mesaj kuyruğu: tüm ajanlar aynı anda mesaj atınca rate-limit/timeout olur.
+# Tek bir arka plan thread'i sırayla gönderir (max 1 mesaj/sn, Telegram limiti: 30/sn).
+import queue as _queue
+_TG_QUEUE: '_queue.Queue[str]' = _queue.Queue(maxsize=50)
+_TG_THREAD_STARTED = False
+
+def _tg_worker():
+    """Arka planda çalışır; kuyruktaki mesajları 1/sn hızında gönderir."""
+    while True:
+        try:
+            msg = _TG_QUEUE.get(timeout=30)
+        except _queue.Empty:
+            continue
+        try:
+            cfg = load_config()
+            token   = cfg.get('telegram_token', '')
+            chat_id = cfg.get('telegram_chat_id', '')
+            if token and chat_id:
+                url  = f'https://api.telegram.org/bot{token}/sendMessage'
+                data = urllib.parse.urlencode({
+                    'chat_id': chat_id,
+                    'text': msg,
+                    'parse_mode': 'HTML'
+                }).encode()
+                urllib.request.urlopen(url, data, timeout=15)
+        except Exception as e:
+            print('[TG] Hata:', e)
+        finally:
+            _TG_QUEUE.task_done()
+            time.sleep(0.5)   # max 2 msg/sn — Telegram rate limit'in çok altında
+
 def send_telegram(msg):
+    global _TG_THREAD_STARTED
+    if not _TG_THREAD_STARTED:
+        import threading as _thr
+        _thr.Thread(target=_tg_worker, daemon=True).start()
+        _TG_THREAD_STARTED = True
     try:
-        cfg = load_config()
-        token   = cfg.get('telegram_token', '')
-        chat_id = cfg.get('telegram_chat_id', '')
-        if not token or not chat_id:
-            return
-        url = f'https://api.telegram.org/bot{token}/sendMessage'
-        data = urllib.parse.urlencode({
-            'chat_id': chat_id,
-            'text': msg,
-            'parse_mode': 'HTML'
-        }).encode()
-        urllib.request.urlopen(url, data, timeout=5)
-    except Exception as e:
-        print('Telegram hata:', e)
+        _TG_QUEUE.put_nowait(msg)   # bloklamadan kuyruğa ekle
+    except _queue.Full:
+        print('[TG] Kuyruk dolu, mesaj atlandı')
