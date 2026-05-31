@@ -595,6 +595,15 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
         if price <= 0:
             return {'ok': False, 'error': 'Fiyat alınamadı'}
 
+        # Saat filtresi: 13:00-20:00 TR (UTC+3) arası yeni alım yok.
+        # Londra-NY örtüşmesi — stop-hunt riski en yüksek pencere.
+        # Manuel işlemler ('MANUEL' source) ve WYCKOFF (uzun vadeli) hariç tutulur.
+        if source not in ('MANUEL',) and 'WYCKOFF' not in (source or ''):
+            tr_hour = (datetime.datetime.utcnow().hour + 3) % 24
+            if 13 <= tr_hour < 20:
+                print(f'[Bot] {symbol} saat filtresi: {tr_hour:02d}:xx TR — 13-20 arası yeni alım yok')
+                return {'ok': False, 'error': f'Saat filtresi: {tr_hour:02d}:xx TR (13-20 arası kapalı)'}
+
         # SL cooldown kontrolü — öncelik: coin ayarı > global ayar > hardcoded default (3s)
         cfg_data   = load_config()
         coin_cfg   = next((c for c in cfg_data.get('coins', []) if c['symbol'] == symbol), {})
