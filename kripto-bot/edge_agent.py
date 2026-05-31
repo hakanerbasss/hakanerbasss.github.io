@@ -38,6 +38,7 @@ MIN_SCORE      = 4.5   # 0-10 — trend modda daha düşük eşik
 # Dinamik eşik: belirsiz koşullarda daha seçici ol (teyitsiz girişleri ele)
 ASIA_MIN_SCORE     = 5.5   # ASIA seansı (ajanın kendi etiketi: "sahte hareket riski")
 BTC_WEAK_MIN_SCORE = 5.5   # BTC SMA altında / zayıfken
+FG_MIN             = 30    # Fear & Greed bu değerin altında yeni alım yok
 
 STABLECOINS = {
     'USDCUSDT','BUSDUSDT','TUSDUSDT','FDUSDUSDT','EURUSDT',
@@ -403,6 +404,18 @@ def _atr(highs, lows, closes, n=14):
            for i in range(1, len(closes))]
     return sum(trs[-n:]) / n if len(trs) >= n else closes[-1] * 0.02
 
+def _fear_greed_ok():
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+            val = int(json.loads(_r.read())['data'][0]['value'])
+        if val < FG_MIN:
+            print(f'[Edge] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+            return False
+        return True
+    except Exception:
+        return True
+
 # ─── Ajan ────────────────────────────────────────────────────────────────────
 
 class EdgeAgent:
@@ -504,6 +517,9 @@ class EdgeAgent:
         from bot import is_trading_halted
         if is_trading_halted(client):
             print('[Edge] Global devre kesici aktif — yeni alım yok')
+            return
+
+        if not _fear_greed_ok():
             return
 
         positions = load_positions()

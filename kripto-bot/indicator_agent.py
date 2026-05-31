@@ -25,6 +25,7 @@ MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 90    # saniye
 MONITOR_SEC    = 8
 MIN_VOLUME     = 3_000_000   # $3M günlük hacim
+FG_MIN         = 30          # Fear & Greed bu değerin altında yeni alım yok
 
 # UT Bot sabit parametreler (tüm coinlere aynı uygulanır)
 UTBOT_KEY    = 2.0
@@ -35,6 +36,19 @@ UTBOT_MODE   = 'crossover'
 # NOT: SMART ve SEANS stratejileri kaldırıldı (0% kazanma oranı, toplam -$292 zarar).
 # Sadece UT Bot bırakıldı — net trend takibi, tek sağlam indikatör.
 INDICATORS = ['UTBOT']
+
+
+def _fear_greed_ok():
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+            val = int(json.loads(_r.read())['data'][0]['value'])
+        if val < FG_MIN:
+            print(f'[Indicator] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+            return False
+        return True
+    except Exception:
+        return True
 
 
 def _scan_candidates(client):
@@ -166,6 +180,9 @@ class IndicatorAgent:
         from bot import is_trading_halted
         if is_trading_halted(client):
             print('[Indicator] Global devre kesici aktif — yeni alım yok')
+            return
+
+        if not _fear_greed_ok():
             return
 
         positions = load_positions()

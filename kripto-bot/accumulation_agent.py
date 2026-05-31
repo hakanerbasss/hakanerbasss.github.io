@@ -39,6 +39,7 @@ MAX_DROP_7D_PCT = -20.0      # 7 günde -%20 altı = dağıtım bölgesi, atla
 TP_PCT          = 12.0
 SL_PCT          = 4.0
 TIMEOUT_H       = 72
+FG_MIN          = 30    # Fear & Greed bu değerin altında yeni alım yok
 
 
 # ── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
@@ -170,6 +171,18 @@ def _entry_trigger(client, symbol):
         return False, 0
 
 
+def _fear_greed_ok():
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+            val = int(json.loads(_r.read())['data'][0]['value'])
+        if val < FG_MIN:
+            print(f'[Birikim] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+            return False
+        return True
+    except Exception:
+        return True
+
 # ── Ajan sınıfı ─────────────────────────────────────────────────────────────
 
 class AccumulationAgent:
@@ -248,6 +261,9 @@ class AccumulationAgent:
         cfg    = load_config()
         from manager_agent import ceo_flag
         if not ceo_flag(cfg, 'accumulation_enabled', True):
+            return
+
+        if not _fear_greed_ok():
             return
 
         tickers = client.get_ticker()

@@ -39,6 +39,20 @@ BE_ARM_PCT     = 4.0   # +%4 görüldüyse başabaş koruması devreye girer
 BE_FLOOR_PCT   = 0.3   # bu seviyeye düşerse çık — komisyonu (~%0.2) çıkarır, NET ZARAR YOK
 TRAIL_ARM_PCT  = 10.0  # +%10'dan sonra zirve takibi (büyük Wyckoff hareketini sür)
 TRAIL_DIST_PCT = 5.0   # zirveden %5 düşünce çık
+FG_MIN         = 30    # Fear & Greed bu değerin altında yeni alım yok
+
+
+def _fear_greed_ok():
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+            val = int(json.loads(_r.read())['data'][0]['value'])
+        if val < FG_MIN:
+            print(f'[Wyckoff] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+            return False
+        return True
+    except Exception:
+        return True
 
 
 class WyckoffAgent:
@@ -237,6 +251,9 @@ class WyckoffAgent:
         from bot import is_trading_halted
         if is_trading_halted(client):
             print('[Wyckoff] Global devre kesici aktif — yeni alım yok')
+            return
+
+        if not _fear_greed_ok():
             return
 
         positions = load_positions()
