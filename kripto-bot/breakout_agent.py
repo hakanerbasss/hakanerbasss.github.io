@@ -37,19 +37,27 @@ STABLECOINS = {
 
 SCAN_INTERVAL    = 180      # saniye (3 dakika) — pump genellikle 10-30dk sürer, 3dk'da içerideyiz
 MONITOR_SEC      = 5        # saniye
-MIN_VOL_24H      = 200_000  # $200K minimum 24h hacim — düşük hacimli pumpler de yakalansın
+MIN_VOL_24H      = 500_000  # $500K min 24h hacim — düşük likidite → slippage hard stop'u aşıyor
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 MIN_COIN_PRICE   = 0.01     # $0.01 altı coinler: step size granülaritesi %10+ → stop güvenilmez
 
 # Kırılım kriterleri
-MIN_PRICE_CHG_2H = 4.0   # son 2 saatte min %4 fiyat hareketi
-MIN_VOL_SPIKE    = 3.0   # 2x→3x: $200K hacim tabanını daha güçlü spike ile dengele
-MAX_CHG_24H      = 35.0  # 24s'te bundan fazla pompalanmış → geç giriş/pump-dump riski, atla
+MIN_PRICE_CHG_2H = 5.0   # 4→5%: güçlü kırılım filtresi, zayıf sinyalleri eler
+MIN_VOL_SPIKE    = 3.0   # minimum 3x hacim spike
+MAX_CHG_24H      = 20.0  # 35→20%: daha önce pompanmış coinlere geç girişi önle
+MIN_SCORE        = 5.5   # minimum skor eşiği — düşük skorda işlem açma
+
+# Re-entry — config'deki reentry_cooldown_hours sıfırlanmış olsa bile
+# aynı coinden çıkıp 1 saat geçmeden tekrar girme (25sn re-entry bug'ını kapatır)
+MIN_REENTRY_HOURS = 1.0
 
 # Çıkış parametreleri — SABİT TP YOK, KADEMELİ TRAIL
 # Kâr arttıkça trail daralır → küçük kârı kilitle, büyük pump'a yer aç
 TRAIL_ACTIVATE_PCT = 3.0   # bu kadar kazanç → trailing başlasın
 HARD_STOP_PCT      = 5.0   # bu kadar zarar → anında çık
+
+# Piyasa durumu eşiği — Aşırı Korku ortamında breakout stratejisi başarısız olur
+FG_MIN           = 35     # Fear & Greed bu değerin altındaysa yeni alım yok
 
 def _trail_distance(peak_pct):
     """Peak kâr yüzdesine göre trail mesafesi (peak'ten % düşüş).
@@ -88,15 +96,30 @@ def _klines_with_vol(client, symbol, limit=26):
 
 
 def _btc_ok(client):
-    """BTC son 3 saatte negatif değilse True (hafif filtre, genişletildi)."""
+    """BTC son 2 saatte flat veya yukarı olmalı (≥-1%). Daha sert düşüşte breakout = sahte."""
     try:
-        kl = client.get_klines(symbol='BTCUSDT', interval=BC.KLINE_INTERVAL_1HOUR, limit=5)
+        kl = client.get_klines(symbol='BTCUSDT', interval=BC.KLINE_INTERVAL_1HOUR, limit=4)
         kl = kl[:-1]
         closes = [float(k[4]) for k in kl]
-        # Son mum, 3 mum öncesinden yüksekse ok
-        return closes[-1] >= closes[-4] * 0.97
+        return closes[-1] >= closes[-3] * 0.99
     except Exception:
         return True
+
+
+def _fear_greed_ok():
+    """Fear & Greed Index ≥ FG_MIN ise True. Aşırı korkuda breakout = sahte breakout."""
+    try:
+        import urllib.request
+        url = 'https://api.alternative.me/fng/?limit=1'
+        with urllib.request.urlopen(url, timeout=4) as r:
+            data = json.loads(r.read())
+            val = int(data['data'][0]['value'])
+            if val < FG_MIN:
+                print(f'[Breakout] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+                return False
+        return True
+    except Exception:
+        return True  # API erişilemezse engelleme
 
 
 def _detect_breakouts(client):
@@ -275,6 +298,9 @@ class BreakoutAgent:
             print('[Breakout] BTC düşüşte — tarama atlandı')
             return
 
+        if not _fear_greed_ok():
+            return
+
         # Günlük zarar limiti: -%8
         try:
             bal       = get_usdt_balance(client)
@@ -300,6 +326,18 @@ class BreakoutAgent:
             total_open = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
             if total_open >= max_total or len(breakout_open) >= MAX_BREAKOUT_POS:
                 break
+
+            # Skor filtresi — zayıf sinyalde işlem açma
+            if r['score'] < MIN_SCORE:
+                print(f'[Breakout] {sym} skor yetersiz: {r["score"]:.1f} < {MIN_SCORE}')
+                continue
+
+            # Hard-coded min re-entry: config reentry_cooldown_hours=0 olsa bile
+            # aynı coinden çıkıp MIN_REENTRY_HOURS geçmeden yeniden alma
+            from bot import _check_reentry
+            if not _check_reentry(sym, MIN_REENTRY_HOURS):
+                print(f'[Breakout] {sym} min {MIN_REENTRY_HOURS}s re-entry koruması aktif')
+                continue
 
             log = (f"{sym} +{r['pct_2h']}% "
                    f"vol={r['vol_spike']}x "

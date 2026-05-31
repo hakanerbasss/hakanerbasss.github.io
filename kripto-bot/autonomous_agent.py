@@ -338,8 +338,10 @@ class AutonomousAgent:
     MONITOR_INTERVAL = 3
     MOMENTUM_EVERY   = 20
     MAX_POSITIONS    = 6
-    MIN_SCORE        = 5.5
+    MIN_SCORE        = 6.0   # 5.5→6.0: korku ortamında düşük skora güvenme
+    MIN_SCORE_SIDEWAY = 6.5  # SIDEWAYS rejimde daha katı eşik
     DAILY_LOSS_LIMIT = 8.0
+    FG_MIN           = 30    # Fear & Greed bu değerin altında yeni alım yok
 
     def __init__(self):
         self.running     = False
@@ -491,6 +493,23 @@ class AutonomousAgent:
                         time.sleep(self.SCAN_INTERVAL)
                         continue
 
+                    # Fear & Greed filtresi — aşırı korkuda yanlış sinyal fazla çıkar
+                    try:
+                        import urllib.request as _ur
+                        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+                            _fg = int(json.loads(_r.read())['data'][0]['value'])
+                        if _fg < self.FG_MIN:
+                            print(f'[Otonom] Fear & Greed={_fg} < {self.FG_MIN} — tarama atlandı')
+                            self.state['scan_count'] += 1
+                            self._save()
+                            time.sleep(self.SCAN_INTERVAL)
+                            continue
+                    except Exception:
+                        _fg = 50  # API erişilemezse engelleme
+
+                    # SIDEWAYS rejimde daha katı skor eşiği
+                    min_sc = self.MIN_SCORE_SIDEWAY if regime == 'SIDEWAYS' else self.MIN_SCORE
+
                     positions = load_positions()
                     held = {s for s, p in positions.items() if p.get('qty',0) > 0}
                     if len(held) >= self.MAX_POSITIONS:
@@ -506,7 +525,7 @@ class AutonomousAgent:
                     best_sym, best_sc = None, None
                     for sym in candidates[:55]:
                         sc = _score(client, sym, regime, w)
-                        if not sc or sc['total'] < self.MIN_SCORE:
+                        if not sc or sc['total'] < min_sc:
                             continue
                         # Veto 1: RSI aşırı alım → pump tepesine alım riski
                         if sc.get('rsi1h', 0) > 70:

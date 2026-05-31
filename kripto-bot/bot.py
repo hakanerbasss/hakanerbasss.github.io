@@ -614,9 +614,12 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
 
         # Re-entry kilidi: son satıştan sonra (kâr/zarar farketmez) kısa süre tekrar alma
         # → aynı coini satıp anında (genelde daha pahalıya) geri alma churn'ünü engeller.
-        reentry_h = float(coin_cfg.get('reentry_cooldown_hours',
-                          cfg_data.get('reentry_cooldown_hours', 2)))
-        if reentry_h > 0 and not _check_reentry(symbol, reentry_h):
+        # MIN_REENTRY_FLOOR: config sıfırlanmış olsa bile en az 30dk bekleme (25sn re-entry bug'ı).
+        MIN_REENTRY_FLOOR = 0.5  # saat
+        reentry_h = max(MIN_REENTRY_FLOOR,
+                        float(coin_cfg.get('reentry_cooldown_hours',
+                              cfg_data.get('reentry_cooldown_hours', 2))))
+        if not _check_reentry(symbol, reentry_h):
             print(f'[Bot] {symbol} re-entry kilidi aktif ({reentry_h}s) — yakın zamanda satıldı')
             return {'ok': False, 'error': f'Re-entry kilidi: {symbol} yakında satıldı'}
 
