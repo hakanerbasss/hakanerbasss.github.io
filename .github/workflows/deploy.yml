@@ -30,6 +30,8 @@ jobs:
             cp kripto-bot/wyckoff_agent.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/breakout_agent.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/manager_agent.py ~/kripto-bot/ 2>/dev/null || true
+            cp kripto-bot/accumulation_agent.py ~/kripto-bot/ 2>/dev/null || true
+            cp kripto-bot/trends_backtest.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/seans_strategy.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/smart_strategy.py ~/kripto-bot/ 2>/dev/null || true
             cp kripto-bot/telegram_bot.py ~/kripto-bot/ 2>/dev/null || true
