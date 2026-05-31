@@ -293,9 +293,15 @@ GLOBAL_HALT_PCT_DEFAULT = 10.0   # config'den 'global_halt_pct' ile değişir; 0
 _HALT = {'date': None, 'baseline': 0.0, 'tripped': False, 'notified': False, 'last_check': 0.0}
 
 def is_trading_halted(client=None):
-    """Gün-içi toplam düşüş eşiği aşıldıysa True (yeni alım yapma). 30s cache'li."""
+    """Yeni alım yapılmamalı mı? True = dur. İki sebep:
+    1) Kullanıcı botu duraklattı (config 'bot_paused') → GERÇEK kapat düğmesi,
+       tüm ajanları durdurur (açık pozisyonlar SL/TP ile korunmaya devam eder).
+    2) Gün-içi toplam düşüş eşiği aşıldı (global devre kesici). 30s cache'li."""
     try:
-        halt_pct = float(load_config().get('global_halt_pct', GLOBAL_HALT_PCT_DEFAULT))
+        cfg = load_config()
+        if cfg.get('bot_paused'):
+            return True   # /durdur veya web Duraklat → tüm ajanlarda yeni alım yok
+        halt_pct = float(cfg.get('global_halt_pct', GLOBAL_HALT_PCT_DEFAULT))
         if halt_pct <= 0:
             return False
         now   = time.time()
