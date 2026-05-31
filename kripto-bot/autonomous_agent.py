@@ -390,6 +390,7 @@ class AutonomousAgent:
             f"🛡 Günlük Kayıp Limiti: -%{self.DAILY_LOSS_LIMIT}\n"
             f"⚡ Pozisyon Takip: her {self.MONITOR_INTERVAL}s\n"
             f"🔍 Fırsat Tarama: her {self.SCAN_INTERVAL}s\n"
+            f"⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)\n"
             "Piyasa izleniyor..."
         )
 

@@ -250,6 +250,7 @@ class BreakoutAgent:
             f'📊 Min Skor: {MIN_SCORE}/10 | Min Hacim: ${MIN_VOL_24H/1_000:.0f}K\n'
             f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-8% | +25%+→-15%\n'
             f'🛑 Hard Stop: -%{HARD_STOP_PCT}\n'
+            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler'
         )
         return True

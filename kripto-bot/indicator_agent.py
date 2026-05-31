@@ -148,7 +148,8 @@ class IndicatorAgent:
             f'📐 Aktif İndikatör:\n'
             f'  • UT Bot (key={UTBOT_KEY}, atr={UTBOT_ATR}, {UTBOT_PERIOD}, {UTBOT_MODE})\n'
             f'  ⓘ Smart + Seans kaldırıldı (0% kazanma, -$292)\n'
-            f'🪙 Evren: Top 50 coin (hacme göre, otomatik)'
+            f'🪙 Evren: Top 50 coin (hacme göre, otomatik)\n'
+            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)'
         )
         return True
 

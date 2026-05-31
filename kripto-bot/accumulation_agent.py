@@ -236,7 +236,8 @@ class AccumulationAgent:
             f'🔍 Sessiz Birikim: Hacim Squeeze + BB Sıkışması\n'
             f'⚡ Tarama: {SCAN_INTERVAL//60}dk | Tetik: {TRIGGER_SEC}s\n'
             f'🎯 TP: +%{TP_PCT} | SL: -%{SL_PCT} | Timeout: {TIMEOUT_H}s\n'
-            f'📦 Ajan slotu: {AGENT_MAX} pozisyon'
+            f'📦 Ajan slotu: {AGENT_MAX} pozisyon\n'
+            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)'
         )
         print('[Accum] Başladı')
         return True
