@@ -247,6 +247,7 @@ class BreakoutAgent:
             f'📡 Yöntem: Hacim spike + fiyat kırılımı (2s)\n'
             f'⚡ Tarama: {SCAN_INTERVAL//60}dk | Takip: {MONITOR_SEC}s\n'
             f'🎯 Min Hareket: +%{MIN_PRICE_CHG_2H} | Vol Spike: {MIN_VOL_SPIKE}x\n'
+            f'📊 Min Skor: {MIN_SCORE}/10 | Min Hacim: ${MIN_VOL_24H/1_000:.0f}K\n'
             f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-8% | +25%+→-15%\n'
             f'🛑 Hard Stop: -%{HARD_STOP_PCT}\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler'
