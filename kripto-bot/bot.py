@@ -546,6 +546,21 @@ def _check_sl_cooldown(symbol, cooldown_hours=3):
     except:
         return True
 
+def _check_reentry(symbol, hours):
+    """Son satıştan (KÂR/ZARAR farketmez) 'hours' saat geçti mi? True = alım serbest.
+    Aynı coini sattıktan hemen sonra (çoğu zaman daha pahalıya) geri alıp churn
+    yapmayı engeller. SL cooldown'dan ayrı ve ona EK bir kısa bekleme."""
+    if hours <= 0:
+        return True
+    last = _last_sell(symbol)
+    if not last:
+        return True
+    try:
+        t = datetime.datetime.strptime(last['time'], '%Y-%m-%d %H:%M:%S')
+        return (datetime.datetime.now() - t).total_seconds() / 3600 >= hours
+    except:
+        return True
+
 def _parse_fill(order, req_qty, req_price, symbol):
     """Binance market emir yanıtından GERÇEKLEŞEN (qty, ortalama fiyat) çıkar.
     executedQty + cummulativeQuoteQty kullanır; base-asset cinsinden alınan
@@ -590,6 +605,14 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
                     kalan = cooldown_h
                 print(f'[Bot] {symbol} SL cooldown aktif — {kalan}s kaldı')
                 return {'ok': False, 'error': f'SL cooldown: {kalan}s kaldı'}
+
+        # Re-entry kilidi: son satıştan sonra (kâr/zarar farketmez) kısa süre tekrar alma
+        # → aynı coini satıp anında (genelde daha pahalıya) geri alma churn'ünü engeller.
+        reentry_h = float(coin_cfg.get('reentry_cooldown_hours',
+                          cfg_data.get('reentry_cooldown_hours', 2)))
+        if reentry_h > 0 and not _check_reentry(symbol, reentry_h):
+            print(f'[Bot] {symbol} re-entry kilidi aktif ({reentry_h}s) — yakın zamanda satıldı')
+            return {'ok': False, 'error': f'Re-entry kilidi: {symbol} yakında satıldı'}
 
         # ATR bazlı TP/SL — emir vermeden önce hesapla
         tp_pct = float(coin_cfg.get('take_profit_pct', 0))
