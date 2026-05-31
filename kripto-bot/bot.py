@@ -641,8 +641,8 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
             # Scanner loop'taki caps ile aynı (max SL %6, max TP %18) — tutarlı bildirim
             atr = _calc_atr_pct(client, symbol, 7)
             if atr:
-                sl_pct = max(1.5, min(6.0, round(atr * 1.5, 2)))
-                tp_pct = max(3.0, min(18.0, round(atr * 3.0, 2)))
+                sl_pct = max(1.5, min(5.0, round(atr * 1.5, 2)))
+                tp_pct = max(3.0, min(15.0, round(atr * 3.0, 2)))
             else:
                 sl_pct = 2.5
                 tp_pct = 5.0

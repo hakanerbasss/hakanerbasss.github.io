@@ -98,6 +98,8 @@ def _futures_symbols(min_vol=30_000_000) -> list:
         if not sym.endswith('USDT') or sym in STABLECOINS:
             continue
         price = float(d.get('lastPrice', 0))
+        if price < 0.01:
+            continue   # ultra-düşük fiyat: step granülaritesi %10+ → stop güvenilmez
         if 0.90 <= price <= 1.10:
             continue
         chg24 = float(d.get('priceChangePercent', 0))
