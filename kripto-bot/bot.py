@@ -1,7 +1,7 @@
 import json, os, time, datetime, threading, urllib.request, urllib.parse
 from binance.client import Client
 
-FEE_RATE = 0.001  # Binance spot %0.1 alım + %0.1 satım = %0.2 toplam
+FEE_RATE = 0.001  # Binance spot: %0.1 alım + %0.1 satım = %0.2 toplam
 
 # Tüm ajanlar bu kilidi kullanır — çakışan alım emirlerini VE positions.json
 # eşzamanlı yazımını (lost-update) önler. RLock: aynı thread içinde
