@@ -865,11 +865,13 @@ private fun SalaryCard(context: android.content.Context, onNavigate: (String) ->
             Spacer(Modifier.height(12.dp))
 
             val totalIncome = profile.totalIncome()
+            val otTotal = com.bluechip.finance.data.OvertimeManager.thisMonthTotal(context)
+            val totalIncomeWithOt = totalIncome + otTotal
             val thisMonthPay = try { com.bluechip.finance.data.PaymentManager.getUpcomingThisMonth(context) } catch (_: Exception) { emptyList() }
             val totalExpense = thisMonthPay.sumOf { it.amount }
             val advanceTaken = profile.isAdvanceTaken()
             val advanceDeduct = if (advanceTaken && profile.advanceAmount > 0) profile.advanceAmount else 0.0
-            val netRemaining = totalIncome - totalExpense - advanceDeduct
+            val netRemaining = totalIncomeWithOt - totalExpense - advanceDeduct
             var showIncomeDetail  by remember { mutableStateOf(false) }
             var showExpenseDetail by remember { mutableStateOf(false) }
 
@@ -898,7 +900,6 @@ private fun SalaryCard(context: android.content.Context, onNavigate: (String) ->
                                 }
                             }
                             // Mesai toplami
-                            val otTotal = remember { com.bluechip.finance.data.OvertimeManager.thisMonthTotal(context) }
                             if (otTotal > 0) Row(
                                 Modifier.fillMaxWidth().clickable { showIncomeDetail = false },
                                 verticalAlignment = Alignment.CenterVertically
@@ -909,7 +910,7 @@ private fun SalaryCard(context: android.content.Context, onNavigate: (String) ->
                             HorizontalDivider(color = com.bluechip.finance.ui.theme.PurplePrimary.copy(alpha = 0.15f))
                             Row(Modifier.fillMaxWidth()) {
                                 Text("Toplam", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary, modifier = Modifier.weight(1f))
-                                Text("${formatMoney(totalIncome + otTotal)} ₺", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = com.bluechip.finance.ui.theme.PurplePrimary)
+                                Text("${formatMoney(totalIncomeWithOt)} ₺", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = com.bluechip.finance.ui.theme.PurplePrimary)
                             }
                             TextButton(onClick = { showIncomeDetail = false }, modifier = Modifier.align(Alignment.End)) { Text("Kapat") }
                         }
@@ -960,7 +961,7 @@ private fun SalaryCard(context: android.content.Context, onNavigate: (String) ->
                     Text("💰", fontSize = 14.sp)
                     Spacer(Modifier.width(6.dp))
                     Text("Toplam Gelir", fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.weight(1f))
-                    Text("${formatMoney(totalIncome)} ₺", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = com.bluechip.finance.ui.theme.PurplePrimary)
+                    Text("${formatMoney(totalIncomeWithOt)} ₺", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = com.bluechip.finance.ui.theme.PurplePrimary)
                     Icon(Icons.Default.KeyboardArrowRight, null, tint = colors.textSecondary, modifier = Modifier.size(14.dp))
                 }
                 Box(

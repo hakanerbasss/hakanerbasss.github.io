@@ -46,11 +46,12 @@ fun OvertimeScreen() {
     val profileManager = remember { ProfileManager(context) }
 
     val types = remember { listOf(
-        OvertimeType("%25", "Gece", 1.25, "Mad. 69", "20:00-06:00 gece"),
-        OvertimeType("%50", "Fazla Çalışma", 1.5, "Mad. 41", "Haftalık 45+ saat"),
-        OvertimeType("%75", "Gece+Fazla", 1.75, "Mad. 41+69", "Gece fazla mesai"),
-        OvertimeType("%100", "Bayram/Tatil", 2.0, "Mad. 47", "Bayram/tatil günü"),
-        OvertimeType("%125", "Gece+Tatil", 2.25, "Mad. 47+69", "Tatil gece mesai")
+        OvertimeType("%25",  "Gece",          1.25, "Mad. 69",    "20:00-06:00 gece"),
+        OvertimeType("%50",  "Fazla Çalışma", 1.5,  "Mad. 41",    "Haftalık 45+ saat"),
+        OvertimeType("%75",  "Gece+Fazla",    1.75, "Mad. 41+69", "Gece fazla mesai"),
+        OvertimeType("%100", "Bayram/Tatil",  2.0,  "Mad. 47",    "Bayram/tatil günü"),
+        OvertimeType("%125", "Gece+Tatil",    2.25, "Mad. 47+69", "Tatil gece mesai"),
+        OvertimeType("%200", "Resmi Tatil",   3.0,  "Mad. 47",    "Resmi tatil 3 kat ücret")
     ) }
 
     LaunchedEffect(Unit) {

@@ -22,7 +22,13 @@ class BaretimWidget : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        appWidgetIds.forEach { updateWidget(context, appWidgetManager, it) }
+        appWidgetIds.forEach { id ->
+            val pending = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try { updateWidget(context, appWidgetManager, id) }
+                finally { pending.finish() }
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {

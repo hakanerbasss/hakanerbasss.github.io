@@ -7,11 +7,12 @@ import java.util.Calendar
 import java.util.UUID
 
 enum class OvertimeTrackType(val label: String, val pct: String, val mult: Double) {
-    PCT25 ("Gece",          "%25",  1.25),
-    PCT50 ("Fazla Calisma", "%50",  1.50),
-    PCT75 ("Gece+Fazla",    "%75",  1.75),
-    PCT100("Bayram/Tatil",  "%100", 2.00),
-    PCT125("Gece+Tatil",    "%125", 2.25)
+    PCT25 ("Gece",           "%25",  1.25),
+    PCT50 ("Fazla Calisma",  "%50",  1.50),
+    PCT75 ("Gece+Fazla",     "%75",  1.75),
+    PCT100("Bayram/Tatil",   "%100", 2.00),
+    PCT125("Gece+Tatil",     "%125", 2.25),
+    PCT200("Resmi Tatil",    "%200", 3.00)
 }
 
 data class OvertimeRecord(
