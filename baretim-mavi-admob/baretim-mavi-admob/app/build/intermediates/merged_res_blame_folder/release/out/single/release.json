@@ -1,0 +1,58 @@
+[
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-xxhdpi_ic_launcher_round.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-xxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/layout_widget_layout.xml.flat",
+        "source": "com.bluechip.finance.app-main-72:/layout/widget_layout.xml"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-xxxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-xxxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-xxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-mdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/xml_file_paths.xml.flat",
+        "source": "com.bluechip.finance.app-main-72:/xml/file_paths.xml"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-mdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-xhdpi_ic_launcher_round.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-xhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/drawable_widget_background.xml.flat",
+        "source": "com.bluechip.finance.app-main-72:/drawable/widget_background.xml"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-xhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/xml_widget_info.xml.flat",
+        "source": "com.bluechip.finance.app-main-72:/xml/widget_info.xml"
+    },
+    {
+        "merged": "com.bluechip.finance.app-merged_res-71:/mipmap-hdpi_ic_launcher_round.png.flat",
+        "source": "com.bluechip.finance.app-main-72:/mipmap-hdpi/ic_launcher_round.png"
+    }
+]

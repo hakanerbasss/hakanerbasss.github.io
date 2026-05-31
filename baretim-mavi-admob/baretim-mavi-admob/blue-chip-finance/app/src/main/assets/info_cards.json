@@ -1,0 +1,6 @@
+[
+  {"id": 1, "category": "Kıdem Tazminatı", "icon": "money", "text": "Kıdem tazminatına hak kazanmak için aynı işverene bağlı en az 1 tam yıl çalışmış olmanız gerekir."},
+  {"id": 2, "category": "Yıllık İzin", "icon": "calendar", "text": "1 yıldan 5 yıla kadar (5 dahil) kıdemi olanların yıllık ücretli izin süresi 14 günden az olamaz."},
+  {"id": 3, "category": "Fazla Mesai", "icon": "time", "text": "Haftalık 45 saati aşan çalışmalar fazla mesai sayılır ve saatlik ücretin %50 fazlası ile ödenir."},
+  {"id": 4, "category": "Vergi Dilimi", "icon": "tax", "text": "Kümülatif geliriniz arttıkça vergi diliminiz yükselir (%15, %20...), bu da net maaşınızın düşmesine neden olabilir."}
+]

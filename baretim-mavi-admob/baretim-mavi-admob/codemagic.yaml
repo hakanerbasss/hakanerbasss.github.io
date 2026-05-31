@@ -1,0 +1,33 @@
+workflows:
+  android-release:
+    name: Android Release
+    max_build_duration: 60
+
+    environment:
+      vars:
+        PACKAGE_NAME: "com.bluechip.finance"
+      java: 17
+
+      android_signing:
+        - bluechip_keystore
+
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+
+      - name: Make gradlew executable
+        script: |
+          chmod +x gradlew
+
+      - name: Build Signed AAB
+        script: |
+          ./gradlew bundleRelease
+
+    artifacts:
+      - app/build/outputs/**/*.aab
+
+    publishing:
+      email:
+        recipients:
+          - hakanerbasss@gmail.com
