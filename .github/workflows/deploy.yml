@@ -37,5 +37,6 @@ jobs:
             cp kripto-bot/telegram_bot.py ~/kripto-bot/ 2>/dev/null || true
             cp -r kripto-bot/templates ~/kripto-bot/
             cp -r kripto-bot/static ~/kripto-bot/ 2>/dev/null || true
+            find ~/kripto-bot -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
             systemctl restart kripto-bot
             systemctl status kripto-bot --no-pager
