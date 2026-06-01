@@ -1,6 +1,8 @@
 package com.bluechip.finance.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -24,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.bluechip.finance.data.BackupManager
 import com.bluechip.finance.data.ProfileManager
 import com.bluechip.finance.data.UserProfile
 import com.bluechip.finance.ui.components.*
@@ -37,6 +40,29 @@ fun ProfileScreen(onNavigate: (String) -> Unit = {}, autoAddIncome: Boolean = fa
     val colors = LocalAppColors.current
     val profileManager = remember { ProfileManager(context) }
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { BackupManager.export(context, it) }
+            Toast.makeText(context, "Yedek kaydedildi", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(context, "Yedek hatası", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        try {
+            val ok = context.contentResolver.openInputStream(uri)?.use { BackupManager.import(context, it) } ?: false
+            Toast.makeText(context, if (ok) "Veriler geri yüklendi, uygulamayı yeniden başlatın" else "Geri yükleme hatası", Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+            Toast.makeText(context, "Geri yükleme hatası", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     var name by remember { mutableStateOf("") }
     var salary by remember { mutableStateOf("") }
@@ -454,6 +480,31 @@ fun ProfileScreen(onNavigate: (String) -> Unit = {}, autoAddIncome: Boolean = fa
                 color = androidx.compose.ui.graphics.Color.White,
                 fontSize = 15.sp
             )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = {
+                    val ts = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+                    exportLauncher.launch("baretim_yedek_$ts.json")
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Upload, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Yedekle", fontSize = 13.sp)
+            }
+            OutlinedButton(
+                onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Geri Yükle", fontSize = 13.sp)
+            }
         }
 
         // ── Otomatik Doldurma - Açılır/Kapanır ───────────────────────────
