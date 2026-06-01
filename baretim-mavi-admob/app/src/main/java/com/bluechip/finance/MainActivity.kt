@@ -182,7 +182,6 @@ fun BlueChipApp() {
         },
         bottomBar = {
             Column {
-            com.bluechip.finance.ui.components.BannerAd(modifier = Modifier.fillMaxWidth())
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
