@@ -25,7 +25,7 @@ MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 90    # saniye
 MONITOR_SEC    = 8
 MIN_VOLUME     = 3_000_000   # $3M günlük hacim
-FG_MIN         = 30          # Fear & Greed bu değerin altında yeni alım yok
+FG_MIN         = 20          # Fear & Greed bu değerin altında yeni alım yok (aşırı korku sınırı)
 
 # UT Bot sabit parametreler (tüm coinlere aynı uygulanır)
 UTBOT_KEY    = 2.0

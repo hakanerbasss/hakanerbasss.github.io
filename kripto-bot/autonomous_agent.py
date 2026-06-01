@@ -341,7 +341,7 @@ class AutonomousAgent:
     MIN_SCORE        = 6.0   # 5.5→6.0: korku ortamında düşük skora güvenme
     MIN_SCORE_SIDEWAY = 6.5  # SIDEWAYS rejimde daha katı eşik
     DAILY_LOSS_LIMIT = 8.0
-    FG_MIN           = 30    # Fear & Greed bu değerin altında yeni alım yok
+    FG_MIN           = 20    # Fear & Greed bu değerin altında yeni alım yok (aşırı korku sınırı)
 
     def __init__(self):
         self.running     = False

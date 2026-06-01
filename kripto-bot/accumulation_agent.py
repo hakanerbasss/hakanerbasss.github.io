@@ -39,7 +39,7 @@ MAX_DROP_7D_PCT = -20.0      # 7 günde -%20 altı = dağıtım bölgesi, atla
 TP_PCT          = 12.0
 SL_PCT          = 4.0
 TIMEOUT_H       = 72
-FG_MIN          = 30    # Fear & Greed bu değerin altında yeni alım yok
+FG_MIN          = 20    # Fear & Greed bu değerin altında yeni alım yok (aşırı korku sınırı)
 
 
 # ── Yardımcı fonksiyonlar ────────────────────────────────────────────────────

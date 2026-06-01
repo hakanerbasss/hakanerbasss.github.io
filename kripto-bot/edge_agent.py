@@ -38,7 +38,7 @@ MIN_SCORE      = 4.5   # 0-10 — trend modda daha düşük eşik
 # Dinamik eşik: belirsiz koşullarda daha seçici ol (teyitsiz girişleri ele)
 ASIA_MIN_SCORE     = 5.5   # ASIA seansı (ajanın kendi etiketi: "sahte hareket riski")
 BTC_WEAK_MIN_SCORE = 5.5   # BTC SMA altında / zayıfken
-FG_MIN             = 30    # Fear & Greed bu değerin altında yeni alım yok
+FG_MIN             = 20    # Fear & Greed bu değerin altında yeni alım yok (aşırı korku sınırı)
 
 STABLECOINS = {
     'USDCUSDT','BUSDUSDT','TUSDUSDT','FDUSDUSDT','EURUSDT',
