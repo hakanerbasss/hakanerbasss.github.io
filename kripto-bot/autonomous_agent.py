@@ -708,6 +708,22 @@ class AutonomousAgent:
         bl = [k for k,v in self.state.get('blacklist',{}).items() if v > time.time()]
         if bl:
             lines.append(f"\n⛔ Kara liste ({len(bl)}): {', '.join(bl[:5])}")
+
+        # Durum tanısı: neden alım yapılmıyor?
+        try:
+            import urllib.request as _ur
+            with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+                _fg = int(json.loads(_r.read())['data'][0]['value'])
+        except Exception:
+            _fg = -1
+        tr_hour = (datetime.datetime.utcnow().hour + 3) % 24
+        time_ok = not (13 <= tr_hour < 20)
+        fg_ok   = _fg < 0 or _fg >= self.FG_MIN
+        lines.append(f"\n🌡 F&G: {_fg if _fg>=0 else '?'} | "
+                     f"⏰ TR: {tr_hour:02d}:xx {'✅' if time_ok else '🚫 KAPALI'} | "
+                     f"Rejim eşik: {self.MIN_SCORE_SIDEWAY if regime=='SIDEWAYS' else self.MIN_SCORE}/10"
+                     + ('' if fg_ok else f' | F&G 🚫 ({_fg}<{self.FG_MIN})'))
+
         send_telegram('\n'.join(lines))
 
     def _hourly_loop(self):
