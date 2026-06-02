@@ -4,8 +4,8 @@ import os
 INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
 INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
 
-# Claude API (caption üretimi için)
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+# DeepSeek API (caption üretimi için — platform.deepseek.com'dan al)
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
 # Gönderi ayarları
 POST_INTERVAL_HOURS = int(os.getenv("POST_INTERVAL_HOURS", "6"))  # kaç saatte bir gönderi

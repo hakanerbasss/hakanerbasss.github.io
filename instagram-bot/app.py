@@ -4,7 +4,7 @@ Instagram Otomatik Gönderi Sistemi — Ana Orkestratör
 Çalışma akışı:
 1. Viral ürünleri çek (AliExpress / Reddit)
 2. Her ürün için 1080x1080 görsel üret (Pillow)
-3. AI ile caption oluştur (Claude API veya şablon)
+3. AI ile caption oluştur (DeepSeek API veya şablon)
 4. Instagram'a gönder (instagrapi)
 5. Belirli aralıklarla tekrarla
 """
@@ -16,7 +16,7 @@ import time
 from datetime import datetime
 
 from config import (
-    ANTHROPIC_API_KEY,
+    DEEPSEEK_API_KEY,
     INSTAGRAM_USERNAME,
     INSTAGRAM_PASSWORD,
     MAX_POSTS_PER_DAY,
@@ -98,7 +98,7 @@ def run_once():
             price=product.price,
             sold_count=product.sold_count,
             niche=PRODUCT_NICHE,
-            api_key=ANTHROPIC_API_KEY or None,
+            api_key=DEEPSEEK_API_KEY or None,
         )
         logger.info(f"Caption:\n{caption[:100]}...")
 
@@ -126,11 +126,21 @@ def run_once():
 
 
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Tek seferlik çalış ve çık (GitHub Actions için)",
+    )
+    args = parser.parse_args()
+
     logger.info("=" * 60)
     logger.info("Instagram Otomatik Gönderi Sistemi başlatıldı")
     logger.info(f"Hesap: {INSTAGRAM_USERNAME or '(ayarlanmadı)'}")
     logger.info(f"Niş: {PRODUCT_NICHE}")
-    logger.info(f"Gönderi aralığı: {POST_INTERVAL_HOURS} saat")
+    logger.info(f"Mod: {'tek seferlik' if args.once else f'{POST_INTERVAL_HOURS} saatte bir'}")
     logger.info(f"DRY_RUN: {DRY_RUN}")
     logger.info("=" * 60)
 
@@ -142,6 +152,10 @@ def main():
             "Ya da DRY_RUN=true ile test edin."
         )
         sys.exit(1)
+
+    if args.once:
+        run_once()
+        return
 
     while True:
         try:

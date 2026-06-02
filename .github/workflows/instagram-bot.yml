@@ -1,0 +1,62 @@
+name: Instagram Auto Post
+
+on:
+  schedule:
+    # Her 6 saatte bir: 08:00, 14:00, 20:00, 02:00 UTC
+    - cron: "0 8,14,20,2 * * *"
+  workflow_dispatch:  # Elle de tetiklenebilir
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Instagram session dosyasını cache'ten geri yükle
+      # (Her çalıştırmada yeniden login yapmamak için)
+      - name: Restore Instagram session
+        uses: actions/cache@v4
+        with:
+          path: instagram-bot/session.json
+          key: instagram-session-${{ runner.os }}
+          restore-keys: instagram-session-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: instagram-bot/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r instagram-bot/requirements.txt
+
+      - name: Run Instagram bot
+        working-directory: instagram-bot
+        env:
+          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          PRODUCT_NICHE: ${{ vars.PRODUCT_NICHE || 'viral gadgets' }}
+          MAX_POSTS_PER_DAY: "1"   # Her tetiklemede 1 post
+          POST_INTERVAL_HOURS: "6"
+        run: python app.py --once   # Sonsuz döngü değil, tek seferlik çalış
+
+      # Güncel session dosyasını kaydet
+      - name: Save Instagram session
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: instagram-bot/session.json
+          key: instagram-session-${{ runner.os }}
+
+      - name: Upload output images (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instagram-posts-${{ github.run_number }}
+          path: instagram-bot/output/
+          retention-days: 7

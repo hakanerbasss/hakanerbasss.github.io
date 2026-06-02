@@ -1,6 +1,8 @@
 """
-Claude API ile Instagram caption üretici.
+DeepSeek API ile Instagram caption üretici.
 API yoksa şablon tabanlı caption kullanır.
+
+DeepSeek API, OpenAI SDK ile uyumludur (base_url farklı).
 """
 
 import random
@@ -9,41 +11,55 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-chat"  # DeepSeek-V3; akıl yürütme için "deepseek-reasoner"
 
-def generate_caption_with_claude(
+CAPTION_PROMPT = """\
+Write a short, punchy Instagram caption for this viral product post.
+Product: {title}
+Price: {price}
+Sold: {sold_count}
+Niche: {niche}
+
+Requirements:
+- 2-3 lines max
+- Start with a hook emoji
+- Include a call-to-action
+- Add 5 relevant hashtags at the end
+- Keep it conversational and exciting
+- No markdown, plain text only"""
+
+
+def generate_caption_with_deepseek(
     title: str,
     price: str,
     sold_count: Optional[str],
     niche: str,
     api_key: str,
 ) -> str:
-    """Claude API ile özgün Instagram caption üretir."""
+    """DeepSeek API ile özgün Instagram caption üretir."""
     try:
-        import anthropic
+        from openai import OpenAI
 
-        client = anthropic.Anthropic(api_key=api_key)
-        prompt = (
-            f"Write a short, punchy Instagram caption for this viral product post.\n"
-            f"Product: {title}\n"
-            f"Price: {price}\n"
-            f"Sold: {sold_count or 'thousands'}\n"
-            f"Niche: {niche}\n\n"
-            f"Requirements:\n"
-            f"- 2-3 lines max\n"
-            f"- Start with a hook emoji\n"
-            f"- Include a call-to-action\n"
-            f"- Add 5 relevant hashtags at the end\n"
-            f"- Keep it conversational and exciting\n"
-            f"- No markdown, plain text only"
-        )
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
+        client = OpenAI(api_key=api_key, base_url=DEEPSEEK_BASE_URL)
+        response = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
             max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {
+                    "role": "user",
+                    "content": CAPTION_PROMPT.format(
+                        title=title,
+                        price=price,
+                        sold_count=sold_count or "thousands",
+                        niche=niche,
+                    ),
+                }
+            ],
         )
-        return message.content[0].text.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.warning(f"Claude API hatası, şablon kullanılıyor: {e}")
+        logger.warning(f"DeepSeek API hatası, şablon kullanılıyor: {e}")
         return generate_template_caption(title, price, sold_count, niche)
 
 
@@ -89,7 +105,7 @@ def get_caption(
     niche: str = "gadgets",
     api_key: Optional[str] = None,
 ) -> str:
-    """Ana caption üretici. API anahtarı varsa Claude kullanır."""
+    """Ana caption üretici. API anahtarı varsa DeepSeek kullanır."""
     if api_key:
-        return generate_caption_with_claude(title, price, sold_count, niche, api_key)
+        return generate_caption_with_deepseek(title, price, sold_count, niche, api_key)
     return generate_template_caption(title, price, sold_count, niche)
