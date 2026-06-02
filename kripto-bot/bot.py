@@ -1,10 +1,12 @@
-import json, os, datetime, threading, urllib.request, urllib.parse
+import json, os, time, datetime, threading, urllib.request, urllib.parse
 from binance.client import Client
 
-FEE_RATE = 0.001  # Binance spot %0.1 alım + %0.1 satım = %0.2 toplam
+FEE_RATE = 0.001  # Binance spot: %0.1 alım + %0.1 satım = %0.2 toplam
 
-# Tüm ajanlar bu kilidi kullanır — çakışan alım emirlerini önler
-_TRADE_LOCK = threading.Lock()
+# Tüm ajanlar bu kilidi kullanır — çakışan alım emirlerini VE positions.json
+# eşzamanlı yazımını (lost-update) önler. RLock: aynı thread içinde
+# execute_buy/sell zaten kilidi tutarken yardımcıları çağırabilsin.
+_TRADE_LOCK = threading.RLock()
 
 CONFIG_FILE = 'config.json'
 TRADES_FILE = 'trades.json'
@@ -52,6 +54,39 @@ def load_positions():
 def save_positions(positions):
     with open(POSITIONS_FILE, 'w') as f:
         json.dump(positions, f, indent=2)
+
+# ── Atomik pozisyon/trade güncelleme ────────────────
+# Ajanlar tüm positions.json'ı okuyup-değiştirip-geri yazınca (5 thread
+# eşzamanlı) "lost update" oluşuyordu: A {X,Y} okur, B {X,Y} okur, A X'i
+# yazar, B Y'yi yazarken X'i eski haliyle ezer. Aşağıdaki yardımcılar tek
+# sembolü kilit altında günceller → ne kayıp güncelleme ne de kapanmış
+# pozisyonun "hayalet" olarak geri yazılması olur.
+def update_position(symbol, **fields):
+    """Var olan bir pozisyonun alanlarını kilit altında güncelle.
+    Pozisyon yoksa HİÇBİR ŞEY yapmaz (kapanmış pozisyonu diriltmez)."""
+    with _TRADE_LOCK:
+        positions = load_positions()
+        if symbol not in positions:
+            return None
+        positions[symbol].update(fields)
+        save_positions(positions)
+        return positions[symbol]
+
+def clear_position(symbol):
+    """Pozisyonu kilit altında sil."""
+    with _TRADE_LOCK:
+        positions = load_positions()
+        if symbol in positions:
+            del positions[symbol]
+            save_positions(positions)
+
+def append_trade(trade):
+    """trades.json'a kilit altında ekle (eşzamanlı append kaybını önler)."""
+    with _TRADE_LOCK:
+        trades = load_trades()
+        trades.append(trade)
+        save_trades(trades)
+        return trades
 
 # ── Binance Client ──────────────────────────────
 def get_client():
@@ -150,6 +185,35 @@ def cleanup_dust_positions(client):
     return removed
 
 
+def reconcile_positions(client):
+    """positions.json'daki miktarları GERÇEK Binance bakiyesiyle karşılaştırır.
+    Bir pozisyonun gerçek bakiyesi defterin %50'sinden azsa → o pozisyon gerçekte
+    yok demektir (elle satılmış / hiç açılmamış / testnet→gerçek geçiş kalıntısı)
+    → defterden silinir. SADECE aşağı yönde düzeltir; manuel tuttuğun fazladan
+    bakiyeye DOKUNMAZ. Gerçek hesapta 'hayalet pozisyon' kaynaklı yanlış satış
+    denemelerini ve bozuk istatistiği önler. Returns: düzeltilen sembol listesi."""
+    try:
+        account = client.get_account()
+        bal = {b['asset']: float(b.get('free', 0)) + float(b.get('locked', 0))
+               for b in account.get('balances', [])}
+    except Exception as e:
+        print(f'[Bot] Reconcile: bakiye alınamadı: {e}')
+        return []
+    fixed = []
+    for sym, pos in list(load_positions().items()):
+        qty = pos.get('qty', 0)
+        if qty <= 0 or not sym.endswith('USDT'):
+            continue
+        asset = sym[:-4]
+        real  = bal.get(asset, 0.0)
+        if real < qty * 0.5:   # defter ile gerçek ciddi uyuşmuyor → hayalet pozisyon
+            clear_position(sym)
+            fixed.append(f'{sym} (defter {qty} ↔ gerçek {real:.6f})')
+            print(f'[Bot] Reconcile: {sym} hayalet pozisyon silindi '
+                  f'(defter {qty}, gerçek {real:.6f})')
+    return fixed
+
+
 def get_total_equity(client):
     """Serbest USDT + tüm açık pozisyonların güncel piyasa değeri.
     Pozisyon boyutlama bunun üzerinden yapılır (cash daraldıkça boyut da
@@ -172,14 +236,23 @@ def get_total_equity(client):
 
 
 def position_size_by_score(equity, score, mult=1.0,
-                           lo_pct=0.01, hi_pct=0.03, min_usd=10.0):
+                           lo_pct=0.01, hi_pct=0.03, min_usd=None):
     """Skora göre değişken pozisyon boyutu — tüm ajanlar için ORTAK kural.
     Güçlü sinyalde büyük, zayıfta küçük:
        skor 5  → %1   (lo_pct)
        skor 7.5→ %2
        skor 10 → %3   (hi_pct)
     Skor 0–10 ölçeğinde beklenir; skoru olmayan ajan (UT Bot) ~6 geçer.
-    `mult`: CEO pozisyon çarpanı (bear'de küçültür)."""
+    `mult`: CEO pozisyon çarpanı (bear'de küçültür).
+    min_usd: taban tutar. None ise config'den 'min_position_usd' (vars. 10).
+    KÜÇÜK HESAP NOTU: equity düşükken %-bazlı boyut bu tabanın altında kalır →
+    tüm işlemler tabana sabitlenir. Küçük sermayede bu knob'u düşürmek (ör. 6,
+    Binance min ~$5-10 sınırına yakın) daha fazla/çeşitli pozisyon açtırır."""
+    if min_usd is None:
+        try:
+            min_usd = float(load_config().get('min_position_usd', 10.0))
+        except Exception:
+            min_usd = 10.0
     try:
         frac = max(0.0, min(1.0, (float(score) - 5.0) / 5.0))
     except Exception:
@@ -187,6 +260,100 @@ def position_size_by_score(equity, score, mult=1.0,
     pct  = lo_pct + (hi_pct - lo_pct) * frac
     size = equity * pct * max(0.0, float(mult))
     return max(min_usd, round(size, 2))
+
+
+# ── Başabaş koruması (TÜM ajanlar için ortak) ────
+# Felsefe: bir işlem bir kez anlamlı yeşile geçtiyse, bir daha NET zarara
+# dönmemeli. Trailing'e EK güvenlik ağıdır (trailing tek başına zirveden geri
+# çekilirken hâlâ küçük zarara izin verebilir). Eşik bilinçli olarak çok düşük
+# DEĞİL — yoksa her ufak dalgada satıp komisyona boğar (tutarlı kazancın düşmanı).
+BE_ARM_PCT   = 2.0   # +%2 görülünce koruma kurulur
+BE_FLOOR_PCT = 0.3   # +%0.3 altına düşerse çık → round-trip komisyon (~%0.2) üstü, net zarar yok
+
+def check_breakeven(symbol, pos, pct, arm=BE_ARM_PCT, floor=BE_FLOOR_PCT):
+    """+arm% bir kez görüldüyse 'be_armed' bayrağını kalıcı kurar; sonra fiyat
+    +floor% altına düşerse True döner (çağıran %100 satmalı). floor komisyonun
+    üstünde olduğundan tetiklenince kazanan işlem net zarara dönmez.
+    pos: ajanın elindeki canlı sözlük (bayrak hem bellekte hem diske yazılır)."""
+    try:
+        if not pos.get('be_armed') and pct >= arm:
+            pos['be_armed'] = True
+            update_position(symbol, be_armed=True)
+        return bool(pos.get('be_armed') and pct <= floor)
+    except Exception:
+        return False
+
+# ── Global Devre Kesici (gün-içi felaket stopu) ──
+# Tüm ajanlar bir gün içinde toplam equity'nin belli bir %'sini kaybederse YENİ
+# alımlar durur (açık pozisyonlar SL/TP/trailing ile yönetilmeye devam eder).
+# Her ajanın ayrı -%8 limiti vardı; bunlar üst üste binip toplam düşüşü aşabiliyordu.
+# Bu, portföy seviyesinde tek bir koruma. Bir kez tetiklenince gün boyu kapalı
+# kalır (revenge-trading önlemi); gece yarısı baz çizgisi sıfırlanır.
+GLOBAL_HALT_PCT_DEFAULT = 10.0   # config'den 'global_halt_pct' ile değişir; 0 = kapalı
+_HALT = {'date': None, 'baseline': 0.0, 'tripped': False, 'notified': False, 'last_check': 0.0}
+
+def is_trading_halted(client=None):
+    """Yeni alım yapılmamalı mı? True = dur. İki sebep:
+    1) Kullanıcı botu duraklattı (config 'bot_paused') → GERÇEK kapat düğmesi,
+       tüm ajanları durdurur (açık pozisyonlar SL/TP ile korunmaya devam eder).
+    2) Gün-içi toplam düşüş eşiği aşıldı (global devre kesici). 30s cache'li."""
+    try:
+        cfg = load_config()
+        if cfg.get('bot_paused'):
+            return True   # /durdur veya web Duraklat → tüm ajanlarda yeni alım yok
+        halt_pct = float(cfg.get('global_halt_pct', GLOBAL_HALT_PCT_DEFAULT))
+        if halt_pct <= 0:
+            return False
+        now   = time.time()
+        today = datetime.date.today().isoformat()
+        if client is None:
+            client = get_client()
+
+        # Yeni gün → baz çizgisini sıfırla
+        if _HALT['date'] != today:
+            try:
+                _HALT['baseline'] = get_total_equity(client)
+            except Exception:
+                _HALT['baseline'] = 0.0
+            _HALT.update({'date': today, 'tripped': False, 'notified': False, 'last_check': now})
+            return False
+
+        if _HALT['tripped']:
+            return True   # gün boyu kapalı kal
+
+        if now - _HALT['last_check'] < 30:   # her taramada equity hesaplama
+            return False
+        _HALT['last_check'] = now
+
+        baseline = _HALT['baseline']
+        if baseline <= 0:
+            try:
+                _HALT['baseline'] = get_total_equity(client)
+            except Exception:
+                pass
+            return False
+
+        try:
+            equity = get_total_equity(client)
+        except Exception:
+            return False
+        dd = (equity - baseline) / baseline * 100
+        if dd <= -halt_pct:
+            _HALT['tripped'] = True
+            if not _HALT['notified']:
+                _HALT['notified'] = True
+                send_telegram(
+                    f'🛑 <b>GLOBAL DEVRE KESİCİ TETİKLENDİ</b>\n'
+                    f'━━━━━━━━━━━━━━\n'
+                    f'📉 Gün-içi toplam düşüş: %{dd:.1f} (eşik: -%{halt_pct:.0f})\n'
+                    f'⛔ Tüm ajanlarda YENİ alımlar durduruldu.\n'
+                    f'✅ Açık pozisyonlar SL/TP/trailing ile yönetilmeye devam ediyor.\n'
+                    f'🔄 Gece yarısı otomatik sıfırlanır.'
+                )
+            return True
+        return False
+    except Exception:
+        return False
 
 # ── Portfolio ────────────────────────────────────
 def get_portfolio_summary(client):
@@ -222,6 +389,9 @@ def get_portfolio_summary(client):
     closed = [t for t in trades if t.get('type') == 'sell']
     wins = [t for t in closed if t.get('pnl', 0) > 0]
     success_rate = round(len(wins) / len(closed) * 100, 1) if closed else 0
+    # Gerçekleşen net K/Z: kapanan tüm işlemlerin net PnL toplamı (botun gerçekten
+    # kazandığı/kaybettiği para — total_pnl ise açık pozisyonların kâğıt K/Z'si).
+    realized_pnl = round(sum(t.get('pnl', 0) for t in closed), 2)
 
     return {
         'positions': result,
@@ -229,13 +399,22 @@ def get_portfolio_summary(client):
         'total_current': round(total_current, 2),
         'total_pnl': round(total_current - total_invested, 2),
         'total_pnl_pct': round((total_current - total_invested) / total_invested * 100, 1) if total_invested > 0 else 0,
+        'realized_pnl': realized_pnl,
         'success_rate': success_rate,
         'total_trades': len(closed),
         'win_trades': len(wins),
     }
 
 # ── Execute Order ────────────────────────────────
+# Sembol filtreleri neredeyse hiç değişmez → her alım/satış/toz-temizlikte
+# exchangeInfo çekmek yerine 6 saat cache'le (rate-limit + gecikme azaltır).
+_SYMBOL_FILTER_CACHE = {}   # symbol -> (step, min_notional, ts)
+_SYMBOL_FILTER_TTL   = 6 * 3600
+
 def get_symbol_filters(client, symbol):
+    cached = _SYMBOL_FILTER_CACHE.get(symbol)
+    if cached and (time.time() - cached[2]) < _SYMBOL_FILTER_TTL:
+        return cached[0], cached[1]
     info = client.get_symbol_info(symbol)
     step = 0.001
     min_notional = 5.0  # varsayılan $5
@@ -246,6 +425,7 @@ def get_symbol_filters(client, symbol):
             min_notional = float(f['minNotional'])
         if f['filterType'] == 'MIN_NOTIONAL':
             min_notional = float(f['minNotional'])
+    _SYMBOL_FILTER_CACHE[symbol] = (step, min_notional, time.time())
     return step, min_notional
 
 def get_step_size(client, symbol):
@@ -343,28 +523,71 @@ def _sell_msg(symbol, price, avg_price, qty, pnl, pnl_pct, fee, source, hold):
 
 def _is_sl_source(source: str) -> bool:
     """Trade kaydının bir SL/STOP satışı olup olmadığını tespit eder.
-    'EDGE SL', 'INDICATOR-X SL', 'BREAKOUT TRAIL_STOP', 'OTONOM SL' hepsini yakalar."""
+    'EDGE SL', 'INDICATOR-X SL', 'BREAKOUT TRAIL_STOP', 'OTONOM SL' hepsini yakalar.
+    NOT: Cooldown artık buna değil, gerçekleşen PnL'e bakar (aşağı bkz)."""
     s = source.upper()
     return 'STOP' in s or s.endswith(' SL') or ' SL ' in s
 
-def _check_sl_cooldown(symbol, cooldown_hours=3):
-    """SL'den sonra cooldown süresi geçti mi? True = alım yapılabilir."""
+def _last_sell(symbol):
     trades = load_trades()
-    last_sl = next(
-        (t for t in reversed(trades)
-         if t.get('symbol') == symbol
-         and t.get('type') == 'sell'
-         and _is_sl_source(t.get('source', ''))),
-        None
-    )
-    if not last_sl:
+    return next((t for t in reversed(trades)
+                 if t.get('symbol') == symbol and t.get('type') == 'sell'), None)
+
+def _check_sl_cooldown(symbol, cooldown_hours=3):
+    """Son çıkış ZARARLA bittiyse cooldown süresi geçti mi? True = alım serbest.
+
+    Eskiden kaynak string'ine ('... SL', 'STOP') bakılıyordu; bu yüzden KÂRLI
+    bir 'TRAIL STOP' çıkışı bile SL sayılıp tekrar girişi blokluyordu. Artık
+    sadece son satışın net PnL'i < 0 ise bekleme uygulanır — kazanan trailing
+    çıkışları cezalandırılmaz ve davranış tüm ajanlarda tutarlıdır."""
+    last = _last_sell(symbol)
+    if not last:
+        return True
+    if last.get('pnl', 0) >= 0:   # son çıkış kârlı/başabaş → bekleme yok
         return True
     try:
-        sl_time = datetime.datetime.strptime(last_sl['time'], '%Y-%m-%d %H:%M:%S')
+        sl_time = datetime.datetime.strptime(last['time'], '%Y-%m-%d %H:%M:%S')
         elapsed = (datetime.datetime.now() - sl_time).total_seconds() / 3600
         return elapsed >= cooldown_hours
     except:
         return True
+
+def _check_reentry(symbol, hours):
+    """Son satıştan (KÂR/ZARAR farketmez) 'hours' saat geçti mi? True = alım serbest.
+    Aynı coini sattıktan hemen sonra (çoğu zaman daha pahalıya) geri alıp churn
+    yapmayı engeller. SL cooldown'dan ayrı ve ona EK bir kısa bekleme."""
+    if hours <= 0:
+        return True
+    last = _last_sell(symbol)
+    if not last:
+        return True
+    try:
+        t = datetime.datetime.strptime(last['time'], '%Y-%m-%d %H:%M:%S')
+        return (datetime.datetime.now() - t).total_seconds() / 3600 >= hours
+    except:
+        return True
+
+def _parse_fill(order, req_qty, req_price, symbol):
+    """Binance market emir yanıtından GERÇEKLEŞEN (qty, ortalama fiyat) çıkar.
+    executedQty + cummulativeQuoteQty kullanır; base-asset cinsinden alınan
+    komisyonu da düşer (net eldeki miktar). Yanıt beklenmedikse istenen
+    değerlere düşer (testnet/fallback güvenli)."""
+    try:
+        filled = float(order.get('executedQty', 0) or 0)
+        quote  = float(order.get('cummulativeQuoteQty', 0) or 0)
+        if filled <= 0:
+            return req_qty, req_price
+        avg = quote / filled if quote > 0 else req_price
+        # Komisyon base asset'ten kesildiyse net miktarı düşür (yoksa toz birikir)
+        base = symbol[:-4] if symbol.endswith('USDT') else None
+        comm = 0.0
+        for f in order.get('fills', []) or []:
+            if base and f.get('commissionAsset') == base:
+                comm += float(f.get('commission', 0) or 0)
+        net = filled - comm
+        return (net if net > 0 else filled), (avg if avg > 0 else req_price)
+    except Exception:
+        return req_qty, req_price
 
 def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agent=None):
     try:
@@ -372,22 +595,42 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
         if price <= 0:
             return {'ok': False, 'error': 'Fiyat alınamadı'}
 
+        # Saat filtresi: 13:00-20:00 TR (UTC+3) arası yeni alım yok.
+        # Londra-NY örtüşmesi — stop-hunt riski en yüksek pencere.
+        # Manuel işlemler ('MANUEL' source) ve WYCKOFF (uzun vadeli) hariç tutulur.
+        if source not in ('MANUEL',) and 'WYCKOFF' not in (source or ''):
+            tr_hour = (datetime.datetime.utcnow().hour + 3) % 24
+            if 13 <= tr_hour < 20:
+                print(f'[Bot] {symbol} saat filtresi: {tr_hour:02d}:xx TR — 13-20 arası yeni alım yok')
+                return {'ok': False, 'error': f'Saat filtresi: {tr_hour:02d}:xx TR (13-20 arası kapalı)'}
+
         # SL cooldown kontrolü — öncelik: coin ayarı > global ayar > hardcoded default (3s)
         cfg_data   = load_config()
         coin_cfg   = next((c for c in cfg_data.get('coins', []) if c['symbol'] == symbol), {})
         global_cd  = float(cfg_data.get('sl_cooldown_hours', 3))
         cooldown_h = float(coin_cfg.get('sl_cooldown_hours', global_cd))
         if cooldown_h > 0 and not _check_sl_cooldown(symbol, cooldown_h):
-            trades_tmp = load_trades()
-            last_sl = next((t for t in reversed(trades_tmp)
-                            if t.get('symbol') == symbol and t.get('type') == 'sell'
-                            and _is_sl_source(t.get('source', ''))), None)
+            last_sl = _last_sell(symbol)   # zararla biten son çıkış
             if last_sl:
-                sl_time = datetime.datetime.strptime(last_sl['time'], '%Y-%m-%d %H:%M:%S')
-                elapsed = (datetime.datetime.now() - sl_time).total_seconds() / 3600
-                kalan   = round(cooldown_h - elapsed, 1)
+                try:
+                    sl_time = datetime.datetime.strptime(last_sl['time'], '%Y-%m-%d %H:%M:%S')
+                    elapsed = (datetime.datetime.now() - sl_time).total_seconds() / 3600
+                    kalan   = round(cooldown_h - elapsed, 1)
+                except Exception:
+                    kalan = cooldown_h
                 print(f'[Bot] {symbol} SL cooldown aktif — {kalan}s kaldı')
                 return {'ok': False, 'error': f'SL cooldown: {kalan}s kaldı'}
+
+        # Re-entry kilidi: son satıştan sonra (kâr/zarar farketmez) kısa süre tekrar alma
+        # → aynı coini satıp anında (genelde daha pahalıya) geri alma churn'ünü engeller.
+        # MIN_REENTRY_FLOOR: config sıfırlanmış olsa bile en az 30dk bekleme (25sn re-entry bug'ı).
+        MIN_REENTRY_FLOOR = 0.5  # saat
+        reentry_h = max(MIN_REENTRY_FLOOR,
+                        float(coin_cfg.get('reentry_cooldown_hours',
+                              cfg_data.get('reentry_cooldown_hours', 2))))
+        if not _check_reentry(symbol, reentry_h):
+            print(f'[Bot] {symbol} re-entry kilidi aktif ({reentry_h}s) — yakın zamanda satıldı')
+            return {'ok': False, 'error': f'Re-entry kilidi: {symbol} yakında satıldı'}
 
         # ATR bazlı TP/SL — emir vermeden önce hesapla
         tp_pct = float(coin_cfg.get('take_profit_pct', 0))
@@ -404,23 +647,24 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
                     return {'ok': False, 'error': msg}
         elif not coin_cfg:
             # Otonom ajan tarafından bulunan coin — config yok, ATR ile otomatik belirle
-            # TP max %6: trailing %2.4'te aktif olur → hızlı küçük kâr kilitleme
+            # Scanner loop'taki caps ile aynı (max SL %6, max TP %18) — tutarlı bildirim
             atr = _calc_atr_pct(client, symbol, 7)
             if atr:
                 sl_pct = max(1.5, min(5.0, round(atr * 1.5, 2)))
-                tp_pct = max(3.0, min(6.0, round(atr * 3.0, 2)))
+                tp_pct = max(3.0, min(15.0, round(atr * 3.0, 2)))
             else:
-                sl_pct = 2.5   # varsayılan: -%2.5
-                tp_pct = 5.0   # varsayılan: +%5.0
+                sl_pct = 2.5
+                tp_pct = 5.0
             print(f'[Bot] {symbol} otonom ajan — ATR TP/SL: +%{tp_pct} / -%{sl_pct}')
 
-        # Bakiye kontrolü
-        balance = get_usdt_balance(client)
-        if balance < usdt_amount:
-            return {'ok': False, 'error': f'Yetersiz bakiye: ${round(balance,2)} USDT'}
-
         # ── Kritik bölge: çakışma önleyici kilit ────────────────────────────
+        # Bakiye kontrolü de kilidin İÇİNDE: iki ajan aynı anda "yeterli" görüp
+        # ikisi de alım yapamaz (alımlar seri hale gelir).
         with _TRADE_LOCK:
+            balance = get_usdt_balance(client)
+            if balance < usdt_amount:
+                return {'ok': False, 'error': f'Yetersiz bakiye: ${round(balance,2)} USDT'}
+
             positions = load_positions()
 
             # Binance min satış tutarını al — toz tespiti için gerçek eşik
@@ -452,102 +696,151 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
 
             order = client.order_market_buy(symbol=symbol, quantity=qty)
 
-            total_qty = pos['qty'] + qty
-            avg = ((pos['qty'] * pos['avg_price']) + (qty * price)) / total_qty
+            # Gerçek dolum: istenen değil, GERÇEKLEŞEN miktar ve ortalama fiyat.
+            # Market emir slippage/kısmi dolum yapabilir; defter ile cüzdan
+            # sürüklenmesin diye order yanıtını baz al.
+            fill_qty, fill_price = _parse_fill(order, qty, price, symbol)
+
+            total_qty = pos['qty'] + fill_qty
+            avg = (((pos['qty'] * pos['avg_price']) + (fill_qty * fill_price)) / total_qty
+                   if total_qty > 0 else fill_price)
             positions[symbol] = {
                 'qty': total_qty, 'avg_price': avg,
                 'tp_pct': tp_pct, 'sl_pct': sl_pct,
                 'agent': agent,
+                'open_time': time.time(),   # epoch — timeout/trailing meta'sı kilit içinde garanti
             }
             save_positions(positions)
+            qty   = fill_qty     # trade kaydı ve dönüş için gerçekleşen değerler
+            price = fill_price
         # ── Kilit bitti ─────────────────────────────────────────────────────
 
-        trades = load_trades()
-        trades.append({
+        append_trade({
             'type': 'buy', 'symbol': symbol, 'qty': qty,
             'price': price, 'usdt': usdt_amount,
             'source': source,
             'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
-        save_trades(trades)
         send_telegram(_buy_msg(symbol, price, qty, usdt_amount, source, period, tp_pct, sl_pct))
         return {'ok': True, 'qty': qty, 'price': price}
     except Exception as e:
         return {'ok': False, 'error': str(e)}
 
 def execute_sell(client, symbol, sell_pct, source='MANUEL', period='—'):
+    # Tüm kritik bölge kilit altında: aynı pozisyona eşzamanlı çift satışı
+    # (manuel + ajan, ya da iki ajan) önler. İlk satış pozisyonu kilit içinde
+    # düşürür/siler; ikinci çağrı "Açık pozisyon yok" alır.
     try:
-        positions = load_positions()
-        pos = positions.get(symbol)
-        if not pos or pos.get('qty', 0) <= 0:
-            return {'ok': False, 'error': 'Açık pozisyon yok'}
-        step, min_notional = get_symbol_filters(client, symbol)
-        price = get_price(client, symbol)
-        total_qty = pos['qty']
-        total_value = total_qty * price
+        with _TRADE_LOCK:
+            positions = load_positions()
+            pos = positions.get(symbol)
+            if not pos or pos.get('qty', 0) <= 0:
+                return {'ok': False, 'error': 'Açık pozisyon yok'}
+            step, min_notional = get_symbol_filters(client, symbol)
+            price = get_price(client, symbol)
+            if price <= 0:
+                return {'ok': False, 'error': 'Fiyat alınamadı'}
+            total_qty = pos['qty']
 
-        # İstenen satış miktarı
-        sell_qty = round_step(total_qty * (sell_pct / 100), step)
-        sell_value = sell_qty * price
-
-        # Satış tutarı min tutarın altındaysa min tutara yükselt
-        if sell_value < min_notional:
-            sell_qty = round_step(min_notional / price * 1.01, step)
+            # İstenen satış miktarı
+            sell_qty = round_step(total_qty * (sell_pct / 100), step)
             sell_value = sell_qty * price
-            print(f'[Bot] {symbol} satış tutarı min altında, {min_notional}$ seviyesine yükseltildi')
 
-        # Satış sonrası kalan min tutarın altında kalıyorsa tamamını sat
-        remaining_value = (total_qty - sell_qty) * price
-        if remaining_value < min_notional or sell_qty > total_qty:
-            sell_qty = round_step(total_qty, step)
-            print(f'[Bot] {symbol} kalan bakiye min altında kalacak, tamamı satılıyor')
+            # Satış tutarı min tutarın altındaysa min tutara yükselt
+            if sell_value < min_notional:
+                sell_qty = round_step(min_notional / price * 1.01, step)
+                sell_value = sell_qty * price
+                print(f'[Bot] {symbol} satış tutarı min altında, {min_notional}$ seviyesine yükseltildi')
 
-        qty = sell_qty
-        if qty <= 0:
-            return {'ok': False, 'error': 'Satılacak miktar hesaplanamadı'}
+            # Satış sonrası kalan min tutarın altında kalıyorsa tamamını sat
+            remaining_value = (total_qty - sell_qty) * price
+            if remaining_value < min_notional or sell_qty > total_qty:
+                sell_qty = round_step(total_qty, step)
+                print(f'[Bot] {symbol} kalan bakiye min altında kalacak, tamamı satılıyor')
 
-        order = client.order_market_sell(symbol=symbol, quantity=qty)
-        avg_price = pos['avg_price']
-        gross_pnl = (price - avg_price) * qty
-        fee       = (avg_price + price) * qty * FEE_RATE
-        net_pnl   = round(gross_pnl - fee, 2)
-        pnl_pct   = round((price - avg_price) / avg_price * 100, 2)
+            qty = sell_qty
+            if qty <= 0:
+                return {'ok': False, 'error': 'Satılacak miktar hesaplanamadı'}
 
-        pos['qty'] = round(pos['qty'] - qty, 6)
-        if pos['qty'] <= 0:
-            del positions[symbol]
-        else:
-            positions[symbol] = pos
-        save_positions(positions)
-        trades = load_trades()
-        trades.append({
-            'type': 'sell', 'symbol': symbol, 'qty': qty,
-            'price': price, 'pnl': net_pnl,
-            'source': source,
-            'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
-        save_trades(trades)
+            order = client.order_market_sell(symbol=symbol, quantity=qty)
+
+            # Gerçekleşen satış: order yanıtından miktar + ortalama dolum fiyatı
+            avg_price = pos['avg_price']
+            filled_qty = qty
+            try:
+                ex = float(order.get('executedQty', 0) or 0)
+                qv = float(order.get('cummulativeQuoteQty', 0) or 0)
+                if ex > 0:
+                    filled_qty = ex
+                    if qv > 0:
+                        price = qv / ex   # gerçek ortalama satış fiyatı
+            except Exception:
+                pass
+
+            gross_pnl = (price - avg_price) * filled_qty
+            fee       = (avg_price + price) * filled_qty * FEE_RATE
+            net_pnl   = round(gross_pnl - fee, 2)
+            pnl_pct   = round((price - avg_price) / avg_price * 100, 2) if avg_price > 0 else 0
+
+            new_qty = round(pos['qty'] - filled_qty, 6)
+            if new_qty <= 0:
+                clear_position(symbol)
+            else:
+                update_position(symbol, qty=new_qty)
+
+            trades = append_trade({
+                'type': 'sell', 'symbol': symbol, 'qty': filled_qty,
+                'price': price, 'pnl': net_pnl,
+                'source': source,
+                'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+
         hold_str = _hold_duration(symbol, trades)
-        send_telegram(_sell_msg(symbol, price, avg_price, qty, gross_pnl, pnl_pct, fee, source, hold_str))
-        return {'ok': True, 'qty': qty, 'price': price, 'pnl': net_pnl}
+        send_telegram(_sell_msg(symbol, price, avg_price, filled_qty, gross_pnl, pnl_pct, fee, source, hold_str))
+        return {'ok': True, 'qty': filled_qty, 'price': price, 'pnl': net_pnl}
     except Exception as e:
         return {'ok': False, 'error': str(e)}
 
 
 
+# Telegram mesaj kuyruğu: tüm ajanlar aynı anda mesaj atınca rate-limit/timeout olur.
+# Tek bir arka plan thread'i sırayla gönderir (max 1 mesaj/sn, Telegram limiti: 30/sn).
+import queue as _queue
+_TG_QUEUE: '_queue.Queue[str]' = _queue.Queue(maxsize=50)
+_TG_THREAD_STARTED = False
+
+def _tg_worker():
+    """Arka planda çalışır; kuyruktaki mesajları 1/sn hızında gönderir."""
+    while True:
+        try:
+            msg = _TG_QUEUE.get(timeout=30)
+        except _queue.Empty:
+            continue
+        try:
+            cfg = load_config()
+            token   = cfg.get('telegram_token', '')
+            chat_id = cfg.get('telegram_chat_id', '')
+            if token and chat_id:
+                url  = f'https://api.telegram.org/bot{token}/sendMessage'
+                data = urllib.parse.urlencode({
+                    'chat_id': chat_id,
+                    'text': msg,
+                    'parse_mode': 'HTML'
+                }).encode()
+                urllib.request.urlopen(url, data, timeout=15)
+        except Exception as e:
+            print('[TG] Hata:', e)
+        finally:
+            _TG_QUEUE.task_done()
+            time.sleep(0.5)   # max 2 msg/sn — Telegram rate limit'in çok altında
+
 def send_telegram(msg):
+    global _TG_THREAD_STARTED
+    if not _TG_THREAD_STARTED:
+        import threading as _thr
+        _thr.Thread(target=_tg_worker, daemon=True).start()
+        _TG_THREAD_STARTED = True
     try:
-        cfg = load_config()
-        token   = cfg.get('telegram_token', '')
-        chat_id = cfg.get('telegram_chat_id', '')
-        if not token or not chat_id:
-            return
-        url = f'https://api.telegram.org/bot{token}/sendMessage'
-        data = urllib.parse.urlencode({
-            'chat_id': chat_id,
-            'text': msg,
-            'parse_mode': 'HTML'
-        }).encode()
-        urllib.request.urlopen(url, data, timeout=5)
-    except Exception as e:
-        print('Telegram hata:', e)
+        _TG_QUEUE.put_nowait(msg)   # bloklamadan kuyruğa ekle
+    except _queue.Full:
+        print('[TG] Kuyruk dolu, mesaj atlandı')

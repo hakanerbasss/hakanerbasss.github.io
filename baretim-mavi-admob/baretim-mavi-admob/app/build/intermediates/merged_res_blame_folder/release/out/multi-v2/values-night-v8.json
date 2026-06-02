@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.bluechip.finance.app-mergeReleaseResources-69:/values-night-v8/values-night-v8.xml",
+            "map": [
+                {
+                    "source": "/data/data/com.termux/files/home/baretim-mavi-admob/app/src/main/res/values-night/themes.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "4",
+                        "endColumns": "12",
+                        "endOffsets": "219"
+                    }
+                }
+            ]
+        }
+    ]
+}

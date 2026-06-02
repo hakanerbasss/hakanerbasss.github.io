@@ -9,7 +9,8 @@ Indicator Agent — Kodlanmış İndikatörler ile Otonom Tarayıcı
 
 import time, threading, json, os, datetime
 from bot import (load_config, get_client, execute_buy, execute_sell,
-                 load_positions, get_price, send_telegram, get_usdt_balance)
+                 load_positions, get_price, send_telegram, get_usdt_balance,
+                 update_position, check_breakeven)
 from signal_engine import calc_ut_bot, get_klines
 from smart_strategy import check_smart_sell   # sadece açık SMART pozisyonların çıkışı için
 
@@ -24,6 +25,7 @@ MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 90    # saniye
 MONITOR_SEC    = 8
 MIN_VOLUME     = 3_000_000   # $3M günlük hacim
+FG_MIN         = 30          # Fear & Greed bu değerin altında yeni alım yok
 
 # UT Bot sabit parametreler (tüm coinlere aynı uygulanır)
 UTBOT_KEY    = 2.0
@@ -34,6 +36,19 @@ UTBOT_MODE   = 'crossover'
 # NOT: SMART ve SEANS stratejileri kaldırıldı (0% kazanma oranı, toplam -$292 zarar).
 # Sadece UT Bot bırakıldı — net trend takibi, tek sağlam indikatör.
 INDICATORS = ['UTBOT']
+
+
+def _fear_greed_ok():
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+            val = int(json.loads(_r.read())['data'][0]['value'])
+        if val < FG_MIN:
+            print(f'[Indicator] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+            return False
+        return True
+    except Exception:
+        return True
 
 
 def _scan_candidates(client):
@@ -101,8 +116,8 @@ class IndicatorAgent:
         try:
             with open(STATE_FILE, 'w') as f:
                 json.dump(self.state, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f'[Indicator] state kaydı başarısız: {e}')
 
     def _bl(self, sym):
         return time.time() < self.state['blacklist'].get(sym, 0)
@@ -133,7 +148,8 @@ class IndicatorAgent:
             f'📐 Aktif İndikatör:\n'
             f'  • UT Bot (key={UTBOT_KEY}, atr={UTBOT_ATR}, {UTBOT_PERIOD}, {UTBOT_MODE})\n'
             f'  ⓘ Smart + Seans kaldırıldı (0% kazanma, -$292)\n'
-            f'🪙 Evren: Top 50 coin (hacme göre, otomatik)'
+            f'🪙 Evren: Top 50 coin (hacme göre, otomatik)\n'
+            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)'
         )
         return True
 
@@ -162,6 +178,14 @@ class IndicatorAgent:
             print('[Indicator] Kapalı (indicator_enabled=false), tarama atlandı')
             return
 
+        from bot import is_trading_halted
+        if is_trading_halted(client):
+            print('[Indicator] Global devre kesici aktif — yeni alım yok')
+            return
+
+        if not _fear_greed_ok():
+            return
+
         positions = load_positions()
         open_cnt  = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
         if open_cnt >= MAX_POSITIONS:
@@ -182,6 +206,24 @@ class IndicatorAgent:
         for sym in candidates:
             if sym in held or self._bl(sym) or not btc_ok:
                 continue
+
+            # RSI > 65 veto: aşırı alım bölgesinde UTBOT sinyali güvenilmez
+            try:
+                from signal_engine import get_klines as _gk
+                import numpy as np
+                _c, _, _, _ = _gk(client, sym, '1h', limit=20)
+                if len(_c) >= 15:
+                    _d = np.diff(_c)
+                    _g = np.where(_d > 0, _d, 0)
+                    _l = np.where(_d < 0, -_d, 0)
+                    _ag = np.mean(_g[-14:]) if len(_g) >= 14 else np.mean(_g)
+                    _al = np.mean(_l[-14:]) if len(_l) >= 14 else np.mean(_l)
+                    _rsi = 100 - (100 / (1 + _ag / _al)) if _al > 0 else 50
+                    if _rsi > 65:
+                        print(f'[Indicator] {sym} RSI1h={_rsi:.0f}>65, veto')
+                        continue
+            except Exception:
+                pass
 
             sig_result = self._check_all_indicators(client, sym)
             if not sig_result:
@@ -205,15 +247,10 @@ class IndicatorAgent:
             res = execute_buy(client, sym, usdt, source=source, period=indicator, agent='INDICATOR')
             if res.get('ok'):
                 # NOT: total burada sayılmaz — _record() satışta sayar (çift sayım önlenir)
-                from bot import save_positions
-                pos_now = load_positions()
-                if sym in pos_now:
-                    pos_now[sym].update({
-                        'agent':          'INDICATOR',
-                        'indicator_name': indicator,
-                        'open_time':      time.time(),
-                    })
-                    save_positions(pos_now)
+                update_position(sym,
+                                agent='INDICATOR',
+                                indicator_name=indicator,
+                                open_time=time.time())
                 break  # Tek taramada bir alım yeter
 
         self.state['scan_count'] = self.state.get('scan_count', 0) + 1
@@ -255,6 +292,8 @@ class IndicatorAgent:
                 continue
             try:
                 price = get_price(client, sym)
+                if price <= 0:        # ağ hatası → 0.0; sahte SL tetiklemesini önle
+                    continue
                 avg   = pos.get('avg_price', price)
                 if avg <= 0:
                     continue
@@ -278,15 +317,19 @@ class IndicatorAgent:
                         self._record(sym, pos, pct, False)
                     continue
 
+                # Başabaş koruması: +%2 görüldüyse bir daha net zarara dönmesin
+                if check_breakeven(sym, pos, pct):
+                    res = execute_sell(client, sym, 100,
+                                       source=f'INDICATOR-{ind} BE', period='BE')
+                    if res.get('ok'):
+                        self._record(sym, pos, pct, pct > 0)
+                    continue
+
                 # Trailing stop — TP'nin %40'ına ulaşınca aktif, peak'ten -%2 düşüşte çık
                 peak = pos.get('peak_price', avg)
                 if price > peak:
-                    from bot import save_positions
-                    pos_now = load_positions()
-                    if sym in pos_now:
-                        pos_now[sym]['peak_price'] = price
-                        save_positions(pos_now)
-                        peak = price
+                    update_position(sym, peak_price=price)  # kilit altında, tek sembol
+                    peak = price
 
                 # Trail: TP'nin %50'sine ulaşınca aktif, peak'ten -%3 düşüşte çık
                 # (önceki: %40 / -%2 → çok erken çıkıyordu, net kazanç ~%0.4'e düşüyordu)
@@ -313,12 +356,22 @@ class IndicatorAgent:
                     except Exception:
                         pass
 
-                # 36 saat timeout
-                if time.time() - pos.get('open_time', time.time()) > 36 * 3600:
+                # 8 saat timeout: UTBOT 1h sinyali 8 mumda çalışmıyorsa geçersiz
+                open_secs = time.time() - pos.get('open_time', time.time())
+                if open_secs > 8 * 3600:
                     res = execute_sell(client, sym, 100,
                                        source=f'INDICATOR-{ind} TIME', period='TIMEOUT')
                     if res.get('ok'):
                         self._record(sym, pos, pct, pct > 0)
+                    continue
+
+                # Stale-loss exit: 6 saatten eski + %-1.5 altı → sinyal ölmüş, çık
+                if open_secs > 6 * 3600 and pct < -1.5:
+                    res = execute_sell(client, sym, 100,
+                                       source=f'INDICATOR-{ind} STALE', period='STALE')
+                    if res.get('ok'):
+                        self._record(sym, pos, pct, False)
+                        self._add_bl(sym, 8)
 
             except Exception as e:
                 print(f'[Indicator] Monitor {sym}: {e}')
@@ -396,7 +449,7 @@ class IndicatorAgent:
         )
         if pos_lines:
             msg += '\n'.join(pos_lines) + '\n'
-        msg += '━━━━━━━━━━━━━━\n📊 <b>İndikatör Performansı:</b>\n'
+        msg += '━━━━━━━━━━━━━━\n📊 <b>İndikatör Performansı</b> (kapalı işlemler):\n'
         msg += '\n'.join(ind_lines)
         send_telegram(msg)
 

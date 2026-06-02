@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="10dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Baretim Mavi"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/widget_usd"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="USD: ..."
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:layout_marginTop="4dp"/>
+
+    <TextView
+        android:id="@+id/widget_eur"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="EUR: ..."
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"/>
+
+    <TextView
+        android:id="@+id/widget_gold"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Altin: ..."
+        android:textColor="#FFD700"
+        android:textSize="12sp"/>
+
+    <TextView
+        android:id="@+id/widget_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="--:--"
+        android:textColor="#CCFFFFFF"
+        android:textSize="9sp"
+        android:layout_marginTop="4dp"/>
+
+    <TextView
+        android:id="@+id/widget_profile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#CCFFFFFF"
+        android:textSize="9sp"
+        android:visibility="gone"/>
+
+</LinearLayout>

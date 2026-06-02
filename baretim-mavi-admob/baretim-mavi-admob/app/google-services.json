@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "413114627213",
+    "project_id": "baretim-mavi",
+    "storage_bucket": "baretim-mavi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:413114627213:android:107dabaf6f3b8345351ec4",
+        "android_client_info": {
+          "package_name": "com.bluechip.finance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjdwCo94tMJcEcyEiQf1Tkie0k9XvCrDc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

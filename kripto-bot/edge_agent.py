@@ -18,7 +18,8 @@ import time, datetime, threading, json, os, math, requests
 from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
-                 send_telegram, get_usdt_balance)
+                 send_telegram, get_usdt_balance,
+                 update_position, clear_position, check_breakeven)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE   = 'edge_state.json'
@@ -34,6 +35,10 @@ MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 60    # saniye
 MONITOR_SEC    = 5
 MIN_SCORE      = 4.5   # 0-10 — trend modda daha düşük eşik
+# Dinamik eşik: belirsiz koşullarda daha seçici ol (teyitsiz girişleri ele)
+ASIA_MIN_SCORE     = 5.5   # ASIA seansı (ajanın kendi etiketi: "sahte hareket riski")
+BTC_WEAK_MIN_SCORE = 5.5   # BTC SMA altında / zayıfken
+FG_MIN             = 30    # Fear & Greed bu değerin altında yeni alım yok
 
 STABLECOINS = {
     'USDCUSDT','BUSDUSDT','TUSDUSDT','FDUSDUSDT','EURUSDT',
@@ -93,6 +98,8 @@ def _futures_symbols(min_vol=30_000_000) -> list:
         if not sym.endswith('USDT') or sym in STABLECOINS:
             continue
         price = float(d.get('lastPrice', 0))
+        if price < 0.01:
+            continue   # ultra-düşük fiyat: step granülaritesi %10+ → stop güvenilmez
         if 0.90 <= price <= 1.10:
             continue
         chg24 = float(d.get('priceChangePercent', 0))
@@ -355,13 +362,21 @@ def _score(client, symbol, funding, weights, cfg):
         (raw + max_raw * 0.35) / (max_raw * 1.35) * 10
     )), 2)
 
-    signal = 'buy' if score >= MIN_SCORE else None
+    # Dinamik eşik: ASIA seansında veya BTC zayıfken (SMA altı) daha yüksek skor iste
+    eff_min = MIN_SCORE
+    if sess == 'ASIA':
+        eff_min = max(eff_min, ASIA_MIN_SCORE)
+    if parts['btc_trend'][0] < 0:
+        eff_min = max(eff_min, BTC_WEAK_MIN_SCORE)
+
+    signal = 'buy' if score >= eff_min else None
 
     reason_parts = [v[1] for k, v in parts.items() if abs(v[0]) > 0.4 and v[1]]
     reason = ' | '.join(reason_parts)[:350]
 
     return {
         'score':   score,
+        'min_req': eff_min,
         'signal':  signal,
         'price':   price,
         'reason':  reason,
@@ -390,6 +405,18 @@ def _atr(highs, lows, closes, n=14):
                abs(lows[i]-closes[i-1]))
            for i in range(1, len(closes))]
     return sum(trs[-n:]) / n if len(trs) >= n else closes[-1] * 0.02
+
+def _fear_greed_ok():
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+            val = int(json.loads(_r.read())['data'][0]['value'])
+        if val < FG_MIN:
+            print(f'[Edge] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+            return False
+        return True
+    except Exception:
+        return True
 
 # ─── Ajan ────────────────────────────────────────────────────────────────────
 
@@ -462,6 +489,7 @@ class EdgeAgent:
             f'📡 Sinyal: Funding + Sweep + OI + CVD + Haber\n'
             f'⚡ Tarama: {SCAN_INTERVAL}s | Takip: {MONITOR_SEC}s\n'
             f'🎯 Min Skor: {MIN_SCORE}/10 | Max Pos: {MAX_POSITIONS}\n'
+            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)\n'
             f'⚠️ Geleneksel indikatör yok. Piyasa mekaniği.'
         )
         return True
@@ -487,6 +515,14 @@ class EdgeAgent:
         from manager_agent import ceo_flag
         if not ceo_flag(cfg, 'edge_enabled', True):
             print('[Edge] CEO tarafından durduruldu, tarama atlandı')
+            return
+
+        from bot import is_trading_halted
+        if is_trading_halted(client):
+            print('[Edge] Global devre kesici aktif — yeni alım yok')
+            return
+
+        if not _fear_greed_ok():
             return
 
         positions = load_positions()
@@ -545,12 +581,23 @@ class EdgeAgent:
             self.scan_log.appendleft(log_line)
 
             if result['signal'] == 'buy':
-                # Veto: yapısal aşağı trend + BTC zayıf → funding tek başına yetmez
                 d = result.get('details', {})
-                struct_score = d.get('struct', {}).get('score', 0)
-                btc_score    = d.get('btc_trend', {}).get('score', 0)
+                struct_score  = d.get('struct', {}).get('score', 0)
+                btc_score     = d.get('btc_trend', {}).get('score', 0)
+                funding_score = d.get('funding', {}).get('score', 0)
+                sweep_score   = d.get('sweep', {}).get('score', 0)
+
+                # Veto 1: yapısal aşağı trend + BTC zayıf → funding tek başına yetmez
                 if struct_score < -0.5 and btc_score < 0:
                     self.scan_log.appendleft(f'{sym} VETO: struct={struct_score} btc={btc_score}')
+                    checked += 1
+                    continue
+
+                # Veto 2: SADECE funding pozitif, geri kalan teyit (struct/btc/sweep)
+                # hepsi ≤0 → teyitsiz funding bahsi; özellikle ASIA/zayıf BTC'de coin flip.
+                if funding_score > 0 and struct_score <= 0 and btc_score <= 0 and sweep_score <= 0:
+                    self.scan_log.appendleft(
+                        f'{sym} VETO: sadece-funding (struct={struct_score} btc={btc_score} sweep={sweep_score})')
                     checked += 1
                     continue
 
@@ -593,15 +640,11 @@ class EdgeAgent:
 
         res = execute_buy(client, symbol, usdt, source='EDGE', period=result['session'], agent='EDGE')
         if res.get('ok'):
-            with self._lock:
-                from bot import save_positions
-                positions = load_positions()
-                if symbol in positions:
-                    positions[symbol]['agent']        = 'EDGE'
-                    positions[symbol]['edge_signals'] = active_signals
-                    positions[symbol]['edge_score']   = result['score']
-                    positions[symbol]['open_time']    = time.time()
-                    save_positions(positions)
+            update_position(symbol,
+                            agent='EDGE',
+                            edge_signals=active_signals,
+                            edge_score=result['score'],
+                            open_time=time.time())
 
     # ── Pozisyon Takibi ────────────────────────────────────────────────────
     def _monitor_loop(self):
@@ -632,6 +675,8 @@ class EdgeAgent:
 
             try:
                 price     = get_price(client, symbol)
+                if price <= 0:        # ağ hatası → 0.0; sahte SL tetiklemesini önle
+                    continue
                 avg_price = pos.get('avg_price', price)
                 if avg_price <= 0:
                     continue
@@ -656,17 +701,42 @@ class EdgeAgent:
                     res = execute_sell(client, symbol, 100, source='EDGE SL', period='SL')
                     self._notified.pop(symbol, None)
                     self._force_clear(symbol, res)
-                    self.blacklist[symbol] = time.time() + 6 * 3600
+                    # Tekrar SL yenildiyse ceza katlanır: 1.SL=8s, 2.SL=24s, 3.SL+=48s
+                    prev_bl = self.blacklist.get(symbol, 0)
+                    prev_remaining = max(0, prev_bl - time.time())
+                    if prev_remaining > 0:
+                        # Hâlâ cezalıyken tekrar SL → coin ısrarcı, çok uzat
+                        penalty = 48 * 3600
+                    else:
+                        # Normal SL: son 24s içinde kaç kez SL yendi?
+                        trades_tmp = load_trades()
+                        cutoff = datetime.datetime.now() - datetime.timedelta(hours=24)
+                        sl_count = sum(1 for t in trades_tmp
+                                      if t.get('symbol') == symbol
+                                      and t.get('type') == 'sell'
+                                      and 'SL' in (t.get('source') or '')
+                                      and t.get('time', '') >= cutoff.strftime('%Y-%m-%d %H:%M:%S'))
+                        penalty = {1: 8, 2: 24, 3: 48}.get(min(sl_count, 3), 48) * 3600
+                    self.blacklist[symbol] = time.time() + penalty
+                    print(f'[Edge] {symbol} blacklist: {int(penalty/3600)}s')
                     self._record_exit(symbol, pos, pct, 'SL')
+                    continue
+
+                # Başabaş koruması: +%2 görüldüyse bir daha net zarara dönmesin
+                if check_breakeven(symbol, pos, pct):
+                    self._notified[symbol] = time.time()
+                    send_telegram(f'🟦 <b>{symbol}</b> BAŞABAŞ +%{pct:.2f} → kâr korundu')
+                    res = execute_sell(client, symbol, 100, source='EDGE BE', period='BE')
+                    self._notified.pop(symbol, None)
+                    self._force_clear(symbol, res)
+                    self._record_exit(symbol, pos, pct, 'BE')
                     continue
 
                 # Trailing stop: %40 TP'de aktif, peak'ten %2.5 düşüşte çık
                 peak = pos.get('peak_price', avg_price)
                 if price > peak:
                     peak = price
-                    positions[symbol]['peak_price'] = price
-                    from bot import save_positions
-                    save_positions(positions)   # zirveyi kalıcı yap (yoksa trailing çalışmaz)
+                    update_position(symbol, peak_price=price)  # zirveyi kilit altında kalıcı yap
 
                 if tp > 0 and pct >= tp * 0.4:
                     drawdown = (price - peak) / peak * 100 if peak > 0 else 0
@@ -708,12 +778,8 @@ class EdgeAgent:
         """Satış başarısız olsa bile pozisyonu sıfırla (elle silinen pozisyonlar için)."""
         if not sell_result.get('ok'):
             try:
-                from bot import save_positions
-                positions = load_positions()
-                if symbol in positions:
-                    positions[symbol]['qty'] = 0
-                    save_positions(positions)
-                    print(f'[Edge] {symbol} zorla sıfırlandı (satış başarısız ama pozisyon temizlendi)')
+                clear_position(symbol)
+                print(f'[Edge] {symbol} zorla temizlendi (satış başarısız ama pozisyon kaldırıldı)')
             except Exception as e:
                 print(f'[Edge] force_clear hata {symbol}: {e}')
 
@@ -757,7 +823,9 @@ class EdgeAgent:
     def _hourly_report(self):
         client    = get_client()
         positions = load_positions()
-        open_pos  = {s: p for s, p in positions.items() if p.get('qty', 0) > 0}
+        # Tüm pozisyonlar (diğer ajanların görünmesi için) — ama sayımda sadece EDGE'inkiler
+        all_pos  = {s: p for s, p in positions.items() if p.get('qty', 0) > 0}
+        edge_pos = {s: p for s, p in all_pos.items() if p.get('agent') == 'EDGE'}
 
         try:
             bal = get_usdt_balance(client)
@@ -766,7 +834,7 @@ class EdgeAgent:
 
         pos_lines = []
         total_pnl = 0.0
-        for sym, pos in open_pos.items():
+        for sym, pos in all_pos.items():
             try:
                 price  = get_price(client, sym)
                 avg    = pos.get('avg_price', price)
@@ -787,7 +855,7 @@ class EdgeAgent:
             f'📊 <b>Edge Agent Saatlik Rapor</b>\n'
             f'━━━━━━━━━━━━━━\n'
             f'💰 Bakiye: ${bal:.2f}\n'
-            f'📦 Açık Pozisyon: {len(open_pos)}/{MAX_POSITIONS}\n'
+            f'📦 Edge Pozisyon: {len(edge_pos)}/{MAX_POSITIONS} | Tümü: {len(all_pos)}\n'
         )
         if pos_lines:
             msg += '\n'.join(pos_lines) + '\n'

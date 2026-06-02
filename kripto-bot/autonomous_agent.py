@@ -14,8 +14,8 @@ Otonom Kripto Ajan v2 — Gerçek Zamanlı
 import time, datetime, threading, json, os, math
 from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
-                 load_positions, save_positions, load_trades, get_price,
-                 send_telegram, get_usdt_balance)
+                 load_positions, load_trades, get_price,
+                 send_telegram, get_usdt_balance, update_position, check_breakeven)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE    = 'agent_state.json'
@@ -259,17 +259,8 @@ def _score(client, sym, regime, weights):
 
 # ─── Risk Yönetimi ────────────────────────────────────────────────────────────
 
-def _position_size(balance, score, atr_pct, is_real, max_positions):
-    risk_per_trade = 0.01 if is_real else 0.02
-    sl_pct_est     = max(atr_pct * 1.5, 1.5) / 100
-    raw_size       = balance * risk_per_trade / sl_pct_est
-    multiplier = max(0.4, min(1.0, (score - 5.0) / 4.0))
-    size       = raw_size * multiplier
-    max_pct  = 0.05 if is_real else 0.10
-    size     = min(size, balance * max_pct)
-    per_slot = balance / max_positions * 0.30
-    size     = min(size, per_slot)
-    return max(10.0, round(size, 2))
+# NOT: Eski Kelly tabanlı _position_size kaldırıldı — artık tüm ajanlar
+# bot.position_size_by_score (ortak skor-bazlı kural) kullanıyor. Ölü koddu.
 
 
 def _daily_loss_ok(trades, balance_start, balance_now, max_loss_pct=8.0):
@@ -305,6 +296,9 @@ def _exit_decision(client, sym, pos, regime, live_price=None):
 
         if change >= tp:         return 'KAR HEDEFİ'
         if change <= -sl:        return 'STOP LOSS'
+
+        # Başabaş koruması: +%2 görüldüyse bir daha net zarara dönmesin
+        if check_breakeven(sym, pos, change): return 'BAŞABAŞ'
 
         if pos.get('check_momentum', False):
             try:
@@ -344,8 +338,10 @@ class AutonomousAgent:
     MONITOR_INTERVAL = 3
     MOMENTUM_EVERY   = 20
     MAX_POSITIONS    = 6
-    MIN_SCORE        = 5.2
+    MIN_SCORE        = 6.0   # 5.5→6.0: korku ortamında düşük skora güvenme
+    MIN_SCORE_SIDEWAY = 6.5  # SIDEWAYS rejimde daha katı eşik
     DAILY_LOSS_LIMIT = 8.0
+    FG_MIN           = 30    # Fear & Greed bu değerin altında yeni alım yok
 
     def __init__(self):
         self.running     = False
@@ -369,7 +365,7 @@ class AutonomousAgent:
     def _save(self):
         try:
             with open(STATE_FILE, 'w') as f: json.dump(self.state, f, indent=2)
-        except Exception: pass
+        except Exception as e: print(f'[Otonom] state kaydı başarısız: {e}')
 
     def _bl(self, sym): return time.time() < self.state['blacklist'].get(sym, 0)
     def _add_bl(self, sym, h=4): self.state['blacklist'][sym] = time.time() + h * 3600
@@ -394,6 +390,7 @@ class AutonomousAgent:
             f"🛡 Günlük Kayıp Limiti: -%{self.DAILY_LOSS_LIMIT}\n"
             f"⚡ Pozisyon Takip: her {self.MONITOR_INTERVAL}s\n"
             f"🔍 Fırsat Tarama: her {self.SCAN_INTERVAL}s\n"
+            f"⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)\n"
             "Piyasa izleniyor..."
         )
 
@@ -406,6 +403,7 @@ class AutonomousAgent:
         threading.Thread(target=self._scanner_loop,  daemon=True).start()
         threading.Thread(target=self._hourly_loop,   daemon=True).start()
         threading.Thread(target=self._daily_loop,    daemon=True).start()
+        threading.Thread(target=self._weekly_loop,   daemon=True).start()
         threading.Thread(target=self._weight_loop,   daemon=True).start()
         threading.Thread(target=self._day_reset_loop, daemon=True).start()
 
@@ -419,7 +417,7 @@ class AutonomousAgent:
                 client    = get_client()
                 positions = load_positions()
                 regime    = self.state.get('last_regime', 'SIDEWAYS')
-                changed   = False
+                state_dirty = False
 
                 for sym, pos in list(positions.items()):
                     if pos.get('qty', 0) <= 0: continue
@@ -432,27 +430,25 @@ class AutonomousAgent:
 
                     reason = _exit_decision(client, sym, pos, regime)
 
-                    # _exit_decision peak_price/trail_active'i güncellediyse diske yaz
+                    # _exit_decision peak_price/trail_active'i güncellediyse SADECE
+                    # bu sembolü kilit altında yaz (tüm dict'i yazmak lost-update yapardı)
                     if pos.get('peak_price') != pre_peak or pos.get('trail_active') != pre_trail:
-                        changed = True
+                        update_position(sym, peak_price=pos.get('peak_price'),
+                                        trail_active=pos.get('trail_active', False))
 
                     if reason:
-                        positions[sym] = pos
-                        is_sl = 'STOP' in reason
-                        src   = 'OTONOM SL' if is_sl else 'OTONOM'
-                        res = execute_sell(client, sym, 100, source=src, period=reason)
+                        # SL etiketi/blacklist süresi GERÇEKLEŞEN PnL'e göre belirlenir;
+                        # kârlı bir 'TRAIL STOP' artık SL gibi cezalandırılmaz.
+                        res = execute_sell(client, sym, 100, source='OTONOM', period=reason)
                         if res.get('ok'):
-                            positions[sym]['qty'] = 0  # local dict'i hemen güncelle
                             pnl = res.get('pnl', 0)
+                            is_loss = pnl < 0
                             self.state['total_pnl'] = round(self.state.get('total_pnl',0) + pnl, 2)
-                            self._add_bl(sym, 8 if is_sl else 2)
+                            self._add_bl(sym, 8 if is_loss else 2)
                             self._track_signal(pos, pnl)
-                        changed = True
-                    else:
-                        positions[sym] = pos
+                            state_dirty = True
 
-                if changed:
-                    save_positions(positions)
+                if state_dirty:
                     self._save()
 
             except Exception as e:
@@ -470,6 +466,12 @@ class AutonomousAgent:
                     from manager_agent import ceo_flag
                     if not ceo_flag(cfg, 'otonom_enabled', True):
                         print('[Otonom] CEO tarafından durduruldu, tarama atlandı')
+                        time.sleep(self.SCAN_INTERVAL)
+                        continue
+
+                    from bot import is_trading_halted
+                    if is_trading_halted(client):
+                        print('[Otonom] Global devre kesici aktif — yeni alım yok')
                         time.sleep(self.SCAN_INTERVAL)
                         continue
 
@@ -492,6 +494,23 @@ class AutonomousAgent:
                         time.sleep(self.SCAN_INTERVAL)
                         continue
 
+                    # Fear & Greed filtresi — aşırı korkuda yanlış sinyal fazla çıkar
+                    try:
+                        import urllib.request as _ur
+                        with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+                            _fg = int(json.loads(_r.read())['data'][0]['value'])
+                        if _fg < self.FG_MIN:
+                            print(f'[Otonom] Fear & Greed={_fg} < {self.FG_MIN} — tarama atlandı')
+                            self.state['scan_count'] += 1
+                            self._save()
+                            time.sleep(self.SCAN_INTERVAL)
+                            continue
+                    except Exception:
+                        _fg = 50  # API erişilemezse engelleme
+
+                    # SIDEWAYS rejimde daha katı skor eşiği
+                    min_sc = self.MIN_SCORE_SIDEWAY if regime == 'SIDEWAYS' else self.MIN_SCORE
+
                     positions = load_positions()
                     held = {s for s, p in positions.items() if p.get('qty',0) > 0}
                     if len(held) >= self.MAX_POSITIONS:
@@ -507,9 +526,26 @@ class AutonomousAgent:
                     best_sym, best_sc = None, None
                     for sym in candidates[:55]:
                         sc = _score(client, sym, regime, w)
-                        if sc and sc['total'] >= self.MIN_SCORE:
-                            if best_sc is None or sc['total'] > best_sc['total']:
-                                best_sym, best_sc = sym, sc
+                        if not sc or sc['total'] < min_sc:
+                            continue
+                        # Veto 1: RSI aşırı alım → pump tepesine alım riski
+                        if sc.get('rsi1h', 0) > 70:
+                            print(f'[Otonom] {sym} veto: RSI1h={sc["rsi1h"]} (>70 aşırı alım)')
+                            continue
+                        # Veto 2: Hacim çok yüksek → pump zaten olmuş, geç kalındı
+                        if sc.get('vol_ratio', 0) > 8:
+                            print(f'[Otonom] {sym} veto: hacim={sc["vol_ratio"]:.1f}x (>8x geç giriş)')
+                            continue
+                        # Veto 3: Hacim verisi sıfır → API/testnet veri hatası, güvenilmez
+                        if sc.get('vol_ratio', -1) == 0:
+                            print(f'[Otonom] {sym} veto: hacim=0 (veri hatası)')
+                            continue
+                        # Veto 4: ADX < 18 → trend yok, yatay piyasa gürültüsü
+                        if sc.get('adx', 0) < 18:
+                            print(f'[Otonom] {sym} veto: ADX={sc["adx"]:.0f} (<18 trend yok)')
+                            continue
+                        if best_sc is None or sc['total'] > best_sc['total']:
+                            best_sym, best_sc = sym, sc
 
                     if best_sym:
                         atr_pct  = best_sc.get('atr_pct', 2.0)
@@ -522,19 +558,19 @@ class AutonomousAgent:
                             res = execute_buy(client, best_sym, amount,
                                               source='OTONOM', period='Ajan', agent='OTONOM')
                             if res.get('ok'):
-                                sl  = max(1.5, min(6.0, atr_pct * 1.5))
-                                tp  = max(3.0, min(18.0, atr_pct * 3.0))
-                                positions = load_positions()
-                                if best_sym in positions:
-                                    positions[best_sym].update({
-                                        'agent': 'OTONOM',
-                                        'tp_pct': tp, 'sl_pct': sl,
-                                        'trail_active': False,
-                                        'peak_price': res['price'],
-                                        'buy_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                        'open_score': best_sc['total'],
-                                    })
-                                save_positions(positions)
+                                # TP/SL execute_buy içinde hesaplanıp positions.json'a yazıldı.
+                                # Sadece agent meta alanlarını ekle (tp/sl yeniden hesaplama yok).
+                                pos = load_positions().get(best_sym, {})
+                                tp  = pos.get('tp_pct', 5.0)
+                                sl  = pos.get('sl_pct', 2.5)
+                                update_position(
+                                    best_sym,
+                                    agent='OTONOM',
+                                    trail_active=False,
+                                    peak_price=res['price'],
+                                    buy_time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                    open_score=best_sc['total'],
+                                )
                                 self._send_buy_rationale(best_sym, best_sc, amount, tp, sl, regime, is_real)
 
                     self.state['scan_count'] += 1
@@ -628,6 +664,15 @@ class AutonomousAgent:
                 send_telegram('🧹 Toz pozisyonlar temizlendi: ' + ', '.join(removed))
         except Exception as e:
             print(f'[Otonom] Toz temizlik hatası: {e}')
+        # Gerçek bakiyeyle uzlaştırma — hayalet pozisyonları temizle (gerçek hesapta kritik)
+        try:
+            from bot import reconcile_positions, send_telegram
+            ghosts = reconcile_positions(client)
+            if ghosts:
+                send_telegram('🔧 Hayalet pozisyon düzeltildi (gerçek bakiye ≠ defter): '
+                              + ', '.join(ghosts))
+        except Exception as e:
+            print(f'[Otonom] Reconcile hatası: {e}')
         positions = load_positions()
         try:
             balance = get_usdt_balance(client)
@@ -663,6 +708,22 @@ class AutonomousAgent:
         bl = [k for k,v in self.state.get('blacklist',{}).items() if v > time.time()]
         if bl:
             lines.append(f"\n⛔ Kara liste ({len(bl)}): {', '.join(bl[:5])}")
+
+        # Durum tanısı: neden alım yapılmıyor?
+        try:
+            import urllib.request as _ur
+            with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
+                _fg = int(json.loads(_r.read())['data'][0]['value'])
+        except Exception:
+            _fg = -1
+        tr_hour = (datetime.datetime.utcnow().hour + 3) % 24
+        time_ok = not (13 <= tr_hour < 20)
+        fg_ok   = _fg < 0 or _fg >= self.FG_MIN
+        lines.append(f"\n🌡 F&G: {_fg if _fg>=0 else '?'} | "
+                     f"⏰ TR: {tr_hour:02d}:xx {'✅' if time_ok else '🚫 KAPALI'} | "
+                     f"Rejim eşik: {self.MIN_SCORE_SIDEWAY if regime=='SIDEWAYS' else self.MIN_SCORE}/10"
+                     + ('' if fg_ok else f' | F&G 🚫 ({_fg}<{self.FG_MIN})'))
+
         send_telegram('\n'.join(lines))
 
     def _hourly_loop(self):
@@ -709,6 +770,97 @@ class AutonomousAgent:
                 send_telegram('\n'.join(lines))
             except Exception as e:
                 print(f'[Daily] {e}')
+
+    def _weekly_loop(self):
+        """Her Pazar 09:00 (sunucu saati) haftalık performans raporu gönderir."""
+        now = datetime.datetime.now()
+        days_until_sunday = (6 - now.weekday()) % 7
+        if days_until_sunday == 0 and now.hour >= 9:
+            days_until_sunday = 7
+        next_sunday = (now + datetime.timedelta(days=days_until_sunday)).replace(
+            hour=9, minute=0, second=0, microsecond=0)
+        time.sleep(max(0, (next_sunday - now).total_seconds()))
+        while self.running:
+            try:
+                self._send_weekly_report()
+            except Exception as e:
+                print(f'[Weekly] {e}')
+            time.sleep(7 * 24 * 3600)
+
+    def _send_weekly_report(self):
+        trades   = load_trades()
+        week_ago = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+        sells    = [t for t in trades
+                    if t.get('type') == 'sell'
+                    and t.get('time', '') >= week_ago
+                    and not t.get('source', '').startswith('CEO_')]
+
+        if not sells:
+            send_telegram('📅 <b>HAFTALIK ÖZET</b>\n━━━━━━━━━━━━━━\nBu hafta kapalı işlem yok.')
+            return
+
+        wins      = [t for t in sells if t.get('pnl', 0) > 0]
+        losses    = [t for t in sells if t.get('pnl', 0) <= 0]
+        total_pnl = sum(t.get('pnl', 0) for t in sells)
+        gross_win = sum(t.get('pnl', 0) for t in wins)
+        gross_loss = abs(sum(t.get('pnl', 0) for t in losses))
+        pf        = round(gross_win / gross_loss, 2) if gross_loss > 0 else 99.0
+        wr        = round(len(wins) / len(sells) * 100, 1)
+        avg_win   = round(gross_win  / len(wins),   2) if wins   else 0
+        avg_loss  = round(gross_loss / len(losses), 2) if losses else 0
+
+        # Kümülatif PnL eğrisinden max drawdown
+        sorted_sells = sorted(sells, key=lambda x: x.get('time', ''))
+        equity = peak = max_dd = 0.0
+        for t in sorted_sells:
+            equity += t.get('pnl', 0)
+            if equity > peak: peak = equity
+            dd = peak - equity
+            if dd > max_dd: max_dd = dd
+
+        # Ajan bazında kırılım
+        buckets = {}
+        for t in sells:
+            src = (t.get('source') or '').upper()
+            if   'OTONOM'       in src: ag = 'OTONOM'
+            elif 'EDGE'         in src: ag = 'EDGE'
+            elif 'BREAKOUT'     in src: ag = 'BREAKOUT'
+            elif 'INDICATOR'    in src: ag = 'INDICATOR'
+            elif 'WYCKOFF'      in src: ag = 'WYCKOFF'
+            elif 'ACCUMULATION' in src: ag = 'BİRİKİM'
+            else:                       ag = 'DİĞER'
+            b = buckets.setdefault(ag, {'n': 0, 'w': 0, 'pnl': 0.0})
+            b['n'] += 1
+            if t.get('pnl', 0) > 0: b['w'] += 1
+            b['pnl'] += t.get('pnl', 0)
+
+        pnl_str = f"+${round(total_pnl,2)}" if total_pnl >= 0 else f"-${abs(round(total_pnl,2))}"
+        lines = [
+            "📅 <b>HAFTALIK PERFORMANS ÖZETI</b>",
+            "━━━━━━━━━━━━━━",
+            f"📊 {len(sells)} işlem  |  %{wr} kazanma",
+            f"💹 Net PnL: <b>{pnl_str}</b>",
+            f"⚖️ Profit Factor: <b>{pf}</b>  (>1 = kârlı)",
+            f"📈 Ort Kazanç: +${avg_win}  |  📉 Ort Kayıp: -${avg_loss}",
+            f"🕳 Max Drawdown: -${round(max_dd,2)}",
+            "",
+            "🤖 <b>Ajan Kırılımı:</b>",
+        ]
+        for ag, b in sorted(buckets.items(), key=lambda x: x[1]['pnl'], reverse=True):
+            ag_wr  = round(b['w'] / b['n'] * 100) if b['n'] else 0
+            p      = b['pnl']
+            p_str  = f"+${round(p,2)}" if p >= 0 else f"-${abs(round(p,2))}"
+            em     = '🟢' if p >= 0 else '🔴'
+            lines.append(f"  {em} {ag}: {b['n']}iş  %{ag_wr}WR  {p_str}")
+
+        if total_pnl > 0 and pf >= 1.3:
+            lines += ["", "✅ <b>Yorum:</b> Edge pozitif, strateji çalışıyor."]
+        elif total_pnl >= 0 and pf < 1.3:
+            lines += ["", "⚠️ <b>Yorum:</b> Kârlı ama profit factor zayıf — kayıplar büyük."]
+        else:
+            lines += ["", "🔴 <b>Yorum:</b> Zarar hafta — en çok kaybeden ajanı gözden geçir."]
+
+        send_telegram('\n'.join(lines))
 
     def _track_signal(self, pos, pnl):
         key  = f"sc_{int(pos.get('open_score',0))}"

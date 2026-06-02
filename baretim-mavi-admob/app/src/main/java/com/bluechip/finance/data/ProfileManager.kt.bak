@@ -1,0 +1,48 @@
+package com.bluechip.finance.data
+
+import android.content.Context
+import android.content.SharedPreferences
+
+data class UserProfile(
+    val name: String = "",
+    val grossSalary: Double = 0.0,
+    val netSalary: Double = 0.0,       // Net maaş
+    val salaryDay: Int = 0,            // Maaş günü (1-31, 0=ayarlanmadı)
+    val startDateMillis: Long = 0L,
+    val birthDateMillis: Long = 0L,
+    val isUnderground: Boolean = false,
+    val isLoggedIn: Boolean = false
+)
+
+class ProfileManager(context: Context) {
+    private val prefs: SharedPreferences = context.getSharedPreferences("user_profile", Context.MODE_PRIVATE)
+
+    fun save(profile: UserProfile) {
+        prefs.edit()
+            .putString("name", profile.name)
+            .putFloat("gross_salary", profile.grossSalary.toFloat())
+            .putFloat("net_salary", profile.netSalary.toFloat())
+            .putInt("salary_day", profile.salaryDay)
+            .putLong("start_date", profile.startDateMillis)
+            .putLong("birth_date", profile.birthDateMillis)
+            .putBoolean("underground", profile.isUnderground)
+            .putBoolean("logged_in", true)
+            .apply()
+    }
+
+    fun load(): UserProfile {
+        return UserProfile(
+            name = prefs.getString("name", "") ?: "",
+            grossSalary = prefs.getFloat("gross_salary", 0f).toDouble(),
+            netSalary = prefs.getFloat("net_salary", 0f).toDouble(),
+            salaryDay = prefs.getInt("salary_day", 0),
+            startDateMillis = prefs.getLong("start_date", 0L),
+            birthDateMillis = prefs.getLong("birth_date", 0L),
+            isUnderground = prefs.getBoolean("underground", false),
+            isLoggedIn = prefs.getBoolean("logged_in", false)
+        )
+    }
+
+    fun isLoggedIn(): Boolean = prefs.getBoolean("logged_in", false)
+    fun logout() { prefs.edit().clear().apply() }
+}

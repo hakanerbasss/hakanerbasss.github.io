@@ -1,0 +1,102 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
+}
+
+android {
+    namespace 'com.bluechip.finance'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.bluechip.finance"
+        minSdk 24
+        targetSdk 35
+        versionCode 118
+        versionName "2.65"
+
+        def localProps = new Properties()
+        def localPropsFile = rootProject.file('local.properties')
+        if (localPropsFile.exists()) localProps.load(localPropsFile.newDataInputStream())
+        buildConfigField "String", "NEWS_API_KEY", "\"${localProps.getProperty('NEWS_API_KEY', '')}\""
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.5.4'
+    }
+}
+
+dependencies {
+    //tarih secici
+    implementation("com.github.commandiron:WheelPickerCompose:1.1.11")
+
+    implementation "androidx.lifecycle:lifecycle-process:2.8.7"
+    implementation "androidx.work:work-runtime-ktx:2.9.0"
+    // Core
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
+
+    // Compose BOM
+    def composeBom = platform('androidx.compose:compose-bom:2024.02.00')
+    implementation composeBom
+
+    // Compose
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.compose.animation:animation'
+
+    // Activity & Navigation Compose
+    implementation 'androidx.activity:activity-compose:1.8.2'
+    implementation 'androidx.navigation:navigation-compose:2.7.7'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // Retrofit (API için)
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+
+    // Coil Compose (görseller için)
+    implementation 'io.coil-kt:coil-compose:2.6.0'
+
+    // Firebase
+    implementation platform('com.google.firebase:firebase-bom:33.0.0')
+    implementation 'com.google.firebase:firebase-config-ktx'
+    implementation 'com.google.firebase:firebase-analytics-ktx'
+
+    // AdMob
+    implementation 'com.android.billingclient:billing-ktx:7.0.0'
+
+    // Unity Ads SDK
+    implementation 'com.unity3d.ads:unity-ads:4.16.6'
+    // In-App Review
+    implementation 'com.google.android.play:review-ktx:2.0.1'
+
+    // Debug
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+}
+
+// Protobuf surum catismasini onler (Firebase BOM 33 + Unity Ads 4.16.4)
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.protobuf:protobuf-javalite:3.25.3'
+    }
+}

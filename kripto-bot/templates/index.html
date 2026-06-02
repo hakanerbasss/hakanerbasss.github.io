@@ -82,7 +82,7 @@ input:focus,select:focus{border-color:#f0a500;}
 <div class="page active" id="tab-dashboard">
   <div class="grid" style="margin-top:12px;">
     <div class="card"><h3>Toplam Bakiye</h3><div class="val" id="totalCurrent">—</div></div>
-    <div class="card"><h3>Kâr/Zarar</h3><div class="val" id="totalPnl">—</div></div>
+    <div class="card"><h3>Açık Poz. K/Z <span style="font-size:11px;opacity:.6">(kâğıt)</span></h3><div class="val" id="totalPnl">—</div></div>
     <div class="card"><h3>Başarı Oranı</h3><div class="val" id="successRate">—</div></div>
     <div class="card"><h3>Toplam İşlem</h3><div class="val" id="totalTrades">—</div></div>
     <div class="card"><h3>Piyasa Kırmızı</h3><div class="val red" id="redPct">—</div></div>
@@ -90,6 +90,7 @@ input:focus,select:focus{border-color:#f0a500;}
     <div class="card"><h3>USDT Bakiye</h3><div class="val green" id="usdtBalance">—</div></div>
     <div class="card"><h3>Pozisyonlarda</h3><div class="val" id="posValue">—</div></div>
     <div class="card" style="border:1px solid #f0c040;"><h3>💼 Toplam Portföy</h3><div class="val yellow" id="totalPortfolio">—</div></div>
+    <div class="card" style="border:1px solid #16a34a;"><h3>💰 Gerçekleşen K/Z <span style="font-size:11px;opacity:.6">(gerçek)</span></h3><div class="val" id="realizedPnl">—</div></div>
   </div>
 
   <div class="section">
@@ -459,8 +460,9 @@ input:focus,select:focus{border-color:#f0a500;}
           ('otonom',    'otonom_enabled',     True,  '🤖 Otonom Ajan',    'BTC rejim + teknik analiz'),
           ('indicator', 'indicator_enabled',  True,  '📐 Indicator',      'UT Bot otomatik tarama'),
           ('wyckoff',   'wyckoff_enabled',    True,  '📈 Wyckoff',        'Akümülasyon deseni tespiti'),
-          ('breakout',  'breakout_enabled',   True,  '🚀 Breakout',       'Hacim spike + trailing stop (sabit TP yok)'),
-          ('ceo',       'ceo_agent_enabled',  False, '👔 CEO Agent',      'Risk yöneticisi (DeepSeek)'),
+          ('breakout',     'breakout_enabled',    True,  '🚀 Breakout',       'Hacim spike + trailing stop (sabit TP yok)'),
+          ('accumulation', 'accumulation_enabled', True, '🔍 Birikim',        'Sessiz birikim: hacim squeeze + BB sıkışması'),
+          ('ceo',          'ceo_agent_enabled',   False, '👔 CEO Agent',      'Risk yöneticisi (DeepSeek)'),
         ] %}
         {% for key, cfg_key, def_val, label, desc in agent_rows %}
           {% set en = cfg.get(cfg_key, def_val) %}
@@ -730,6 +732,12 @@ function loadDashboard() {
     const pnlEl = document.getElementById('totalPnl');
     pnlEl.textContent = (p.total_pnl>=0?'+':'')+'$'+p.total_pnl.toFixed(2)+' ('+p.total_pnl_pct+'%)';
     pnlEl.className = 'val '+(p.total_pnl>=0?'green':'red');
+    const rp = (p.realized_pnl||0);
+    const rpEl = document.getElementById('realizedPnl');
+    if (rpEl) {
+      rpEl.textContent = (rp>=0?'+':'')+'$'+rp.toFixed(2);
+      rpEl.className = 'val '+(rp>=0?'green':'red');
+    }
     document.getElementById('successRate').textContent = p.success_rate+'%';
     document.getElementById('totalTrades').textContent = p.total_trades;
     document.getElementById('redPct').textContent = d.market.red_pct+'%';
@@ -1011,6 +1019,7 @@ const IND_COLORS = {
   'EDGE':             '#7c3aed',
   'OTONOM':           '#0891b2',
   'BREAKOUT':         '#dc2626',
+  'ACCUMULATION':     '#d97706',
   'WYCKOFF':          '#16a34a',
   'INDICATOR-UTBOT':  '#1d4ed8',
   'INDICATOR-SMART':  '#0369a1',
@@ -1024,7 +1033,7 @@ const IND_COLORS = {
 };
 
 const AGENT_ORDER = [
-  'EDGE', 'OTONOM', 'BREAKOUT', 'WYCKOFF',
+  'EDGE', 'OTONOM', 'BREAKOUT', 'ACCUMULATION', 'WYCKOFF',
   'INDICATOR-UTBOT', 'INDICATOR-SMART', 'INDICATOR-SEANS',
   'UT BOT', 'SEANS', 'SMART', 'MANUEL', 'DİĞER',
 ];
