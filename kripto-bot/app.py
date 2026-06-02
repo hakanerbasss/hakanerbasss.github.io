@@ -19,6 +19,8 @@ from accumulation_agent import (start_accumulation_agent, stop_accumulation_agen
                                  accumulation_agent_status)
 from manager_agent import (start_ceo_agent, stop_ceo_agent, ceo_agent_status,
                             trigger_ceo_review, restart_ceo_agent)
+from funding_agent import (start_funding_agent, stop_funding_agent,
+                            funding_agent_status)
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -351,6 +353,10 @@ def settings():
     cfg['sl_cooldown_hours']    = float(request.form.get('sl_cooldown_hours', 3))
     if request.form.get('deepseek_api_key', '').strip():
         cfg['deepseek_api_key'] = request.form.get('deepseek_api_key', '').strip()
+    if request.form.get('funding_futures_key', '').strip():
+        cfg['funding_futures_key']    = request.form.get('funding_futures_key', '').strip()
+        cfg['funding_futures_secret'] = request.form.get('funding_futures_secret', '').strip()
+    cfg['funding_allocation_usdt'] = float(request.form.get('funding_allocation_usdt', cfg.get('funding_allocation_usdt', 500)))
     old_ceo_interval             = cfg.get('ceo_interval_hours', 1)
     cfg['ceo_interval_hours']    = int(request.form.get('ceo_interval_hours', 1))
     cfg['report_interval_hours'] = int(request.form.get('report_interval_hours', 1))
@@ -1115,6 +1121,7 @@ def api_agent_toggle():
         'breakout':     'breakout_enabled',
         'accumulation': 'accumulation_enabled',
         'ceo':          'ceo_agent_enabled',
+        'funding':      'funding_agent_enabled',
     }
     if agent not in KEY_MAP:
         return jsonify({'ok': False, 'error': 'Bilinmeyen ajan'})
@@ -1144,6 +1151,9 @@ def api_agent_toggle():
     elif agent == 'ceo':
         if enabled: start_ceo_agent()
         else: stop_ceo_agent()
+    elif agent == 'funding':
+        if enabled: start_funding_agent()
+        else: stop_funding_agent()
 
     return jsonify({'ok': True, 'agent': agent, 'enabled': enabled})
 
@@ -1168,6 +1178,24 @@ def api_bot_control():
         subprocess.Popen(['systemctl', 'restart', 'kripto-bot'])
         return jsonify({'ok': True, 'msg': '🔄 Bot yeniden başlatılıyor...'})
     return jsonify({'ok': False, 'error': 'Bilinmeyen eylem'})
+
+# ── Funding Agent API ────────────────────────────
+@app.route('/funding/status')
+@login_required
+def funding_status_api():
+    return jsonify(funding_agent_status())
+
+@app.route('/funding/start', methods=['POST'])
+@login_required
+def funding_start():
+    ok = start_funding_agent()
+    return jsonify({'ok': ok, 'msg': 'Funding Agent başlatıldı' if ok else 'Başlatılamadı (key eksik veya zaten çalışıyor)'})
+
+@app.route('/funding/stop', methods=['POST'])
+@login_required
+def funding_stop():
+    stop_funding_agent()
+    return jsonify({'ok': True})
 
 # ── CEO Manuel Analiz API ─────────────────────────
 @app.route('/api/ceo_analyze_now', methods=['POST'])
@@ -1244,4 +1272,6 @@ if __name__ == '__main__':
     cfg = load_config()
     if cfg.get('ceo_agent_enabled', False):
         start_ceo_agent()     # CEO: ajan performans analizi + parametre optimizasyonu
+    if cfg.get('funding_agent_enabled', False):
+        start_funding_agent() # Funding: delta-nötr funding rate toplama
     app.run(host='0.0.0.0', port=5000, debug=False)

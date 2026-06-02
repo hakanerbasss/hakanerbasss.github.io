@@ -31,6 +31,7 @@ jobs:
             cp kripto-bot/wyckoff_agent.py $DEST/ 2>/dev/null || true
             cp kripto-bot/breakout_agent.py $DEST/ 2>/dev/null || true
             cp kripto-bot/manager_agent.py $DEST/ 2>/dev/null || true
+            cp kripto-bot/funding_agent.py $DEST/ 2>/dev/null || true
             cp kripto-bot/accumulation_agent.py $DEST/ 2>/dev/null || true
             cp kripto-bot/trends_backtest.py $DEST/ 2>/dev/null || true
             cp kripto-bot/seans_strategy.py $DEST/ 2>/dev/null || true
