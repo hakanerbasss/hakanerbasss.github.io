@@ -76,6 +76,7 @@ input:focus,select:focus{border-color:#f0a500;}
   <div class="tab" onclick="showTab('trades')">İşlemler</div>
   <div class="tab" onclick="showTab('settings')">Ayarlar</div>
   <div class="tab" onclick="showTab('chart')">📊 Grafik</div>
+  <div class="tab" onclick="showTab('funding')">💹 Funding</div>
 </div>
 
 <!-- DASHBOARD -->
@@ -371,6 +372,107 @@ input:focus,select:focus{border-color:#f0a500;}
     </div>
     <canvas id="chartCanvas" style="width:100%;height:400px;background:#111;border-radius:8px;display:block;"></canvas>
   </div>
+</div>
+
+<!-- FUNDING -->
+<div class="page" id="tab-funding">
+
+  <!-- Özet Kartlar -->
+  <div class="grid" style="margin-top:12px;">
+    <div class="card" id="fndStatusCard">
+      <h3>Ajan Durumu</h3>
+      <div class="val" id="fndStatus">—</div>
+    </div>
+    <div class="card">
+      <h3>Toplam Kazanılan</h3>
+      <div class="val green" id="fndTotal">$0.000000</div>
+    </div>
+    <div class="card">
+      <h3>Açık Pozisyon</h3>
+      <div class="val blue" id="fndOpenCount">0</div>
+    </div>
+    <div class="card">
+      <h3>Tarama Sayısı</h3>
+      <div class="val" id="fndScanCount">0</div>
+    </div>
+  </div>
+
+  <!-- Kontrol -->
+  <div class="section">
+    <h2>🎮 Ajan Kontrolü</h2>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="fundingToggle(true)">▶ Başlat</button>
+      <button class="btn btn-red"   onclick="fundingToggle(false)">⏹ Durdur</button>
+      <button class="btn btn-blue"  onclick="loadFunding()">🔄 Yenile</button>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:#888;" id="fndInfo">
+      Strateji: Spot LONG + Futures SHORT → fiyat riski sıfır, funding ödemesi toplanır (her 8 saatte bir).
+    </div>
+  </div>
+
+  <!-- Açık Pozisyonlar -->
+  <div class="section">
+    <h2>📊 Açık Pozisyonlar</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Coin</th>
+          <th>Boyut</th>
+          <th>Giriş Fiyatı</th>
+          <th>Rate (8h)</th>
+          <th>Toplanan Funding</th>
+          <th>Ödeme</th>
+          <th>Açılış</th>
+        </tr>
+      </thead>
+      <tbody id="fndPositionsTable">
+        <tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Açık pozisyon yok</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Kapatılan Pozisyonlar -->
+  <div class="section">
+    <h2>📋 Son Kapatılan Pozisyonlar</h2>
+    <table>
+      <thead>
+        <tr><th>Coin</th><th>Kapanış</th><th>Sebep</th><th>Kazanılan</th><th>Ödeme</th></tr>
+      </thead>
+      <tbody id="fndClosedTable">
+        <tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">Henüz kapatılan yok</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Ayarlar -->
+  <div class="section">
+    <h2>⚙️ Funding Ayarları</h2>
+    <div style="background:#1e3a5f22;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:11px;color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔑 Futures Testnet API</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label>Futures API Key</label>
+        <input type="text" id="fndApiKey" value="{{ cfg.get('funding_futures_key','') }}" placeholder="Futures testnet key">
+      </div>
+      <div class="form-group">
+        <label>Futures API Secret</label>
+        <input type="password" id="fndApiSecret" value="{{ cfg.get('funding_futures_secret','') }}" placeholder="Futures testnet secret">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Pozisyon Başına USDT</label>
+        <input type="number" id="fndAlloc" value="{{ cfg.get('funding_allocation_usdt', 500) }}" min="10" step="10">
+        <div style="font-size:11px;color:#888;margin-top:3px;">Her delta-nötr pozisyon için ayrılan tutar</div>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-orange" onclick="saveFundingSettings()">💾 Ayarları Kaydet</button>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:#888;">
+      ℹ️ Key kaydedildikten sonra ajanı yeniden başlatın.
+    </div>
+  </div>
+
 </div>
 
 <!-- AYARLAR -->
@@ -707,12 +809,13 @@ let top50Data = [];
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  const tabs = ['dashboard','coins','trades','settings','chart'];
+  const tabs = ['dashboard','coins','trades','settings','chart','funding'];
   document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'trades') loadTrades();
   if (name === 'coins') renderCoins();
   if (name === 'chart') { initChartSymbols(); loadChart(); if(chartAutoRefresh) clearInterval(chartAutoRefresh); chartAutoRefresh = setInterval(loadChart, 60000); }
+  if (name === 'funding') loadFunding();
 }
 
 function toast(msg, ok=true) {
@@ -1209,6 +1312,105 @@ function ceoAnalyze() {
   fetch('/api/ceo_analyze_now', {method:'POST'})
     .then(r => r.json())
     .then(d => { if(d.ok) toast(d.msg); else toast(d.error, false); });
+}
+
+// ── Funding Agent ────────────────────────────────
+function loadFunding() {
+  fetch('/funding/status').then(r => r.json()).then(d => {
+    // Durum kartı
+    const statusEl = document.getElementById('fndStatus');
+    const cardEl   = document.getElementById('fndStatusCard');
+    if (d.running) {
+      statusEl.textContent = '🟢 Çalışıyor';
+      statusEl.className = 'val green';
+    } else if (d.enabled) {
+      statusEl.textContent = '🟡 Durdu';
+      statusEl.className = 'val yellow';
+    } else {
+      statusEl.textContent = '⚫ Kapalı';
+      statusEl.className = 'val';
+    }
+
+    document.getElementById('fndTotal').textContent     = '$' + (d.total_funding || 0).toFixed(6);
+    document.getElementById('fndOpenCount').textContent = d.open_count || 0;
+    document.getElementById('fndScanCount').textContent = d.scan_count || 0;
+
+    // Açık pozisyonlar
+    const posBody = document.getElementById('fndPositionsTable');
+    const positions = d.positions || {};
+    const posKeys = Object.keys(positions);
+    if (!posKeys.length) {
+      posBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Açık pozisyon yok — ajan tarama yapana kadar bekleyin</td></tr>';
+    } else {
+      posBody.innerHTML = posKeys.map(sym => {
+        const p = positions[sym];
+        const opened = p.opened_at ? p.opened_at.replace('T',' ').substring(0,16) : '—';
+        return `<tr>
+          <td><b>${sym}</b></td>
+          <td>$${(p.usdt_size||0).toFixed(0)}</td>
+          <td>$${(0).toLocaleString()}</td>
+          <td class="${(p.last_rate||0)>0?'green':'red'}">${(p.last_rate||0).toFixed(4)}%</td>
+          <td class="green"><b>$${(p.collected||0).toFixed(6)}</b></td>
+          <td>${p.payments||0}</td>
+          <td style="font-size:11px;color:#888;">${opened} UTC</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Kapatılan log
+    const closedBody = document.getElementById('fndClosedTable');
+    const closed = d.closed_log || [];
+    if (!closed.length) {
+      closedBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">Henüz kapatılan yok</td></tr>';
+    } else {
+      closedBody.innerHTML = [...closed].reverse().map(c => {
+        const t = (c.closed_at||'').replace('T',' ').substring(0,16);
+        return `<tr>
+          <td><b>${c.symbol}</b></td>
+          <td style="font-size:11px;color:#888;">${t} UTC</td>
+          <td style="font-size:11px;">${c.reason||'—'}</td>
+          <td class="${(c.collected||0)>0?'green':'red'}">$${(c.collected||0).toFixed(6)}</td>
+          <td>${c.payments||0}</td>
+        </tr>`;
+      }).join('');
+    }
+  }).catch(() => toast('Funding durum alınamadı', false));
+}
+
+function fundingToggle(enable) {
+  const url = enable ? '/funding/start' : '/funding/stop';
+  fetch(url, {method:'POST'}).then(r => r.json()).then(d => {
+    toast(d.msg || (d.ok ? 'Tamam' : d.error), d.ok);
+    setTimeout(loadFunding, 1000);
+  });
+}
+
+function saveFundingSettings() {
+  const key    = document.getElementById('fndApiKey').value.trim();
+  const secret = document.getElementById('fndApiSecret').value.trim();
+  const alloc  = document.getElementById('fndAlloc').value;
+
+  const formData = new FormData();
+  if (key)    { formData.append('funding_futures_key', key); formData.append('funding_futures_secret', secret); }
+  formData.append('funding_allocation_usdt', alloc);
+  // Diğer mevcut ayarları koru
+  formData.append('api_key',           document.getElementById('cfgApiKey').value);
+  formData.append('api_secret',        document.getElementById('cfgApiSecret').value);
+  formData.append('real_api_key',      document.getElementById('cfgRealApiKey').value);
+  formData.append('real_api_secret',   document.getElementById('cfgRealApiSecret').value);
+  formData.append('testnet',           document.getElementById('cfgTestnet').checked ? 'on' : '');
+  formData.append('webhook_secret',    document.getElementById('cfgWebhookSecret').value);
+  formData.append('check_interval',    document.getElementById('cfgInterval').value);
+  formData.append('telegram_token',    document.getElementById('cfgTelegramToken').value);
+  formData.append('telegram_chat_id',  document.getElementById('cfgTelegramChatId').value);
+  formData.append('max_positions',     document.getElementById('cfgMaxPositions').value);
+  formData.append('sl_cooldown_hours', document.getElementById('cfgSlCooldown').value);
+  formData.append('report_interval_hours', document.getElementById('cfgReportInterval').value);
+  formData.append('ceo_interval_hours',    document.getElementById('cfgCeoInterval').value);
+
+  fetch('/settings', {method:'POST', body: formData})
+    .then(r => r.json())
+    .then(d => { if(d.ok) toast('Ayarlar kaydedildi'); else toast(d.error||'Hata', false); });
 }
 
 function drawChart(candles, trails, signals) {
