@@ -1,8 +1,8 @@
 import os
 
-# Instagram kimlik bilgileri
-INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
-INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
+# Telegram (gönderi önizleme için)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # DeepSeek API (caption üretimi için — platform.deepseek.com'dan al)
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
