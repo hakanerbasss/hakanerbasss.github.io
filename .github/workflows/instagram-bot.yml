@@ -39,7 +39,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add instagram-bot/public/ shop.html
+          git add instagram-bot/public/ shop.html || true
           git diff --staged --quiet && echo "Değişiklik yok" && exit 0
           git commit -m "chore: update post image and shop link [skip ci]"
           git push
@@ -48,7 +48,7 @@ jobs:
       - name: Wait for GitHub to serve image
         run: sleep 90
 
-      # Adım 4: Instagram Graph API ile yayınla
+      # Adım 4: Instagram feed postu + story
       - name: Post to Instagram
         env:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
@@ -58,7 +58,7 @@ jobs:
           python3 - <<'EOF'
           import os, sys
           sys.path.insert(0, "instagram-bot")
-          from instagram_graph import post_to_instagram
+          from instagram_graph import post_to_instagram, post_story_to_instagram
 
           token = os.environ.get("IG_ACCESS_TOKEN", "")
           user_id = os.environ.get("IG_USER_ID", "")
@@ -69,14 +69,24 @@ jobs:
               sys.exit(0)
 
           caption_file = "instagram-bot/public/latest_caption.txt"
-          if os.path.exists(caption_file):
-              caption = open(caption_file).read()
-          else:
-              caption = "🔥 Viral product! #viral #trending #deals"
+          caption = open(caption_file).read() if os.path.exists(caption_file) else "🔥 Viral product! #viral #trending #deals"
+
+          link_file = "instagram-bot/public/latest_link.txt"
+          affiliate_link = open(link_file).read().strip() if os.path.exists(link_file) else "https://hakanerbasss.github.io/shop"
 
           image_url = f"https://raw.githubusercontent.com/{repo}/main/instagram-bot/public/latest.jpg"
           print(f"Image URL: {image_url}")
 
+          # Feed postu
           ok = post_to_instagram(user_id, token, image_url, caption)
-          sys.exit(0 if ok else 1)
+          if not ok:
+              print("Feed postu başarısız.")
+              sys.exit(1)
+
+          # Story — 10 sn bekle, sonra at
+          import time
+          time.sleep(10)
+          post_story_to_instagram(user_id, token, image_url, affiliate_link)
+          # Story hata verse bile çıkış 0 — feed postu önemli olan
+          sys.exit(0)
           EOF

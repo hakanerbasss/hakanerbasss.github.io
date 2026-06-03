@@ -183,11 +183,14 @@ def run_once():
     os.makedirs(PUBLIC_DIR, exist_ok=True)
     public_image = os.path.join(PUBLIC_DIR, "latest.jpg")
     public_caption = os.path.join(PUBLIC_DIR, "latest_caption.txt")
+    public_link = os.path.join(PUBLIC_DIR, "latest_link.txt")
     shutil.copy2(image_path, public_image)
     with open(public_caption, "w") as f:
         f.write(full_caption)
+    with open(public_link, "w") as f:
+        f.write(affiliate_link)
     logger.info(f"Görsel: {public_image}")
-    logger.info(f"Caption kaydedildi.")
+    logger.info(f"Caption ve link kaydedildi.")
 
     # 4. Telegram önizleme
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID and not DRY_RUN:
