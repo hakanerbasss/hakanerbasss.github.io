@@ -1,8 +1,13 @@
 import os
 
-# Telegram (gönderi önizleme için)
+# Telegram (önizleme)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+# Instagram Graph API
+IG_ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN", "")
+IG_USER_ID = os.getenv("IG_USER_ID", "")
+GITHUB_REPO = os.getenv("GITHUB_REPOSITORY", "hakanerbasss/hakanerbasss.github.io")
 
 # DeepSeek API (caption üretimi için — platform.deepseek.com'dan al)
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")

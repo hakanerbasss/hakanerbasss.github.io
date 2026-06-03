@@ -2,21 +2,20 @@ name: Instagram Auto Post
 
 on:
   schedule:
-    # Her 6 saatte bir: 08:00, 14:00, 20:00, 02:00 UTC (TR: 11:00, 17:00, 23:00, 05:00)
     - cron: "0 8,14,20,2 * * *"
   workflow_dispatch:
 
 jobs:
   post:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
@@ -25,20 +24,59 @@ jobs:
       - name: Install dependencies
         run: pip install -r instagram-bot/requirements.txt
 
-      - name: Run bot
+      # Adım 1: Görsel + caption üret, public/ klasörüne kaydet
+      - name: Generate post
         working-directory: instagram-bot
         env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           PRODUCT_NICHE: ${{ vars.PRODUCT_NICHE || 'viral gadgets' }}
-          MAX_POSTS_PER_DAY: "1"
         run: python app.py --once
 
-      - name: Upload images (debug)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: posts-${{ github.run_number }}
-          path: instagram-bot/output/
-          retention-days: 7
+      # Adım 2: Görseli repo'ya commit et + push (public URL için)
+      - name: Commit & push image
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add instagram-bot/public/
+          git diff --staged --quiet && echo "Değişiklik yok" && exit 0
+          git commit -m "chore: post image [skip ci]"
+          git push
+
+      # Adım 3: 90sn bekle (GitHub raw URL aktif olsun)
+      - name: Wait for GitHub to serve image
+        run: sleep 90
+
+      # Adım 4: Instagram Graph API ile yayınla
+      - name: Post to Instagram
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'EOF'
+          import os, sys
+          sys.path.insert(0, "instagram-bot")
+          from instagram_graph import post_to_instagram
+
+          token = os.environ.get("IG_ACCESS_TOKEN", "")
+          user_id = os.environ.get("IG_USER_ID", "")
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+
+          if not token or not user_id:
+              print("IG_ACCESS_TOKEN veya IG_USER_ID eksik, atlanıyor.")
+              sys.exit(0)
+
+          caption_file = "instagram-bot/public/latest_caption.txt"
+          if os.path.exists(caption_file):
+              caption = open(caption_file).read()
+          else:
+              caption = "🔥 Viral product! #viral #trending #deals"
+
+          image_url = f"https://raw.githubusercontent.com/{repo}/main/instagram-bot/public/latest.jpg"
+          print(f"Image URL: {image_url}")
+
+          ok = post_to_instagram(user_id, token, image_url, caption)
+          sys.exit(0 if ok else 1)
+          EOF

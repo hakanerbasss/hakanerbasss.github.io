@@ -1,18 +1,19 @@
 """
-Viral Ürün Post Sistemi — Ana Orkestratör
+Viral Ürün Post Sistemi
 
-Çalışma akışı:
-1. Viral ürünleri çek (AliExpress / Reddit)
-2. Her ürün için 1080x1080 görsel üret (Pillow)
-3. AI ile caption oluştur (DeepSeek API veya şablon)
-4. Telegram'a gönder (önizleme + Instagram'a manuel paylaşım için)
+Akış:
+1. Viral ürün bul
+2. Görsel üret → public/latest.jpg
+3. Caption üret → public/latest_caption.txt
+4. Telegram önizleme gönder
+(Instagram postu workflow'un git push adımından sonra ayrıca atılır)
 """
 
 import logging
 import os
+import shutil
 import sys
 import time
-from datetime import datetime
 
 from config import (
     AMAZON_ASSOCIATE_TAG,
@@ -31,14 +32,12 @@ from telegram_sender import send_post, make_amazon_link
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("instagram_bot.log"),
-    ],
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 
 POSTED_LOG = "posted_products.txt"
+PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "public")
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
 
 
@@ -56,82 +55,61 @@ def save_posted_id(product_id: str):
 
 def run_once():
     posted = load_posted_ids()
-    logger.info(f"Daha önce gönderilen ürün sayısı: {len(posted)}")
-
-    products = get_viral_products(count=MAX_POSTS_PER_DAY + 5)
+    products = get_viral_products(count=10)
     new_products = [p for p in products if p.product_url not in posted]
 
     if not new_products:
-        logger.warning("Gönderilecek yeni ürün bulunamadı.")
+        logger.warning("Yeni ürün bulunamadı.")
         return
 
-    posts_done = 0
-    for product in new_products:
-        if posts_done >= MAX_POSTS_PER_DAY:
-            logger.info(f"Günlük limit ({MAX_POSTS_PER_DAY}) doldu.")
-            break
+    product = new_products[0]
+    logger.info(f"İşleniyor: {product.title}")
 
-        logger.info(f"İşleniyor: {product.title}")
+    # 1. Görsel üret
+    image_path = create_product_post(
+        title=product.title,
+        price=product.price,
+        image_url=product.image_url,
+        rating=product.rating,
+        sold_count=product.sold_count,
+    )
 
-        # 1. Görsel üret
-        try:
-            image_path = create_product_post(
-                title=product.title,
-                price=product.price,
-                image_url=product.image_url,
-                rating=product.rating,
-                sold_count=product.sold_count,
-            )
-        except Exception as e:
-            logger.error(f"Görsel oluşturma hatası: {e}")
-            continue
+    # 2. Caption + affiliate link üret
+    affiliate_link = make_amazon_link(product.title, AMAZON_ASSOCIATE_TAG)
+    caption = get_caption(
+        title=product.title,
+        price=product.price,
+        sold_count=product.sold_count,
+        niche=PRODUCT_NICHE,
+        api_key=DEEPSEEK_API_KEY or None,
+    )
+    full_caption = f"{caption}\n\n🛒 Amazon: {affiliate_link}"
 
-        # 2. Caption üret
-        caption = get_caption(
-            title=product.title,
-            price=product.price,
-            sold_count=product.sold_count,
-            niche=PRODUCT_NICHE,
-            api_key=DEEPSEEK_API_KEY or None,
-        )
-        logger.info(f"Caption: {caption[:80]}...")
+    # 3. public/ klasörüne kaydet (workflow bu dosyaları commit edecek)
+    os.makedirs(PUBLIC_DIR, exist_ok=True)
+    public_image = os.path.join(PUBLIC_DIR, "latest.jpg")
+    public_caption = os.path.join(PUBLIC_DIR, "latest_caption.txt")
+    shutil.copy2(image_path, public_image)
+    with open(public_caption, "w") as f:
+        f.write(full_caption)
+    logger.info(f"Görsel: {public_image}")
+    logger.info(f"Caption kaydedildi.")
 
-        # 3. Affiliate linki üret
-        affiliate_link = make_amazon_link(product.title, AMAZON_ASSOCIATE_TAG)
+    # 4. Telegram önizleme
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID and not DRY_RUN:
+        send_post(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, image_path, caption, affiliate_link)
 
-        # 4. Telegram'a gönder
-        if DRY_RUN:
-            logger.info(f"[DRY RUN] Gönderilmedi: {image_path}")
-            logger.info(f"[DRY RUN] Affiliate: {affiliate_link}")
-        else:
-            ok = send_post(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, image_path, caption, affiliate_link)
-            if not ok:
-                logger.error("Telegram gönderilemedi, atlanıyor.")
-                continue
-
-        save_posted_id(product.product_url)
-        posts_done += 1
-
-    logger.info(f"Bu turda {posts_done} post Telegram'a gönderildi.")
+    save_posted_id(product.product_url)
+    logger.info("Tamamlandı. Workflow şimdi git push + Instagram post yapacak.")
 
 
 def main():
     import argparse
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("--once", action="store_true", help="Tek seferlik çalış (GitHub Actions için)")
+    parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
 
-    logger.info("=" * 60)
-    logger.info("Viral Ürün Post Sistemi başlatıldı")
-    logger.info(f"Niş: {PRODUCT_NICHE}")
-    logger.info(f"Mod: {'tek seferlik' if args.once else f'{POST_INTERVAL_HOURS} saatte bir'}")
-    logger.info(f"DRY_RUN: {DRY_RUN}")
-    logger.info("=" * 60)
-
-    if not TELEGRAM_BOT_TOKEN and not DRY_RUN:
-        logger.error("TELEGRAM_BOT_TOKEN ayarlanmamış! GitHub Secrets'a ekle.")
-        sys.exit(1)
+    logger.info(f"Niş: {PRODUCT_NICHE} | DRY_RUN: {DRY_RUN}")
 
     if args.once:
         run_once()
@@ -141,12 +119,9 @@ def main():
         try:
             run_once()
         except KeyboardInterrupt:
-            logger.info("Durduruldu.")
             break
         except Exception as e:
-            logger.exception(f"Beklenmeyen hata: {e}")
-
-        logger.info(f"Sonraki çalışma {POST_INTERVAL_HOURS} saat sonra...")
+            logger.exception(f"Hata: {e}")
         time.sleep(POST_INTERVAL_HOURS * 3600)
 
 
