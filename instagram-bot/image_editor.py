@@ -258,14 +258,12 @@ def create_story_post(
     # Alt pembe şerit
     draw.rectangle([0, SH - 260, SW, SH], fill=THEME["accent"])
 
-    # CTA butonu metni
+    # CTA — ortala
     cta_font = _load_font(62, bold=True)
-    draw.text((SW // 2 - 200, SH - 220), "SATIN AL →", font=cta_font, fill=(255, 255, 255))
-
-    # Link metni (kopyalanabilsin diye)
-    short_link = affiliate_link[:55] + "…" if len(affiliate_link) > 55 else affiliate_link
-    link_font = _load_font(28)
-    draw.text((40, SH - 60), short_link, font=link_font, fill=(255, 255, 255, 180))
+    cta_text = "SATIN AL →"
+    cta_bbox = draw.textbbox((0, 0), cta_text, font=cta_font)
+    cta_x = (SW - (cta_bbox[2] - cta_bbox[0])) // 2
+    draw.text((cta_x, SH - 210), cta_text, font=cta_font, fill=(255, 255, 255))
 
     canvas.convert("RGB").save(output_path, "JPEG", quality=95)
     logger.info(f"Story görseli oluşturuldu: {output_path}")

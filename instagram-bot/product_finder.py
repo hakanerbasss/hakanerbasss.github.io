@@ -108,19 +108,31 @@ def fetch_reddit_viral_products() -> list[Product]:
     return products
 
 
-def fetch_product_image(title: str) -> str:
-    """DuckDuckGo ile ürün görseli arar — API key gerektirmez."""
+CATEGORY_KEYWORDS = {
+    "gadgets": "gadget,technology",
+    "home": "home,interior",
+    "car": "car,automotive",
+    "general": "product,shopping",
+    "community_pick": "product",
+}
+
+
+def fetch_product_image(title: str, category: str = "general") -> str:
+    """Önce DuckDuckGo, başarısız olursa loremflickr.com kullanır."""
     try:
         from duckduckgo_search import DDGS
         with DDGS() as ddgs:
-            results = list(ddgs.images(f"{title} product", max_results=3))
+            results = list(ddgs.images(f"{title} product white background", max_results=3))
             for r in results:
                 url = r.get("image", "")
                 if url and url.startswith("http"):
                     return url
     except Exception as e:
         logger.warning(f"DuckDuckGo görsel hatası: {e}")
-    return ""
+
+    # Fallback: loremflickr.com — her zaman çalışır, API key gerekmez
+    keyword = CATEGORY_KEYWORDS.get(category, "product")
+    return f"https://loremflickr.com/1080/1080/{keyword}?lock={abs(hash(title)) % 9999}"
 
 
 def get_fallback_products() -> list[Product]:
@@ -134,7 +146,7 @@ def get_fallback_products() -> list[Product]:
     ]
     products = []
     for title, price, rating, sold, cat in items:
-        image_url = fetch_product_image(title)
+        image_url = fetch_product_image(title, cat)
         products.append(Product(
             title=title,
             price=price,
@@ -167,10 +179,10 @@ def get_viral_products(count: int = 5) -> list[Product]:
         logger.warning("Hiç ürün bulunamadı, fallback kullanılıyor")
         all_products = get_fallback_products()
 
-    # Görseli olmayan ürünler için DuckDuckGo'dan çek
+    # Görseli olmayan ürünler için çek (DuckDuckGo → loremflickr fallback)
     for p in all_products:
         if not p.image_url:
-            p.image_url = fetch_product_image(p.title)
+            p.image_url = fetch_product_image(p.title, p.category)
 
     random.shuffle(all_products)
     return all_products[:count]
