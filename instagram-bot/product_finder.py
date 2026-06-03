@@ -108,61 +108,39 @@ def fetch_reddit_viral_products() -> list[Product]:
     return products
 
 
-CATEGORY_KEYWORDS = {
-    "gadgets": "gadget,technology",
-    "home": "home,interior",
-    "car": "car,automotive",
-    "general": "product,shopping",
-    "community_pick": "product",
+CATEGORY_SEARCH = {
+    "gadgets": "electronics gadget technology",
+    "home": "home appliance kitchen tool",
+    "car": "car accessory automotive",
+    "general": "trending product",
+    "community_pick": "popular product",
 }
 
 
-def _fetch_bing_image(title: str) -> str:
-    """Bing Image Search'ten ürün görseli çeker."""
-    import urllib.parse
-    try:
-        query = urllib.parse.quote_plus(f"{title} product")
-        url = f"https://www.bing.com/images/search?q={query}&form=HDRSC2&first=1"
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for img in soup.select("img.mimg"):
-            src = img.get("src", "")
-            if src and src.startswith("http"):
-                return src
-        # Alternatif selector
-        for a in soup.select("a.iusc"):
-            import json as _json
-            m = a.get("m", "{}")
-            try:
-                data = _json.loads(m)
-                src = data.get("murl", "")
-                if src and src.startswith("http"):
-                    return src
-            except Exception:
-                continue
-    except Exception as e:
-        logger.warning(f"Bing görsel hatası: {e}")
-    return ""
-
-
 def fetch_product_image(title: str, category: str = "general") -> str:
-    """Önce DuckDuckGo, sonra Bing ile gerçek ürün görseli çeker."""
-    # 1. DuckDuckGo
-    try:
-        from duckduckgo_search import DDGS
-        with DDGS() as ddgs:
-            results = list(ddgs.images(f"{title} product", max_results=3))
-            for r in results:
-                url = r.get("image", "")
-                if url and url.startswith("http"):
-                    return url
-    except Exception as e:
-        logger.warning(f"DuckDuckGo görsel hatası: {e}")
+    """Pexels API ile kaliteli ürün görseli çeker."""
+    import os
+    api_key = os.getenv("PEXELS_API_KEY", "")
+    if not api_key:
+        logger.warning("PEXELS_API_KEY eksik")
+        return ""
 
-    # 2. Bing
-    url = _fetch_bing_image(title)
-    if url:
-        return url
+    # Önce ürün adıyla ara, bulamazsa kategori kelimesiyle ara
+    queries = [title, CATEGORY_SEARCH.get(category, "product")]
+    for query in queries:
+        try:
+            resp = requests.get(
+                "https://api.pexels.com/v1/search",
+                headers={"Authorization": api_key},
+                params={"query": query, "per_page": 1, "orientation": "square"},
+                timeout=10,
+            )
+            data = resp.json()
+            photos = data.get("photos", [])
+            if photos:
+                return photos[0]["src"]["large"]
+        except Exception as e:
+            logger.warning(f"Pexels hatası ({query}): {e}")
 
     return ""
 

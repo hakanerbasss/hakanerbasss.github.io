@@ -12,7 +12,10 @@ GITHUB_REPO = os.getenv("GITHUB_REPOSITORY", "hakanerbasss/hakanerbasss.github.i
 # DeepSeek API (caption üretimi için — platform.deepseek.com'dan al)
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
-# Amazon Associates affiliate tag
+# Pexels API (görsel için — pexels.com/api'den al)
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
+
+
 AMAZON_ASSOCIATE_TAG = os.getenv("AMAZON_ASSOCIATE_TAG", "hakanerb-20")
 
 # Gönderi ayarları
