@@ -108,26 +108,23 @@ def fetch_reddit_viral_products() -> list[Product]:
     return products
 
 
-def fetch_amazon_image(title: str) -> str:
-    """Amazon arama sonuçlarından ilk ürün görselini çeker."""
-    import urllib.parse
+def fetch_product_image(title: str) -> str:
+    """DuckDuckGo ile ürün görseli arar — API key gerektirmez."""
     try:
-        query = urllib.parse.quote_plus(title)
-        url = f"https://www.amazon.com/s?k={query}"
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        soup = BeautifulSoup(resp.text, "html.parser")
-        img = soup.select_one("[data-component-type='s-search-result'] img.s-image")
-        if img:
-            src = img.get("src", "")
-            if src and src.startswith("http"):
-                return src
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.images(f"{title} product", max_results=3))
+            for r in results:
+                url = r.get("image", "")
+                if url and url.startswith("http"):
+                    return url
     except Exception as e:
-        logger.warning(f"Amazon görsel hatası: {e}")
+        logger.warning(f"DuckDuckGo görsel hatası: {e}")
     return ""
 
 
 def get_fallback_products() -> list[Product]:
-    """Scraping başarısız olursa kullanılan ürün listesi — görseller Amazon'dan çekilir."""
+    """Scraping başarısız olursa kullanılan ürün listesi — görseller DuckDuckGo'dan çekilir."""
     items = [
         ("Mini Portable Projector 1080P HD", "$49.99", 4.8, "10,000+", "gadgets"),
         ("LED Strip Lights 10M RGB Smart WiFi", "$12.99", 4.7, "50,000+", "home"),
@@ -137,7 +134,7 @@ def get_fallback_products() -> list[Product]:
     ]
     products = []
     for title, price, rating, sold, cat in items:
-        image_url = fetch_amazon_image(title)
+        image_url = fetch_product_image(title)
         products.append(Product(
             title=title,
             price=price,
@@ -169,6 +166,11 @@ def get_viral_products(count: int = 5) -> list[Product]:
     if not all_products:
         logger.warning("Hiç ürün bulunamadı, fallback kullanılıyor")
         all_products = get_fallback_products()
+
+    # Görseli olmayan ürünler için DuckDuckGo'dan çek
+    for p in all_products:
+        if not p.image_url:
+            p.image_url = fetch_product_image(p.title)
 
     random.shuffle(all_products)
     return all_products[:count]
