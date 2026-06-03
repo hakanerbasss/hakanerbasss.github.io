@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-BASE = "https://graph.instagram.com/v21.0"
+BASE = "https://graph.facebook.com/v21.0"
 
 
 def post_to_instagram(ig_user_id: str, access_token: str, image_url: str, caption: str) -> bool:
