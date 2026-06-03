@@ -53,23 +53,84 @@ def save_posted_id(product_id: str):
         f.write(product_id + "\n")
 
 
-def _update_shop_page(affiliate_link: str, product_title: str):
-    """hakanerbasss.github.io/shop sayfasını günceller — bio linki buraya yönlendirir."""
+def _update_shop_page(affiliate_link: str, product_title: str, price: str, image_url: str):
+    """Linktree benzeri ürün listesi sayfasını günceller — yeni ürünü başa ekler."""
+    import re
+    import json as _json
+
     shop_path = os.path.join(os.path.dirname(__file__), "..", "shop.html")
+
+    products = []
+    if os.path.exists(shop_path):
+        with open(shop_path) as f:
+            content = f.read()
+        m = re.search(r"<!--PRODUCTS:(.*?)-->", content, re.DOTALL)
+        if m:
+            try:
+                products = _json.loads(m.group(1))
+            except Exception:
+                products = []
+
+    new_item = {"title": product_title, "price": price, "url": affiliate_link, "image": image_url}
+    products = [p for p in products if p.get("url") != affiliate_link]
+    products.insert(0, new_item)
+    products = products[:15]
+
+    cards_html = ""
+    for p in products:
+        img_tag = (
+            f'<img src="{p["image"]}" alt="" onerror="this.style.display=\'none\'">'
+            if p.get("image") else ""
+        )
+        cards_html += f"""
+    <a href="{p['url']}" class="card" target="_blank" rel="nofollow">
+      {img_tag}
+      <div class="info">
+        <div class="title">{p['title']}</div>
+        <div class="price">{p['price']}</div>
+        <div class="btn">Amazon'da Gör →</div>
+      </div>
+    </a>"""
+
+    products_json = _json.dumps(products, ensure_ascii=False)
+
     html = f"""<!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0;url={affiliate_link}">
-  <title>Shop — {product_title}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>@hakanerbasss | Viral Ürünler</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#0f0f19;color:#fff;font-family:-apple-system,sans-serif;min-height:100vh}}
+    header{{text-align:center;padding:24px 16px 8px}}
+    header h1{{font-size:1.4rem;color:#ff3c78}}
+    header p{{color:#aaa;font-size:.85rem;margin-top:4px}}
+    .grid{{display:flex;flex-direction:column;gap:12px;padding:16px;max-width:480px;margin:0 auto}}
+    .card{{display:flex;background:#1e1e30;border-radius:12px;overflow:hidden;text-decoration:none;color:#fff}}
+    .card img{{width:90px;height:90px;object-fit:cover;flex-shrink:0}}
+    .info{{padding:12px;flex:1}}
+    .title{{font-size:.85rem;font-weight:600;margin-bottom:4px;line-height:1.3}}
+    .price{{color:#ffc800;font-weight:bold;margin-bottom:6px}}
+    .btn{{background:#ff3c78;color:#fff;border-radius:6px;padding:4px 10px;font-size:.75rem;display:inline-block}}
+    footer{{text-align:center;padding:24px;color:#555;font-size:.75rem}}
+  </style>
 </head>
 <body>
-  <p>Ürüne yönlendiriliyorsunuz: <a href="{affiliate_link}">{product_title}</a></p>
+<!--PRODUCTS:{products_json}-->
+<header>
+  <h1>@hakanerbasss</h1>
+  <p>Viral ürünler — En güncel liste 🔥</p>
+</header>
+<div class="grid">{cards_html}
+</div>
+<footer>Affiliate linkler içerir. Satın alma yapılırsa komisyon kazanılabilir.</footer>
 </body>
 </html>"""
+
     with open(shop_path, "w") as f:
         f.write(html)
-    logger.info(f"shop.html güncellendi → {affiliate_link}")
+    logger.info(f"shop.html güncellendi ({len(products)} ürün) → {affiliate_link}")
 
 
 def run_once():
@@ -102,11 +163,15 @@ def run_once():
         niche=PRODUCT_NICHE,
         api_key=DEEPSEEK_API_KEY or None,
     )
-    # Instagram caption'da link tıklanamaz — bio'ya yönlendir
-    full_caption = f"{caption}\n\n🔗 Amazon linki bio'da 👆"
+    # Link Instagram'da tıklanamaz ama kopyalanabilir; bio linki tüm ürünleri listeler
+    full_caption = (
+        f"{caption}\n\n"
+        f"🔗 {affiliate_link}\n\n"
+        f"👆 Bio linki: hakanerbasss.github.io/shop"
+    )
 
-    # Bio sayfasını güncelle (hakanerbasss.github.io/shop)
-    _update_shop_page(affiliate_link, product.title)
+    # Bio sayfasını güncelle (hakanerbasss.github.io/shop) — ürünü listeye ekler
+    _update_shop_page(affiliate_link, product.title, product.price, product.image_url)
 
     # 3. public/ klasörüne kaydet (workflow bu dosyaları commit edecek)
     os.makedirs(PUBLIC_DIR, exist_ok=True)
