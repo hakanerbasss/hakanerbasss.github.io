@@ -131,7 +131,7 @@ def _draw_stats(draw: ImageDraw.ImageDraw, rating: float | None, sold: str | Non
         draw.text((60, 980), "  ".join(parts), font=font, fill=THEME["subtitle_text"])
 
 
-def _draw_watermark(canvas: Image.Image, text: str = "@your_account"):
+def _draw_watermark(canvas: Image.Image, text: str = "@hakanerbasss"):
     """Sol üst köşeye şeffaf watermark ekler."""
     overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -151,7 +151,7 @@ def create_product_post(
     image_url: str,
     rating: float | None = None,
     sold_count: str | None = None,
-    watermark: str = "@your_account",
+    watermark: str = "@hakanerbasss",
     output_path: str | None = None,
 ) -> str:
     """
