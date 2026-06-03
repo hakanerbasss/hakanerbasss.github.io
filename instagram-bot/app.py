@@ -74,17 +74,18 @@ def _update_shop_page(affiliate_link: str, product_title: str, price: str, image
     new_item = {"title": product_title, "price": price, "url": affiliate_link, "image": image_url}
     products = [p for p in products if p.get("url") != affiliate_link]
     products.insert(0, new_item)
-    products = products[:15]
+    products = products[:9]  # Instagram grid 3x3 — son 9 ürün yeterli
 
     cards_html = ""
-    for p in products:
-        img_tag = (
-            f'<img src="{p["image"]}" alt="" onerror="this.style.display=\'none\'">'
-            if p.get("image") else ""
+    for i, p in enumerate(products):
+        badge = '<span class="new">YENİ</span>' if i == 0 else ""
+        img_html = (
+            f'<img src="{p["image"]}" alt="{p["title"]}">'
+            if p.get("image") else '<div class="no-img">📦</div>'
         )
         cards_html += f"""
     <a href="{p['url']}" class="card" target="_blank" rel="nofollow">
-      {img_tag}
+      <div class="thumb">{img_html}{badge}</div>
       <div class="info">
         <div class="title">{p['title']}</div>
         <div class="price">{p['price']}</div>
@@ -103,25 +104,30 @@ def _update_shop_page(affiliate_link: str, product_title: str, price: str, image
   <style>
     *{{box-sizing:border-box;margin:0;padding:0}}
     body{{background:#0f0f19;color:#fff;font-family:-apple-system,sans-serif;min-height:100vh}}
-    header{{text-align:center;padding:24px 16px 8px}}
-    header h1{{font-size:1.4rem;color:#ff3c78}}
-    header p{{color:#aaa;font-size:.85rem;margin-top:4px}}
-    .grid{{display:flex;flex-direction:column;gap:12px;padding:16px;max-width:480px;margin:0 auto}}
-    .card{{display:flex;background:#1e1e30;border-radius:12px;overflow:hidden;text-decoration:none;color:#fff}}
-    .card img{{width:90px;height:90px;object-fit:cover;flex-shrink:0}}
-    .info{{padding:12px;flex:1}}
-    .title{{font-size:.85rem;font-weight:600;margin-bottom:4px;line-height:1.3}}
-    .price{{color:#ffc800;font-weight:bold;margin-bottom:6px}}
-    .btn{{background:#ff3c78;color:#fff;border-radius:6px;padding:4px 10px;font-size:.75rem;display:inline-block}}
-    footer{{text-align:center;padding:24px;color:#555;font-size:.75rem}}
+    header{{text-align:center;padding:28px 16px 12px}}
+    header h1{{font-size:1.5rem;color:#ff3c78;letter-spacing:1px}}
+    header p{{color:#999;font-size:.85rem;margin-top:6px}}
+    .hint{{background:#1e1e30;border-left:3px solid #ff3c78;margin:0 16px 4px;padding:10px 14px;font-size:.8rem;color:#ccc;border-radius:0 8px 8px 0}}
+    .grid{{display:flex;flex-direction:column;gap:10px;padding:12px 16px;max-width:480px;margin:0 auto}}
+    .card{{display:flex;background:#1e1e30;border-radius:14px;overflow:hidden;text-decoration:none;color:#fff;border:1px solid #2a2a40}}
+    .thumb{{position:relative;width:100px;height:100px;flex-shrink:0;background:#111}}
+    .thumb img{{width:100%;height:100%;object-fit:cover}}
+    .no-img{{display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem}}
+    .new{{position:absolute;top:6px;left:6px;background:#ff3c78;color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:4px}}
+    .info{{padding:12px 14px;flex:1;display:flex;flex-direction:column;justify-content:space-between}}
+    .title{{font-size:.82rem;font-weight:600;line-height:1.35;color:#eee}}
+    .price{{color:#ffc800;font-weight:700;font-size:.95rem;margin-top:4px}}
+    .btn{{background:#ff3c78;color:#fff;border-radius:8px;padding:5px 12px;font-size:.75rem;font-weight:600;display:inline-block;margin-top:6px;width:fit-content}}
+    footer{{text-align:center;padding:20px;color:#444;font-size:.72rem}}
   </style>
 </head>
 <body>
 <!--PRODUCTS:{products_json}-->
 <header>
   <h1>@hakanerbasss</h1>
-  <p>Viral ürünler — En güncel liste 🔥</p>
+  <p>Son paylaşılan viral ürünler 🔥</p>
 </header>
+<p class="hint">📸 Instagram'da hangi ürünü gördüysen aşağıdan bul ve tıkla</p>
 <div class="grid">{cards_html}
 </div>
 <footer>Affiliate linkler içerir. Satın alma yapılırsa komisyon kazanılabilir.</footer>
