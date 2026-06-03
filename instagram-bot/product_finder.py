@@ -109,35 +109,48 @@ def fetch_reddit_viral_products() -> list[Product]:
 
 
 CATEGORY_SEARCH = {
-    "gadgets": "electronics gadget technology",
-    "home": "home appliance kitchen tool",
-    "car": "car accessory automotive",
-    "general": "trending product",
-    "community_pick": "popular product",
+    "gadgets": "electronic gadget",
+    "home": "home appliance",
+    "car": "car accessory",
+    "general": "technology product",
+    "community_pick": "popular item",
+}
+
+# Ürün adındaki gereksiz kelimeler — Pexels'ta anlamsız sonuç veriyor
+_STOPWORDS = {
+    "1080p", "4k", "hd", "rgb", "usb", "wifi", "smart", "portable", "mini",
+    "led", "cordless", "rechargeable", "electric", "magnetic", "automatic",
+    "adjustable", "10m", "strip", "with", "for", "and", "the", "pro", "plus",
+    "ultra", "max", "set", "pack", "new", "upgraded", "2024", "wireless",
 }
 
 
+def _pexels_query(title: str, category: str) -> list[str]:
+    """Pexels için arama sorguları üretir — önce kısa ürün adı, sonra kategori."""
+    words = [w for w in title.lower().split() if w not in _STOPWORDS and len(w) > 2]
+    short = " ".join(words[:3])
+    return [short, CATEGORY_SEARCH.get(category, "product")]
+
+
 def fetch_product_image(title: str, category: str = "general") -> str:
-    """Pexels API ile kaliteli ürün görseli çeker."""
+    """Pexels API ile görsel çeker."""
     import os
     api_key = os.getenv("PEXELS_API_KEY", "")
     if not api_key:
         logger.warning("PEXELS_API_KEY eksik")
         return ""
 
-    # Önce ürün adıyla ara, bulamazsa kategori kelimesiyle ara
-    queries = [title, CATEGORY_SEARCH.get(category, "product")]
-    for query in queries:
+    for query in _pexels_query(title, category):
         try:
             resp = requests.get(
                 "https://api.pexels.com/v1/search",
                 headers={"Authorization": api_key},
-                params={"query": query, "per_page": 1, "orientation": "square"},
+                params={"query": query, "per_page": 3, "orientation": "square"},
                 timeout=10,
             )
-            data = resp.json()
-            photos = data.get("photos", [])
+            photos = resp.json().get("photos", [])
             if photos:
+                logger.info(f"Pexels görseli bulundu: '{query}'")
                 return photos[0]["src"]["large"]
         except Exception as e:
             logger.warning(f"Pexels hatası ({query}): {e}")

@@ -81,16 +81,16 @@ jobs:
           print(f"Feed URL: {image_url}")
           print(f"Story URL: {story_url}")
 
-          # Feed postu
-          ok = post_to_instagram(user_id, token, image_url, caption)
-          if not ok:
-              print("Feed postu başarısız.")
-              sys.exit(1)
-
-          # Story — 10 sn bekle, 9:16 görsel + link sticker
           import time
+
+          # Feed postu
+          feed_ok = post_to_instagram(user_id, token, image_url, caption)
+          print(f"Feed: {'✅ başarılı' if feed_ok else '❌ başarısız'}")
+
+          # Story — feed başarısız olsa da dene
           time.sleep(10)
-          post_story_to_instagram(user_id, token, story_url, affiliate_link)
-          # Story hata verse bile çıkış 0 — feed postu önemli olan
-          sys.exit(0)
+          story_ok = post_story_to_instagram(user_id, token, story_url, affiliate_link)
+          print(f"Story: {'✅ başarılı' if story_ok else '❌ başarısız'}")
+
+          sys.exit(0 if feed_ok else 1)
           EOF
