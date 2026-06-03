@@ -117,12 +117,41 @@ CATEGORY_KEYWORDS = {
 }
 
 
+def _fetch_bing_image(title: str) -> str:
+    """Bing Image Search'ten ürün görseli çeker."""
+    import urllib.parse
+    try:
+        query = urllib.parse.quote_plus(f"{title} product")
+        url = f"https://www.bing.com/images/search?q={query}&form=HDRSC2&first=1"
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for img in soup.select("img.mimg"):
+            src = img.get("src", "")
+            if src and src.startswith("http"):
+                return src
+        # Alternatif selector
+        for a in soup.select("a.iusc"):
+            import json as _json
+            m = a.get("m", "{}")
+            try:
+                data = _json.loads(m)
+                src = data.get("murl", "")
+                if src and src.startswith("http"):
+                    return src
+            except Exception:
+                continue
+    except Exception as e:
+        logger.warning(f"Bing görsel hatası: {e}")
+    return ""
+
+
 def fetch_product_image(title: str, category: str = "general") -> str:
-    """Önce DuckDuckGo, başarısız olursa loremflickr.com kullanır."""
+    """Önce DuckDuckGo, sonra Bing ile gerçek ürün görseli çeker."""
+    # 1. DuckDuckGo
     try:
         from duckduckgo_search import DDGS
         with DDGS() as ddgs:
-            results = list(ddgs.images(f"{title} product white background", max_results=3))
+            results = list(ddgs.images(f"{title} product", max_results=3))
             for r in results:
                 url = r.get("image", "")
                 if url and url.startswith("http"):
@@ -130,9 +159,12 @@ def fetch_product_image(title: str, category: str = "general") -> str:
     except Exception as e:
         logger.warning(f"DuckDuckGo görsel hatası: {e}")
 
-    # Fallback: loremflickr.com — her zaman çalışır, API key gerekmez
-    keyword = CATEGORY_KEYWORDS.get(category, "product")
-    return f"https://loremflickr.com/1080/1080/{keyword}?lock={abs(hash(title)) % 9999}"
+    # 2. Bing
+    url = _fetch_bing_image(title)
+    if url:
+        return url
+
+    return ""
 
 
 def get_fallback_products() -> list[Product]:
