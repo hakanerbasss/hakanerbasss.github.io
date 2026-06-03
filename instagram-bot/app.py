@@ -15,6 +15,7 @@ import time
 from datetime import datetime
 
 from config import (
+    AMAZON_ASSOCIATE_TAG,
     DEEPSEEK_API_KEY,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
@@ -25,7 +26,7 @@ from config import (
 from product_finder import get_viral_products
 from image_editor import create_product_post
 from caption_gen import get_caption
-from telegram_sender import send_post
+from telegram_sender import send_post, make_amazon_link
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,11 +96,15 @@ def run_once():
         )
         logger.info(f"Caption: {caption[:80]}...")
 
-        # 3. Telegram'a gönder
+        # 3. Affiliate linki üret
+        affiliate_link = make_amazon_link(product.title, AMAZON_ASSOCIATE_TAG)
+
+        # 4. Telegram'a gönder
         if DRY_RUN:
             logger.info(f"[DRY RUN] Gönderilmedi: {image_path}")
+            logger.info(f"[DRY RUN] Affiliate: {affiliate_link}")
         else:
-            ok = send_post(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, image_path, caption)
+            ok = send_post(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, image_path, caption, affiliate_link)
             if not ok:
                 logger.error("Telegram gönderilemedi, atlanıyor.")
                 continue

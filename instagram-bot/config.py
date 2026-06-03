@@ -7,6 +7,9 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 # DeepSeek API (caption üretimi için — platform.deepseek.com'dan al)
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
+# Amazon Associates affiliate tag
+AMAZON_ASSOCIATE_TAG = os.getenv("AMAZON_ASSOCIATE_TAG", "hakanerb-20")
+
 # Gönderi ayarları
 POST_INTERVAL_HOURS = int(os.getenv("POST_INTERVAL_HOURS", "6"))  # kaç saatte bir gönderi
 MAX_POSTS_PER_DAY = int(os.getenv("MAX_POSTS_PER_DAY", "4"))
