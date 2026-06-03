@@ -53,6 +53,25 @@ def save_posted_id(product_id: str):
         f.write(product_id + "\n")
 
 
+def _update_shop_page(affiliate_link: str, product_title: str):
+    """hakanerbasss.github.io/shop sayfasını günceller — bio linki buraya yönlendirir."""
+    shop_path = os.path.join(os.path.dirname(__file__), "..", "shop.html")
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0;url={affiliate_link}">
+  <title>Shop — {product_title}</title>
+</head>
+<body>
+  <p>Ürüne yönlendiriliyorsunuz: <a href="{affiliate_link}">{product_title}</a></p>
+</body>
+</html>"""
+    with open(shop_path, "w") as f:
+        f.write(html)
+    logger.info(f"shop.html güncellendi → {affiliate_link}")
+
+
 def run_once():
     posted = load_posted_ids()
     products = get_viral_products(count=10)
@@ -83,7 +102,11 @@ def run_once():
         niche=PRODUCT_NICHE,
         api_key=DEEPSEEK_API_KEY or None,
     )
-    full_caption = f"{caption}\n\n🛒 Amazon: {affiliate_link}"
+    # Instagram caption'da link tıklanamaz — bio'ya yönlendir
+    full_caption = f"{caption}\n\n🔗 Amazon linki bio'da 👆"
+
+    # Bio sayfasını güncelle (hakanerbasss.github.io/shop)
+    _update_shop_page(affiliate_link, product.title)
 
     # 3. public/ klasörüne kaydet (workflow bu dosyaları commit edecek)
     os.makedirs(PUBLIC_DIR, exist_ok=True)

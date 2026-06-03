@@ -108,40 +108,47 @@ def fetch_reddit_viral_products() -> list[Product]:
     return products
 
 
+def fetch_amazon_image(title: str) -> str:
+    """Amazon arama sonuçlarından ilk ürün görselini çeker."""
+    import urllib.parse
+    try:
+        query = urllib.parse.quote_plus(title)
+        url = f"https://www.amazon.com/s?k={query}"
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        img = soup.select_one("[data-component-type='s-search-result'] img.s-image")
+        if img:
+            src = img.get("src", "")
+            if src and src.startswith("http"):
+                return src
+    except Exception as e:
+        logger.warning(f"Amazon görsel hatası: {e}")
+    return ""
+
+
 def get_fallback_products() -> list[Product]:
-    """Scraping başarısız olursa kullanılan statik ürün listesi."""
-    return [
-        Product(
-            title="Mini Portable Projector - 1080P HD",
-            price="$49.99",
-            image_url="https://ae01.alicdn.com/kf/S123.jpg",
-            product_url="https://www.aliexpress.com",
-            source="fallback",
-            category="gadgets",
-            rating=4.8,
-            sold_count="10,000+",
-        ),
-        Product(
-            title="LED Strip Lights 10M RGB Smart",
-            price="$12.99",
-            image_url="https://ae01.alicdn.com/kf/S456.jpg",
-            product_url="https://www.aliexpress.com",
-            source="fallback",
-            category="home",
-            rating=4.7,
-            sold_count="50,000+",
-        ),
-        Product(
-            title="Magnetic Phone Holder Car Mount",
-            price="$8.99",
-            image_url="https://ae01.alicdn.com/kf/S789.jpg",
-            product_url="https://www.aliexpress.com",
-            source="fallback",
-            category="car",
-            rating=4.9,
-            sold_count="25,000+",
-        ),
+    """Scraping başarısız olursa kullanılan ürün listesi — görseller Amazon'dan çekilir."""
+    items = [
+        ("Mini Portable Projector 1080P HD", "$49.99", 4.8, "10,000+", "gadgets"),
+        ("LED Strip Lights 10M RGB Smart WiFi", "$12.99", 4.7, "50,000+", "home"),
+        ("Magnetic Phone Holder Car Mount Dashboard", "$8.99", 4.9, "25,000+", "car"),
+        ("Electric Spin Scrubber Cordless Cleaning Brush", "$35.99", 4.6, "30,000+", "home"),
+        ("Portable Mini Fan USB Rechargeable", "$14.99", 4.5, "20,000+", "gadgets"),
     ]
+    products = []
+    for title, price, rating, sold, cat in items:
+        image_url = fetch_amazon_image(title)
+        products.append(Product(
+            title=title,
+            price=price,
+            image_url=image_url,
+            product_url=f"https://www.amazon.com/s?k={title.replace(' ', '+')}",
+            source="amazon_search",
+            category=cat,
+            rating=rating,
+            sold_count=sold,
+        ))
+    return products
 
 
 def get_viral_products(count: int = 5) -> list[Product]:
