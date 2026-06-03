@@ -186,3 +186,87 @@ def create_product_post(
     canvas.convert("RGB").save(output_path, "JPEG", quality=95)
     logger.info(f"Görsel oluşturuldu: {output_path}")
     return output_path
+
+
+SW, SH = 1080, 1920  # Story boyutu 9:16
+
+
+def create_story_post(
+    title: str,
+    price: str,
+    image_url: str,
+    affiliate_link: str,
+    rating: float | None = None,
+    output_path: str | None = None,
+) -> str:
+    """
+    1080x1920 Story görseli üretir.
+    Ürün görseli ortada, üstte başlık, altta büyük CTA butonu + link metni.
+    """
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    if output_path is None:
+        safe_name = "".join(c if c.isalnum() else "_" for c in title[:30])
+        output_path = os.path.join(OUTPUT_DIR, f"{safe_name}_story.jpg")
+
+    canvas = Image.new("RGBA", (SW, SH))
+    draw = ImageDraw.Draw(canvas)
+
+    # Gradient arka plan (story yüksekliğinde)
+    top, bot = THEME["bg_gradient_top"], THEME["bg_gradient_bottom"]
+    for y in range(SH):
+        t = y / SH
+        r = int(top[0] + (bot[0] - top[0]) * t)
+        g = int(top[1] + (bot[1] - top[1]) * t)
+        b = int(top[2] + (bot[2] - top[2]) * t)
+        draw.line([(0, y), (SW, y)], fill=(r, g, b))
+
+    # Watermark üst
+    wm_font = _load_font(38)
+    draw.text((40, 80), "@hakanerbasss", font=wm_font, fill=THEME["watermark"])
+
+    # Başlık
+    title_font = _load_font(58, bold=True)
+    wrapped = textwrap.fill(title, width=20)
+    draw.text((60, 180), wrapped, font=title_font, fill=THEME["title_text"])
+
+    # Fiyat etiketi
+    price_font = _load_font(64, bold=True)
+    pbbox = draw.textbbox((0, 0), price, font=price_font)
+    pw, ph = pbbox[2] - pbbox[0], pbbox[3] - pbbox[1]
+    pad = 20
+    draw.rectangle([SW - pw - pad * 2 - 30, 160, SW - 30, 160 + ph + pad * 2], fill=THEME["price_bg"])
+    draw.text((SW - pw - pad - 30, 160 + pad), price, font=price_font, fill=THEME["price_text"])
+
+    # Ürün görseli ortaya
+    product_img = _download_image(image_url)
+    if product_img:
+        product_img = product_img.convert("RGBA")
+        product_img.thumbnail((860, 860), Image.LANCZOS)
+        pw2, ph2 = product_img.size
+        px = (SW - pw2) // 2
+        py = (SH - ph2) // 2 - 60
+        canvas.paste(product_img, (px, py), product_img)
+    else:
+        draw.rectangle([110, 500, 970, 1360], fill=(40, 40, 60))
+        draw.text((400, 900), "No Image", font=_load_font(48), fill=(120, 120, 140))
+
+    # Puan
+    if rating:
+        star_font = _load_font(42)
+        draw.text((60, SH - 380), f"★ {rating}", font=star_font, fill=(255, 200, 0))
+
+    # Alt pembe şerit
+    draw.rectangle([0, SH - 260, SW, SH], fill=THEME["accent"])
+
+    # CTA butonu metni
+    cta_font = _load_font(62, bold=True)
+    draw.text((SW // 2 - 200, SH - 220), "SATIN AL →", font=cta_font, fill=(255, 255, 255))
+
+    # Link metni (kopyalanabilsin diye)
+    short_link = affiliate_link[:55] + "…" if len(affiliate_link) > 55 else affiliate_link
+    link_font = _load_font(28)
+    draw.text((40, SH - 60), short_link, font=link_font, fill=(255, 255, 255, 180))
+
+    canvas.convert("RGB").save(output_path, "JPEG", quality=95)
+    logger.info(f"Story görseli oluşturuldu: {output_path}")
+    return output_path

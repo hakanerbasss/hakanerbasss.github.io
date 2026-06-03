@@ -74,8 +74,11 @@ jobs:
           link_file = "instagram-bot/public/latest_link.txt"
           affiliate_link = open(link_file).read().strip() if os.path.exists(link_file) else "https://hakanerbasss.github.io/shop"
 
-          image_url = f"https://raw.githubusercontent.com/{repo}/main/instagram-bot/public/latest.jpg"
-          print(f"Image URL: {image_url}")
+          base = f"https://raw.githubusercontent.com/{repo}/main/instagram-bot/public"
+          image_url = f"{base}/latest.jpg"
+          story_url = f"{base}/latest_story.jpg"
+          print(f"Feed URL: {image_url}")
+          print(f"Story URL: {story_url}")
 
           # Feed postu
           ok = post_to_instagram(user_id, token, image_url, caption)
@@ -83,10 +86,10 @@ jobs:
               print("Feed postu başarısız.")
               sys.exit(1)
 
-          # Story — 10 sn bekle, sonra at
+          # Story — 10 sn bekle, 9:16 görsel + link sticker
           import time
           time.sleep(10)
-          post_story_to_instagram(user_id, token, image_url, affiliate_link)
+          post_story_to_instagram(user_id, token, story_url, affiliate_link)
           # Story hata verse bile çıkış 0 — feed postu önemli olan
           sys.exit(0)
           EOF

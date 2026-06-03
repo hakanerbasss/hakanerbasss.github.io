@@ -25,7 +25,7 @@ from config import (
     PRODUCT_NICHE,
 )
 from product_finder import get_viral_products
-from image_editor import create_product_post
+from image_editor import create_product_post, create_story_post
 from caption_gen import get_caption
 from telegram_sender import send_post, make_amazon_link
 
@@ -151,7 +151,8 @@ def run_once():
     product = new_products[0]
     logger.info(f"İşleniyor: {product.title}")
 
-    # 1. Görsel üret
+    # 1. Görsel üret (feed + story)
+    affiliate_link = make_amazon_link(product.title, AMAZON_ASSOCIATE_TAG)
     image_path = create_product_post(
         title=product.title,
         price=product.price,
@@ -159,9 +160,15 @@ def run_once():
         rating=product.rating,
         sold_count=product.sold_count,
     )
+    story_path = create_story_post(
+        title=product.title,
+        price=product.price,
+        image_url=product.image_url,
+        affiliate_link=affiliate_link,
+        rating=product.rating,
+    )
 
-    # 2. Caption + affiliate link üret
-    affiliate_link = make_amazon_link(product.title, AMAZON_ASSOCIATE_TAG)
+    # 2. Caption üret
     caption = get_caption(
         title=product.title,
         price=product.price,
@@ -182,14 +189,17 @@ def run_once():
     # 3. public/ klasörüne kaydet (workflow bu dosyaları commit edecek)
     os.makedirs(PUBLIC_DIR, exist_ok=True)
     public_image = os.path.join(PUBLIC_DIR, "latest.jpg")
+    public_story = os.path.join(PUBLIC_DIR, "latest_story.jpg")
     public_caption = os.path.join(PUBLIC_DIR, "latest_caption.txt")
     public_link = os.path.join(PUBLIC_DIR, "latest_link.txt")
     shutil.copy2(image_path, public_image)
+    shutil.copy2(story_path, public_story)
     with open(public_caption, "w") as f:
         f.write(full_caption)
     with open(public_link, "w") as f:
         f.write(affiliate_link)
-    logger.info(f"Görsel: {public_image}")
+    logger.info(f"Feed görseli: {public_image}")
+    logger.info(f"Story görseli: {public_story}")
     logger.info(f"Caption ve link kaydedildi.")
 
     # 4. Telegram önizleme
