@@ -237,7 +237,7 @@
 </div>
 
 <div class="grid" id="grid"></div>
-<div id="toast">✓ Link kopyalandı! Instagram'ı aç ve yapıştır.</div>
+<div id="toast">✓ Komisyonlu link kopyalandı — Instagram Bio veya Story'ye yapıştır</div>
 
 <script>
 // =====================================================
@@ -456,11 +456,10 @@ function renderGrid() {
   }).join('');
 }
 
-// ── Share — clipboard + Instagram deep link
+// ── Share — sadece clipboard kopyala, toast göster
 function shareProduct(asin, btn) {
   const link = amazonLink(asin);
 
-  // Clipboard
   if (navigator.clipboard) {
     navigator.clipboard.writeText(link).catch(() => fallbackCopy(link));
   } else {
@@ -468,15 +467,6 @@ function shareProduct(asin, btn) {
   }
 
   showToast();
-
-  // Web Share API (native share sheet on mobile)
-  if (navigator.share) {
-    navigator.share({
-      title: 'Amazon ürünü',
-      text: 'Bunu gördün mü? 🔥',
-      url: link,
-    }).catch(() => {});
-  }
 }
 
 function fallbackCopy(text) {
