@@ -163,7 +163,7 @@
     .btn {
       display: block;
       text-align: center;
-      padding: 9px 8px;
+      padding: 11px 8px;
       border-radius: 9px;
       font-size: .73rem;
       font-weight: 600;
@@ -171,8 +171,12 @@
       text-decoration: none;
       border: none;
       transition: opacity .2s, transform .1s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(255,60,120,.25);
+      min-height: 42px;
+      width: 100%;
     }
-    .btn:active { transform: scale(.97); }
+    .btn:active { opacity: .75; transform: scale(.97); }
     .btn-amazon {
       background: var(--accent);
       color: #fff;
@@ -447,7 +451,7 @@ function renderGrid() {
           <a class="btn btn-amazon" href="${link}" target="_blank" rel="nofollow">
             Amazon'da Gör →
           </a>
-          <button class="btn btn-instagram" onclick="shareProduct('${p.asin}', this)">
+          <button class="btn btn-instagram" data-asin="${p.asin}">
             📲 Instagram'da Paylaş
           </button>
         </div>
@@ -487,6 +491,13 @@ function showToast() {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
 }
+
+// ── Event delegation — grid'e tek listener, onclick'ten daha güvenilir mobilede
+document.getElementById('grid').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-asin]');
+  if (!btn) return;
+  shareProduct(btn.dataset.asin);
+});
 
 // ── Init
 buildFilters();
