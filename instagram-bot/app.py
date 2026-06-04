@@ -1,12 +1,14 @@
 """
-Viral Ürün Post Sistemi
+Viral Ürün → Telegram Paketi
 
 Akış:
 1. Viral ürün bul
-2. Görsel üret → public/latest.jpg
-3. Caption üret → public/latest_caption.txt
-4. Telegram önizleme gönder
-(Instagram postu workflow'un git push adımından sonra ayrıca atılır)
+2. Feed + story görseli üret
+3. Caption üret
+4. HER ŞEYİ Telegram'a gönder (feed görseli, story görseli,
+   kopyalanabilir caption, fiyat, affiliate link)
+
+Instagram'a otomatik atılmaz — paketi Telegram'dan alıp elle koyarsın.
 """
 
 import logging
@@ -202,12 +204,26 @@ def run_once():
     logger.info(f"Story görseli: {public_story}")
     logger.info(f"Caption ve link kaydedildi.")
 
-    # 4. Telegram önizleme
+    # 4. Telegram'a TAM PAKET gönder (feed + story + caption + link)
+    #    Sen bunu alıp Instagram'a elle koyacaksın.
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID and not DRY_RUN:
-        send_post(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, image_path, caption, affiliate_link)
+        send_post(
+            bot_token=TELEGRAM_BOT_TOKEN,
+            chat_id=TELEGRAM_CHAT_ID,
+            feed_image_path=image_path,
+            story_image_path=story_path,
+            caption=full_caption,
+            affiliate_link=affiliate_link,
+            title=product.title,
+            price=product.price,
+            rating=product.rating,
+            sold_count=product.sold_count or "",
+        )
+    else:
+        logger.warning("Telegram token/chat_id eksik veya DRY_RUN — gönderim atlandı.")
 
     save_posted_id(product.product_url)
-    logger.info("Tamamlandı. Workflow şimdi git push + Instagram post yapacak.")
+    logger.info("Tamamlandı. Her şey Telegram'a gönderildi — Instagram'a elle koyabilirsin.")
 
 
 def main():
