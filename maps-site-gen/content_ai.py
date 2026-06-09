@@ -1,9 +1,8 @@
 """
-Claude API ile işletme için web sitesi içeriği üretir.
-ANTHROPIC_API_KEY yoksa şablon içerik kullanır.
+Claude API ile SEO uyumlu içerik üretir. API yoksa şablon kullanır.
 """
 
-import anthropic
+import json
 import config
 from scraper import BusinessInfo
 
@@ -13,100 +12,98 @@ _client = None
 def _get_client():
     global _client
     if _client is None and config.ANTHROPIC_API_KEY:
+        import anthropic
         _client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
     return _client
 
 
 def generate_content(business: BusinessInfo) -> dict:
-    """
-    İşletme için SEO uyumlu web sitesi içeriği üretir.
-    Dönen dict: headline, tagline, about, services, cta_text
-    """
     client = _get_client()
-
-    if client:
-        return _generate_with_ai(client, business)
-    else:
-        return _generate_fallback(business)
+    return _with_ai(client, business) if client else _fallback(business)
 
 
-def _generate_with_ai(client, business: BusinessInfo) -> dict:
-    hours_text = ""
-    if business.hours:
-        hours_text = "\n".join(f"  {k}: {v}" for k, v in business.hours.items())
+def _with_ai(client, b: BusinessInfo) -> dict:
+    hours_str = "\n".join(f"  {k}: {v}" for k, v in b.hours.items()) if b.hours else "  Belirtilmemiş"
+    reviews_str = "\n".join(f'  - "{r}"' for r in b.reviews_snippet[:3]) if b.reviews_snippet else "  Yok"
 
     prompt = f"""Bir işletme için Türkçe web sitesi içeriği oluştur.
 
-İşletme Bilgileri:
-- Ad: {business.name}
-- Kategori: {business.category}
-- Adres: {business.address}
-- Telefon: {business.phone}
-- Puan: {business.rating}/5 ({business.review_count} yorum)
-- Çalışma Saatleri:
-{hours_text or "  Belirtilmemiş"}
+İşletme:
+- Ad: {b.name}
+- Kategori: {b.category}
+- Adres: {b.address}
+- Telefon: {b.phone}
+- Puan: {b.rating}/5 ({b.review_count} yorum)
+- Hakkında: {b.about or 'Belirtilmemiş'}
+- Çalışma saatleri:\n{hours_str}
+- Müşteri yorumları:\n{reviews_str}
 
-Şu alanları JSON olarak üret (başka şey yazma):
+Sadece JSON döndür, başka hiçbir şey yazma:
 {{
-  "headline": "Ana başlık (kısa, dikkat çekici, 5-10 kelime)",
-  "tagline": "Alt başlık/slogan (15-20 kelime)",
-  "about": "Hakkında bölümü (3-4 cümle, samimi ve profesyonel, işletme adı ve konumu içersin)",
-  "services": ["Hizmet 1", "Hizmet 2", "Hizmet 3", "Hizmet 4", "Hizmet 5"],
-  "cta_text": "Harekete geçirici metin (kısa, örn: Hemen Arayın, Rezervasyon Yapın)"
+  "headline": "Ana başlık (dikkat çekici, 6-10 kelime)",
+  "tagline": "Alt başlık/slogan (15-25 kelime, özgün)",
+  "about": "Hakkımızda paragrafı (4-5 cümle, işletme adını ve konumu belirt, samimi ton)",
+  "services": ["Hizmet/Ürün 1", "Hizmet/Ürün 2", "Hizmet/Ürün 3", "Hizmet/Ürün 4", "Hizmet/Ürün 5", "Hizmet/Ürün 6"],
+  "cta_text": "Harekete geçirici buton metni (kısa, max 4 kelime)",
+  "seo_description": "Meta description (max 155 karakter, SEO uyumlu)"
 }}"""
 
     try:
-        message = client.messages.create(
+        msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=800,
+            max_tokens=900,
             messages=[{"role": "user", "content": prompt}],
         )
-        import json
-        text = message.content[0].text.strip()
-        # JSON bloğunu ayıkla
+        text = msg.content[0].text.strip()
         if "```" in text:
             text = text.split("```")[1]
             if text.startswith("json"):
                 text = text[4:]
-        return json.loads(text)
+        return json.loads(text.strip())
     except Exception as e:
-        print(f"[AI] İçerik üretilemedi, fallback kullanılıyor: {e}")
-        return _generate_fallback(business)
+        print(f"[AI] Hata: {e}")
+        return _fallback(b)
 
 
-def _generate_fallback(business: BusinessInfo) -> dict:
-    """API olmadan şablon içerik üretir."""
-    category = business.category or "İşletme"
-    name = business.name or "İşletmemiz"
+def _fallback(b: BusinessInfo) -> dict:
+    cat = b.category or "İşletme"
+    name = b.name or "İşletmemiz"
 
     service_map = {
-        "restoran": ["Öğle Yemeği", "Akşam Yemeği", "Paket Servis", "Catering", "Özel Günler"],
-        "kafe": ["Sıcak İçecekler", "Soğuk İçecekler", "Atıştırmalıklar", "Kahvaltı", "Wi-Fi"],
-        "market": ["Gıda Ürünleri", "Temizlik Ürünleri", "Kişisel Bakım", "İçecekler", "Şarküteri"],
-        "berber": ["Saç Kesimi", "Sakal Tıraşı", "Saç Boyama", "Bakım", "Styling"],
-        "kuaför": ["Saç Kesimi", "Boyama", "Manikür", "Pedikür", "Cilt Bakımı"],
-        "eczane": ["Reçeteli İlaçlar", "OTC Ürünler", "Kozmetik", "Bebek Ürünleri", "Takviye"],
-        "tamirci": ["Onarım", "Bakım", "Yedek Parça", "Servis", "Danışmanlık"],
-        "doktor": ["Muayene", "Teşhis", "Tedavi", "Kontrol", "Danışmanlık"],
+        "restoran": ["Öğle Yemeği", "Akşam Yemeği", "Paket Servis", "Catering", "Özel Günler", "Taze Malzeme"],
+        "kafe": ["Kahve Çeşitleri", "Soğuk İçecekler", "Atıştırmalıklar", "Kahvaltı", "Tatlılar", "Wi-Fi"],
+        "berber": ["Saç Kesimi", "Sakal Tıraşı", "Saç Yıkama", "Fön", "Sakal Şekillendirme", "Cilt Bakımı"],
+        "kuaför": ["Saç Kesimi", "Boyama", "Röfle", "Manikür", "Fön", "Keratin"],
+        "market": ["Gıda Ürünleri", "Temizlik", "İçecekler", "Şarküteri", "Ekmek & Unlu", "Ev Ürünleri"],
+        "eczane": ["Reçeteli İlaçlar", "Takviyeler", "Kozmetik", "Bebek Ürünleri", "Ölçüm Hizmetleri", "Danışmanlık"],
+        "tamirci": ["Arıza Tespiti", "Onarım", "Yedek Parça", "Periyodik Bakım", "Servis", "Garanti"],
+        "doktor": ["Muayene", "Teşhis", "Tedavi", "Takip", "Raporlama", "Online Randevu"],
+        "fırın": ["Ekmek", "Börek & Poğaça", "Pasta & Kek", "Simit", "Kurabiye", "Özel Sipariş"],
+        "güzellik": ["Makyaj", "Cilt Bakımı", "Kaş Tasarımı", "İpek Kirpik", "Manikür", "Pedikür"],
     }
 
-    services = ["Kaliteli Hizmet", "Profesyonel Kadro", "Uygun Fiyat", "Hızlı Servis", "Güvenilir"]
+    services = ["Kaliteli Hizmet", "Profesyonel Ekip", "Uygun Fiyat", "Hızlı Servis", "Güvenilir", "Müşteri Odaklı"]
     for key, val in service_map.items():
-        if key in category.lower():
+        if key in cat.lower():
             services = val
             break
 
-    city = business.city or business.address.split(",")[-1].strip() if business.address else "şehrimizde"
+    if b.services:
+        services = b.services[:6] or services
+
+    city_parts = b.address.split(",") if b.address else []
+    city = city_parts[-1].strip() if city_parts else "şehrimizde"
 
     return {
-        "headline": f"{name} — {category} Hizmetleri",
-        "tagline": f"Kaliteli ve güvenilir {category.lower()} hizmetleri için doğru adres.",
+        "headline": f"{name} — {cat} Hizmetleri",
+        "tagline": f"{city} bölgesinde güvenilir ve profesyonel {cat.lower()} hizmetleri.",
         "about": (
-            f"{name} olarak {city} bölgesinde {category.lower()} alanında hizmet vermekteyiz. "
-            f"Müşteri memnuniyetini her zaman ön planda tutarak profesyonel ekibimizle "
-            f"sizlere en iyi hizmeti sunmaya çalışıyoruz. "
-            f"Bizi arayın veya adresimize gelin, sizinle tanışmaktan mutluluk duyarız."
+            f"{name} olarak {city} bölgesinde {cat.lower()} alanında hizmet vermekteyiz. "
+            f"Müşteri memnuniyetini ön planda tutarak, deneyimli ekibimizle en iyi hizmeti sunuyoruz. "
+            f"Kalite ve güven ilkesiyle hareket ediyor, her müşterimize özel çözümler üretiyoruz. "
+            f"Bizi aramaktan veya ziyaret etmekten çekinmeyin, sizinle tanışmak isteriz."
         ),
         "services": services,
         "cta_text": "Hemen Arayın",
+        "seo_description": f"{name} | {cat} | {b.address[:100]}",
     }

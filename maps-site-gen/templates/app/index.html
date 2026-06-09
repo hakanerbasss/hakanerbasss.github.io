@@ -1,0 +1,186 @@
+{% extends "app/base.html" %}
+{% block title %}Arama — MapsSiteGen{% endblock %}
+
+{% block extra_head %}
+<style>
+.hero{padding:3rem 0 2rem;text-align:center;}
+.hero h1{font-size:2.2rem;font-weight:800;margin-bottom:0.7rem;line-height:1.2;}
+.hero h1 span{color:var(--primary);}
+.hero p{color:var(--muted);font-size:1.05rem;max-width:560px;margin:0 auto 2rem;}
+
+.search-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:2rem;max-width:640px;margin:0 auto;
+}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+.form-group{display:flex;flex-direction:column;gap:0.4rem;}
+.form-group label{font-size:0.8rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.form-group input,.form-group select{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:0.65rem 0.9rem;border-radius:var(--radius);font-size:0.95rem;font-family:inherit;
+  transition:border-color 0.15s;
+}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--primary);}
+.form-footer{display:flex;gap:1rem;align-items:center;margin-top:1.2rem;}
+
+.progress-section{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:2rem;max-width:640px;margin:1.5rem auto;display:none;
+}
+.progress-bar-wrap{background:var(--surface2);border-radius:50px;height:8px;margin:1rem 0;}
+.progress-bar{height:8px;border-radius:50px;background:var(--primary);transition:width 0.5s;width:0%;}
+.progress-text{color:var(--muted);font-size:0.85rem;}
+.progress-name{font-size:0.9rem;margin-top:0.5rem;color:var(--text);}
+
+.tips{max-width:640px;margin:1.5rem auto 0;}
+.tips h3{font-size:0.85rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.8rem;}
+.tip-list{display:flex;flex-direction:column;gap:0.5rem;}
+.tip{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:0.7rem 1rem;font-size:0.85rem;color:var(--muted);cursor:pointer;transition:all 0.15s;
+}
+.tip:hover{border-color:var(--primary);color:var(--text);}
+.tip strong{color:var(--text);}
+
+@media(max-width:540px){.form-row{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <h1>Google Maps'ten <span>Web Sitesiz</span><br>İşletmeleri Bul</h1>
+  <p>Konum ve kategori gir, sisteme en yakın web sitesi olmayan işletmeleri bulsun, onlara site üret.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-error">⚠️ {{ error }}</div>
+{% endif %}
+
+<div class="search-card">
+  <form id="searchForm">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Kategori / İşletme Türü</label>
+        <input type="text" name="query" id="queryInput" placeholder="restoran, berber, kafe..." required value="{{ request.args.get('q','') }}"/>
+      </div>
+      <div class="form-group">
+        <label>Konum</label>
+        <input type="text" name="location" id="locationInput" placeholder="Kadıköy İstanbul"/>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Maksimum Sonuç</label>
+      <select name="max">
+        <option value="10">10 işletme</option>
+        <option value="20" selected>20 işletme</option>
+        <option value="30">30 işletme</option>
+      </select>
+    </div>
+    <div class="form-footer">
+      <button type="submit" class="btn btn-primary" id="searchBtn">🔍 Aramayı Başlat</button>
+      <span id="locBtn" class="btn btn-ghost" style="cursor:pointer;" onclick="getLocation()">📍 Konumumu Al</span>
+      {% if businesses %}
+      <a href="/businesses" class="btn btn-ghost">📋 {{ businesses|length }} sonuç</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<div class="progress-section" id="progressSection">
+  <div style="font-weight:600;margin-bottom:0.5rem;">🔍 Google Maps taranıyor...</div>
+  <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="progress-text" id="progressText">Başlatılıyor...</div>
+  <div class="progress-name" id="progressName"></div>
+</div>
+
+<div class="tips">
+  <h3>💡 Hızlı Aramalar</h3>
+  <div class="tip-list">
+    <div class="tip" onclick="fillSearch('restoran','Kadıköy İstanbul')"><strong>Restoran</strong> — Kadıköy, İstanbul</div>
+    <div class="tip" onclick="fillSearch('berber','Beşiktaş İstanbul')"><strong>Berber / Kuaför</strong> — Beşiktaş, İstanbul</div>
+    <div class="tip" onclick="fillSearch('kafe','Çankaya Ankara')"><strong>Kafe</strong> — Çankaya, Ankara</div>
+    <div class="tip" onclick="fillSearch('eczane','Bornova İzmir')"><strong>Eczane</strong> — Bornova, İzmir</div>
+    <div class="tip" onclick="fillSearch('market','Nilüfer Bursa')"><strong>Market</strong> — Nilüfer, Bursa</div>
+  </div>
+</div>
+
+<script>
+const searchForm = document.getElementById('searchForm');
+const searchBtn = document.getElementById('searchBtn');
+const progressSection = document.getElementById('progressSection');
+let polling = null;
+
+function fillSearch(q, loc) {
+  document.getElementById('queryInput').value = q;
+  document.getElementById('locationInput').value = loc;
+}
+
+function getLocation() {
+  if (!navigator.geolocation) return alert('Tarayıcınız konum desteklemiyor.');
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const {latitude: lat, longitude: lng} = pos.coords;
+    // Reverse geocode
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+      const d = await r.json();
+      const addr = d.address;
+      const loc = [addr.suburb||addr.neighbourhood||'', addr.city||addr.town||''].filter(Boolean).join(' ');
+      document.getElementById('locationInput').value = loc;
+    } catch(e) {
+      document.getElementById('locationInput').value = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    }
+  }, () => alert('Konum alınamadı.'));
+}
+
+searchForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = new FormData(searchForm);
+  searchBtn.disabled = true;
+  searchBtn.textContent = '⏳ Aranıyor...';
+  progressSection.style.display = 'block';
+
+  const res = await fetch('/search', {method:'POST', body: data});
+  const j = await res.json();
+  if (j.error) {
+    alert(j.error);
+    searchBtn.disabled = false;
+    searchBtn.textContent = '🔍 Aramayı Başlat';
+    return;
+  }
+  startPolling();
+});
+
+function startPolling() {
+  polling = setInterval(async () => {
+    const r = await fetch('/status');
+    const s = await r.json();
+
+    // Progress bar
+    const pct = s.progress.total > 0 ? (s.progress.current / s.progress.total * 100) : 5;
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressText').textContent =
+      s.progress.total > 0 ? `${s.progress.current} / ${s.progress.total} işletme işlendi` : 'Aranıyor...';
+    document.getElementById('progressName').textContent = s.progress.name ? `📍 ${s.progress.name}` : '';
+
+    if (!s.searching) {
+      clearInterval(polling);
+      if (s.error) {
+        alert('Hata: ' + s.error);
+        searchBtn.disabled = false;
+        searchBtn.textContent = '🔍 Aramayı Başlat';
+      } else {
+        window.location.href = '/businesses';
+      }
+    }
+  }, 1500);
+}
+
+// Eğer arama devam ediyorsa göster
+{% if searching %}
+progressSection.style.display = 'block';
+searchBtn.disabled = true;
+searchBtn.textContent = '⏳ Aranıyor...';
+startPolling();
+{% endif %}
+</script>
+{% endblock %}

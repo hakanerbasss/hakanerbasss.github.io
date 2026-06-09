@@ -1,0 +1,334 @@
+{% extends "app/base.html" %}
+{% block title %}{{ business.name }} — MapsSiteGen{% endblock %}
+
+{% block extra_head %}
+<style>
+.detail-layout{display:grid;grid-template-columns:1fr 340px;gap:2rem;padding:2rem 0;}
+@media(max-width:900px){.detail-layout{grid-template-columns:1fr;}}
+
+.main-col{}
+.side-col{}
+
+.info-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:1.5rem;margin-bottom:1.2rem;
+}
+.info-card h3{font-size:0.8rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:1rem;font-weight:600;}
+
+.biz-header{margin-bottom:1.5rem;}
+.biz-header h1{font-size:1.8rem;font-weight:800;margin-bottom:0.3rem;}
+.biz-cat{color:var(--muted);font-size:0.9rem;margin-bottom:0.7rem;}
+.biz-rating{display:inline-flex;align-items:center;gap:0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:50px;padding:0.4rem 0.9rem;font-size:0.85rem;}
+.stars{color:var(--yellow);}
+
+.photos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;}
+.photo-cell{border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:var(--surface2);}
+.photo-cell img{width:100%;height:100%;object-fit:cover;}
+
+.info-row{display:flex;align-items:flex-start;gap:0.8rem;padding:0.7rem 0;border-bottom:1px solid var(--border);}
+.info-row:last-child{border-bottom:none;}
+.info-icon{font-size:1.1rem;flex-shrink:0;width:1.5rem;text-align:center;}
+.info-label{font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+.info-val{font-size:0.9rem;font-weight:500;}
+
+.hours-list{display:flex;flex-direction:column;gap:0.3rem;}
+.hour-row{display:flex;justify-content:space-between;font-size:0.85rem;padding:0.3rem 0;}
+.hour-row span:first-child{color:var(--muted);}
+
+.reviews-list{display:flex;flex-direction:column;gap:0.8rem;}
+.review-item{background:var(--surface2);border-radius:8px;padding:0.8rem;font-size:0.85rem;color:var(--text);line-height:1.5;font-style:italic;}
+
+.ig-posts{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;}
+.ig-post{aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--surface2);position:relative;}
+.ig-post img{width:100%;height:100%;object-fit:cover;}
+.ig-post a{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);opacity:0;transition:opacity 0.15s;color:white;font-size:0.75rem;font-weight:600;text-decoration:none;}
+.ig-post:hover a{opacity:1;}
+
+.action-section{display:flex;flex-direction:column;gap:0.7rem;}
+.action-btn{width:100%;justify-content:center;padding:0.75rem;}
+
+.status-badge{
+  display:inline-flex;align-items:center;gap:0.4rem;
+  padding:0.4rem 0.9rem;border-radius:50px;font-size:0.8rem;font-weight:600;
+}
+.status-no-site{background:#3a1010;color:#f87171;}
+.status-has-site{background:#0f2a1a;color:#4ade80;}
+
+#generateResult{display:none;margin-top:0.5rem;}
+#previewFrame{width:100%;height:500px;border:none;border-radius:10px;background:#fff;display:none;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:1.5rem 0 0;">
+  <a href="/businesses" class="btn btn-ghost btn-sm">← Listeye Dön</a>
+</div>
+
+<div class="detail-layout">
+
+  <!-- SOL: Ana içerik -->
+  <div class="main-col">
+
+    <div class="biz-header">
+      <h1>{{ business.name }}</h1>
+      <div class="biz-cat">{{ business.category }}</div>
+      {% if business.rating > 0 %}
+      <div class="biz-rating">
+        <span class="stars">{% for i in range(business.rating|int) %}★{% endfor %}</span>
+        <span>{{ business.rating }} · {{ business.review_count }} yorum</span>
+      </div>
+      {% endif %}
+      &nbsp;
+      {% if not business.has_website %}
+      <span class="status-badge status-no-site">✗ Web sitesi yok</span>
+      {% else %}
+      <span class="status-badge status-has-site">✓ Web sitesi var</span>
+      {% endif %}
+    </div>
+
+    <!-- Fotoğraflar -->
+    {% if business.photos %}
+    <div class="info-card">
+      <h3>📸 Fotoğraflar ({{ business.photos|length }})</h3>
+      <div class="photos-grid">
+        {% for photo in business.photos[:9] %}
+        <div class="photo-cell">
+          <img src="{{ photo }}" alt="{{ business.name }}" loading="lazy"/>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Instagram -->
+    {% if business.instagram_handle %}
+    <div class="info-card">
+      <h3>📸 Instagram: @{{ business.instagram_handle }}
+        {% if business.instagram_followers %} · {{ business.instagram_followers }} takipçi{% endif %}
+      </h3>
+      {% if business.instagram_bio %}
+      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">{{ business.instagram_bio }}</p>
+      {% endif %}
+      {% if business.instagram_posts %}
+      <div class="ig-posts">
+        {% for post in business.instagram_posts[:9] %}
+        <div class="ig-post">
+          {% if post.thumbnail or post.url %}
+          <img src="{{ post.thumbnail or post.url }}" alt="Instagram post" loading="lazy"/>
+          {% else %}
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);">📷</div>
+          {% endif %}
+          <a href="{{ post.ig_link }}" target="_blank">Gör →</a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.85rem;">
+        <a href="https://instagram.com/{{ business.instagram_handle }}" target="_blank" style="color:var(--primary);">@{{ business.instagram_handle }}</a> hesabını ziyaret et
+      </p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Yorumlar -->
+    {% if business.reviews_snippet %}
+    <div class="info-card">
+      <h3>💬 Müşteri Yorumları</h3>
+      <div class="reviews-list">
+        {% for review in business.reviews_snippet %}
+        <div class="review-item">"{{ review }}"</div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- About -->
+    {% if business.about %}
+    <div class="info-card">
+      <h3>ℹ️ Google Açıklaması</h3>
+      <p style="color:var(--muted);font-size:0.9rem;line-height:1.7;">{{ business.about }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Site Önizleme -->
+    <div id="previewSection" style="display:{% if site_exists %}block{% else %}none{% endif %}">
+      <div class="info-card">
+        <h3>👁️ Üretilen Site Önizleme</h3>
+        <iframe id="previewFrame" src="/preview/{{ business.slug }}"
+          style="display:{% if site_exists %}block{% else %}none{% endif %}"></iframe>
+        {% if site_exists %}
+        <script>document.getElementById('previewFrame').style.display='block';</script>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SAĞ: İletişim + Aksiyonlar -->
+  <div class="side-col">
+
+    <!-- İletişim Bilgileri -->
+    <div class="info-card">
+      <h3>📋 İletişim Bilgileri</h3>
+      {% if business.phone %}
+      <div class="info-row">
+        <span class="info-icon">📞</span>
+        <div>
+          <div class="info-label">Telefon</div>
+          <div class="info-val"><a href="tel:{{ business.phone|replace(' ','') }}" style="color:var(--green);">{{ business.phone }}</a></div>
+        </div>
+      </div>
+      {% endif %}
+      {% if business.address %}
+      <div class="info-row">
+        <span class="info-icon">📍</span>
+        <div>
+          <div class="info-label">Adres</div>
+          <div class="info-val">{{ business.address }}</div>
+        </div>
+      </div>
+      {% endif %}
+      {% if business.category %}
+      <div class="info-row">
+        <span class="info-icon">🏷️</span>
+        <div>
+          <div class="info-label">Kategori</div>
+          <div class="info-val">{{ business.category }}</div>
+        </div>
+      </div>
+      {% endif %}
+      {% if business.instagram_handle %}
+      <div class="info-row">
+        <span class="info-icon">📸</span>
+        <div>
+          <div class="info-label">Instagram</div>
+          <div class="info-val">
+            <a href="https://instagram.com/{{ business.instagram_handle }}" target="_blank" style="color:#e1306c;">@{{ business.instagram_handle }}</a>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% if business.google_maps_url %}
+      <div class="info-row">
+        <span class="info-icon">🗺️</span>
+        <div>
+          <div class="info-label">Google Maps</div>
+          <div class="info-val"><a href="{{ business.google_maps_url }}" target="_blank">Haritada Gör</a></div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Çalışma Saatleri -->
+    {% if business.hours %}
+    <div class="info-card">
+      <h3>🕐 Çalışma Saatleri</h3>
+      <div class="hours-list">
+        {% for day, time in business.hours.items() %}
+        <div class="hour-row"><span>{{ day }}</span><span>{{ time }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Aksiyonlar -->
+    <div class="info-card">
+      <h3>⚡ Aksiyonlar</h3>
+      <div class="action-section">
+
+        <button class="btn btn-primary action-btn" id="generateBtn" onclick="generateSite()">
+          🌐 Site Üret
+        </button>
+
+        <div id="generateResult" class="alert alert-success">
+          ✓ Site üretildi!
+          <a href="/preview/{{ business.slug }}" target="_blank" style="color:inherit;text-decoration:underline;">Önizle →</a>
+        </div>
+
+        <button class="btn btn-ghost action-btn" id="deployBtn" onclick="deploySite()" {% if not site_exists %}disabled{% endif %}>
+          🚀 GitHub Pages'e Deploy
+        </button>
+
+        <div id="deployResult"></div>
+
+        {% if business.phone %}
+        <a href="tel:{{ business.phone|replace(' ','') }}" class="btn btn-green action-btn">
+          📞 Hemen Ara — {{ business.phone }}
+        </a>
+        {% endif %}
+
+        {% if business.instagram_handle %}
+        <a href="https://instagram.com/{{ business.instagram_handle }}" target="_blank" class="btn btn-ghost action-btn">
+          📸 Instagram'dan DM Gönder
+        </a>
+        {% endif %}
+
+        {% if business.google_maps_url %}
+        <a href="{{ business.google_maps_url }}" target="_blank" class="btn btn-ghost action-btn">
+          🗺️ Google Maps'te Aç
+        </a>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- Hizmetler -->
+    {% if business.services %}
+    <div class="info-card">
+      <h3>✅ Hizmetler (Maps'ten)</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
+        {% for s in business.services %}
+        <span style="background:var(--surface2);border:1px solid var(--border);border-radius:50px;padding:0.25rem 0.7rem;font-size:0.8rem;">{{ s }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+async function generateSite() {
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Üretiliyor...';
+
+  const res = await fetch('/generate/{{ business.slug }}', {method:'POST'});
+  const j = await res.json();
+
+  if (j.ok) {
+    document.getElementById('generateResult').style.display = 'block';
+    document.getElementById('deployBtn').disabled = false;
+    document.getElementById('previewSection').style.display = 'block';
+    const frame = document.getElementById('previewFrame');
+    frame.style.display = 'block';
+    frame.src = '/preview/{{ business.slug }}?' + Date.now();
+    btn.textContent = '✓ Yeniden Üret';
+    btn.disabled = false;
+  } else {
+    alert('Hata: ' + j.error);
+    btn.disabled = false;
+    btn.textContent = '🌐 Site Üret';
+  }
+}
+
+async function deploySite() {
+  const btn = document.getElementById('deployBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Deploy ediliyor...';
+
+  const res = await fetch('/deploy/{{ business.slug }}', {method:'POST'});
+  const j = await res.json();
+  const el = document.getElementById('deployResult');
+
+  if (j.ok) {
+    el.innerHTML = '<div class="alert alert-success">✓ Deploy edildi! <a href="'+j.url+'" target="_blank" style="color:inherit;text-decoration:underline;">'+j.url+'</a></div>';
+  } else {
+    el.innerHTML = '<div class="alert alert-error">⚠️ '+j.error+'</div>';
+  }
+  btn.disabled = false;
+  btn.textContent = '🚀 GitHub Pages\'e Deploy';
+  el.style.display = 'block';
+}
+</script>
+{% endblock %}

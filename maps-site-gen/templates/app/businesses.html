@@ -1,0 +1,119 @@
+{% extends "app/base.html" %}
+{% block title %}İşletmeler — MapsSiteGen{% endblock %}
+
+{% block extra_head %}
+<style>
+.toolbar{display:flex;align-items:center;gap:1rem;padding:1.2rem 0;flex-wrap:wrap;}
+.toolbar input{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  padding:0.55rem 0.9rem;border-radius:var(--radius);font-size:0.9rem;min-width:220px;
+}
+.toolbar input:focus{outline:none;border-color:var(--primary);}
+.toolbar-right{margin-left:auto;display:flex;gap:0.7rem;}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.2rem;padding-bottom:3rem;}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  overflow:hidden;transition:border-color 0.15s,transform 0.15s;display:block;text-decoration:none;color:inherit;
+}
+.card:hover{border-color:var(--primary);transform:translateY(-2px);text-decoration:none;}
+.card-photo{
+  height:160px;background:linear-gradient(135deg,#1e2a4a,#2d3f70);
+  display:flex;align-items:center;justify-content:center;font-size:3rem;
+  position:relative;overflow:hidden;
+}
+.card-photo img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.card-photo .ig-badge{
+  position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);
+  color:white;padding:0.2rem 0.5rem;border-radius:50px;font-size:0.7rem;font-weight:600;
+}
+.card-body{padding:1rem 1.1rem;}
+.card-cat{font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.25rem;}
+.card-name{font-size:1rem;font-weight:700;margin-bottom:0.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-addr{font-size:0.82rem;color:var(--muted);margin-bottom:0.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-meta{display:flex;align-items:center;gap:0.8rem;font-size:0.8rem;flex-wrap:wrap;}
+.rating{color:var(--yellow);}
+.no-web{background:#3a1010;color:#f87171;padding:0.15rem 0.5rem;border-radius:50px;font-weight:600;font-size:0.72rem;}
+.has-ig{color:#e1306c;font-weight:600;}
+.card-actions{padding:0 1.1rem 1rem;display:flex;gap:0.5rem;}
+
+.empty{text-align:center;padding:4rem 2rem;color:var(--muted);}
+.empty h2{font-size:1.4rem;margin-bottom:0.5rem;color:var(--text);}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>📋 Bulunan İşletmeler
+    {% if businesses %}<span class="badge" style="font-size:0.95rem;vertical-align:middle;">{{ businesses|length }}</span>{% endif %}
+  </h1>
+  <p>Web sitesi olmayan işletmeler — tıklayarak detayları gör ve site üret</p>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="searchFilter" placeholder="İşletme ara..." oninput="filterCards()"/>
+  <div class="toolbar-right">
+    <a href="/export/csv" class="btn btn-ghost btn-sm">⬇️ CSV Export</a>
+    <a href="/" class="btn btn-primary btn-sm">🔍 Yeni Arama</a>
+    <form action="/clear" method="post" style="margin:0;" onsubmit="return confirm('Tüm liste silinsin mi?')">
+      <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red);">🗑️ Temizle</button>
+    </form>
+  </div>
+</div>
+
+{% if not businesses %}
+<div class="empty">
+  <div style="font-size:3rem;margin-bottom:1rem;">🔍</div>
+  <h2>Henüz arama yapılmadı</h2>
+  <p>Ana sayfadan bir arama yapın.</p>
+  <a href="/" class="btn btn-primary" style="margin-top:1.5rem;">Aramaya Başla</a>
+</div>
+{% else %}
+<div class="grid" id="grid">
+  {% set icons = {'restoran':'🍽️','kafe':'☕','market':'🛒','berber':'✂️','kuaför':'💇','eczane':'💊','doktor':'🏥','tamirci':'🔧','otel':'🏨','fırın':'🥐','güzellik':'💅','spor':'💪'} %}
+  {% for b in businesses %}
+  <div class="card-wrap" data-name="{{ b.name|lower }}" data-cat="{{ b.category|lower }}">
+    <a href="/business/{{ b.slug }}" class="card">
+      <div class="card-photo">
+        {% if b.photos %}
+          <img src="{{ b.photos[0] }}" alt="{{ b.name }}" loading="lazy"/>
+        {% else %}
+          {% set icon = '🏢' %}
+          {% for key, ico in icons.items() %}{% if key in b.category|lower %}{% set icon = ico %}{% endif %}{% endfor %}
+          {{ icon }}
+        {% endif %}
+        {% if b.instagram_handle %}<span class="ig-badge">📸 IG</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <div class="card-cat">{{ b.category }}</div>
+        <div class="card-name">{{ b.name }}</div>
+        <div class="card-addr">📍 {{ b.address[:55] }}{% if b.address|length > 55 %}…{% endif %}</div>
+        <div class="card-meta">
+          {% if b.rating > 0 %}<span class="rating">★ {{ b.rating }}</span>{% endif %}
+          <span class="no-web">Web sitesi yok</span>
+          {% if b.instagram_handle %}<span class="has-ig">📸 IG</span>{% endif %}
+          {% if b.phone %}<span>📞 {{ b.phone }}</span>{% endif %}
+        </div>
+      </div>
+    </a>
+    <div class="card-actions">
+      <a href="/business/{{ b.slug }}" class="btn btn-primary btn-sm" style="flex:1;justify-content:center;">Detay & Site Üret</a>
+      {% if b.phone %}
+      <a href="tel:{{ b.phone|replace(' ','') }}" class="btn btn-ghost btn-sm">📞</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+function filterCards() {
+  const q = document.getElementById('searchFilter').value.toLowerCase();
+  document.querySelectorAll('.card-wrap').forEach(el => {
+    const show = el.dataset.name.includes(q) || el.dataset.cat.includes(q);
+    el.style.display = show ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

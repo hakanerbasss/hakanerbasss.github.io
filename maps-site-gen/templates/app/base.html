@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Maps Site Gen{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f1117;--surface:#1a1d27;--surface2:#222636;--border:#2d3148;
+      --text:#e8eaf0;--muted:#8890b0;--primary:#4f6ef7;--primary-dark:#3d5ce0;
+      --green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--radius:10px;
+    }
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+    a{color:var(--primary);text-decoration:none;}a:hover{text-decoration:underline;}
+
+    nav{
+      background:var(--surface);border-bottom:1px solid var(--border);
+      padding:0.9rem 1.5rem;display:flex;align-items:center;gap:1.5rem;
+      position:sticky;top:0;z-index:100;
+    }
+    .nav-brand{font-weight:700;font-size:1.1rem;color:var(--text);}
+    .nav-brand span{color:var(--primary);}
+    nav a.nav-link{color:var(--muted);font-size:0.9rem;transition:color 0.15s;}
+    nav a.nav-link:hover{color:var(--text);text-decoration:none;}
+    .nav-spacer{flex:1;}
+    .badge{background:var(--primary);color:white;border-radius:50px;padding:0.15rem 0.6rem;font-size:0.75rem;font-weight:600;}
+
+    .btn{
+      display:inline-flex;align-items:center;gap:0.4rem;
+      padding:0.55rem 1.1rem;border-radius:var(--radius);font-size:0.9rem;font-weight:600;
+      cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;
+    }
+    .btn-primary{background:var(--primary);color:white;}
+    .btn-primary:hover{background:var(--primary-dark);color:white;text-decoration:none;}
+    .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
+    .btn-ghost:hover{color:var(--text);border-color:var(--muted);text-decoration:none;}
+    .btn-green{background:var(--green);color:white;}
+    .btn-green:hover{filter:brightness(1.1);color:white;text-decoration:none;}
+    .btn-red{background:var(--red);color:white;}
+    .btn-sm{padding:0.35rem 0.75rem;font-size:0.8rem;}
+
+    .container{max-width:1200px;margin:0 auto;padding:0 1.5rem;}
+    .page-header{padding:2rem 0 1.5rem;}
+    .page-header h1{font-size:1.6rem;font-weight:700;margin-bottom:0.3rem;}
+    .page-header p{color:var(--muted);font-size:0.95rem;}
+
+    .alert{padding:0.8rem 1rem;border-radius:var(--radius);margin-bottom:1rem;font-size:0.9rem;}
+    .alert-error{background:#3a1a1a;border:1px solid #5a2020;color:#f87171;}
+    .alert-success{background:#0f2a1a;border:1px solid #1a4a2a;color:#4ade80;}
+    .alert-info{background:#1a1f3a;border:1px solid #2a3060;color:#93c5fd;}
+
+    footer{padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;margin-top:3rem;border-top:1px solid var(--border);}
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<nav>
+  <span class="nav-brand">Maps<span>Site</span>Gen</span>
+  <a href="/" class="nav-link">🔍 Ara</a>
+  <a href="/businesses" class="nav-link">📋 İşletmeler</a>
+  <a href="/export/csv" class="nav-link">⬇️ CSV Export</a>
+  <span class="nav-spacer"></span>
+</nav>
+
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+
+<footer>maps-site-gen · Google Maps → Web Sitesi Üretici</footer>
+</body>
+</html>
