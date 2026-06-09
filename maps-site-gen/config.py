@@ -6,6 +6,7 @@ HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"
 SLOW_MO = int(os.environ.get("SLOW_MO", "80"))
 MAX_BUSINESSES = int(os.environ.get("MAX_BUSINESSES", "30"))
 REQUEST_DELAY = float(os.environ.get("REQUEST_DELAY", "2.5"))
+GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "")
 FLASK_SECRET = os.environ.get("FLASK_SECRET", "maps-site-gen-secret-2024")

@@ -2,12 +2,18 @@
 Flask web uygulaması — Google Maps işletme bulucu + site üretici.
 """
 
-import asyncio
 import json
 import os
 import threading
 import csv
 import io
+
+# .env dosyasını yükle (varsa)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 import datetime
 from flask import (
     Flask, render_template, request, jsonify,
@@ -81,9 +87,7 @@ def search():
             _state["progress"] = {"current": cur, "total": tot, "name": name or "..."}
 
         try:
-            results = asyncio.run(
-                find_businesses_without_website(query, location, max_n, progress_cb)
-            )
+            results = find_businesses_without_website(query, location, max_n, progress_cb)
             _state["businesses"] = results
             _save_businesses(results)
         except Exception as e:
