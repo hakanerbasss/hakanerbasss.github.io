@@ -398,6 +398,14 @@ def scrape_with_overpass(
             break
         b = _osm_element_to_business(el)
         if b and b.name and not b.has_website:
+            # Fotoğraf yoksa stok fotoğraf ekle
+            if not b.photos:
+                try:
+                    from photos import fetch_photos
+                    b.photos = fetch_photos(b.category, b.name, 6)
+                    b.cover_photo = b.photos[0] if b.photos else ""
+                except Exception:
+                    pass
             results.append(b)
             if progress_cb:
                 progress_cb(i + 1, len(elements), b.name)
