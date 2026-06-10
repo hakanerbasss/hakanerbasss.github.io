@@ -1,5 +1,6 @@
 import os
 
+DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "output")
 HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"
