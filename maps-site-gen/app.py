@@ -2,50 +2,42 @@
 Flask web uygulaması — Google Maps işletme bulucu + site üretici.
 """
 
-import json
-import os
-import threading
-import csv
-import io
-import traceback
+import json, os, threading, csv, io, traceback, datetime
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
 
-# .env dosyasını yükle (varsa)
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass
 
-import datetime
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
 import config
 from scraper import BusinessInfo, find_businesses_without_website, save_json, load_json
 from generator import generate_business_site
-import instagram as ig
 
 app = Flask(__name__)
 app.secret_key = config.FLASK_SECRET
 
 _state = {
-    "searching": False,
-    "progress": {"current": 0, "total": 0, "name": ""},
-    "businesses": [],
-    "error": "",
-    "last_search": None,  # Son arama bilgisi
-    "log": [],            # Debug log satırları
+    "searching":   False,
+    "progress":    {"current": 0, "total": 0, "name": ""},
+    "businesses":  [],
+    "error":       "",
+    "last_search": None,
+    "log":         [],
 }
 
 DATA_FILE = os.path.join(config.OUTPUT_DIR, "businesses.json")
 
 
-def _log(msg: str):
+def _log(msg):
     print(msg)
     _state["log"].append(msg)
-    if len(_state["log"]) > 100:
-        _state["log"] = _state["log"][-100:]
+    if len(_state["log"]) > 200:
+        _state["log"] = _state["log"][-200:]
 
 
-def _load_businesses():
+def _load():
     if os.path.exists(DATA_FILE):
         try:
             return load_json(DATA_FILE)
@@ -54,24 +46,45 @@ def _load_businesses():
     return []
 
 
-def _save_businesses(businesses):
+def _save(businesses):
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     save_json(businesses, DATA_FILE)
 
 
-# ─── SAYFALAR ─────────────────────────────────────────────────────
+def _get_biz(slug=None):
+    biz = _state["businesses"] or _load()
+    _state["businesses"] = biz
+    if slug:
+        return biz, next((b for b in biz if b.slug == slug), None)
+    return biz
+
+
+# ─── ANA SAYFALAR ─────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    businesses = _state["businesses"] or _load_businesses()
-    _state["businesses"] = businesses
-    return render_template(
-        "app/index.html",
-        businesses=businesses,
-        searching=_state["searching"],
-        error=_state["error"],
-    )
+    biz = _get_biz()
+    return render_template("app/index.html", businesses=biz,
+                           searching=_state["searching"], error=_state["error"])
 
+
+@app.route("/businesses")
+def businesses():
+    biz = _get_biz()
+    return render_template("app/businesses.html", businesses=biz,
+                           last_search=_state.get("last_search"))
+
+
+@app.route("/business/<slug>")
+def business_detail(slug):
+    biz, b = _get_biz(slug)
+    if not b:
+        return "İşletme bulunamadı", 404
+    site_exists = os.path.exists(os.path.join(config.OUTPUT_DIR, slug, "index.html"))
+    return render_template("app/business_detail.html", business=b, site_exists=site_exists)
+
+
+# ─── ARAMA ────────────────────────────────────────────────────────
 
 @app.route("/search", methods=["POST"])
 def search():
@@ -85,34 +98,29 @@ def search():
     if not query:
         return jsonify({"error": "Arama terimi gerekli"}), 400
 
-    _state["searching"]   = True
-    _state["error"]       = ""
-    _state["businesses"]  = []
-    _state["log"]         = []
-    _state["last_search"] = {"query": query, "location": location, "max": max_n}
-    _state["progress"]    = {"current": 0, "total": 0, "name": "Başlatılıyor..."}
+    _state.update({"searching": True, "error": "", "businesses": [],
+                   "log": [], "last_search": {"query": query, "location": location},
+                   "progress": {"current": 0, "total": 0, "name": "Başlatılıyor..."}})
 
     def run():
-        def progress_cb(cur, tot, name):
+        def cb(cur, tot, name):
             _state["progress"] = {"current": cur, "total": tot, "name": name or "..."}
-
         try:
-            _log(f"[Arama] '{query}' @ '{location}', max={max_n}")
-            results = find_businesses_without_website(query, location, max_n, progress_cb)
-            _log(f"[Arama] Tamamlandı — {len(results)} işletme bulundu")
+            _log(f"[Arama] '{query}' @ '{location}'")
+            results = find_businesses_without_website(query, location, max_n, cb)
+            _log(f"[Arama] Tamamlandı — {len(results)} işletme")
             _state["businesses"] = results
             if results:
-                _save_businesses(results)
+                _save(results)
             else:
                 _state["error"] = (
-                    f"'{query}' araması için '{location or 'belirtilmemiş konum'}' "
-                    f"yakınında web sitesi olmayan işletme bulunamadı. "
-                    f"Farklı bir kategori veya konum deneyin."
+                    f"'{query}' için '{location or 'belirsiz konum'}' "
+                    f"yakınında web sitesiz işletme bulunamadı. "
+                    f"Farklı kategori veya konum deneyin."
                 )
         except Exception as e:
-            err = traceback.format_exc()
-            _log(f"[HATA] {err}")
-            _state["error"] = f"Arama hatası: {str(e)}"
+            _log(f"[HATA] {traceback.format_exc()}")
+            _state["error"] = f"Hata: {str(e)}"
         finally:
             _state["searching"] = False
 
@@ -131,47 +139,160 @@ def status():
     })
 
 
-@app.route("/businesses")
-def businesses():
-    biz = _state["businesses"] or _load_businesses()
-    _state["businesses"] = biz
-    last = _state.get("last_search")
-    return render_template("app/businesses.html", businesses=biz, last_search=last)
+# ─── INSTAGRAM ─────────────────────────────────────────────────────
 
-
-@app.route("/business/<slug>")
-def business_detail(slug):
-    businesses = _state["businesses"] or _load_businesses()
-    b = next((x for x in businesses if x.slug == slug), None)
+@app.route("/fetch-instagram/<slug>", methods=["POST"])
+def fetch_instagram(slug):
+    """Instagram hesabını arar + gerçek fotoğrafları çeker."""
+    biz, b = _get_biz(slug)
     if not b:
-        return "İşletme bulunamadı", 404
+        return jsonify({"error": "İşletme bulunamadı"}), 404
 
-    if b.instagram_handle and not b.instagram_posts:
-        try:
-            ig_profile = ig.fetch_profile(b.instagram_handle)
-            b.instagram_posts    = ig_profile.posts
-            b.instagram_bio      = ig_profile.bio
-            b.instagram_followers = ig_profile.followers
-            _save_businesses(businesses)
-        except Exception:
-            pass
+    handle = request.form.get("handle", "").strip().lstrip("@")
 
-    site_exists = os.path.exists(os.path.join(config.OUTPUT_DIR, slug, "index.html"))
-    return render_template("app/business_detail.html", business=b, site_exists=site_exists)
+    import instagram as ig
 
+    # Handle verilmediyse otomatik ara
+    if not handle:
+        handle = ig.find_instagram_handle(b.name, b.address)
+        if not handle:
+            return jsonify({"error": "Instagram hesabı bulunamadı. Hesap adını elle gir."}), 404
+
+    # Profili çek
+    profile = ig.fetch_profile(handle)
+    if not profile.posts and not profile.bio:
+        return jsonify({"error": f"@{handle} profili çekilemedi (gizli veya yok)."}), 400
+
+    # İşletme verisini güncelle
+    b.instagram_handle   = profile.handle
+    b.instagram_bio      = profile.bio
+    b.instagram_followers = profile.followers
+    b.instagram_posts    = profile.posts
+
+    # Gerçek Instagram fotoğraflarını photos listesine al
+    real_photos = [p["thumbnail"] for p in profile.posts if p.get("thumbnail")]
+    if real_photos:
+        b.photos       = real_photos
+        b.cover_photo  = real_photos[0]
+
+    _save(biz)
+
+    return jsonify({
+        "ok":         True,
+        "handle":     profile.handle,
+        "followers":  profile.followers,
+        "bio":        profile.bio,
+        "post_count": len(profile.posts),
+        "photos":     real_photos[:9],
+        "profile_pic": profile.profile_pic,
+    })
+
+
+@app.route("/set-instagram/<slug>", methods=["POST"])
+def set_instagram(slug):
+    """Elle Instagram handle set eder (fetch tetiklemez)."""
+    biz, b = _get_biz(slug)
+    if not b:
+        return jsonify({"error": "İşletme bulunamadı"}), 404
+    b.instagram_handle = request.form.get("handle", "").strip().lstrip("@")
+    _save(biz)
+    return jsonify({"ok": True})
+
+
+# ─── SITE ÜRET / DÜZENLE ──────────────────────────────────────────
 
 @app.route("/generate/<slug>", methods=["POST"])
 def generate(slug):
-    businesses = _state["businesses"] or _load_businesses()
-    b = next((x for x in businesses if x.slug == slug), None)
+    biz, b = _get_biz(slug)
     if not b:
         return jsonify({"error": "İşletme bulunamadı"}), 404
     try:
-        tpl_dir = os.path.join(os.path.dirname(__file__), "templates", "site")
-        generate_business_site(b, config.OUTPUT_DIR, tpl_dir)
-        return jsonify({"ok": True, "slug": slug})
+        tpl = os.path.join(os.path.dirname(__file__), "templates", "site")
+        generate_business_site(b, config.OUTPUT_DIR, tpl)
+        return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": traceback.format_exc()}), 500
+
+
+@app.route("/edit/<slug>", methods=["GET"])
+def edit(slug):
+    """Site editörü sayfası."""
+    biz, b = _get_biz(slug)
+    if not b:
+        return "İşletme bulunamadı", 404
+
+    # Mevcut içeriği yükle (varsa override JSON)
+    override = _load_override(slug)
+    site_exists = os.path.exists(os.path.join(config.OUTPUT_DIR, slug, "index.html"))
+    return render_template("app/edit.html", business=b, override=override,
+                           site_exists=site_exists)
+
+
+@app.route("/edit/<slug>", methods=["POST"])
+def edit_save(slug):
+    """Düzenlenen içeriği kaydeder ve siteyi yeniler."""
+    biz, b = _get_biz(slug)
+    if not b:
+        return jsonify({"error": "İşletme bulunamadı"}), 404
+
+    data = request.get_json(force=True) or {}
+
+    # İletişim bilgilerini güncelle
+    if "phone"    in data: b.phone    = data["phone"]
+    if "address"  in data: b.address  = data["address"]
+    if "name"     in data: b.name     = data["name"]
+    if "category" in data: b.category = data["category"]
+    if "about"    in data: b.about    = data["about"]
+    if "instagram_handle" in data:
+        b.instagram_handle = data["instagram_handle"].lstrip("@")
+
+    # Fotoğraf sırası
+    if "photos" in data and isinstance(data["photos"], list):
+        b.photos      = data["photos"]
+        b.cover_photo = b.photos[0] if b.photos else ""
+
+    # Çalışma saatleri
+    if "hours" in data and isinstance(data["hours"], dict):
+        b.hours = data["hours"]
+
+    # AI içerik override'ı kaydet
+    override = {}
+    for key in ("headline", "tagline", "about_text", "services", "cta_text"):
+        if key in data and data[key]:
+            override[key] = data[key]
+
+    _save_override(slug, override)
+    _save(biz)
+
+    # Siteyi yeniden üret
+    try:
+        tpl = os.path.join(os.path.dirname(__file__), "templates", "site")
+        generate_business_site(b, config.OUTPUT_DIR, tpl, override=override)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": traceback.format_exc()}), 500
+
+
+def _override_path(slug):
+    return os.path.join(config.OUTPUT_DIR, slug, "override.json")
+
+
+def _load_override(slug):
+    p = _override_path(slug)
+    if os.path.exists(p):
+        try:
+            with open(p, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _save_override(slug, data):
+    p = _override_path(slug)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 @app.route("/preview/<slug>")
@@ -183,47 +304,45 @@ def preview(slug):
         return f.read()
 
 
+# ─── DEPLOY ───────────────────────────────────────────────────────
+
 @app.route("/deploy/<slug>", methods=["POST"])
 def deploy(slug):
     if not config.GITHUB_TOKEN or not config.GITHUB_REPO:
         return jsonify({"error": "GITHUB_TOKEN ve GITHUB_REPO .env dosyasında eksik"}), 400
-    businesses = _state["businesses"] or _load_businesses()
-    b = next((x for x in businesses if x.slug == slug), None)
+    biz, b = _get_biz(slug)
     if not b:
         return jsonify({"error": "İşletme bulunamadı"}), 404
     if not os.path.exists(os.path.join(config.OUTPUT_DIR, slug, "index.html")):
-        return jsonify({"error": "Önce site üretin"}), 400
+        return jsonify({"error": "Önce siteyi üretin"}), 400
     try:
         from deploy import push_to_github_pages
         url = push_to_github_pages(
             site_dir=os.path.join(config.OUTPUT_DIR, slug),
-            repo=config.GITHUB_REPO,
-            token=config.GITHUB_TOKEN,
-            branch=f"site/{slug}",
-            subdir=slug,
+            repo=config.GITHUB_REPO, token=config.GITHUB_TOKEN,
+            branch=f"site/{slug}", subdir=slug,
         )
         return jsonify({"ok": True, "url": url})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
+# ─── EXPORT ───────────────────────────────────────────────────────
+
 @app.route("/export/csv")
 def export_csv():
-    businesses = _state["businesses"] or _load_businesses()
-    output = io.StringIO()
-    w = csv.writer(output)
-    w.writerow(["İşletme Adı", "Kategori", "Adres", "Telefon", "Instagram", "Google Maps"])
-    for b in businesses:
+    biz = _get_biz()
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["İşletme", "Kategori", "Adres", "Telefon", "Instagram", "Google Maps"])
+    for b in biz:
         w.writerow([b.name, b.category, b.address, b.phone,
                     f"@{b.instagram_handle}" if b.instagram_handle else "",
                     b.google_maps_url])
-    output.seek(0)
-    return send_file(
-        io.BytesIO(output.getvalue().encode("utf-8-sig")),
-        mimetype="text/csv",
-        as_attachment=True,
-        download_name=f"isletmeler_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-    )
+    out.seek(0)
+    return send_file(io.BytesIO(out.getvalue().encode("utf-8-sig")),
+                     mimetype="text/csv", as_attachment=True,
+                     download_name=f"isletmeler_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv")
 
 
 @app.route("/clear", methods=["POST"])
@@ -240,68 +359,51 @@ def clear():
 
 @app.route("/debug")
 def debug():
-    """Bağlantı ve scraper testleri."""
-    results = {}
-
-    # Overpass bağlantısı
-    try:
-        import requests as req
-        r = req.get("https://overpass-api.de/api/status", timeout=8)
-        results["overpass"] = f"✓ Bağlı (HTTP {r.status_code})"
-    except Exception as e:
-        results["overpass"] = f"✗ BAĞLANAMADI: {e}"
-
-    # Nominatim bağlantısı
-    try:
-        import requests as req
-        r = req.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={"q": "Istanbul", "format": "json", "limit": 1},
-            headers={"User-Agent": "maps-site-gen/1.0"},
-            timeout=8,
-        )
-        data = r.json()
-        results["nominatim"] = f"✓ Bağlı — Istanbul: {data[0]['lat'] if data else 'veri yok'}"
-    except Exception as e:
-        results["nominatim"] = f"✗ BAĞLANAMADI: {e}"
-
-    # Tüm mirror'ları test et
     from scraper import OVERPASS_MIRRORS
     import requests as req
-    mirror_results = {}
+    results = {}
+
+    try:
+        r = req.get("https://nominatim.openstreetmap.org/search",
+                    params={"q": "Istanbul", "format": "json", "limit": 1},
+                    headers={"User-Agent": "maps-site-gen/1.0"}, timeout=8)
+        d = r.json()
+        results["nominatim"] = f"✓ {d[0]['lat'] if d else 'veri yok'}"
+    except Exception as e:
+        results["nominatim"] = f"✗ {e}"
+
     q = '[out:json][timeout:10];\nnode["amenity"="cafe"][!"website"](around:2000,41.0082,28.9784);\nout body;\n'
     hdrs = {"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "maps-site-gen/1.0"}
+    mirror_results = {}
     for mirror in OVERPASS_MIRRORS:
         try:
             r = req.post(mirror, data={"data": q}, headers=hdrs, timeout=12)
             if r.status_code == 200:
                 els = r.json().get("elements", [])
-                mirror_results[mirror] = f"✓ HTTP 200 — {len(els)} sonuç"
-                break
+                mirror_results[mirror] = f"✓ {len(els)} sonuç"
             else:
                 mirror_results[mirror] = f"✗ HTTP {r.status_code}"
         except Exception as e:
             mirror_results[mirror] = f"✗ {e}"
     results["overpass_mirrors"] = mirror_results
-
-    results["log"] = _state["log"][-20:] or ["(log boş)"]
+    results["log"] = _state["log"][-20:] or ["(boş)"]
     results["last_search"] = _state.get("last_search")
-    results["business_count"] = len(_state["businesses"])
+    results["businesses"] = len(_state["businesses"])
 
-    html = "<h2>Debug</h2><pre style='font-family:monospace;font-size:14px;background:#111;color:#eee;padding:1.5rem;border-radius:8px;'>"
+    html = "<h2 style='font-family:sans-serif'>Debug</h2><pre style='font-family:monospace;font-size:13px;background:#111;color:#eee;padding:1.5rem;border-radius:8px;'>"
     for k, v in results.items():
-        if isinstance(v, list):
+        if isinstance(v, dict):
             html += f"\n{k}:\n"
-            for line in v:
-                html += f"  {line}\n"
+            for kk, vv in v.items():
+                html += f"  {kk}: {vv}\n"
+        elif isinstance(v, list):
+            html += f"\n{k}:\n" + "".join(f"  {l}\n" for l in v)
         else:
             html += f"{k}: {v}\n"
-    html += "</pre>"
-    html += '<br><a href="/" style="color:#4f6ef7;">← Ana Sayfa</a>'
+    html += f"</pre><br><a href='/' style='color:#4f6ef7'>← Ana Sayfa</a>"
     return html
 
 
 if __name__ == "__main__":
-    print(f"\n✅ maps-site-gen başlatıldı → http://127.0.0.1:{config.FLASK_PORT}/")
-    print(f"   Debug: http://127.0.0.1:{config.FLASK_PORT}/debug\n")
+    print(f"\n✅ http://127.0.0.1:{config.FLASK_PORT}/  |  debug: /debug\n")
     app.run(host=config.FLASK_HOST, port=config.FLASK_PORT, debug=False)

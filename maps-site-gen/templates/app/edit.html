@@ -1,0 +1,299 @@
+{% extends "app/base.html" %}
+{% block title %}Düzenle — {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.edit-layout{display:grid;grid-template-columns:1fr 380px;gap:1.5rem;padding:1.5rem 0 3rem;}
+@media(max-width:900px){.edit-layout{grid-template-columns:1fr;}}
+
+.edit-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.4rem;margin-bottom:1rem;}
+.edit-card h3{font-size:0.78rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:1rem;font-weight:600;}
+
+.field{display:flex;flex-direction:column;gap:0.35rem;margin-bottom:0.9rem;}
+.field label{font-size:0.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;}
+.field input,.field textarea,.field select{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:0.6rem 0.85rem;border-radius:8px;font-size:0.9rem;font-family:inherit;
+  transition:border-color 0.15s;resize:vertical;
+}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--primary);}
+.field textarea{min-height:90px;line-height:1.6;}
+
+.services-list{display:flex;flex-direction:column;gap:0.4rem;}
+.svc-row{display:flex;gap:0.4rem;align-items:center;}
+.svc-row input{flex:1;}
+.svc-del{background:var(--surface2);border:1px solid var(--border);color:var(--red);
+  width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:0.9rem;display:flex;align-items:center;justify-content:center;}
+
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-bottom:0.7rem;}
+.photo-item{aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--surface2);position:relative;cursor:move;}
+.photo-item img{width:100%;height:100%;object-fit:cover;}
+.photo-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);color:white;
+  border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;padding:2px 5px;}
+.add-photo-row{display:flex;gap:0.4rem;margin-top:0.4rem;}
+.add-photo-row input{flex:1;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);padding:0.5rem 0.7rem;border-radius:8px;font-size:0.82rem;}
+
+.preview-frame{width:100%;height:600px;border:none;border-radius:10px;background:#fff;}
+.sticky-save{position:sticky;top:70px;z-index:10;}
+
+.hours-list{display:flex;flex-direction:column;gap:0.4rem;}
+.hour-row-edit{display:grid;grid-template-columns:110px 1fr;gap:0.5rem;align-items:center;}
+.hour-row-edit span{font-size:0.85rem;color:var(--muted);}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:1.2rem 0 0;">
+  <a href="/business/{{ business.slug }}" class="btn btn-ghost btn-sm">← Detaya Dön</a>
+</div>
+
+<h1 style="padding:1rem 0 0.2rem;font-size:1.5rem;">✏️ Site Düzenleyici</h1>
+<p style="color:var(--muted);font-size:0.9rem;margin-bottom:1.2rem;">{{ business.name }} — değişiklikler kaydedilince site yeniden üretilir</p>
+
+<div class="edit-layout">
+
+  <!-- SOL: Formlar -->
+  <div>
+
+    <!-- Temel Bilgiler -->
+    <div class="edit-card">
+      <h3>📋 Temel Bilgiler</h3>
+      <div class="field">
+        <label>İşletme Adı</label>
+        <input type="text" id="f_name" value="{{ business.name }}"/>
+      </div>
+      <div class="field">
+        <label>Kategori</label>
+        <input type="text" id="f_category" value="{{ business.category }}"/>
+      </div>
+      <div class="field">
+        <label>Telefon</label>
+        <input type="text" id="f_phone" value="{{ business.phone }}"/>
+      </div>
+      <div class="field">
+        <label>Adres</label>
+        <input type="text" id="f_address" value="{{ business.address }}"/>
+      </div>
+      <div class="field">
+        <label>Instagram Hesabı (@olmadan)</label>
+        <input type="text" id="f_instagram" value="{{ business.instagram_handle }}" placeholder="ornek_kuafor"/>
+      </div>
+    </div>
+
+    <!-- İçerik -->
+    <div class="edit-card">
+      <h3>✍️ Site İçeriği</h3>
+      <div class="field">
+        <label>Ana Başlık (Headline)</label>
+        <input type="text" id="f_headline" value="{{ override.headline or '' }}" placeholder="Ör: Değişim Kuaför — Profesyonel Saç Tasarımı"/>
+      </div>
+      <div class="field">
+        <label>Slogan (Tagline)</label>
+        <input type="text" id="f_tagline" value="{{ override.tagline or '' }}" placeholder="Ör: İstanbul Beyoğlu'nda güvenilir kuaför hizmetleri"/>
+      </div>
+      <div class="field">
+        <label>Hakkımızda Metni</label>
+        <textarea id="f_about">{{ override.about_text or business.about or '' }}</textarea>
+      </div>
+      <div class="field">
+        <label>Buton Metni (CTA)</label>
+        <input type="text" id="f_cta" value="{{ override.cta_text or '' }}" placeholder="Hemen Arayın"/>
+      </div>
+    </div>
+
+    <!-- Hizmetler -->
+    <div class="edit-card">
+      <h3>✅ Hizmetler</h3>
+      <div class="services-list" id="servicesList">
+        {% set svcs = override.services if override.services else business.services %}
+        {% for s in svcs %}
+        <div class="svc-row">
+          <input type="text" value="{{ s }}"/>
+          <button class="svc-del" onclick="this.parentElement.remove()">✕</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:0.5rem;" onclick="addService()">+ Hizmet Ekle</button>
+    </div>
+
+    <!-- Çalışma Saatleri -->
+    {% if business.hours %}
+    <div class="edit-card">
+      <h3>🕐 Çalışma Saatleri</h3>
+      <div class="hours-list" id="hoursList">
+        {% for day, time in business.hours.items() %}
+        <div class="hour-row-edit">
+          <span>{{ day }}</span>
+          <input type="text" class="hour-input" data-day="{{ day }}" value="{{ time }}"/>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Fotoğraflar -->
+    <div class="edit-card">
+      <h3>🖼️ Fotoğraflar <small style="font-weight:400;color:var(--muted);">(sürükleyerek sırala)</small></h3>
+      <div class="photo-grid" id="photoGrid">
+        {% for photo in business.photos %}
+        <div class="photo-item" draggable="true" data-url="{{ photo }}">
+          <img src="{{ photo }}" loading="lazy"/>
+          <button class="photo-del" onclick="removePhoto(this)">✕</button>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="add-photo-row">
+        <input type="text" id="newPhotoUrl" placeholder="Fotoğraf URL'si yapıştır (Instagram, Google, vs)"/>
+        <button class="btn btn-ghost btn-sm" onclick="addPhoto()">Ekle</button>
+      </div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem;">
+        Instagram'dan gerçek fotoğraf için önce detay sayfasında "Çek" butonunu kullan.
+      </p>
+    </div>
+
+  </div>
+
+  <!-- SAĞ: Kaydet + Önizleme -->
+  <div>
+    <div class="sticky-save">
+      <div class="edit-card">
+        <h3>💾 Kaydet & Yayınla</h3>
+        <div style="display:flex;flex-direction:column;gap:0.7rem;">
+          <button class="btn btn-primary action-btn" onclick="saveAndGenerate()" id="saveBtn">
+            ✓ Kaydet & Siteyi Güncelle
+          </button>
+          <a href="/preview/{{ business.slug }}" target="_blank" class="btn btn-ghost action-btn" id="previewBtn"
+            {% if not site_exists %}style="opacity:0.4;pointer-events:none;"{% endif %}>
+            👁️ Önizle (yeni sekmede)
+          </a>
+          <button class="btn btn-ghost action-btn" id="deployBtn"
+            onclick="deploySite()" {% if not site_exists %}disabled{% endif %}>
+            🚀 GitHub Pages Deploy
+          </button>
+        </div>
+        <div id="saveResult" style="margin-top:0.7rem;"></div>
+        <div id="deployResult" style="margin-top:0.5rem;"></div>
+      </div>
+
+      {% if site_exists %}
+      <div class="edit-card" style="padding:0;overflow:hidden;">
+        <div style="padding:0.8rem 1rem;font-size:0.78rem;color:var(--muted);border-bottom:1px solid var(--border);">
+          👁️ Canlı Önizleme
+        </div>
+        <iframe class="preview-frame" id="previewFrame" src="/preview/{{ business.slug }}"></iframe>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+function addService() {
+  const row = document.createElement('div');
+  row.className = 'svc-row';
+  row.innerHTML = '<input type="text" placeholder="Yeni hizmet..."/><button class="svc-del" onclick="this.parentElement.remove()">✕</button>';
+  document.getElementById('servicesList').appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function addPhoto() {
+  const url = document.getElementById('newPhotoUrl').value.trim();
+  if (!url) return;
+  const grid = document.getElementById('photoGrid');
+  const item = document.createElement('div');
+  item.className = 'photo-item';
+  item.draggable = true;
+  item.dataset.url = url;
+  item.innerHTML = `<img src="${url}" loading="lazy"/><button class="photo-del" onclick="removePhoto(this)">✕</button>`;
+  grid.appendChild(item);
+  document.getElementById('newPhotoUrl').value = '';
+}
+
+function removePhoto(btn) {
+  btn.parentElement.remove();
+}
+
+function getPhotos() {
+  return [...document.querySelectorAll('.photo-item')].map(el => el.dataset.url).filter(Boolean);
+}
+
+function getServices() {
+  return [...document.querySelectorAll('#servicesList .svc-row input')]
+    .map(i => i.value.trim()).filter(Boolean);
+}
+
+function getHours() {
+  const h = {};
+  document.querySelectorAll('.hour-input').forEach(i => {
+    const day = i.dataset.day;
+    const val = i.value.trim();
+    if (day && val) h[day] = val;
+  });
+  return h;
+}
+
+async function saveAndGenerate() {
+  const btn = document.getElementById('saveBtn');
+  const res_el = document.getElementById('saveResult');
+  btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+
+  const payload = {
+    name:       document.getElementById('f_name').value,
+    category:   document.getElementById('f_category').value,
+    phone:      document.getElementById('f_phone').value,
+    address:    document.getElementById('f_address').value,
+    instagram_handle: document.getElementById('f_instagram').value,
+    headline:   document.getElementById('f_headline').value,
+    tagline:    document.getElementById('f_tagline').value,
+    about_text: document.getElementById('f_about').value,
+    cta_text:   document.getElementById('f_cta').value,
+    services:   getServices(),
+    photos:     getPhotos(),
+    hours:      getHours(),
+  };
+
+  const r = await fetch('/edit/{{ business.slug }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const j = await r.json();
+
+  if (j.ok) {
+    res_el.innerHTML = '<div class="alert alert-success">✓ Kaydedildi! Site yenilendi.</div>';
+    document.getElementById('deployBtn').disabled = false;
+    document.getElementById('previewBtn').style.opacity = '1';
+    document.getElementById('previewBtn').style.pointerEvents = 'auto';
+    // Önizlemeyi yenile
+    const frame = document.getElementById('previewFrame');
+    if (frame) { frame.style.display = 'block'; frame.src = '/preview/{{ business.slug }}?' + Date.now(); }
+  } else {
+    res_el.innerHTML = `<div class="alert alert-error">⚠️ ${j.error?.substring(0,200)}</div>`;
+  }
+  btn.disabled = false; btn.textContent = '✓ Kaydet & Siteyi Güncelle';
+}
+
+async function deploySite() {
+  const btn = document.getElementById('deployBtn');
+  btn.disabled = true; btn.textContent = '⏳ Deploy...';
+  const r = await fetch('/deploy/{{ business.slug }}', {method:'POST'});
+  const j = await r.json();
+  const el = document.getElementById('deployResult');
+  if (j.ok) {
+    el.innerHTML = `<div class="alert alert-success">🚀 Yayında! <a href="${j.url}" target="_blank" style="color:inherit;text-decoration:underline;">${j.url}</a></div>`;
+  } else {
+    el.innerHTML = `<div class="alert alert-error">⚠️ ${j.error}</div>`;
+  }
+  btn.disabled = false; btn.textContent = '🚀 GitHub Pages Deploy';
+}
+
+// Sürükle-bırak fotoğraf sıralama
+const grid = document.getElementById('photoGrid');
+let dragEl = null;
+grid.addEventListener('dragstart', e => { dragEl = e.target.closest('.photo-item'); dragEl.style.opacity='0.4'; });
+grid.addEventListener('dragend',   e => { dragEl.style.opacity='1'; dragEl = null; });
+grid.addEventListener('dragover',  e => { e.preventDefault(); const t = e.target.closest('.photo-item'); if (t && t !== dragEl) t.parentNode.insertBefore(dragEl, t); });
+</script>
+{% endblock %}

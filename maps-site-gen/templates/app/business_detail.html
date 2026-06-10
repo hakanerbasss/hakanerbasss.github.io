@@ -231,6 +231,28 @@
     </div>
     {% endif %}
 
+    <!-- Instagram Fotoğraf Çekici -->
+    <div class="info-card">
+      <h3>📸 Gerçek Fotoğraflar — Instagram</h3>
+      <p style="color:var(--muted);font-size:0.82rem;margin-bottom:0.8rem;">
+        İşletmenin Instagram'ından gerçek fotoğraflar çeker ve siteye ekler.
+      </p>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.7rem;">
+        <input type="text" id="igHandle" placeholder="@hesap_adi (boş bırak=otomatik)"
+          value="{{ business.instagram_handle or '' }}"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.55rem 0.8rem;border-radius:var(--radius);font-size:0.85rem;"/>
+        <button class="btn btn-primary btn-sm" onclick="fetchIG()" id="igBtn">Çek</button>
+      </div>
+      <div id="igResult"></div>
+      {% if business.instagram_handle %}
+      <div style="font-size:0.8rem;color:var(--muted);">
+        Mevcut: <a href="https://instagram.com/{{ business.instagram_handle }}" target="_blank">@{{ business.instagram_handle }}</a>
+        {% if business.instagram_followers %} · {{ business.instagram_followers }} takipçi{% endif %}
+        {% if business.instagram_posts %} · {{ business.instagram_posts|length }} gerçek fotoğraf ✓{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
     <!-- Aksiyonlar -->
     <div class="info-card">
       <h3>⚡ Aksiyonlar</h3>
@@ -240,8 +262,12 @@
           🌐 Site Üret
         </button>
 
-        <div id="generateResult" class="alert alert-success">
-          ✓ Site üretildi!
+        <a href="/edit/{{ business.slug }}" class="btn btn-ghost action-btn">
+          ✏️ Siteyi Düzenle
+        </a>
+
+        <div id="generateResult" style="display:none;" class="alert alert-success">
+          ✓ Site üretildi! &nbsp;
           <a href="/preview/{{ business.slug }}" target="_blank" style="color:inherit;text-decoration:underline;">Önizle →</a>
         </div>
 
@@ -259,7 +285,7 @@
 
         {% if business.instagram_handle %}
         <a href="https://instagram.com/{{ business.instagram_handle }}" target="_blank" class="btn btn-ghost action-btn">
-          📸 Instagram'dan DM Gönder
+          📩 Instagram DM
         </a>
         {% endif %}
 
@@ -310,6 +336,42 @@ async function generateSite() {
     btn.disabled = false;
     btn.textContent = '🌐 Site Üret';
   }
+}
+
+async function fetchIG() {
+  const btn = document.getElementById('igBtn');
+  const handle = document.getElementById('igHandle').value.trim();
+  const res_el = document.getElementById('igResult');
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  res_el.innerHTML = '<div class="alert alert-info" style="margin-top:0.5rem;">🔍 Instagram aranıyor...</div>';
+
+  const fd = new FormData();
+  fd.append('handle', handle);
+  const res = await fetch('/fetch-instagram/{{ business.slug }}', {method:'POST', body: fd});
+  const j = await res.json();
+
+  if (j.ok) {
+    res_el.innerHTML = `
+      <div class="alert alert-success" style="margin-top:0.5rem;">
+        ✓ <strong>@${j.handle}</strong> · ${j.followers} takipçi · ${j.post_count} fotoğraf çekildi
+        <br><small style="opacity:0.8;">Şimdi "Site Üret" butonuna bas — gerçek fotoğraflarla üretilecek.</small>
+      </div>`;
+    // Fotoğraf grid'ini güncelle
+    if (j.photos && j.photos.length > 0) {
+      const grid = document.querySelector('.photos-grid');
+      if (grid) {
+        grid.innerHTML = j.photos.map(url =>
+          `<div class="photo-cell"><img src="${url}" loading="lazy"/></div>`
+        ).join('');
+      }
+    }
+  } else {
+    res_el.innerHTML = `<div class="alert alert-error" style="margin-top:0.5rem;">⚠️ ${j.error}</div>`;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Çek';
 }
 
 async function deploySite() {

@@ -32,6 +32,7 @@ def generate_business_site(
     business: BusinessInfo,
     output_dir: str,
     template_dir: str = None,
+    override: dict = None,
 ) -> str:
     if template_dir is None:
         template_dir = os.path.join(os.path.dirname(__file__), "templates", "site")
@@ -40,6 +41,15 @@ def generate_business_site(
     tpl = env.get_template("business.html")
 
     content = content_ai.generate_content(business)
+
+    # Kullanıcının düzenlemelerini içeriğe uygula
+    if override:
+        if "headline"   in override: content["headline"]        = override["headline"]
+        if "tagline"    in override: content["tagline"]         = override["tagline"]
+        if "about_text" in override: content["about"]           = override["about_text"]
+        if "services"   in override: content["services"]        = override["services"]
+        if "cta_text"   in override: content["cta_text"]        = override["cta_text"]
+
     theme_idx = sum(ord(c) for c in (business.slug or "x")) % len(THEMES)
     theme = THEMES[theme_idx]
 
