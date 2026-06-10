@@ -87,10 +87,16 @@
 </div>
 
 <div class="progress-section" id="progressSection">
-  <div style="font-weight:600;margin-bottom:0.5rem;">🔍 Google Maps taranıyor...</div>
+  <div style="font-weight:600;margin-bottom:0.5rem;">🔍 Aranıyor...</div>
   <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
   <div class="progress-text" id="progressText">Başlatılıyor...</div>
   <div class="progress-name" id="progressName"></div>
+  <!-- Arama bitince bu buton belirir — mobilde redirect çalışmazsa -->
+  <div id="readyBox" style="display:none;margin-top:1rem;text-align:center;">
+    <a href="/businesses" class="btn btn-green" style="font-size:1rem;padding:0.9rem 2rem;">
+      ✅ Sonuçları Gör →
+    </a>
+  </div>
 </div>
 
 <div class="tips">
@@ -152,27 +158,44 @@ searchForm.addEventListener('submit', async e => {
 
 function startPolling() {
   polling = setInterval(async () => {
-    const r = await fetch('/status');
-    const s = await r.json();
+    try {
+      const r = await fetch('/status');
+      const s = await r.json();
 
-    // Progress bar
-    const pct = s.progress.total > 0 ? (s.progress.current / s.progress.total * 100) : 5;
-    document.getElementById('progressBar').style.width = pct + '%';
-    document.getElementById('progressText').textContent =
-      s.progress.total > 0 ? `${s.progress.current} / ${s.progress.total} işletme işlendi` : 'Aranıyor...';
-    document.getElementById('progressName').textContent = s.progress.name ? `📍 ${s.progress.name}` : '';
+      const pct = s.progress.total > 0 ? Math.round(s.progress.current / s.progress.total * 100) : 10;
+      document.getElementById('progressBar').style.width = pct + '%';
+      document.getElementById('progressText').textContent =
+        s.progress.total > 0
+          ? `${s.progress.current} / ${s.progress.total} işletme işlendi`
+          : 'Aranıyor...';
+      document.getElementById('progressName').textContent = s.progress.name ? `📍 ${s.progress.name}` : '';
 
-    if (!s.searching) {
-      clearInterval(polling);
-      if (s.error) {
-        alert('Hata: ' + s.error);
-        searchBtn.disabled = false;
-        searchBtn.textContent = '🔍 Aramayı Başlat';
-      } else {
-        window.location.href = '/businesses';
+      if (!s.searching) {
+        clearInterval(polling);
+        document.getElementById('progressBar').style.width = '100%';
+
+        if (s.error && s.count === 0) {
+          // Hata — arama sayfasında göster
+          document.getElementById('progressText').textContent = '⚠️ ' + s.error;
+          searchBtn.disabled = false;
+          searchBtn.textContent = '🔍 Yeniden Ara';
+        } else {
+          // Başarılı — hem otomatik git hem büyük buton göster
+          document.getElementById('progressText').textContent =
+            `✅ ${s.count} işletme bulundu!`;
+          document.getElementById('progressName').textContent = '';
+          document.getElementById('readyBox').style.display = 'block';
+          searchBtn.textContent = '✅ Tamamlandı';
+
+          // 800ms sonra otomatik git (mobilde de çalışsın)
+          setTimeout(() => { window.location.href = '/businesses'; }, 800);
+        }
       }
+    } catch(e) {
+      // Network hatası — devam et
+      console.warn('Polling hata:', e);
     }
-  }, 1500);
+  }, 2000);
 }
 
 // Eğer arama devam ediyorsa göster
