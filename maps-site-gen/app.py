@@ -265,15 +265,24 @@ def debug():
     except Exception as e:
         results["nominatim"] = f"✗ BAĞLANAMADI: {e}"
 
-    # Küçük Overpass sorgusu
-    try:
-        import requests as req
-        q = '[out:json][timeout:10];node["amenity"="cafe"][!"website"](around:2000,41.0082,28.9784);out body 3;'
-        r = req.post("https://overpass-api.de/api/interpreter", data={"data": q}, timeout=15)
-        els = r.json().get("elements", [])
-        results["overpass_query"] = f"✓ Test sorgusu — {len(els)} kafe bulundu (İstanbul merkezi)"
-    except Exception as e:
-        results["overpass_query"] = f"✗ SORGU HATASI: {e}"
+    # Tüm mirror'ları test et
+    from scraper import OVERPASS_MIRRORS
+    import requests as req
+    mirror_results = {}
+    q = '[out:json][timeout:10];\nnode["amenity"="cafe"][!"website"](around:2000,41.0082,28.9784);\nout body;\n'
+    hdrs = {"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "maps-site-gen/1.0"}
+    for mirror in OVERPASS_MIRRORS:
+        try:
+            r = req.post(mirror, data={"data": q}, headers=hdrs, timeout=12)
+            if r.status_code == 200:
+                els = r.json().get("elements", [])
+                mirror_results[mirror] = f"✓ HTTP 200 — {len(els)} sonuç"
+                break
+            else:
+                mirror_results[mirror] = f"✗ HTTP {r.status_code}"
+        except Exception as e:
+            mirror_results[mirror] = f"✗ {e}"
+    results["overpass_mirrors"] = mirror_results
 
     results["log"] = _state["log"][-20:] or ["(log boş)"]
     results["last_search"] = _state.get("last_search")

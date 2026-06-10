@@ -61,7 +61,14 @@ HEADERS = {
 PLACES_SEARCH = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 PLACES_DETAIL = "https://maps.googleapis.com/maps/api/place/details/json"
 PLACES_PHOTO  = "https://maps.googleapis.com/maps/api/place/photo"
-OVERPASS_URL  = "https://overpass-api.de/api/interpreter"
+# Birden fazla mirror — 406/timeout durumunda sıradakini dener
+OVERPASS_MIRRORS = [
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.osm.rambler.ru/cgi/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+OVERPASS_URL = OVERPASS_MIRRORS[0]
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 
@@ -251,26 +258,49 @@ def _geocode_location(location: str) -> Optional[tuple[float, float]]:
 
 
 def _overpass_query(tag_key: str, tag_val: str, lat: float, lon: float, radius: int = 5000) -> list[dict]:
-    """Overpass API ile OSM veritabanında işletme arar."""
-    query = f"""
-[out:json][timeout:30];
+    """Overpass API ile OSM veritabanında işletme arar. 406/hata durumunda mirror değiştirir."""
+    query = (
+        f'[out:json][timeout:30];'
+        f'({{"node":["{tag_key}"="{tag_val}"][!"website"](around:{radius},{lat},{lon});'
+        f'"way":["{tag_key}"="{tag_val}"][!"website"](around:{radius},{lat},{lon});'
+        f'}});'
+        f'out body center;'
+    )
+    # Basit format — tırnak sorunlarından kaçın
+    query = f"""[out:json][timeout:30];
 (
   node["{tag_key}"="{tag_val}"][!"website"](around:{radius},{lat},{lon});
   way["{tag_key}"="{tag_val}"][!"website"](around:{radius},{lat},{lon});
-  node["{tag_key}"="{tag_val}"]["website"=""](around:{radius},{lat},{lon});
 );
 out body center;
 """
-    try:
-        r = requests.post(OVERPASS_URL, data={"data": query}, timeout=35)
-        r.raise_for_status()
-        data = r.json()
-        elements = data.get("elements", [])
-        print(f"[Overpass] {tag_key}={tag_val} — {len(elements)} sonuç ({radius}m)")
-        return elements
-    except Exception as e:
-        print(f"[Overpass] HATA ({tag_key}={tag_val}): {e}")
-        raise
+    last_err = None
+    for mirror in OVERPASS_MIRRORS:
+        try:
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "maps-site-gen/1.0 (contact: info@example.com)",
+            }
+            r = requests.post(
+                mirror,
+                data={"data": query},
+                headers=headers,
+                timeout=35,
+            )
+            if r.status_code == 406:
+                print(f"[Overpass] {mirror} → 406 rate limit, mirror değiştiriliyor...")
+                time.sleep(2)
+                continue
+            r.raise_for_status()
+            elements = r.json().get("elements", [])
+            print(f"[Overpass] {mirror} — {tag_key}={tag_val}: {len(elements)} sonuç ({radius}m)")
+            return elements
+        except Exception as e:
+            print(f"[Overpass] {mirror} HATA: {e}")
+            last_err = e
+            time.sleep(1)
+            continue
+    raise RuntimeError(f"Tüm Overpass mirror'ları başarısız: {last_err}")
 
 
 def _osm_element_to_business(el: dict) -> Optional[BusinessInfo]:
