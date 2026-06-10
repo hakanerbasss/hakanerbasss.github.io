@@ -63,10 +63,28 @@
 
 {% if not businesses %}
 <div class="empty">
+  {% if last_search %}
+  <div style="font-size:3rem;margin-bottom:1rem;">😔</div>
+  <h2>Sonuç bulunamadı</h2>
+  <p>
+    <strong>"{{ last_search.query }}"</strong> araması
+    {% if last_search.location %}— <strong>{{ last_search.location }}</strong>{% endif %}
+    için web sitesi olmayan işletme bulunamadı.
+  </p>
+  <p style="margin-top:0.5rem;font-size:0.85rem;">
+    💡 <strong>Öneri:</strong> Daha büyük bir il/ilçe adı deneyin (örn: "Kadıköy" yerine "İstanbul"),
+    veya farklı kategori (restoran, kafe, berber, eczane...).
+  </p>
+  <div style="display:flex;gap:1rem;justify-content:center;margin-top:1.5rem;flex-wrap:wrap;">
+    <a href="/" class="btn btn-primary">🔍 Yeni Arama</a>
+    <a href="/debug" class="btn btn-ghost btn-sm" target="_blank">🔧 Bağlantı Testi</a>
+  </div>
+  {% else %}
   <div style="font-size:3rem;margin-bottom:1rem;">🔍</div>
   <h2>Henüz arama yapılmadı</h2>
   <p>Ana sayfadan bir arama yapın.</p>
   <a href="/" class="btn btn-primary" style="margin-top:1.5rem;">Aramaya Başla</a>
+  {% endif %}
 </div>
 {% else %}
 <div class="grid" id="grid">

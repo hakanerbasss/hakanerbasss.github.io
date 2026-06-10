@@ -250,22 +250,27 @@ def _geocode_location(location: str) -> Optional[tuple[float, float]]:
     return None
 
 
-def _overpass_query(tag_key: str, tag_val: str, lat: float, lon: float, radius: int = 3000) -> list[dict]:
+def _overpass_query(tag_key: str, tag_val: str, lat: float, lon: float, radius: int = 5000) -> list[dict]:
     """Overpass API ile OSM veritabanında işletme arar."""
     query = f"""
-[out:json][timeout:25];
+[out:json][timeout:30];
 (
   node["{tag_key}"="{tag_val}"][!"website"](around:{radius},{lat},{lon});
   way["{tag_key}"="{tag_val}"][!"website"](around:{radius},{lat},{lon});
+  node["{tag_key}"="{tag_val}"]["website"=""](around:{radius},{lat},{lon});
 );
 out body center;
 """
     try:
-        r = requests.post(OVERPASS_URL, data={"data": query}, timeout=30)
-        return r.json().get("elements", [])
+        r = requests.post(OVERPASS_URL, data={"data": query}, timeout=35)
+        r.raise_for_status()
+        data = r.json()
+        elements = data.get("elements", [])
+        print(f"[Overpass] {tag_key}={tag_val} — {len(elements)} sonuç ({radius}m)")
+        return elements
     except Exception as e:
-        print(f"[Overpass] Hata: {e}")
-        return []
+        print(f"[Overpass] HATA ({tag_key}={tag_val}): {e}")
+        raise
 
 
 def _osm_element_to_business(el: dict) -> Optional[BusinessInfo]:
@@ -383,14 +388,21 @@ def scrape_with_overpass(
         # Genel arama: hem amenity hem shop dene
         osm_tags = [("amenity", query_lower), ("shop", query_lower)]
 
+    # 5km → 10km → 20km otomatik genişleme
     elements = []
-    for tag_key, tag_val in osm_tags:
-        found = _overpass_query(tag_key, tag_val, lat, lon)
-        elements.extend(found)
-        if len(elements) >= max_results * 2:
+    for radius in (5000, 10000, 20000):
+        for tag_key, tag_val in osm_tags:
+            try:
+                found = _overpass_query(tag_key, tag_val, lat, lon, radius)
+                elements.extend(found)
+            except Exception as e:
+                print(f"[Scraper] Overpass sorgu hatası: {e}")
+        if elements:
+            print(f"[Scraper] {len(elements)} sonuç bulundu ({radius//1000}km)")
             break
+        print(f"[Scraper] {radius//1000}km'de sonuç yok, alan genişletiliyor...")
 
-    print(f"[Scraper] Overpass: {len(elements)} sonuç (web sitesiz filtresi uygulandı)")
+    print(f"[Scraper] Toplam: {len(elements)} sonuç")
 
     results = []
     for i, el in enumerate(elements):
