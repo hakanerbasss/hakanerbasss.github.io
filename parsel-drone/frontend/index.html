@@ -268,6 +268,17 @@
       infoBox: false, selectionIndicator: false,
     });
     viewer.scene.globe.enableLighting = true;
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+
+    // OSM 3D binalar — gerçek drone hissi için
+    Cesium.Cesium3DTileset.fromIonAssetId(96188).then(tileset => {
+      viewer.scene.primitives.add(tileset);
+    }).catch(() => {
+      // 96188 yoksa OSM Buildings dene
+      Cesium.Cesium3DTileset.fromIonAssetId(354307).then(tileset => {
+        viewer.scene.primitives.add(tileset);
+      }).catch(e => console.log('3D bina yüklenemedi:', e));
+    });
   } catch(e) {
     console.error('Cesium init error:', e);
   }
@@ -463,8 +474,8 @@
     let step = 0;
 
     // Orbit mesafesi sabit, irtifa ve açı sürekli değişir
-    const minAlt = Math.max(orbitMeters * 0.25, 40);   // alçak geçiş
-    const maxAlt = Math.max(orbitMeters * 1.8, 150);   // yüksek geçiş
+    const minAlt = Math.max(orbitMeters * 0.2, 30);    // çok alçak geçiş — binalar görünsün
+    const maxAlt = Math.max(orbitMeters * 2.0, 180);   // yüksek genel bakış
 
     // İlk pozisyon
     viewer.camera.setView({
