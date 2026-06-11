@@ -209,6 +209,10 @@ async def get_parsel(
 
     try:
         data = await tkgm_get(url)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Bu ada/parsel bulunamadı")
+        raise HTTPException(status_code=502, detail="TKGM servisine ulaşılamadı")
     except httpx.HTTPError:
         raise HTTPException(status_code=502, detail="TKGM servisine ulaşılamadı")
 

@@ -3,221 +3,178 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parsel Drone — Ada/Parsel ile Drone Videosu</title>
+  <title>ParselDrone — Ada/Parsel ile Drone Videosu</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
 
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0f0f13;
-      color: #e8e8f0;
-      min-height: 100vh;
-    }
-
+    /* HEADER */
     header {
-      padding: 16px 24px;
-      border-bottom: 1px solid #1e1e2e;
+      background: #fff;
+      border-bottom: 1px solid #e0e0f0;
+      padding: 12px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: #0f0f13;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
     }
-
-    .logo { font-size: 20px; font-weight: 700; color: #7c6ff7; letter-spacing: -0.5px; }
-    .logo span { color: #e8e8f0; }
-
-    #auth-bar { display: flex; gap: 8px; align-items: center; font-size: 13px; }
-
+    .logo { font-size: 18px; font-weight: 800; color: #5b4fcf; letter-spacing: -0.5px; }
+    .logo span { color: #1a1a2e; }
+    #auth-bar { display: flex; gap: 8px; align-items: center; }
     #credits-badge {
-      background: #1e1e2e;
-      border: 1px solid #2e2e4e;
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-size: 12px;
-      color: #a0a0c0;
+      background: #f0eeff; border: 1px solid #c0b8f0;
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; color: #5b4fcf; font-weight: 600;
       display: none;
     }
 
+    /* BUTTONS */
     button {
-      cursor: pointer;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      padding: 8px 16px;
-      transition: opacity .15s;
+      cursor: pointer; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; padding: 8px 14px;
+      transition: all .15s;
     }
-    button:hover { opacity: .85; }
-    button:disabled { opacity: .4; cursor: default; }
+    button:hover { filter: brightness(.93); }
+    button:disabled { opacity: .45; cursor: default; }
+    .btn-primary { background: #5b4fcf; color: #fff; }
+    .btn-ghost { background: transparent; color: #5b4fcf; border: 1px solid #c0b8f0; }
+    .btn-danger { background: #fff0f0; color: #d04040; border: 1px solid #f0c0c0; }
 
-    .btn-primary { background: #7c6ff7; color: #fff; }
-    .btn-secondary { background: #1e1e2e; color: #a0a0c0; }
-    .btn-danger { background: #3e1e1e; color: #f07070; }
-
-    main { display: flex; height: calc(100vh - 57px); }
+    /* LAYOUT */
+    main { display: flex; height: calc(100vh - 53px); }
 
     #panel {
-      width: 340px;
-      flex-shrink: 0;
-      padding: 20px;
-      border-right: 1px solid #1e1e2e;
+      width: 320px; flex-shrink: 0;
+      background: #fff;
+      border-right: 1px solid #e0e0f0;
       overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .card {
-      background: #15151f;
-      border: 1px solid #1e1e2e;
-      border-radius: 12px;
       padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
     }
 
-    .card h3 {
-      font-size: 12px;
-      color: #6060a0;
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 12px;
+    #map-container { flex: 1; position: relative; background: #222; }
+    #cesiumContainer { width: 100%; height: 100%; }
+
+    /* CARD */
+    .card {
+      background: #fafafe;
+      border: 1px solid #e8e8f8;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .card-title {
+      font-size: 11px; font-weight: 700;
+      color: #8888aa; text-transform: uppercase;
+      letter-spacing: .6px; margin-bottom: 10px;
     }
 
-    .form-row { display: flex; gap: 8px; }
-
-    input, select {
-      width: 100%;
-      background: #0f0f1a;
-      border: 1px solid #2e2e4e;
-      border-radius: 8px;
-      color: #e8e8f0;
-      padding: 9px 12px;
-      font-size: 13px;
-      margin-bottom: 8px;
-      outline: none;
-      transition: border-color .15s;
-      appearance: none;
-    }
-    input:focus, select:focus { border-color: #7c6ff7; }
-    input::placeholder { color: #40405a; }
-    select:disabled { opacity: .4; }
-    select option { background: #15151f; }
-
+    /* FORM */
     .select-wrap { position: relative; margin-bottom: 8px; }
     .select-wrap::after {
-      content: '▾';
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #6060a0;
-      pointer-events: none;
-      font-size: 11px;
+      content: '▾'; position: absolute;
+      right: 10px; top: 50%; transform: translateY(-50%);
+      color: #aaa; pointer-events: none; font-size: 11px;
     }
-    .select-wrap select { margin-bottom: 0; }
+    select, input {
+      width: 100%;
+      background: #fff; border: 1.5px solid #ddd;
+      border-radius: 8px; color: #1a1a2e;
+      padding: 9px 12px; font-size: 14px;
+      outline: none; transition: border-color .15s;
+      appearance: none;
+    }
+    select:focus, input:focus { border-color: #5b4fcf; }
+    select:disabled { background: #f5f5f8; color: #aaa; }
+    select option { color: #1a1a2e; }
+    input::placeholder { color: #bbb; }
+    .row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .row input { margin-bottom: 0; }
 
     #generate-btn {
-      width: 100%;
-      background: #7c6ff7;
-      color: #fff;
-      padding: 12px;
-      font-size: 14px;
-      border-radius: 10px;
-      margin-top: 4px;
+      width: 100%; background: #5b4fcf; color: #fff;
+      padding: 12px; font-size: 14px; border-radius: 10px;
+      margin-top: 2px;
     }
-
     #record-btn {
-      width: 100%;
-      background: #1e1e2e;
-      color: #a0a0c0;
-      padding: 10px;
-      font-size: 13px;
-      border-radius: 10px;
-      margin-top: 6px;
+      width: 100%; background: #fff0f0; color: #d04040;
+      border: 1px solid #f0c0c0;
+      padding: 10px; font-size: 13px; border-radius: 10px;
+      margin-top: 6px; display: none;
     }
 
     #status-msg {
-      font-size: 12px;
-      color: #7070a0;
-      text-align: center;
-      min-height: 18px;
-      margin-top: 8px;
+      font-size: 12px; text-align: center;
+      margin-top: 8px; min-height: 16px; color: #8888aa;
     }
-    #status-msg.error { color: #f07070; }
-    #status-msg.success { color: #70c070; }
+    #status-msg.error { color: #d04040; }
+    #status-msg.success { color: #2a9d5c; }
 
+    /* HISTORY */
     .history-item {
-      padding: 10px;
-      border: 1px solid #1e1e2e;
-      border-radius: 8px;
-      margin-bottom: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: background .15s;
+      padding: 10px; border: 1px solid #e8e8f8;
+      border-radius: 8px; margin-bottom: 6px;
+      cursor: pointer; transition: background .15s;
     }
-    .history-item:hover { background: #1e1e2e; }
-    .history-item .parsel-label { font-weight: 600; color: #9090d0; }
-    .history-item .date-label { color: #50506a; margin-top: 2px; }
+    .history-item:hover { background: #f0eeff; }
+    .h-label { font-size: 13px; font-weight: 600; color: #5b4fcf; }
+    .h-sub { font-size: 12px; color: #666; margin-top: 2px; }
+    .h-date { font-size: 11px; color: #aaa; margin-top: 3px; }
 
-    #map-container { flex: 1; position: relative; }
-    #cesiumContainer { width: 100%; height: 100%; }
-
+    /* RECORD BAR */
     #record-bar {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
+      position: absolute; bottom: 20px; left: 50%;
       transform: translateX(-50%);
-      display: none;
-      gap: 10px;
-      align-items: center;
-      background: rgba(15,15,19,.9);
+      display: none; gap: 10px; align-items: center;
+      background: rgba(255,255,255,.95);
       backdrop-filter: blur(8px);
-      border: 1px solid #2e2e4e;
-      border-radius: 40px;
-      padding: 10px 20px;
+      border: 1px solid #e0e0f0;
+      border-radius: 40px; padding: 10px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
     }
-
-    #rec-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: #f07070;
-      animation: blink 1s infinite;
-    }
+    #rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #d04040; animation: blink 1s infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
-    #rec-label { font-size: 13px; }
+    #rec-label { font-size: 13px; color: #333; }
 
+    /* AUTH MODAL */
     #modal-overlay {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,.75);
+      background: rgba(0,0,0,.5);
       display: flex; align-items: center; justify-content: center;
-      z-index: 1000;
+      z-index: 1000; padding: 20px;
     }
-
     #modal {
-      background: #15151f;
-      border: 1px solid #2e2e4e;
-      border-radius: 16px;
-      padding: 32px;
-      width: 360px;
+      background: #fff; border-radius: 16px;
+      padding: 28px; width: 100%; max-width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
     }
-    #modal h2 { font-size: 20px; margin-bottom: 20px; }
-
+    #modal h2 { font-size: 20px; margin-bottom: 18px; color: #1a1a2e; }
     .modal-tabs {
-      display: flex; gap: 4px;
-      margin-bottom: 20px;
-      background: #0f0f1a;
-      border-radius: 8px; padding: 4px;
+      display: flex; gap: 4px; margin-bottom: 16px;
+      background: #f0f2f5; border-radius: 8px; padding: 4px;
     }
     .modal-tab {
-      flex: 1; text-align: center;
-      padding: 7px; border-radius: 6px;
-      font-size: 13px; cursor: pointer;
-      color: #60608a; transition: all .15s;
+      flex: 1; text-align: center; padding: 7px;
+      border-radius: 6px; font-size: 13px;
+      cursor: pointer; color: #888; transition: all .15s;
     }
-    .modal-tab.active { background: #7c6ff7; color: #fff; }
+    .modal-tab.active { background: #5b4fcf; color: #fff; }
+    #modal-error { color: #d04040; font-size: 12px; margin-bottom: 8px; min-height: 16px; }
+    #modal input { margin-bottom: 10px; }
 
-    #modal-error { color: #f07070; font-size: 12px; margin-bottom: 8px; min-height: 16px; }
+    /* MOBILE */
+    @media (max-width: 700px) {
+      main { flex-direction: column; height: auto; }
+      #panel { width: 100%; border-right: none; border-bottom: 1px solid #e0e0f0; }
+      #map-container { height: 60vw; min-height: 280px; }
+      header { padding: 10px 14px; }
+      .logo { font-size: 16px; }
+      button { padding: 7px 10px; font-size: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -226,7 +183,7 @@
   <div class="logo">Parsel<span>Drone</span></div>
   <div id="auth-bar">
     <div id="credits-badge">💳 <span id="credit-count">0</span> kredi</div>
-    <button class="btn-secondary" id="history-btn" style="display:none" onclick="loadHistory()">Geçmiş</button>
+    <button class="btn-ghost" id="history-btn" style="display:none" onclick="loadHistory()">Geçmiş</button>
     <button class="btn-danger" id="logout-btn" style="display:none" onclick="logout()">Çıkış</button>
     <button class="btn-primary" id="login-open-btn" onclick="openModal()">Giriş Yap</button>
   </div>
@@ -235,38 +192,36 @@
 <main>
   <div id="panel">
     <div class="card">
-      <h3>Parsel Bilgileri</h3>
+      <div class="card-title">Parsel Bilgileri</div>
 
       <div class="select-wrap">
         <select id="il-select" onchange="loadIlceler()">
-          <option value="">İl yükleniyor...</option>
+          <option value="">İl yükleniyor…</option>
         </select>
       </div>
-
       <div class="select-wrap">
         <select id="ilce-select" onchange="loadMahalleler()" disabled>
           <option value="">Önce il seçin</option>
         </select>
       </div>
-
-      <div class="select-wrap">
+      <div class="select-wrap" style="margin-bottom:10px">
         <select id="mahalle-select" disabled>
           <option value="">Önce ilçe seçin</option>
         </select>
       </div>
 
-      <div class="form-row">
+      <div class="row">
         <input id="ada" type="text" placeholder="Ada No" />
         <input id="parsel" type="text" placeholder="Parsel No" />
       </div>
 
-      <button id="generate-btn" onclick="generateDrone()">Drone Videosu Oluştur</button>
-      <button id="record-btn" onclick="startRecording()" style="display:none">⏺ Kaydet</button>
-      <p id="status-msg"></p>
+      <button id="generate-btn" onclick="generateDrone()">🛸 Drone Videosu Oluştur</button>
+      <button id="record-btn" onclick="startRecording()">⏺ Kaydet</button>
+      <div id="status-msg"></div>
     </div>
 
     <div class="card" id="history-card" style="display:none">
-      <h3>Son Sorgular</h3>
+      <div class="card-title">Son Sorgular</div>
       <div id="history-list"></div>
     </div>
   </div>
@@ -276,7 +231,7 @@
     <div id="record-bar">
       <div id="rec-dot"></div>
       <span id="rec-label">Kaydediliyor…</span>
-      <button class="btn-secondary" onclick="stopRecording()">Durdur & İndir</button>
+      <button class="btn-danger" onclick="stopRecording()">Durdur & İndir</button>
     </div>
   </div>
 </main>
@@ -299,10 +254,9 @@
   const API = 'http://45.143.4.169/api';
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzZTg0MzEyMy1lNjhiLTRjYTMtODJmMC0xNGUwMmYxY2VhMmIiLCJpZCI6NDQzMjk4LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODExOTY0NTR9.T-xpMd4EZDA8Dk39U0eL1xAuJBzDPF7AeU293KiPANw';
 
-  let viewer, mediaRecorder, recordedChunks = [];
+  let viewer, mediaRecorder, recordedChunks = [], flightInterval = null;
   let authMode = 'login';
   let token = localStorage.getItem('token') || null;
-  let flightInterval = null;
 
   // ── Cesium ──────────────────────────────────────────────
   try {
@@ -324,15 +278,14 @@
     try {
       const res = await fetch(API + '/iller');
       const data = await res.json();
-      sel.innerHTML = '<option value="">İl seçin...</option>';
+      sel.innerHTML = '<option value="">— İl seçin —</option>';
       data.forEach(il => {
-        const opt = document.createElement('option');
-        opt.value = il.id;
-        opt.textContent = il.text;
-        sel.appendChild(opt);
+        const o = document.createElement('option');
+        o.value = il.id; o.textContent = il.text;
+        sel.appendChild(o);
       });
     } catch {
-      sel.innerHTML = '<option value="">Yüklenemedi</option>';
+      sel.innerHTML = '<option value="">Yüklenemedi, yenile</option>';
     }
   }
 
@@ -340,186 +293,128 @@
     const ilId = document.getElementById('il-select').value;
     const ilceSel = document.getElementById('ilce-select');
     const mahalleSel = document.getElementById('mahalle-select');
-
-    ilceSel.innerHTML = '<option value="">İlçe yükleniyor...</option>';
-    ilceSel.disabled = true;
-    mahalleSel.innerHTML = '<option value="">Önce ilçe seçin</option>';
-    mahalleSel.disabled = true;
-
+    ilceSel.innerHTML = '<option value="">Yükleniyor…</option>'; ilceSel.disabled = true;
+    mahalleSel.innerHTML = '<option value="">Önce ilçe seçin</option>'; mahalleSel.disabled = true;
     if (!ilId) return;
-
     try {
-      const res = await fetch(API + `/ilceler/${ilId}`);
+      const res = await fetch(API + '/ilceler/' + ilId);
       const data = await res.json();
-      ilceSel.innerHTML = '<option value="">İlçe seçin...</option>';
-      data.forEach(ilce => {
-        const opt = document.createElement('option');
-        opt.value = ilce.id;
-        opt.textContent = ilce.text;
-        ilceSel.appendChild(opt);
-      });
+      ilceSel.innerHTML = '<option value="">— İlçe seçin —</option>';
+      data.forEach(i => { const o = document.createElement('option'); o.value = i.id; o.textContent = i.text; ilceSel.appendChild(o); });
       ilceSel.disabled = false;
-    } catch {
-      ilceSel.innerHTML = '<option value="">Yüklenemedi</option>';
-    }
+    } catch { ilceSel.innerHTML = '<option value="">Yüklenemedi</option>'; }
   }
 
   async function loadMahalleler() {
     const ilceId = document.getElementById('ilce-select').value;
     const mahalleSel = document.getElementById('mahalle-select');
-
-    mahalleSel.innerHTML = '<option value="">Mahalle yükleniyor...</option>';
-    mahalleSel.disabled = true;
-
+    mahalleSel.innerHTML = '<option value="">Yükleniyor…</option>'; mahalleSel.disabled = true;
     if (!ilceId) return;
-
     try {
-      const res = await fetch(API + `/mahalleler/${ilceId}`);
+      const res = await fetch(API + '/mahalleler/' + ilceId);
       const data = await res.json();
-      mahalleSel.innerHTML = '<option value="">Mahalle seçin...</option>';
-      data.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.text;
-        mahalleSel.appendChild(opt);
-      });
+      mahalleSel.innerHTML = '<option value="">— Mahalle seçin —</option>';
+      data.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.text; mahalleSel.appendChild(o); });
       mahalleSel.disabled = false;
-    } catch {
-      mahalleSel.innerHTML = '<option value="">Yüklenemedi</option>';
-    }
+    } catch { mahalleSel.innerHTML = '<option value="">Yüklenemedi</option>'; }
   }
 
   // ── Auth ─────────────────────────────────────────────────
   function openModal() { document.getElementById('modal-overlay').style.display = 'flex'; }
   function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
-
   document.getElementById('modal-overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('modal-overlay')) closeModal();
   });
-
   function switchTab(mode) {
     authMode = mode;
     document.querySelectorAll('.modal-tab').forEach((t, i) =>
-      t.classList.toggle('active', (i === 0 && mode === 'login') || (i === 1 && mode === 'register'))
+      t.classList.toggle('active', (i===0&&mode==='login')||(i===1&&mode==='register'))
     );
-    document.getElementById('auth-submit-btn').textContent = mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol';
+    document.getElementById('auth-submit-btn').textContent = mode==='login' ? 'Giriş Yap' : 'Kayıt Ol';
     document.getElementById('modal-error').textContent = '';
   }
-
   async function submitAuth() {
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
     if (!email || !password) return;
-    const endpoint = authMode === 'login' ? '/login' : '/register';
     try {
-      const res = await fetch(API + endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const res = await fetch(API + (authMode==='login' ? '/login' : '/register'), {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, password}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Hata');
-      token = data.token;
-      localStorage.setItem('token', token);
-      updateAuthUI(data.credits);
-      closeModal();
-    } catch (e) {
-      document.getElementById('modal-error').textContent = e.message;
-    }
+      token = data.token; localStorage.setItem('token', token);
+      updateAuthUI(data.credits); closeModal();
+    } catch(e) { document.getElementById('modal-error').textContent = e.message; }
   }
-
   function logout() {
-    token = null;
-    localStorage.removeItem('token');
-    document.getElementById('credits-badge').style.display = 'none';
-    document.getElementById('history-btn').style.display = 'none';
-    document.getElementById('logout-btn').style.display = 'none';
-    document.getElementById('login-open-btn').style.display = '';
-    document.getElementById('history-card').style.display = 'none';
+    token = null; localStorage.removeItem('token');
+    ['credits-badge','history-btn','logout-btn'].forEach(id => document.getElementById(id).style.display='none');
+    document.getElementById('login-open-btn').style.display='';
+    document.getElementById('history-card').style.display='none';
   }
-
   function updateAuthUI(credits) {
     document.getElementById('credit-count').textContent = credits;
-    document.getElementById('credits-badge').style.display = '';
-    document.getElementById('history-btn').style.display = '';
-    document.getElementById('logout-btn').style.display = '';
-    document.getElementById('login-open-btn').style.display = 'none';
+    document.getElementById('credits-badge').style.display='';
+    document.getElementById('history-btn').style.display='';
+    document.getElementById('logout-btn').style.display='';
+    document.getElementById('login-open-btn').style.display='none';
   }
-
   async function checkSession() {
     if (!token) return;
     try {
-      const res = await fetch(API + '/me', { headers: { Authorization: 'Bearer ' + token } });
+      const res = await fetch(API+'/me', {headers:{Authorization:'Bearer '+token}});
       if (!res.ok) { logout(); return; }
-      const data = await res.json();
-      updateAuthUI(data.credits);
+      updateAuthUI((await res.json()).credits);
     } catch { logout(); }
   }
 
-  // ── Parsel & Drone ───────────────────────────────────────
+  // ── Parsel ───────────────────────────────────────────────
   async function generateDrone() {
     if (!token) { openModal(); return; }
-
     const ilSel = document.getElementById('il-select');
     const ilceSel = document.getElementById('ilce-select');
     const mahalleSel = document.getElementById('mahalle-select');
     const ada = document.getElementById('ada').value.trim();
     const parsel = document.getElementById('parsel').value.trim();
-
-    if (!ilSel.value || !ilceSel.value || !mahalleSel.value) {
-      setStatus('İl, ilçe ve mahalle seçin', 'error'); return;
-    }
-    if (!ada || !parsel) {
-      setStatus('Ada ve parsel numarası girin', 'error'); return;
-    }
-
+    if (!ilSel.value || !ilceSel.value || !mahalleSel.value) { setStatus('İl, ilçe ve mahalle seçin','error'); return; }
+    if (!ada || !parsel) { setStatus('Ada ve parsel girin','error'); return; }
     setStatus('Parsel aranıyor…');
-
+    document.getElementById('generate-btn').disabled = true;
     try {
-      const res = await fetch(API + '/parsel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      const res = await fetch(API+'/parsel', {
+        method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token},
         body: JSON.stringify({
-          il_id: parseInt(ilSel.value),
-          il_adi: ilSel.options[ilSel.selectedIndex].text,
-          ilce_id: parseInt(ilceSel.value),
-          ilce_adi: ilceSel.options[ilceSel.selectedIndex].text,
-          mahalle_id: parseInt(mahalleSel.value),
-          mahalle_adi: mahalleSel.options[mahalleSel.selectedIndex].text,
-          ada,
-          parsel,
+          il_id: parseInt(ilSel.value), il_adi: ilSel.options[ilSel.selectedIndex].text,
+          ilce_id: parseInt(ilceSel.value), ilce_adi: ilceSel.options[ilceSel.selectedIndex].text,
+          mahalle_id: parseInt(mahalleSel.value), mahalle_adi: mahalleSel.options[mahalleSel.selectedIndex].text,
+          ada, parsel,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Hata');
-
       document.getElementById('credit-count').textContent = data.remaining_credits;
-      setStatus('Parsel bulundu — drone uçuşu başladı', 'success');
+      setStatus('Parsel bulundu — drone uçuşu başladı ✓','success');
       document.getElementById('record-btn').style.display = '';
       flyToParsel(data.lat, data.lon, data.coordinates);
-    } catch (e) {
-      setStatus(e.message, 'error');
-    }
+    } catch(e) { setStatus(e.message,'error'); }
+    finally { document.getElementById('generate-btn').disabled = false; }
   }
 
   function flyToParsel(lat, lon, coordinates) {
     if (!viewer) return;
     viewer.entities.removeAll();
     if (flightInterval) clearInterval(flightInterval);
-
-    if (coordinates && coordinates.length) {
-      const positions = coordinates.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1]));
+    if (coordinates?.length) {
       viewer.entities.add({
         polygon: {
-          hierarchy: new Cesium.PolygonHierarchy(positions),
-          material: Cesium.Color.fromCssColorString('#7c6ff7').withAlpha(0.35),
-          outline: true,
-          outlineColor: Cesium.Color.fromCssColorString('#7c6ff7'),
-          height: 0,
+          hierarchy: new Cesium.PolygonHierarchy(coordinates.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1]))),
+          material: Cesium.Color.fromCssColorString('#5b4fcf').withAlpha(0.4),
+          outline: true, outlineColor: Cesium.Color.fromCssColorString('#5b4fcf'), height: 0,
         },
       });
     }
-
     startDroneFlight(lat, lon);
   }
 
@@ -528,23 +423,13 @@
     const radius = 0.003;
     const steps = 180;
     let step = 0;
-
     flightInterval = setInterval(() => {
-      if (step >= steps) { clearInterval(flightInterval); return; }
-
+      if (step >= steps) { clearInterval(flightInterval); setStatus('Uçuş tamamlandı ✓','success'); return; }
       const angle = (step / steps) * Math.PI * 2;
-      const altitude = 250 + Math.sin(angle * 3) * 60;
-      const camLon = lon + radius * Math.cos(angle);
-      const camLat = lat + radius * Math.sin(angle);
-      const heading = (angle * (180 / Math.PI) + 90) % 360;
-
+      const alt = 250 + Math.sin(angle * 3) * 60;
       viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, altitude),
-        orientation: {
-          heading: Cesium.Math.toRadians(heading),
-          pitch: Cesium.Math.toRadians(-30),
-          roll: 0,
-        },
+        destination: Cesium.Cartesian3.fromDegrees(lon + radius * Math.cos(angle), lat + radius * Math.sin(angle), alt),
+        orientation: { heading: Cesium.Math.toRadians((angle*57.3+90)%360), pitch: Cesium.Math.toRadians(-30), roll: 0 },
       });
       step++;
     }, 100);
@@ -555,7 +440,7 @@
     if (!viewer) return;
     recordedChunks = [];
     const stream = viewer.scene.canvas.captureStream(30);
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+    mediaRecorder = new MediaRecorder(stream, {mimeType: 'video/webm;codecs=vp9'});
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.start();
     document.getElementById('record-bar').style.display = 'flex';
@@ -565,12 +450,9 @@
   function stopRecording() {
     if (!mediaRecorder) return;
     mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const blob = new Blob(recordedChunks, {type:'video/webm'});
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `parsel-drone-${Date.now()}.webm`;
-      a.click();
+      Object.assign(document.createElement('a'), {href:url, download:`parsel-drone-${Date.now()}.webm`}).click();
       URL.revokeObjectURL(url);
     };
     mediaRecorder.stop();
@@ -582,33 +464,25 @@
   async function loadHistory() {
     if (!token) return;
     try {
-      const res = await fetch(API + '/history', { headers: { Authorization: 'Bearer ' + token } });
-      const data = await res.json();
+      const data = await (await fetch(API+'/history', {headers:{Authorization:'Bearer '+token}})).json();
       const list = document.getElementById('history-list');
-      list.innerHTML = '';
-      if (!data.length) { list.innerHTML = '<p style="color:#50506a;font-size:12px">Henüz sorgu yok</p>'; }
+      list.innerHTML = data.length ? '' : '<p style="color:#aaa;font-size:12px">Henüz sorgu yok</p>';
       data.forEach(r => {
-        const div = document.createElement('div');
-        div.className = 'history-item';
-        div.innerHTML = `
-          <div class="parsel-label">${r.il} / ${r.ilce} / ${r.mahalle}</div>
-          <div class="parsel-label" style="margin-top:2px">Ada ${r.ada} — Parsel ${r.parsel}</div>
-          <div class="date-label">${r.date}</div>
-        `;
-        div.onclick = () => flyToParsel(r.lat, r.lon, null);
-        list.appendChild(div);
+        const d = document.createElement('div');
+        d.className = 'history-item';
+        d.innerHTML = `<div class="h-label">${r.il} / ${r.ilce}</div><div class="h-sub">${r.mahalle} — Ada ${r.ada}, Parsel ${r.parsel}</div><div class="h-date">${r.date}</div>`;
+        d.onclick = () => flyToParsel(r.lat, r.lon, null);
+        list.appendChild(d);
       });
       document.getElementById('history-card').style.display = 'block';
     } catch {}
   }
 
-  function setStatus(msg, type = '') {
+  function setStatus(msg, type='') {
     const el = document.getElementById('status-msg');
-    el.textContent = msg;
-    el.className = type;
+    el.textContent = msg; el.className = type;
   }
 
-  // ── Init ─────────────────────────────────────────────────
   checkSession();
   loadIller();
 </script>
