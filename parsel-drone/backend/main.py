@@ -274,6 +274,22 @@ def history(user: User = Depends(get_current_user), db: Session = Depends(get_db
     ]
 
 
+@app.get("/api/reverse-geocode")
+async def reverse_geocode(lon: float, lat: float):
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json&accept-language=tr"
+    try:
+        async with httpx.AsyncClient(timeout=10, headers={"User-Agent": "ParselDrone/1.0"}) as client:
+            resp = await client.get(url)
+            data = resp.json()
+        address = data.get("address", {})
+        il = (address.get("province") or address.get("state") or "").upper()
+        ilce = (address.get("county") or "")
+        ilce = ilce.replace(" İlçesi", "").replace(" ilçesi", "").replace(" Ilcesi", "").strip().upper()
+        return {"il": il, "ilce": ilce}
+    except Exception:
+        raise HTTPException(status_code=502, detail="Konum tanımlanamadı")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

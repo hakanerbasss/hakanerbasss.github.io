@@ -215,6 +215,9 @@
         <input id="parsel" type="text" placeholder="Parsel No" />
       </div>
 
+      <button id="map-pick-btn" onclick="toggleMapPick()" style="width:100%;background:#f0eeff;color:#5b4fcf;border:1.5px solid #c0b8f0;padding:10px;font-size:13px;border-radius:10px;margin-bottom:8px">
+        📍 Haritaya Tıklayarak Seç
+      </button>
       <button id="generate-btn" onclick="generateDrone()">🛸 Drone Videosu Oluştur</button>
       <button id="record-btn" onclick="startRecording()">⏺ Kaydet</button>
       <div id="status-msg"></div>
@@ -562,6 +565,115 @@
   function setStatus(msg, type='') {
     const el = document.getElementById('status-msg');
     el.textContent = msg; el.className = type;
+  }
+
+  // ── Haritadan Seç ───────────────────────────────────────
+  let mapPickMode = false;
+  let mapClickHandler = null;
+
+  function normalizeTR(s) {
+    return s.toUpperCase()
+      .replace(/İ/g, 'I').replace(/I/g, 'I')
+      .replace(/Ğ/g, 'G').replace(/Ü/g, 'U')
+      .replace(/Ö/g, 'O').replace(/Ş/g, 'S').replace(/Ç/g, 'C')
+      .replace('ILCESI', '').replace('ILI', '').trim();
+  }
+
+  function findAndSelectOption(selectEl, text) {
+    const norm = normalizeTR(text);
+    for (const opt of selectEl.options) {
+      if (normalizeTR(opt.text) === norm) {
+        selectEl.value = opt.value;
+        return true;
+      }
+    }
+    // kısmi eşleşme
+    for (const opt of selectEl.options) {
+      const n = normalizeTR(opt.text);
+      if (n.includes(norm) || norm.includes(n)) {
+        selectEl.value = opt.value;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function toggleMapPick() {
+    mapPickMode = !mapPickMode;
+    const btn = document.getElementById('map-pick-btn');
+    if (mapPickMode) {
+      btn.style.background = '#5b4fcf';
+      btn.style.color = '#fff';
+      btn.textContent = '✕ Tıklama Modunu Kapat';
+      setStatus('Haritada herhangi bir yere tıklayın…');
+      document.getElementById('cesiumContainer').style.cursor = 'crosshair';
+    } else {
+      btn.style.background = '#f0eeff';
+      btn.style.color = '#5b4fcf';
+      btn.textContent = '📍 Haritaya Tıklayarak Seç';
+      setStatus('');
+      document.getElementById('cesiumContainer').style.cursor = '';
+    }
+  }
+
+  // Cesium harita tıklama
+  if (viewer) {
+    viewer.screenSpaceEventHandler.setInputAction(async (click) => {
+      if (!mapPickMode) return;
+      if (!token) { openModal(); return; }
+
+      const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+      if (!cartesian) return;
+
+      const carto = Cesium.Cartographic.fromCartesian(cartesian);
+      const lon = Cesium.Math.toDegrees(carto.longitude);
+      const lat = Cesium.Math.toDegrees(carto.latitude);
+
+      setStatus('İl/İlçe tanımlanıyor…');
+
+      try {
+        const res = await fetch(`${API}/reverse-geocode?lon=${lon}&lat=${lat}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail);
+
+        const ilSel = document.getElementById('il-select');
+        const ilFound = findAndSelectOption(ilSel, data.il);
+
+        if (ilFound) {
+          await loadIlceler();
+          // İlçe dropdown yüklenince eşleştir
+          setTimeout(async () => {
+            const ilceSel = document.getElementById('ilce-select');
+            findAndSelectOption(ilceSel, data.ilce);
+            if (ilceSel.value) {
+              await loadMahalleler();
+              setStatus(`${data.il} / ${data.ilce} — Mahalle, Ada ve Parsel girin`, 'success');
+            } else {
+              setStatus(`${data.il} bulundu — İlçe ve Mahalle seçin`, 'success');
+            }
+          }, 600);
+        } else {
+          setStatus('İl tanımlanamadı, manuel seçin', 'error');
+        }
+
+        // Tıklanan noktayı işaretle
+        viewer.entities.removeAll();
+        viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lon, lat),
+          point: {
+            pixelSize: 14,
+            color: Cesium.Color.DODGERBLUE,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+        });
+
+        toggleMapPick(); // modu kapat
+      } catch (e) {
+        setStatus(e.message || 'Konum tanımlanamadı', 'error');
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }
 
   checkSession();
