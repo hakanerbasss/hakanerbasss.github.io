@@ -456,16 +456,20 @@
   function startDroneFlight(lat, lon, orbitMeters) {
     if (!viewer) return;
 
-    const camAlt = Math.max(orbitMeters * 0.9, 150); // min 150m — ekran siyahlaşmasın
+    // Gerçek drone hissi için:
+    // - İrtifa = orbit yarıçapının yarısı → yatay bakış açısı
+    // - Pitch = -20° → tepeden değil yandan bakıyor
+    const camAlt = Math.max(orbitMeters * 0.55, 60);
+    const pitch = -20; // derece — daha yatay, daha sinematik
     const mPerDegLat = 110540;
     const mPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
-    const totalSteps = 300; // tam bir tur
+    const totalSteps = 360; // tam bir tur, yavaş
     let step = 0;
 
-    // İlk pozisyonu hemen ayarla
+    // İlk kareyi hemen göster
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(lon + orbitMeters / mPerDegLon, lat, camAlt),
-      orientation: { heading: Cesium.Math.toRadians(270), pitch: Cesium.Math.toRadians(-35), roll: 0 },
+      orientation: { heading: Cesium.Math.toRadians(270), pitch: Cesium.Math.toRadians(pitch), roll: 0 },
     });
 
     flightInterval = setInterval(() => {
@@ -480,18 +484,21 @@
       const camLon = lon + (orbitMeters / mPerDegLon) * Math.cos(angle);
       const camLat = lat + (orbitMeters / mPerDegLat) * Math.sin(angle);
 
-      // Kamera başlığı: merkeze baksın (3π/2 - angle)
+      // Başlık: her zaman parsele baksın
       const headingRad = ((3 * Math.PI / 2) - angle + 4 * Math.PI) % (2 * Math.PI);
 
+      // Hafif irtifa dalgalanması — daha canlı görünüm
+      const altVar = camAlt + Math.sin(angle * 2) * camAlt * 0.08;
+
       viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, camAlt),
+        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, altVar),
         orientation: {
           heading: headingRad,
-          pitch: Cesium.Math.toRadians(-35),
+          pitch: Cesium.Math.toRadians(pitch),
           roll: 0,
         },
       });
-    }, 150);
+    }, 160); // yavaş orbit → sinematik his
   }
 
   // ── Recording ────────────────────────────────────────────
