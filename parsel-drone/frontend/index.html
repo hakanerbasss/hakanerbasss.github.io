@@ -474,8 +474,8 @@
     let step = 0;
 
     // Orbit mesafesi sabit, irtifa ve açı sürekli değişir
-    const minAlt = Math.max(orbitMeters * 0.2, 30);    // çok alçak geçiş — binalar görünsün
-    const maxAlt = Math.max(orbitMeters * 2.0, 180);   // yüksek genel bakış
+    const minAlt = Math.max(orbitMeters * 0.6, 80);    // min 80m — bina üstünde kal
+    const maxAlt = Math.max(orbitMeters * 2.2, 220);   // geniş genel bakış
 
     // İlk pozisyon
     viewer.camera.setView({
@@ -499,8 +499,8 @@
       const altPhase = 0.5 + 0.5 * Math.sin(angle * 2 - Math.PI / 2);
       const camAlt = minAlt + (maxAlt - minAlt) * altPhase;
 
-      // Pitch: alçakta yatay (-10°), yüksekte dik (-50°) — irtifayla orantılı
-      const pitchDeg = -10 - 40 * altPhase;
+      // Pitch: alçakta -25° (binaları göster), yüksekte -55° (genel bakış)
+      const pitchDeg = -25 - 30 * altPhase;
 
       // Başlık: her zaman parsele baksın
       const headingRad = ((3 * Math.PI / 2) - angle + 4 * Math.PI) % (2 * Math.PI);
