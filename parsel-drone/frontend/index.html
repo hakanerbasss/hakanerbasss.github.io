@@ -641,17 +641,16 @@
 
         if (ilFound) {
           await loadIlceler();
-          // İlçe dropdown yüklenince eşleştir
-          setTimeout(async () => {
-            const ilceSel = document.getElementById('ilce-select');
-            findAndSelectOption(ilceSel, data.ilce);
-            if (ilceSel.value) {
-              await loadMahalleler();
-              setStatus(`${data.il} / ${data.ilce} — Mahalle, Ada ve Parsel girin`, 'success');
-            } else {
-              setStatus(`${data.il} bulundu — İlçe ve Mahalle seçin`, 'success');
-            }
-          }, 600);
+          const ilceSel = document.getElementById('ilce-select');
+          const ilceFound = findAndSelectOption(ilceSel, data.ilce);
+          if (ilceFound && ilceSel.value) {
+            await loadMahalleler();
+            const mahalleSel = document.getElementById('mahalle-select');
+            if (data.mahalle) findAndSelectOption(mahalleSel, data.mahalle);
+            setStatus(`${data.il} / ${data.ilce} — Ada ve Parsel girin`, 'success');
+          } else {
+            setStatus(`${data.il} bulundu — İlçe ve Mahalle seçin`, 'success');
+          }
         } else {
           setStatus('İl tanımlanamadı, manuel seçin', 'error');
         }
