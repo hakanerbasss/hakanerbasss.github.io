@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Parsel Drone — Ada/Parsel ile Drone Videosu</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f13;
+      color: #e8e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #1e1e2e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0f0f13;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #7c6ff7;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span { color: #e8e8f0; }
+
+    #auth-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    #credits-badge {
+      background: #1e1e2e;
+      border: 1px solid #2e2e4e;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: #a0a0c0;
+      display: none;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      transition: opacity .15s;
+    }
+
+    button:hover { opacity: .85; }
+
+    .btn-primary { background: #7c6ff7; color: #fff; }
+    .btn-secondary { background: #1e1e2e; color: #a0a0c0; }
+    .btn-danger { background: #3e1e1e; color: #f07070; }
+
+    main {
+      display: flex;
+      height: calc(100vh - 57px);
+    }
+
+    /* --- Panel --- */
+    #panel {
+      width: 340px;
+      flex-shrink: 0;
+      padding: 20px;
+      border-right: 1px solid #1e1e2e;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      background: #15151f;
+      border: 1px solid #1e1e2e;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .card h3 {
+      font-size: 13px;
+      color: #6060a0;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 12px;
+    }
+
+    .form-row { display: flex; gap: 8px; }
+
+    input, select {
+      width: 100%;
+      background: #0f0f1a;
+      border: 1px solid #2e2e4e;
+      border-radius: 8px;
+      color: #e8e8f0;
+      padding: 9px 12px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    input:focus, select:focus { border-color: #7c6ff7; }
+
+    input::placeholder { color: #40405a; }
+
+    #generate-btn {
+      width: 100%;
+      background: #7c6ff7;
+      color: #fff;
+      padding: 12px;
+      font-size: 14px;
+      border-radius: 10px;
+    }
+
+    #status-msg {
+      font-size: 12px;
+      color: #7070a0;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    #status-msg.error { color: #f07070; }
+    #status-msg.success { color: #70c070; }
+
+    /* History */
+    .history-item {
+      padding: 10px;
+      border: 1px solid #1e1e2e;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background .15s;
+    }
+
+    .history-item:hover { background: #1e1e2e; }
+
+    .history-item .parsel-label {
+      font-weight: 600;
+      color: #9090d0;
+    }
+
+    .history-item .date-label {
+      color: #50506a;
+      margin-top: 2px;
+    }
+
+    /* --- Map --- */
+    #map-container {
+      flex: 1;
+      position: relative;
+    }
+
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+    }
+
+    #record-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: rgba(15,15,19,.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid #2e2e4e;
+      border-radius: 40px;
+      padding: 10px 20px;
+      display: none;
+    }
+
+    #rec-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f07070;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+    #rec-label { font-size: 13px; color: #e8e8f0; }
+
+    /* --- Auth Modal --- */
+    #modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    #modal {
+      background: #15151f;
+      border: 1px solid #2e2e4e;
+      border-radius: 16px;
+      padding: 32px;
+      width: 360px;
+    }
+
+    #modal h2 { font-size: 20px; margin-bottom: 20px; }
+
+    .modal-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      background: #0f0f1a;
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .modal-tab {
+      flex: 1;
+      text-align: center;
+      padding: 7px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #60608a;
+      transition: all .15s;
+    }
+
+    .modal-tab.active { background: #7c6ff7; color: #fff; }
+
+    #modal-error {
+      color: #f07070;
+      font-size: 12px;
+      margin-bottom: 8px;
+      min-height: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Parsel<span>Drone</span></div>
+  <div id="auth-bar">
+    <div id="credits-badge">💳 <span id="credit-count">0</span> kredi</div>
+    <button class="btn-secondary" id="history-btn" style="display:none" onclick="loadHistory()">Geçmiş</button>
+    <button class="btn-danger" id="logout-btn" style="display:none" onclick="logout()">Çıkış</button>
+    <button class="btn-primary" id="login-open-btn" onclick="openModal()">Giriş Yap</button>
+  </div>
+</header>
+
+<main>
+  <div id="panel">
+    <div class="card">
+      <h3>Parsel Bilgileri</h3>
+      <input id="il" type="text" placeholder="İl (örn: ISTANBUL)" />
+      <input id="ilce" type="text" placeholder="İlçe (örn: KADIKOY)" />
+      <input id="mahalle" type="text" placeholder="Mahalle (opsiyonel)" />
+      <div class="form-row">
+        <input id="ada" type="text" placeholder="Ada" />
+        <input id="parsel" type="text" placeholder="Parsel" />
+      </div>
+      <button id="generate-btn" onclick="generateDrone()">Drone Videosu Oluştur</button>
+      <p id="status-msg"></p>
+    </div>
+
+    <div class="card" id="history-card" style="display:none">
+      <h3>Son Sorgular</h3>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <div id="map-container">
+    <div id="cesiumContainer"></div>
+    <div id="record-bar">
+      <div id="rec-dot"></div>
+      <span id="rec-label">Video kaydediliyor…</span>
+      <button class="btn-secondary" onclick="stopRecording()">Durdur & İndir</button>
+    </div>
+  </div>
+</main>
+
+<!-- Auth Modal -->
+<div id="modal-overlay" style="display:none">
+  <div id="modal">
+    <h2>Hesabınıza Giriş Yapın</h2>
+    <div class="modal-tabs">
+      <div class="modal-tab active" onclick="switchTab('login')">Giriş</div>
+      <div class="modal-tab" onclick="switchTab('register')">Kayıt Ol</div>
+    </div>
+    <p id="modal-error"></p>
+    <input id="auth-email" type="email" placeholder="E-posta" />
+    <input id="auth-password" type="password" placeholder="Şifre" />
+    <button class="btn-primary" style="width:100%;padding:12px" id="auth-submit-btn" onclick="submitAuth()">Giriş Yap</button>
+  </div>
+</div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────
+  const API = 'http://45.143.4.169:3001/api';
+  // Cesium Ion token — ücretsiz hesap aç: https://ion.cesium.com
+  Cesium.Ion.defaultAccessToken = 'YOUR_CESIUM_ION_TOKEN';
+
+  // ── State ────────────────────────────────────────────────
+  let viewer, mediaRecorder, recordedChunks = [];
+  let authMode = 'login';
+  let token = localStorage.getItem('token') || null;
+
+  // ── Cesium Init ──────────────────────────────────────────
+  viewer = new Cesium.Viewer('cesiumContainer', {
+    terrainProvider: Cesium.createWorldTerrain(),
+    imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }), // Bing Aerial
+    animation: false,
+    timeline: false,
+    baseLayerPicker: false,
+    navigationHelpButton: false,
+    homeButton: false,
+    sceneModePicker: false,
+    geocoder: false,
+    infoBox: false,
+    selectionIndicator: false,
+  });
+
+  viewer.scene.globe.enableLighting = true;
+
+  // ── Auth UI ──────────────────────────────────────────────
+  function openModal() { document.getElementById('modal-overlay').style.display = 'flex'; }
+  function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+
+  function switchTab(mode) {
+    authMode = mode;
+    document.querySelectorAll('.modal-tab').forEach((t, i) =>
+      t.classList.toggle('active', (i === 0 && mode === 'login') || (i === 1 && mode === 'register'))
+    );
+    document.getElementById('auth-submit-btn').textContent = mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol';
+    document.getElementById('modal-error').textContent = '';
+  }
+
+  async function submitAuth() {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    if (!email || !password) return;
+
+    const endpoint = authMode === 'login' ? '/login' : '/register';
+    try {
+      const res = await fetch(API + endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Hata');
+      token = data.token;
+      localStorage.setItem('token', token);
+      updateAuthUI(data.credits);
+      closeModal();
+    } catch (e) {
+      document.getElementById('modal-error').textContent = e.message;
+    }
+  }
+
+  function logout() {
+    token = null;
+    localStorage.removeItem('token');
+    document.getElementById('credits-badge').style.display = 'none';
+    document.getElementById('history-btn').style.display = 'none';
+    document.getElementById('logout-btn').style.display = 'none';
+    document.getElementById('login-open-btn').style.display = '';
+    document.getElementById('history-card').style.display = 'none';
+  }
+
+  function updateAuthUI(credits) {
+    document.getElementById('credit-count').textContent = credits;
+    document.getElementById('credits-badge').style.display = '';
+    document.getElementById('history-btn').style.display = '';
+    document.getElementById('logout-btn').style.display = '';
+    document.getElementById('login-open-btn').style.display = 'none';
+  }
+
+  // Oturum kontrolü
+  async function checkSession() {
+    if (!token) return;
+    try {
+      const res = await fetch(API + '/me', { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) { logout(); return; }
+      const data = await res.json();
+      updateAuthUI(data.credits);
+    } catch { logout(); }
+  }
+
+  // ── Drone Generation ─────────────────────────────────────
+  async function generateDrone() {
+    if (!token) { openModal(); return; }
+
+    const il = document.getElementById('il').value.trim().toUpperCase();
+    const ilce = document.getElementById('ilce').value.trim().toUpperCase();
+    const mahalle = document.getElementById('mahalle').value.trim().toUpperCase();
+    const ada = document.getElementById('ada').value.trim();
+    const parsel = document.getElementById('parsel').value.trim();
+
+    if (!il || !ilce || !ada || !parsel) {
+      setStatus('İl, ilçe, ada ve parsel zorunlu', 'error'); return;
+    }
+
+    setStatus('Parsel aranıyor…');
+
+    try {
+      const res = await fetch(API + '/parsel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ il, ilce, mahalle, ada, parsel }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Hata');
+
+      document.getElementById('credit-count').textContent = data.remaining_credits;
+      setStatus('Parsel bulundu, uçuş başlıyor…', 'success');
+      flyToParsel(data.lat, data.lon, data.coordinates);
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  function flyToParsel(lat, lon, coordinates) {
+    // Parseli haritada göster
+    viewer.entities.removeAll();
+
+    if (coordinates && coordinates.length) {
+      const positions = coordinates.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1]));
+      viewer.entities.add({
+        polygon: {
+          hierarchy: new Cesium.PolygonHierarchy(positions),
+          material: Cesium.Color.fromCssColorString('#7c6ff7').withAlpha(0.35),
+          outline: true,
+          outlineColor: Cesium.Color.fromCssColorString('#7c6ff7'),
+          outlineWidth: 2,
+          height: 0,
+        },
+      });
+    }
+
+    // Drone uçuş animasyonu
+    startDroneFlight(lat, lon);
+  }
+
+  function startDroneFlight(lat, lon) {
+    const center = Cesium.Cartesian3.fromDegrees(lon, lat);
+    const radius = 0.003; // derece cinsinden yarıçap
+    const totalSeconds = 20;
+    const steps = 120;
+
+    let step = 0;
+
+    setStatus('Drone uçuşu başladı — kayıt için "Kaydet" butonuna bas', 'success');
+
+    const interval = setInterval(() => {
+      if (step >= steps) {
+        clearInterval(interval);
+        setStatus('Uçuş tamamlandı', 'success');
+        return;
+      }
+
+      const angle = (step / steps) * Math.PI * 2;
+      const altitude = 300 + Math.sin(angle * 2) * 50; // irtifa değişimi
+      const camLon = lon + radius * Math.cos(angle);
+      const camLat = lat + radius * Math.sin(angle);
+
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, altitude),
+        orientation: {
+          heading: Cesium.Math.toRadians(angle * Cesium.Math.toDegrees(1) % 360),
+          pitch: Cesium.Math.toRadians(-25),
+          roll: 0,
+        },
+      });
+
+      step++;
+    }, (totalSeconds * 1000) / steps);
+  }
+
+  // ── Video Recording ──────────────────────────────────────
+  function startRecording() {
+    recordedChunks = [];
+    const canvas = viewer.scene.canvas;
+    const stream = canvas.captureStream(30);
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.start();
+    document.getElementById('record-bar').style.display = 'flex';
+  }
+
+  function stopRecording() {
+    if (!mediaRecorder) return;
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `parsel-drone-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    mediaRecorder.stop();
+    document.getElementById('record-bar').style.display = 'none';
+  }
+
+  // Kayıt butonunu generate butonuna ekle
+  document.getElementById('generate-btn').insertAdjacentHTML('afterend',
+    '<button class="btn-secondary" style="width:100%;margin-top:8px" onclick="startRecording()">⏺ Kaydet</button>'
+  );
+
+  // ── History ──────────────────────────────────────────────
+  async function loadHistory() {
+    if (!token) return;
+    try {
+      const res = await fetch(API + '/history', { headers: { Authorization: 'Bearer ' + token } });
+      const data = await res.json();
+      const list = document.getElementById('history-list');
+      list.innerHTML = '';
+      data.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+          <div class="parsel-label">${r.il} / ${r.ilce} — Ada ${r.ada} Parsel ${r.parsel}</div>
+          <div class="date-label">${r.date}</div>
+        `;
+        div.onclick = () => flyToParsel(r.lat, r.lon, null);
+        list.appendChild(div);
+      });
+      document.getElementById('history-card').style.display = 'block';
+    } catch {}
+  }
+
+  // ── Helpers ──────────────────────────────────────────────
+  function setStatus(msg, type = '') {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.className = type;
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  checkSession();
+</script>
+</body>
+</html>
