@@ -420,11 +420,12 @@
       const parselM = Math.max(lonExt, latExt);
       orbitMeters = Math.min(Math.max(parselM * 4, 80), 600);
 
+      // height yok + classificationType → arazi yüzeyine yapışır
       viewer.entities.add({
         polygon: {
           hierarchy: new Cesium.PolygonHierarchy(coordinates.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1]))),
           material: Cesium.Color.YELLOW.withAlpha(0.4),
-          height: 0,
+          classificationType: Cesium.ClassificationType.BOTH,
         },
       });
 
@@ -456,20 +457,19 @@
   function startDroneFlight(lat, lon, orbitMeters) {
     if (!viewer) return;
 
-    // Gerçek drone hissi için:
-    // - İrtifa = orbit yarıçapının yarısı → yatay bakış açısı
-    // - Pitch = -20° → tepeden değil yandan bakıyor
-    const camAlt = Math.max(orbitMeters * 0.55, 60);
-    const pitch = -20; // derece — daha yatay, daha sinematik
     const mPerDegLat = 110540;
     const mPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
-    const totalSteps = 360; // tam bir tur, yavaş
+    const totalSteps = 360;
     let step = 0;
 
-    // İlk kareyi hemen göster
+    // Orbit mesafesi sabit, irtifa ve açı sürekli değişir
+    const minAlt = Math.max(orbitMeters * 0.25, 40);   // alçak geçiş
+    const maxAlt = Math.max(orbitMeters * 1.8, 150);   // yüksek geçiş
+
+    // İlk pozisyon
     viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(lon + orbitMeters / mPerDegLon, lat, camAlt),
-      orientation: { heading: Cesium.Math.toRadians(270), pitch: Cesium.Math.toRadians(pitch), roll: 0 },
+      destination: Cesium.Cartesian3.fromDegrees(lon + orbitMeters / mPerDegLon, lat, (minAlt + maxAlt) / 2),
+      orientation: { heading: Cesium.Math.toRadians(270), pitch: Cesium.Math.toRadians(-25), roll: 0 },
     });
 
     flightInterval = setInterval(() => {
@@ -484,21 +484,25 @@
       const camLon = lon + (orbitMeters / mPerDegLon) * Math.cos(angle);
       const camLat = lat + (orbitMeters / mPerDegLat) * Math.sin(angle);
 
+      // İrtifa: sinüs dalgası ile alçalıp yükseliyor (2 kez tam tur başına)
+      const altPhase = 0.5 + 0.5 * Math.sin(angle * 2 - Math.PI / 2);
+      const camAlt = minAlt + (maxAlt - minAlt) * altPhase;
+
+      // Pitch: alçakta yatay (-10°), yüksekte dik (-50°) — irtifayla orantılı
+      const pitchDeg = -10 - 40 * altPhase;
+
       // Başlık: her zaman parsele baksın
       const headingRad = ((3 * Math.PI / 2) - angle + 4 * Math.PI) % (2 * Math.PI);
 
-      // Hafif irtifa dalgalanması — daha canlı görünüm
-      const altVar = camAlt + Math.sin(angle * 2) * camAlt * 0.08;
-
       viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, altVar),
+        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, camAlt),
         orientation: {
           heading: headingRad,
-          pitch: Cesium.Math.toRadians(pitch),
+          pitch: Cesium.Math.toRadians(pitchDeg),
           roll: 0,
         },
       });
-    }, 160); // yavaş orbit → sinematik his
+    }, 160);
   }
 
   // ── Recording ────────────────────────────────────────────
