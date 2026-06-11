@@ -41,6 +41,12 @@ systemctl daemon-reload
 systemctl enable parsel-drone
 systemctl restart parsel-drone
 
+echo "==> Nginx kuruluyor (yoksa)..."
+if ! command -v nginx &> /dev/null; then
+    apt-get update -qq && apt-get install -y -qq nginx
+fi
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+
 echo "==> Nginx config yazılıyor..."
 cat > /etc/nginx/sites-available/parsel-drone << 'EOF'
 server {
