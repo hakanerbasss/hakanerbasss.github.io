@@ -305,15 +305,19 @@
   let flightInterval = null;
 
   // ── Cesium ──────────────────────────────────────────────
-  viewer = new Cesium.Viewer('cesiumContainer', {
-    terrainProvider: Cesium.createWorldTerrain(),
-    imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }),
-    animation: false, timeline: false, baseLayerPicker: false,
-    navigationHelpButton: false, homeButton: false,
-    sceneModePicker: false, geocoder: false,
-    infoBox: false, selectionIndicator: false,
-  });
-  viewer.scene.globe.enableLighting = true;
+  let viewer;
+  try {
+    viewer = new Cesium.Viewer('cesiumContainer', {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+      animation: false, timeline: false, baseLayerPicker: false,
+      navigationHelpButton: false, homeButton: false,
+      sceneModePicker: false, geocoder: false,
+      infoBox: false, selectionIndicator: false,
+    });
+    viewer.scene.globe.enableLighting = true;
+  } catch(e) {
+    console.error('Cesium init error:', e);
+  }
 
   // ── Dropdowns ────────────────────────────────────────────
   async function loadIller() {
@@ -500,6 +504,7 @@
   }
 
   function flyToParsel(lat, lon, coordinates) {
+    if (!viewer) return;
     viewer.entities.removeAll();
     if (flightInterval) clearInterval(flightInterval);
 
@@ -520,6 +525,7 @@
   }
 
   function startDroneFlight(lat, lon) {
+    if (!viewer) return;
     const radius = 0.003;
     const steps = 180;
     let step = 0;
@@ -547,6 +553,7 @@
 
   // ── Recording ────────────────────────────────────────────
   function startRecording() {
+    if (!viewer) return;
     recordedChunks = [];
     const stream = viewer.scene.canvas.captureStream(30);
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
