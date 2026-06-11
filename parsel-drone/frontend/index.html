@@ -639,20 +639,23 @@
         const ilSel = document.getElementById('il-select');
         const ilFound = findAndSelectOption(ilSel, data.il);
 
+        console.log('[ParselDrone] Nominatim:', data);
+
         if (ilFound) {
           await loadIlceler();
           const ilceSel = document.getElementById('ilce-select');
-          const ilceFound = findAndSelectOption(ilceSel, data.ilce);
+          const ilceFound = data.ilce ? findAndSelectOption(ilceSel, data.ilce) : false;
           if (ilceFound && ilceSel.value) {
             await loadMahalleler();
             const mahalleSel = document.getElementById('mahalle-select');
             if (data.mahalle) findAndSelectOption(mahalleSel, data.mahalle);
-            setStatus(`${data.il} / ${data.ilce} — Ada ve Parsel girin`, 'success');
+            setStatus(`${data.il} / ${ilceSel.options[ilceSel.selectedIndex].text} — Ada ve Parsel girin`, 'success');
           } else {
-            setStatus(`${data.il} bulundu — İlçe ve Mahalle seçin`, 'success');
+            const ilceHint = data.ilce ? ` (Nominatim ilçe: "${data.ilce}")` : '';
+            setStatus(`${data.il} bulundu${ilceHint} — İlçe ve Mahalle seçin`, 'success');
           }
         } else {
-          setStatus('İl tanımlanamadı, manuel seçin', 'error');
+          setStatus(`İl tanımlanamadı (Nominatim il: "${data.il}") — manuel seçin`, 'error');
         }
 
         // Tıklanan noktayı işaretle
