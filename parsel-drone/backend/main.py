@@ -283,9 +283,11 @@ async def reverse_geocode(lon: float, lat: float):
             data = resp.json()
         address = data.get("address", {})
         il = (address.get("province") or address.get("state") or "").upper()
-        ilce = (address.get("county") or "")
-        ilce = ilce.replace(" İlçesi", "").replace(" ilçesi", "").replace(" Ilcesi", "").strip().upper()
-        return {"il": il, "ilce": ilce}
+        # Nominatim ilçe için birkaç farklı alan kullanıyor
+        ilce_raw = (address.get("county") or address.get("state_district") or address.get("city_district") or "")
+        ilce = ilce_raw.replace(" İlçesi", "").replace(" ilçesi", "").replace(" Ilçesi", "").strip().upper()
+        mahalle = (address.get("suburb") or address.get("neighbourhood") or address.get("village") or address.get("town") or "").upper()
+        return {"il": il, "ilce": ilce, "mahalle": mahalle}
     except Exception:
         raise HTTPException(status_code=502, detail="Konum tanımlanamadı")
 
