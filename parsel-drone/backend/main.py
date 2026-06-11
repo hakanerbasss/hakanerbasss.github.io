@@ -29,6 +29,9 @@ app.add_middleware(
 )
 
 security = HTTPBearer()
+_cache = {}  # in-memory cache for TKGM lists
+
+TKGM_BASE = "https://cbsapi.tkgm.gov.tr/megsiswebapi.v3/api"
 
 
 # --- Models ---
@@ -72,9 +75,12 @@ class LoginRequest(BaseModel):
 
 
 class ParselRequest(BaseModel):
-    il: str
-    ilce: str
-    mahalle: str = ""
+    il_id: int
+    il_adi: str
+    ilce_id: int
+    ilce_adi: str
+    mahalle_id: int
+    mahalle_adi: str
     ada: str
     parsel: str
 
@@ -118,6 +124,50 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Geçersiz token")
 
 
+async def tkgm_get(url: str) -> dict:
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.json()
+
+
+# --- TKGM List Endpoints (cached) ---
+
+@app.get("/api/iller")
+async def iller():
+    if "iller" not in _cache:
+        data = await tkgm_get(f"{TKGM_BASE}/idariYapi/ilListe")
+        _cache["iller"] = sorted(
+            [{"text": f["properties"]["text"], "id": f["properties"]["id"]} for f in data["features"]],
+            key=lambda x: x["text"]
+        )
+    return _cache["iller"]
+
+
+@app.get("/api/ilceler/{il_id}")
+async def ilceler(il_id: int):
+    key = f"ilce_{il_id}"
+    if key not in _cache:
+        data = await tkgm_get(f"{TKGM_BASE}/idariYapi/ilceListe/{il_id}")
+        _cache[key] = sorted(
+            [{"text": f["properties"]["text"], "id": f["properties"]["id"]} for f in data["features"]],
+            key=lambda x: x["text"]
+        )
+    return _cache[key]
+
+
+@app.get("/api/mahalleler/{ilce_id}")
+async def mahalleler(ilce_id: int):
+    key = f"mahalle_{ilce_id}"
+    if key not in _cache:
+        data = await tkgm_get(f"{TKGM_BASE}/idariYapi/mahalleListe/{ilce_id}")
+        _cache[key] = sorted(
+            [{"text": f["properties"]["text"], "id": f["properties"]["id"]} for f in data["features"]],
+            key=lambda x: x["text"]
+        )
+    return _cache[key]
+
+
 # --- Auth Routes ---
 
 @app.post("/api/register")
@@ -155,24 +205,15 @@ async def get_parsel(
     if user.credits <= 0:
         raise HTTPException(status_code=402, detail="Krediniz yetersiz")
 
-    # TKGM CBS API
-    url = (
-        f"https://cbsapi.tkgm.gov.tr/megsisapi/api/parsel/"
-        f"ilAdi/{req.il}/ilceAdi/{req.ilce}/mahalleAdi/{req.mahalle}/"
-        f"ada/{req.ada}/parsel/{req.parsel}/getParsel"
-    )
+    url = f"{TKGM_BASE}/parsel/{req.mahalle_id}/{req.ada}/{req.parsel}"
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            data = resp.json()
-        except httpx.HTTPError:
-            raise HTTPException(status_code=502, detail="TKGM servisine ulaşılamadı")
-
-    # Koordinat çıkar
     try:
-        coords = data["features"][0]["geometry"]["coordinates"][0]
+        data = await tkgm_get(url)
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="TKGM servisine ulaşılamadı")
+
+    try:
+        coords = data["geometry"]["coordinates"][0]
         lons = [c[0] for c in coords]
         lats = [c[1] for c in coords]
         center_lon = sum(lons) / len(lons)
@@ -180,16 +221,14 @@ async def get_parsel(
     except (KeyError, IndexError, TypeError):
         raise HTTPException(status_code=404, detail="Parsel bulunamadı")
 
-    # Kredi düş
     user.credits -= 1
     db.commit()
 
-    # Geçmişe kaydet
     history = VideoHistory(
         user_id=user.id,
-        il=req.il,
-        ilce=req.ilce,
-        mahalle=req.mahalle,
+        il=req.il_adi,
+        ilce=req.ilce_adi,
+        mahalle=req.mahalle_adi,
         ada=req.ada,
         parsel=req.parsel,
         lat=center_lat,
@@ -202,7 +241,7 @@ async def get_parsel(
         "lat": center_lat,
         "lon": center_lon,
         "coordinates": coords,
-        "remaining_credits": user.credits - 1 + 1,  # already decremented above
+        "remaining_credits": user.credits,
     }
 
 
@@ -220,6 +259,7 @@ def history(user: User = Depends(get_current_user), db: Session = Depends(get_db
             "id": r.id,
             "il": r.il,
             "ilce": r.ilce,
+            "mahalle": r.mahalle,
             "ada": r.ada,
             "parsel": r.parsel,
             "lat": r.lat,

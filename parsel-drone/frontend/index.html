@@ -25,21 +25,10 @@
       background: #0f0f13;
     }
 
-    .logo {
-      font-size: 20px;
-      font-weight: 700;
-      color: #7c6ff7;
-      letter-spacing: -0.5px;
-    }
-
+    .logo { font-size: 20px; font-weight: 700; color: #7c6ff7; letter-spacing: -0.5px; }
     .logo span { color: #e8e8f0; }
 
-    #auth-bar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      font-size: 13px;
-    }
+    #auth-bar { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 
     #credits-badge {
       background: #1e1e2e;
@@ -60,19 +49,15 @@
       padding: 8px 16px;
       transition: opacity .15s;
     }
-
     button:hover { opacity: .85; }
+    button:disabled { opacity: .4; cursor: default; }
 
     .btn-primary { background: #7c6ff7; color: #fff; }
     .btn-secondary { background: #1e1e2e; color: #a0a0c0; }
     .btn-danger { background: #3e1e1e; color: #f07070; }
 
-    main {
-      display: flex;
-      height: calc(100vh - 57px);
-    }
+    main { display: flex; height: calc(100vh - 57px); }
 
-    /* --- Panel --- */
     #panel {
       width: 340px;
       flex-shrink: 0;
@@ -81,7 +66,7 @@
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
     }
 
     .card {
@@ -92,7 +77,7 @@
     }
 
     .card h3 {
-      font-size: 13px;
+      font-size: 12px;
       color: #6060a0;
       text-transform: uppercase;
       letter-spacing: .5px;
@@ -112,11 +97,25 @@
       margin-bottom: 8px;
       outline: none;
       transition: border-color .15s;
+      appearance: none;
     }
-
     input:focus, select:focus { border-color: #7c6ff7; }
-
     input::placeholder { color: #40405a; }
+    select:disabled { opacity: .4; }
+    select option { background: #15151f; }
+
+    .select-wrap { position: relative; margin-bottom: 8px; }
+    .select-wrap::after {
+      content: '▾';
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6060a0;
+      pointer-events: none;
+      font-size: 11px;
+    }
+    .select-wrap select { margin-bottom: 0; }
 
     #generate-btn {
       width: 100%;
@@ -125,6 +124,17 @@
       padding: 12px;
       font-size: 14px;
       border-radius: 10px;
+      margin-top: 4px;
+    }
+
+    #record-btn {
+      width: 100%;
+      background: #1e1e2e;
+      color: #a0a0c0;
+      padding: 10px;
+      font-size: 13px;
+      border-radius: 10px;
+      margin-top: 6px;
     }
 
     #status-msg {
@@ -132,12 +142,11 @@
       color: #7070a0;
       text-align: center;
       min-height: 18px;
+      margin-top: 8px;
     }
-
     #status-msg.error { color: #f07070; }
     #status-msg.success { color: #70c070; }
 
-    /* History */
     .history-item {
       padding: 10px;
       border: 1px solid #1e1e2e;
@@ -147,66 +156,41 @@
       font-size: 12px;
       transition: background .15s;
     }
-
     .history-item:hover { background: #1e1e2e; }
+    .history-item .parsel-label { font-weight: 600; color: #9090d0; }
+    .history-item .date-label { color: #50506a; margin-top: 2px; }
 
-    .history-item .parsel-label {
-      font-weight: 600;
-      color: #9090d0;
-    }
-
-    .history-item .date-label {
-      color: #50506a;
-      margin-top: 2px;
-    }
-
-    /* --- Map --- */
-    #map-container {
-      flex: 1;
-      position: relative;
-    }
-
-    #cesiumContainer {
-      width: 100%;
-      height: 100%;
-    }
+    #map-container { flex: 1; position: relative; }
+    #cesiumContainer { width: 100%; height: 100%; }
 
     #record-bar {
       position: absolute;
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      display: flex;
+      display: none;
       gap: 10px;
       align-items: center;
-      background: rgba(15,15,19,.85);
+      background: rgba(15,15,19,.9);
       backdrop-filter: blur(8px);
       border: 1px solid #2e2e4e;
       border-radius: 40px;
       padding: 10px 20px;
-      display: none;
     }
 
     #rec-dot {
-      width: 10px;
-      height: 10px;
+      width: 10px; height: 10px;
       border-radius: 50%;
       background: #f07070;
       animation: blink 1s infinite;
     }
-
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+    #rec-label { font-size: 13px; }
 
-    #rec-label { font-size: 13px; color: #e8e8f0; }
-
-    /* --- Auth Modal --- */
     #modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      display: flex; align-items: center; justify-content: center;
       z-index: 1000;
     }
 
@@ -217,37 +201,23 @@
       padding: 32px;
       width: 360px;
     }
-
     #modal h2 { font-size: 20px; margin-bottom: 20px; }
 
     .modal-tabs {
-      display: flex;
-      gap: 4px;
+      display: flex; gap: 4px;
       margin-bottom: 20px;
       background: #0f0f1a;
-      border-radius: 8px;
-      padding: 4px;
+      border-radius: 8px; padding: 4px;
     }
-
     .modal-tab {
-      flex: 1;
-      text-align: center;
-      padding: 7px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      color: #60608a;
-      transition: all .15s;
+      flex: 1; text-align: center;
+      padding: 7px; border-radius: 6px;
+      font-size: 13px; cursor: pointer;
+      color: #60608a; transition: all .15s;
     }
-
     .modal-tab.active { background: #7c6ff7; color: #fff; }
 
-    #modal-error {
-      color: #f07070;
-      font-size: 12px;
-      margin-bottom: 8px;
-      min-height: 16px;
-    }
+    #modal-error { color: #f07070; font-size: 12px; margin-bottom: 8px; min-height: 16px; }
   </style>
 </head>
 <body>
@@ -266,14 +236,32 @@
   <div id="panel">
     <div class="card">
       <h3>Parsel Bilgileri</h3>
-      <input id="il" type="text" placeholder="İl (örn: ISTANBUL)" />
-      <input id="ilce" type="text" placeholder="İlçe (örn: KADIKOY)" />
-      <input id="mahalle" type="text" placeholder="Mahalle (opsiyonel)" />
-      <div class="form-row">
-        <input id="ada" type="text" placeholder="Ada" />
-        <input id="parsel" type="text" placeholder="Parsel" />
+
+      <div class="select-wrap">
+        <select id="il-select" onchange="loadIlceler()">
+          <option value="">İl yükleniyor...</option>
+        </select>
       </div>
+
+      <div class="select-wrap">
+        <select id="ilce-select" onchange="loadMahalleler()" disabled>
+          <option value="">Önce il seçin</option>
+        </select>
+      </div>
+
+      <div class="select-wrap">
+        <select id="mahalle-select" disabled>
+          <option value="">Önce ilçe seçin</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <input id="ada" type="text" placeholder="Ada No" />
+        <input id="parsel" type="text" placeholder="Parsel No" />
+      </div>
+
       <button id="generate-btn" onclick="generateDrone()">Drone Videosu Oluştur</button>
+      <button id="record-btn" onclick="startRecording()" style="display:none">⏺ Kaydet</button>
       <p id="status-msg"></p>
     </div>
 
@@ -287,16 +275,15 @@
     <div id="cesiumContainer"></div>
     <div id="record-bar">
       <div id="rec-dot"></div>
-      <span id="rec-label">Video kaydediliyor…</span>
+      <span id="rec-label">Kaydediliyor…</span>
       <button class="btn-secondary" onclick="stopRecording()">Durdur & İndir</button>
     </div>
   </div>
 </main>
 
-<!-- Auth Modal -->
 <div id="modal-overlay" style="display:none">
   <div id="modal">
-    <h2>Hesabınıza Giriş Yapın</h2>
+    <h2>Hesap</h2>
     <div class="modal-tabs">
       <div class="modal-tab active" onclick="switchTab('login')">Giriş</div>
       <div class="modal-tab" onclick="switchTab('register')">Kayıt Ol</div>
@@ -309,34 +296,97 @@
 </div>
 
 <script>
-  // ── Config ──────────────────────────────────────────────
-  const API = 'http://45.143.4.169:3001/api';
-  // Cesium Ion token — ücretsiz hesap aç: https://ion.cesium.com
+  const API = 'http://45.143.4.169/api';
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzZTg0MzEyMy1lNjhiLTRjYTMtODJmMC0xNGUwMmYxY2VhMmIiLCJpZCI6NDQzMjk4LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODExOTY0NTR9.T-xpMd4EZDA8Dk39U0eL1xAuJBzDPF7AeU293KiPANw';
 
-  // ── State ────────────────────────────────────────────────
   let viewer, mediaRecorder, recordedChunks = [];
   let authMode = 'login';
   let token = localStorage.getItem('token') || null;
+  let flightInterval = null;
 
-  // ── Cesium Init ──────────────────────────────────────────
+  // ── Cesium ──────────────────────────────────────────────
   viewer = new Cesium.Viewer('cesiumContainer', {
     terrainProvider: Cesium.createWorldTerrain(),
-    imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }), // Bing Aerial
-    animation: false,
-    timeline: false,
-    baseLayerPicker: false,
-    navigationHelpButton: false,
-    homeButton: false,
-    sceneModePicker: false,
-    geocoder: false,
-    infoBox: false,
-    selectionIndicator: false,
+    imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }),
+    animation: false, timeline: false, baseLayerPicker: false,
+    navigationHelpButton: false, homeButton: false,
+    sceneModePicker: false, geocoder: false,
+    infoBox: false, selectionIndicator: false,
   });
-
   viewer.scene.globe.enableLighting = true;
 
-  // ── Auth UI ──────────────────────────────────────────────
+  // ── Dropdowns ────────────────────────────────────────────
+  async function loadIller() {
+    const sel = document.getElementById('il-select');
+    try {
+      const res = await fetch(API + '/iller');
+      const data = await res.json();
+      sel.innerHTML = '<option value="">İl seçin...</option>';
+      data.forEach(il => {
+        const opt = document.createElement('option');
+        opt.value = il.id;
+        opt.textContent = il.text;
+        sel.appendChild(opt);
+      });
+    } catch {
+      sel.innerHTML = '<option value="">Yüklenemedi</option>';
+    }
+  }
+
+  async function loadIlceler() {
+    const ilId = document.getElementById('il-select').value;
+    const ilceSel = document.getElementById('ilce-select');
+    const mahalleSel = document.getElementById('mahalle-select');
+
+    ilceSel.innerHTML = '<option value="">İlçe yükleniyor...</option>';
+    ilceSel.disabled = true;
+    mahalleSel.innerHTML = '<option value="">Önce ilçe seçin</option>';
+    mahalleSel.disabled = true;
+
+    if (!ilId) return;
+
+    try {
+      const res = await fetch(API + `/ilceler/${ilId}`);
+      const data = await res.json();
+      ilceSel.innerHTML = '<option value="">İlçe seçin...</option>';
+      data.forEach(ilce => {
+        const opt = document.createElement('option');
+        opt.value = ilce.id;
+        opt.textContent = ilce.text;
+        ilceSel.appendChild(opt);
+      });
+      ilceSel.disabled = false;
+    } catch {
+      ilceSel.innerHTML = '<option value="">Yüklenemedi</option>';
+    }
+  }
+
+  async function loadMahalleler() {
+    const ilceId = document.getElementById('ilce-select').value;
+    const mahalleSel = document.getElementById('mahalle-select');
+
+    mahalleSel.innerHTML = '<option value="">Mahalle yükleniyor...</option>';
+    mahalleSel.disabled = true;
+
+    if (!ilceId) return;
+
+    try {
+      const res = await fetch(API + `/mahalleler/${ilceId}`);
+      const data = await res.json();
+      mahalleSel.innerHTML = '<option value="">Mahalle seçin...</option>';
+      data.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.text;
+        mahalleSel.appendChild(opt);
+      });
+      mahalleSel.disabled = false;
+    } catch {
+      mahalleSel.innerHTML = '<option value="">Yüklenemedi</option>';
+    }
+  }
+
+  // ── Auth ─────────────────────────────────────────────────
   function openModal() { document.getElementById('modal-overlay').style.display = 'flex'; }
   function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
 
@@ -357,7 +407,6 @@
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
     if (!email || !password) return;
-
     const endpoint = authMode === 'login' ? '/login' : '/register';
     try {
       const res = await fetch(API + endpoint, {
@@ -394,7 +443,6 @@
     document.getElementById('login-open-btn').style.display = 'none';
   }
 
-  // Oturum kontrolü
   async function checkSession() {
     if (!token) return;
     try {
@@ -405,18 +453,21 @@
     } catch { logout(); }
   }
 
-  // ── Drone Generation ─────────────────────────────────────
+  // ── Parsel & Drone ───────────────────────────────────────
   async function generateDrone() {
     if (!token) { openModal(); return; }
 
-    const il = document.getElementById('il').value.trim().toUpperCase();
-    const ilce = document.getElementById('ilce').value.trim().toUpperCase();
-    const mahalle = document.getElementById('mahalle').value.trim().toUpperCase();
+    const ilSel = document.getElementById('il-select');
+    const ilceSel = document.getElementById('ilce-select');
+    const mahalleSel = document.getElementById('mahalle-select');
     const ada = document.getElementById('ada').value.trim();
     const parsel = document.getElementById('parsel').value.trim();
 
-    if (!il || !ilce || !ada || !parsel) {
-      setStatus('İl, ilçe, ada ve parsel zorunlu', 'error'); return;
+    if (!ilSel.value || !ilceSel.value || !mahalleSel.value) {
+      setStatus('İl, ilçe ve mahalle seçin', 'error'); return;
+    }
+    if (!ada || !parsel) {
+      setStatus('Ada ve parsel numarası girin', 'error'); return;
     }
 
     setStatus('Parsel aranıyor…');
@@ -425,13 +476,23 @@
       const res = await fetch(API + '/parsel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ il, ilce, mahalle, ada, parsel }),
+        body: JSON.stringify({
+          il_id: parseInt(ilSel.value),
+          il_adi: ilSel.options[ilSel.selectedIndex].text,
+          ilce_id: parseInt(ilceSel.value),
+          ilce_adi: ilceSel.options[ilceSel.selectedIndex].text,
+          mahalle_id: parseInt(mahalleSel.value),
+          mahalle_adi: mahalleSel.options[mahalleSel.selectedIndex].text,
+          ada,
+          parsel,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Hata');
 
       document.getElementById('credit-count').textContent = data.remaining_credits;
-      setStatus('Parsel bulundu, uçuş başlıyor…', 'success');
+      setStatus('Parsel bulundu — drone uçuşu başladı', 'success');
+      document.getElementById('record-btn').style.display = '';
       flyToParsel(data.lat, data.lon, data.coordinates);
     } catch (e) {
       setStatus(e.message, 'error');
@@ -439,8 +500,8 @@
   }
 
   function flyToParsel(lat, lon, coordinates) {
-    // Parseli haritada göster
     viewer.entities.removeAll();
+    if (flightInterval) clearInterval(flightInterval);
 
     if (coordinates && coordinates.length) {
       const positions = coordinates.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1]));
@@ -450,60 +511,49 @@
           material: Cesium.Color.fromCssColorString('#7c6ff7').withAlpha(0.35),
           outline: true,
           outlineColor: Cesium.Color.fromCssColorString('#7c6ff7'),
-          outlineWidth: 2,
           height: 0,
         },
       });
     }
 
-    // Drone uçuş animasyonu
     startDroneFlight(lat, lon);
   }
 
   function startDroneFlight(lat, lon) {
-    const center = Cesium.Cartesian3.fromDegrees(lon, lat);
-    const radius = 0.003; // derece cinsinden yarıçap
-    const totalSeconds = 20;
-    const steps = 120;
-
+    const radius = 0.003;
+    const steps = 180;
     let step = 0;
 
-    setStatus('Drone uçuşu başladı — kayıt için "Kaydet" butonuna bas', 'success');
-
-    const interval = setInterval(() => {
-      if (step >= steps) {
-        clearInterval(interval);
-        setStatus('Uçuş tamamlandı', 'success');
-        return;
-      }
+    flightInterval = setInterval(() => {
+      if (step >= steps) { clearInterval(flightInterval); return; }
 
       const angle = (step / steps) * Math.PI * 2;
-      const altitude = 300 + Math.sin(angle * 2) * 50; // irtifa değişimi
+      const altitude = 250 + Math.sin(angle * 3) * 60;
       const camLon = lon + radius * Math.cos(angle);
       const camLat = lat + radius * Math.sin(angle);
+      const heading = (angle * (180 / Math.PI) + 90) % 360;
 
       viewer.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, altitude),
         orientation: {
-          heading: Cesium.Math.toRadians(angle * Cesium.Math.toDegrees(1) % 360),
-          pitch: Cesium.Math.toRadians(-25),
+          heading: Cesium.Math.toRadians(heading),
+          pitch: Cesium.Math.toRadians(-30),
           roll: 0,
         },
       });
-
       step++;
-    }, (totalSeconds * 1000) / steps);
+    }, 100);
   }
 
-  // ── Video Recording ──────────────────────────────────────
+  // ── Recording ────────────────────────────────────────────
   function startRecording() {
     recordedChunks = [];
-    const canvas = viewer.scene.canvas;
-    const stream = canvas.captureStream(30);
+    const stream = viewer.scene.canvas.captureStream(30);
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.start();
     document.getElementById('record-bar').style.display = 'flex';
+    document.getElementById('record-btn').style.display = 'none';
   }
 
   function stopRecording() {
@@ -519,12 +569,8 @@
     };
     mediaRecorder.stop();
     document.getElementById('record-bar').style.display = 'none';
+    document.getElementById('record-btn').style.display = '';
   }
-
-  // Kayıt butonunu generate butonuna ekle
-  document.getElementById('generate-btn').insertAdjacentHTML('afterend',
-    '<button class="btn-secondary" style="width:100%;margin-top:8px" onclick="startRecording()">⏺ Kaydet</button>'
-  );
 
   // ── History ──────────────────────────────────────────────
   async function loadHistory() {
@@ -534,11 +580,13 @@
       const data = await res.json();
       const list = document.getElementById('history-list');
       list.innerHTML = '';
+      if (!data.length) { list.innerHTML = '<p style="color:#50506a;font-size:12px">Henüz sorgu yok</p>'; }
       data.forEach(r => {
         const div = document.createElement('div');
         div.className = 'history-item';
         div.innerHTML = `
-          <div class="parsel-label">${r.il} / ${r.ilce} — Ada ${r.ada} Parsel ${r.parsel}</div>
+          <div class="parsel-label">${r.il} / ${r.ilce} / ${r.mahalle}</div>
+          <div class="parsel-label" style="margin-top:2px">Ada ${r.ada} — Parsel ${r.parsel}</div>
           <div class="date-label">${r.date}</div>
         `;
         div.onclick = () => flyToParsel(r.lat, r.lon, null);
@@ -548,7 +596,6 @@
     } catch {}
   }
 
-  // ── Helpers ──────────────────────────────────────────────
   function setStatus(msg, type = '') {
     const el = document.getElementById('status-msg');
     el.textContent = msg;
@@ -557,6 +604,7 @@
 
   // ── Init ─────────────────────────────────────────────────
   checkSession();
+  loadIller();
 </script>
 </body>
 </html>
