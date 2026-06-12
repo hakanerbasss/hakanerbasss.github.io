@@ -2,7 +2,7 @@ package com.bluechip.finance.util
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import androidx.security.crypto.MasterKeys
 
 object DeepSeekKeyManager {
 
@@ -10,11 +10,9 @@ object DeepSeekKeyManager {
     private const val KEY   = "api_key"
 
     private fun prefs(context: Context) = EncryptedSharedPreferences.create(
-        context,
         PREFS,
-        MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build(),
+        MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+        context,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
