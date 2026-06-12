@@ -68,19 +68,55 @@ import androidx.compose.ui.unit.sp
 import com.bluechip.finance.data.HistoryEntry
 import com.bluechip.finance.data.HistoryManager
 import com.bluechip.finance.ui.theme.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
 
 @Composable
 fun SectionHeader(title: String, icon: ImageVector? = null, onInfoClick: (() -> Unit)? = null) {
     val colors = LocalAppColors.current
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
+            val blobTr = rememberInfiniteTransition(label = "blob")
+            val morph by blobTr.animateFloat(
+                0f, 1f,
+                infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Reverse), "m"
+            )
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .shadow(6.dp, RoundedCornerShape(10.dp), spotColor = PurplePrimary)
-                    .background(GradientPrimary, RoundedCornerShape(10.dp)),
+                    .shadow(6.dp, RoundedCornerShape(10.dp), spotColor = PurplePrimary),
                 contentAlignment = Alignment.Center
-            ) { Icon(icon, null, tint = Color.White, modifier = Modifier.size(19.dp)) }
+            ) {
+                val morphVal = morph
+                Canvas(modifier = Modifier.matchParentSize()) {
+                    val path = Path()
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val r = size.minDimension / 2f * 0.86f
+                    fun lp(a: Float, b: Float) = a + (b - a) * morphVal
+                    val topX  = cx + lp(-r * 0.10f,  r * 0.10f)
+                    val topY  = cy - r + lp(-r * 0.08f, r * 0.08f)
+                    val rightX = cx + r + lp(-r * 0.08f, r * 0.08f)
+                    val rightY = cy + lp(-r * 0.10f,  r * 0.10f)
+                    val botX  = cx + lp( r * 0.08f, -r * 0.08f)
+                    val botY  = cy + r + lp( r * 0.08f, -r * 0.08f)
+                    val leftX = cx - r + lp( r * 0.08f, -r * 0.08f)
+                    val leftY = cy + lp( r * 0.10f, -r * 0.10f)
+                    val h = r * 0.55f
+                    path.moveTo(topX, topY)
+                    path.cubicTo(topX + h, topY, rightX, rightY - h, rightX, rightY)
+                    path.cubicTo(rightX, rightY + h, botX + h, botY, botX, botY)
+                    path.cubicTo(botX - h, botY, leftX, leftY + h, leftX, leftY)
+                    path.cubicTo(leftX, leftY - h, topX - h, topY, topX, topY)
+                    path.close()
+                    drawPath(path, brush = GradientPrimary)
+                }
+                Icon(icon, null, tint = Color.White, modifier = Modifier.size(19.dp))
+            }
             Spacer(Modifier.width(10.dp))
         }
         Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary, modifier = Modifier.weight(1f))
@@ -147,10 +183,13 @@ fun NumberField(value: String, onValueChange: (String) -> Unit, label: String, m
 
 @Composable
 fun ActionButtons(onCalculate: () -> Unit, onReset: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
+    val inkScope = rememberCoroutineScope()
+    val inkRadius = remember { Animatable(0f) }
+    var inkCenter by remember { mutableStateOf(GeoOffset.Zero) }
+    var inkVisible by remember { mutableStateOf(false) }
+    val inkR = inkRadius.value
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.93f else 1f,
+        targetValue = if (inkVisible) 0.96f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "btnScale"
     )
@@ -163,9 +202,39 @@ fun ActionButtons(onCalculate: () -> Unit, onReset: () -> Unit) {
                 .shadow(12.dp, RoundedCornerShape(16.dp),
                     spotColor = PurplePrimary, ambientColor = PurplePrimary)
                 .background(GradientButton, RoundedCornerShape(16.dp))
-                .clickable(interactionSource = interaction, indication = null) { onCalculate() },
+                .clip(RoundedCornerShape(16.dp))
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        inkCenter = offset
+                        inkScope.launch {
+                            inkVisible = true
+                            inkRadius.snapTo(0f)
+                            inkRadius.animateTo(440f, tween(420, easing = FastOutSlowInEasing))
+                            inkVisible = false
+                        }
+                        onCalculate()
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                if (inkR > 0f) {
+                    val frac = (inkR / 440f).coerceIn(0f, 1f)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.52f * (1f - frac)),
+                                Color.White.copy(alpha = 0.18f * (1f - frac)),
+                                Color.Transparent
+                            ),
+                            center = inkCenter,
+                            radius = (inkR * 1.15f).coerceAtLeast(1f)
+                        ),
+                        radius = (inkR * 1.15f).coerceAtLeast(1f),
+                        center = inkCenter
+                    )
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Calculate, null, modifier = Modifier.size(20.dp), tint = Color.White)
                 Spacer(Modifier.width(8.dp))
@@ -294,27 +363,26 @@ fun ResultLine(label: String, value: String, color: Color = LocalAppColors.curre
 
 @Composable
 fun BigResult(label: String, value: String, color: Color = LocalAppColors.current.success) {
-    // Sayiyi yakala ve 0'dan hedefe dogru sayarak goster (count-up)
-    val match  = remember(value) { Regex("\\d[\\d.,]*").find(value) }
-    val target = remember(value) {
-        match?.value?.replace(".", "")?.replace(',', '.')?.toDoubleOrNull()
-    }
-    val progress = remember(value) { Animatable(0f) }
+    var display by remember { mutableStateOf(value) }
+    var scrambling by remember { mutableStateOf(false) }
     LaunchedEffect(value) {
-        progress.snapTo(0f)
-        progress.animateTo(1f, tween(durationMillis = 900, easing = FastOutSlowInEasing))
+        scrambling = true
+        repeat(12) { i ->
+            display = value.map { c ->
+                if (c.isDigit() && kotlin.random.Random.nextFloat() > i.toFloat() / 12f)
+                    ('0' + kotlin.random.Random.nextInt(10))
+                else c
+            }.joinToString("")
+            delay(45)
+        }
+        display = value
+        scrambling = false
     }
-    val display = if (target != null && match != null && progress.value < 1f) {
-        val current = target * progress.value
-        val formatted = if (match.value.contains(',')) formatMoney(current) else formatNumber(current)
-        value.replaceRange(match.range, formatted)
-    } else value
     val scale by animateFloatAsState(
-        targetValue = if (progress.value >= 1f) 1f else 1.06f,
+        targetValue = if (scrambling) 1.06f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "resultScale"
     )
-    // Nabız atan glow halo — sadece animasyon tamamlandıktan sonra başlar
     val glow by rememberInfiniteTransition(label = "glow").animateFloat(
         0.08f, 0.36f,
         infiniteRepeatable(tween(1300, easing = FastOutSlowInEasing), RepeatMode.Reverse),
@@ -324,10 +392,9 @@ fun BigResult(label: String, value: String, color: Color = LocalAppColors.curren
            horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, fontSize = 13.sp, color = color)
         Box(contentAlignment = Alignment.Center) {
-            // Glow arkası
             Canvas(modifier = Modifier.matchParentSize()) {
                 drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
-                    listOf(color.copy(alpha = if (progress.value >= 1f) glow else 0f),
+                    listOf(color.copy(alpha = if (!scrambling) glow else 0f),
                            androidx.compose.ui.graphics.Color.Transparent),
                     center = GeoOffset(size.width / 2f, size.height / 2f),
                     radius = size.width * 0.6f

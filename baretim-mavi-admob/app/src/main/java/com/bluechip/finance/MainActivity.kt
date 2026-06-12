@@ -23,6 +23,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -206,99 +214,95 @@ fun BlueChipApp() {
                     1.dp, com.bluechip.finance.ui.theme.PurplePrimary.copy(alpha = 0.15f)),
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth()
             ) {
-            NavigationBar(
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                tonalElevation = 0.dp,
-                windowInsets = WindowInsets(0, 0, 0, 0),
-                modifier = androidx.compose.ui.Modifier
-                    .fillMaxWidth()
-            ) {
-                val navBackStack by navController.currentBackStackEntryAsState()
-                val currentRoute = navBackStack?.destination?.route
-
-                items.forEach { item ->
-                    val isSelected = if (item.route == "tools") {
-                        currentRoute == "tools" || currentRoute in toolsSubRoutes
-                    } else {
-                        currentRoute == item.route
-                    }
-
-                    NavigationBarItem(
-                        icon = {
-                            if (item.route == "home") {
-                                // Merkez FAB tarzı emoji butonu
-                                Box(
-                                    modifier = androidx.compose.ui.Modifier
-                                        .size(52.dp)
-                                        .background(
-                                            com.bluechip.finance.ui.theme.PurplePrimary.copy(alpha = 0.10f),
-                                            androidx.compose.foundation.shape.CircleShape
-                                        )
-                                        .then(
-                                            if (isSelected)
-                                                androidx.compose.ui.Modifier.border(
-                                                    2.dp,
-                                                    com.bluechip.finance.ui.theme.PurplePrimary,
-                                                    androidx.compose.foundation.shape.CircleShape
-                                                )
-                                            else
-                                                androidx.compose.ui.Modifier.border(
-                                                    1.5f.dp,
-                                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                                                    androidx.compose.foundation.shape.CircleShape
-                                                )
-                                        ),
-                                    contentAlignment = androidx.compose.ui.Alignment.Center
+            // Liquid navigation — animated gradient blob slides between tabs
+            val navBackStack by navController.currentBackStackEntryAsState()
+            val currentRoute = navBackStack?.destination?.route
+            val selectedIdx = items.indexOfFirst { item ->
+                if (item.route == "tools") currentRoute == "tools" || currentRoute in toolsSubRoutes
+                else currentRoute == item.route
+            }.coerceAtLeast(0)
+            val blobAnim by animateFloatAsState(
+                targetValue = selectedIdx.toFloat(),
+                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+                label = "blobX"
+            )
+            Box(modifier = Modifier.fillMaxWidth().height(62.dp)) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val tabW = size.width / items.size
+                    val cx = tabW * blobAnim + tabW / 2f
+                    val bW = tabW * 0.82f
+                    val bH = size.height * 0.74f
+                    val top = (size.height - bH) / 2f
+                    drawRoundRect(
+                        brush = com.bluechip.finance.ui.theme.GradientButton,
+                        topLeft = Offset(cx - bW / 2f, top),
+                        size = Size(bW, bH),
+                        cornerRadius = CornerRadius(bH / 2f)
+                    )
+                }
+                Row(modifier = Modifier.fillMaxSize()) {
+                    items.forEach { item ->
+                        val isSelected = if (item.route == "tools") {
+                            currentRoute == "tools" || currentRoute in toolsSubRoutes
+                        } else {
+                            currentRoute == item.route
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { MutableInteractionSource() }
                                 ) {
-                                    Text(moodEmoji, fontSize = 34.sp, lineHeight = 38.sp)
-                                }
-                            } else {
-                            Box(
-                                modifier = androidx.compose.ui.Modifier
-                                    .then(if (isSelected) androidx.compose.ui.Modifier
-                                        .background(
-                                            com.bluechip.finance.ui.theme.PurplePrimary.copy(alpha = 0.12f),
-                                            androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-                                        )
-                                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                                    else androidx.compose.ui.Modifier.padding(horizontal = 8.dp, vertical = 6.dp)),
-                                contentAlignment = androidx.compose.ui.Alignment.Center
+                                    if (item.route == "tools") {
+                                        if (currentRoute in toolsSubRoutes) {
+                                            navController.popBackStack("tools", inclusive = false)
+                                        } else if (currentRoute != "tools") {
+                                            navController.navigate("tools") {
+                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true; restoreState = true
+                                            }
+                                        }
+                                    } else {
+                                        if (currentRoute != item.route) {
+                                            navController.navigate(item.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true; restoreState = true
+                                            }
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
-                                Icon(item.icon!!, item.label,
-                                    tint = if (isSelected) com.bluechip.finance.ui.theme.PurplePrimary
-                                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                            }
-                            } // end if home
-                        },
-                        label = { Text(item.label, fontSize = 10.sp,
-                            color = if (isSelected) com.bluechip.finance.ui.theme.PurplePrimary
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
-                        selected = isSelected,
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                        ),
-                        onClick = {
-                            if (item.route == "tools") {
-                                if (currentRoute in toolsSubRoutes) {
-                                    navController.popBackStack("tools", inclusive = false)
-                                } else if (currentRoute != "tools") {
-                                    navController.navigate("tools") {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
+                                if (item.route == "home") {
+                                    Text(moodEmoji, fontSize = 26.sp, lineHeight = 30.sp)
+                                } else {
+                                    Icon(
+                                        item.icon!!,
+                                        item.label,
+                                        tint = if (isSelected) androidx.compose.ui.graphics.Color.White
+                                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
-                            } else {
-                                if (currentRoute != item.route) {
-                                    navController.navigate(item.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
+                                if (item.label.isNotEmpty()) {
+                                    Text(
+                                        item.label,
+                                        fontSize = 10.sp,
+                                        lineHeight = 13.sp,
+                                        color = if (isSelected) androidx.compose.ui.graphics.Color.White
+                                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f),
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
                                 }
                             }
                         }
-                    )
+                    }
                 }
             }
             }
