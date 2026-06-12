@@ -1,6 +1,18 @@
 package com.bluechip.finance.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import com.commandiron.wheel_picker_compose.WheelDatePicker
 import com.commandiron.wheel_picker_compose.core.WheelPickerDefaults
 import java.time.LocalDate
@@ -51,7 +63,16 @@ import com.bluechip.finance.ui.theme.*
 fun SectionHeader(title: String, icon: ImageVector? = null, onInfoClick: (() -> Unit)? = null) {
     val colors = LocalAppColors.current
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (icon != null) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)); Spacer(Modifier.width(8.dp)) }
+        if (icon != null) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .shadow(6.dp, RoundedCornerShape(10.dp), spotColor = PurplePrimary)
+                    .background(GradientPrimary, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) { Icon(icon, null, tint = Color.White, modifier = Modifier.size(19.dp)) }
+            Spacer(Modifier.width(10.dp))
+        }
         Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary, modifier = Modifier.weight(1f))
         if (onInfoClick != null) { IconButton(onClick = onInfoClick) { Icon(Icons.Default.Info, "Bilgi", tint = MaterialTheme.colorScheme.primary) } }
     }
@@ -69,10 +90,10 @@ fun CurrencyField(value: String, onValueChange: (String) -> Unit, label: String,
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
+                    .background(GradientPrimary, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("₺", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+                Text("₺", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
             }
         },
         modifier = modifier.fillMaxWidth(),
@@ -116,27 +137,30 @@ fun NumberField(value: String, onValueChange: (String) -> Unit, label: String, m
 
 @Composable
 fun ActionButtons(onCalculate: () -> Unit, onReset: () -> Unit) {
-    val colors = LocalAppColors.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.93f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "btnScale"
+    )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(54.dp)
-                .background(
-                    Brush.horizontalGradient(listOf(PurplePrimary, PurplePrimaryDark)),
-                    RoundedCornerShape(16.dp)
-                )
-                .then(Modifier.border(0.dp, Color.Transparent, RoundedCornerShape(16.dp))),
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .shadow(12.dp, RoundedCornerShape(16.dp),
+                    spotColor = PurplePrimary, ambientColor = PurplePrimary)
+                .background(GradientButton, RoundedCornerShape(16.dp))
+                .clickable(interactionSource = interaction, indication = null) { onCalculate() },
             contentAlignment = Alignment.Center
         ) {
-            androidx.compose.material3.TextButton(
-                onClick = onCalculate,
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Calculate, null, modifier = Modifier.size(20.dp), tint = Color.White)
                 Spacer(Modifier.width(8.dp))
-                Text("HESAPLA", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+                Text("HESAPLA", fontWeight = FontWeight.Bold, color = Color.White,
+                    fontSize = 15.sp, letterSpacing = 1.sp)
             }
         }
         OutlinedButton(
@@ -156,11 +180,20 @@ fun ResultCard(visible: Boolean, content: @Composable ColumnScope.() -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     var cardBounds by remember { mutableStateOf<android.graphics.Rect?>(null) }
-    AnimatedVisibility(visible = visible, enter = fadeIn() + expandVertically()) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(300)) +
+                expandVertically(spring(dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow)) +
+                scaleIn(initialScale = 0.94f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp)
+                .shadow(16.dp, RoundedCornerShape(20.dp),
+                    spotColor = PurplePrimary, ambientColor = PurplePrimary)
                 .onGloballyPositioned { coords ->
                     val r = coords.boundsInRoot()
                     cardBounds = android.graphics.Rect(
@@ -168,8 +201,9 @@ fun ResultCard(visible: Boolean, content: @Composable ColumnScope.() -> Unit) {
                         r.right.toInt(), r.bottom.toInt()
                     )
                 },
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(8.dp),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(0.dp),
+            border = BorderStroke(1.5.dp, GradientPrimary),
             colors = CardDefaults.cardColors(containerColor = colors.cardGray)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -200,8 +234,30 @@ fun ResultLine(label: String, value: String, color: Color = LocalAppColors.curre
 
 @Composable
 fun BigResult(label: String, value: String, color: Color = LocalAppColors.current.success) {
+    // Sayiyi yakala ve 0'dan hedefe dogru sayarak goster (count-up)
+    val match  = remember(value) { Regex("\\d[\\d.,]*").find(value) }
+    val target = remember(value) {
+        match?.value?.replace(".", "")?.replace(',', '.')?.toDoubleOrNull()
+    }
+    val progress = remember(value) { Animatable(0f) }
+    LaunchedEffect(value) {
+        progress.snapTo(0f)
+        progress.animateTo(1f, tween(durationMillis = 900, easing = FastOutSlowInEasing))
+    }
+    val display = if (target != null && match != null && progress.value < 1f) {
+        val current = target * progress.value
+        val formatted = if (match.value.contains(',')) formatMoney(current) else formatNumber(current)
+        value.replaceRange(match.range, formatted)
+    } else value
+    val scale by animateFloatAsState(
+        targetValue = if (progress.value >= 1f) 1f else 1.04f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "resultScale"
+    )
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 13.sp, color = color); Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
+        Text(label, fontSize = 13.sp, color = color)
+        Text(display, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = color,
+            modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale })
     }
 }
 

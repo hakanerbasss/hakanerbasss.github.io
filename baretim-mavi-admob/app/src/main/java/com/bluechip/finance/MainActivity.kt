@@ -123,7 +123,8 @@ fun BlueChipApp() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Baretim Mavi", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = colors.textPrimary) },
+                title = { Text("Baretim Mavi", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp,
+                    style = androidx.compose.ui.text.TextStyle(brush = com.bluechip.finance.ui.theme.GradientPrimary)) },
                 actions = {
                     if (adFreeActive) {
                         androidx.compose.foundation.layout.Box(
@@ -188,10 +189,26 @@ fun BlueChipApp() {
             )
         },
         bottomBar = {
-            Column {
+            // Yuzen dock tarzi alt bar
+            Box(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 14.dp)
+                    .padding(bottom = 10.dp, top = 4.dp)
+            ) {
+            Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 18.dp,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, com.bluechip.finance.ui.theme.PurplePrimary.copy(alpha = 0.15f)),
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth()
+            ) {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
                 tonalElevation = 0.dp,
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxWidth()
             ) {
@@ -282,6 +299,7 @@ fun BlueChipApp() {
                         }
                     )
                 }
+            }
             }
             }
         }
@@ -441,7 +459,17 @@ fun BlueChipApp() {
         }
 
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-        NavHost(navController, startDestination = "home", modifier = Modifier.weight(1f)) {
+        NavHost(navController, startDestination = "home", modifier = Modifier.weight(1f),
+            enterTransition = {
+                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) +
+                androidx.compose.animation.slideInVertically(
+                    initialOffsetY = { it / 24 },
+                    animationSpec = androidx.compose.animation.core.tween(260))
+            },
+            exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)) },
+            popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) },
+            popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)) }
+        ) {
             composable("home") { HomeScreen(onNavigate = { route ->
                 navController.navigate(route) {
                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
