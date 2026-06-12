@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
 data class NavItem(val route: String, val label: String, val icon: ImageVector?)
 
 // Araçlar alt sayfaları
-val toolsSubRoutes = setOf("leave", "bordro", "unemployment", "retirement", "inflation", "comparison", "profile", "rights", "payments", "savings", "overtime_track")
+val toolsSubRoutes = setOf("leave", "bordro", "unemployment", "retirement", "inflation", "comparison", "profile", "rights", "payments", "savings", "overtime_track", "earnings_ticker", "salary_coach", "budget", "rights_chat")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -501,6 +501,10 @@ fun BlueChipApp() {
             composable("special_days") { com.bluechip.finance.ui.screens.SpecialDaysScreen(onBack = { navController.popBackStack() }) }
             composable("special_days_add") { com.bluechip.finance.ui.screens.SpecialDaysScreen(onBack = { navController.popBackStack() }, autoAdd = true) }
             composable("overtime_track") { com.bluechip.finance.ui.screens.OvertimeTrackScreen() }
+            composable("earnings_ticker") { com.bluechip.finance.ui.screens.EarningsTickerScreen() }
+            composable("salary_coach")   { com.bluechip.finance.ui.screens.SalaryCoachScreen() }
+            composable("budget")         { com.bluechip.finance.ui.screens.BudgetScreen() }
+            composable("rights_chat")    { com.bluechip.finance.ui.screens.RightsChatScreen() }
             }
         }
         }
