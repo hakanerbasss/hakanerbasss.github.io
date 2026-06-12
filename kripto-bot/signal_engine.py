@@ -57,7 +57,8 @@ def calc_ut_bot(closes, highs, lows, key_value=2, atr_period=7, mode='crossover'
     for i in range(start, n):
         c = closes[i]
         prev_trail = trail
-        n_loss = key_value * atr_per_candle[i - 1]
+        # Pine ta.atr(period) mevcut mumun TR'sini içerir → [i], [i-1] değil
+        n_loss = key_value * atr_per_candle[i]
 
         # Pine Script: 4 ayrı koşul (cross anında trail doğru yere oturur)
         if c > prev_trail and prev_close > prev_trail:
@@ -263,9 +264,9 @@ def run_engine():
                 buy_hour  = int(coin.get('seans_buy_hour', 20))
 
                 try:
-                    import pytz
-                    TR_TZ  = pytz.timezone('Europe/Istanbul')
-                    now_tr = datetime.datetime.now(TR_TZ)
+                    # pytz sunucuda kurulu değil — seans_strategy ile aynı stdlib TZ
+                    from seans_strategy import _TR_TZ
+                    now_tr = datetime.datetime.now(_TR_TZ)
                     current_hour = now_tr.hour
                     today_str    = now_tr.strftime('%Y-%m-%d')
 

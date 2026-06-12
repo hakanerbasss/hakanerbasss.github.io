@@ -609,9 +609,11 @@ class AutonomousAgent:
             time.sleep(12 * 3600)
             try:
                 trades = load_trades()
+                # Satış kayıtlarında period=çıkış nedeni ('KAR HEDEFİ' vb.) olur,
+                # 'Ajan' değil — eski filtre hiç eşleşmiyordu, ağırlıklar donuktu.
                 ajan_sells = [t for t in trades
                               if t.get('type') == 'sell'
-                              and 'Ajan' in t.get('period','')]
+                              and t.get('source','') == 'OTONOM']
                 if len(ajan_sells) < 5: continue
                 wins = [t for t in ajan_sells if t.get('pnl',0) > 0]
                 wr   = len(wins) / len(ajan_sells)

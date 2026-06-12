@@ -56,12 +56,21 @@ TOOLS = [
 
 # ─── Araç Yürütücüleri ────────────────────────────────────────────────────────
 
+_CEO_AGENTS = ['edge', 'otonom', 'indicator', 'wyckoff', 'breakout']
+
 def _exec_set_agent_enabled(agent, enabled):
     cfg = load_config()
     key = f'{agent}_enabled'
     old = cfg.get(key, True)
     if old == bool(enabled):
         return None  # değişiklik yok
+    # Güvenlik kilidi: LLM'in TÜM ajanları kapatmasına izin verme —
+    # en az bir ajan açık kalmalı, yoksa bot tamamen işlem yapamaz hale gelir.
+    if not enabled:
+        others_on = sum(1 for a in _CEO_AGENTS
+                        if a != agent and cfg.get(f'{a}_enabled', True))
+        if others_on == 0:
+            return f'{agent} kapatılMADI: son açık ajan, en az biri açık kalmalı'
     cfg[key] = bool(enabled)
     save_config(cfg)
     return f'{agent}_enabled: {old} → {bool(enabled)}'
@@ -85,7 +94,8 @@ def _execute_tool_calls(tool_calls):
         name = tc['function']['name']
         try:
             args = json.loads(tc['function']['arguments'])
-        except Exception:
+        except Exception as e:
+            print(f'[CEO] Bozuk araç argümanı atlandı ({name}): {e}')
             continue
         try:
             if name == 'set_agent_enabled':

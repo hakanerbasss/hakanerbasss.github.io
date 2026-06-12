@@ -29,6 +29,10 @@ def check_smart_signal(client, symbol, min_score=3):
     Returns: {'signal': 'buy'|'', 'score': int, 'detail': str}
     """
     try:
+        # Skor en fazla 4 olabilir (4 faktör x 1 puan). Config'de 6 gibi bir
+        # eşik girilirse sinyal HİÇ tetiklenmez — sessizce ölü strateji olur.
+        min_score = max(1, min(4, int(min_score)))
+
         closes, volumes = _get_klines(client, symbol, limit=60)
         if len(closes) < 25:
             return {'signal': '', 'score': 0, 'detail': 'Yetersiz veri'}

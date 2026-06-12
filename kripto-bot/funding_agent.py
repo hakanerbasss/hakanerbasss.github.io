@@ -153,8 +153,15 @@ def _open_position(symbol, state):
             quantity=futures_qty,
         )
     except Exception as e:
-        # Spot alındı, futures açılamadı → spot'u geri sat
-        execute_sell(spot_client, symbol, 100, source='FUNDING-ROLLBACK')
+        # Spot alındı, futures açılamadı → spot'u geri sat.
+        # Rollback de başarısız olursa elde HEDGE'SİZ long kalır — kritik uyarı ver.
+        rb = execute_sell(spot_client, symbol, 100, source='FUNDING-ROLLBACK')
+        if not rb.get('ok'):
+            send_telegram(
+                f'🚨 <b>FUNDING KRİTİK</b>: {symbol} futures short açılamadı VE '
+                f'spot geri satışı başarısız ({rb.get("error","?")}) — '
+                f'pozisyon hedge\'siz LONG, elle müdahale gerekli!'
+            )
         return False, f'Futures short hatası: {e}'
 
     rate      = _get_funding_rate(fc, symbol)
@@ -277,21 +284,26 @@ def _scan_loop():
     """30 dakikada bir yeni yüksek-funding fırsatı ara."""
     fc = _futures_client()
     while not _stop.is_set():
-        state      = _load_state()
-        open_syms  = set(state['positions'].keys())
-        open_count = len(open_syms)
+        # try/except şart: tek bir yakalanmamış istisna (ağ hatası, bozuk state)
+        # thread'i sessizce öldürür — ajan "çalışıyor" görünür ama hiçbir şey yapmaz.
+        try:
+            state      = _load_state()
+            open_syms  = set(state['positions'].keys())
+            open_count = len(open_syms)
 
-        for symbol in COINS:
-            if _stop.is_set():
-                break
-            if symbol in open_syms or open_count >= MAX_POSITIONS:
-                continue
-            rate = _get_funding_rate(fc, symbol)
-            if rate >= MIN_RATE:
-                ok, msg = _open_position(symbol, state)
-                if ok:
-                    open_count += 1
-                    state = _load_state()
+            for symbol in COINS:
+                if _stop.is_set():
+                    break
+                if symbol in open_syms or open_count >= MAX_POSITIONS:
+                    continue
+                rate = _get_funding_rate(fc, symbol)
+                if rate >= MIN_RATE:
+                    ok, msg = _open_position(symbol, state)
+                    if ok:
+                        open_count += 1
+                        state = _load_state()
+        except Exception as e:
+            print(f'[Funding] Tarama hata: {e}')
 
         _stop.wait(SCAN_INTERVAL)
 
@@ -300,18 +312,21 @@ def _monitor_loop():
     """5 dakikada bir açık pozisyonları izle, rate negatife dönünce kapat."""
     fc = _futures_client()
     while not _stop.is_set():
-        state = _load_state()
+        try:
+            state = _load_state()
 
-        _update_funding_estimates(state)
+            _update_funding_estimates(state)
 
-        for symbol in list(state['positions'].keys()):
-            rate = _get_funding_rate(fc, symbol)
-            if rate < 0:
-                _close_position(
-                    symbol, state,
-                    reason=f'Rate negatife döndü ({rate*100:.4f}%)'
-                )
-                state = _load_state()
+            for symbol in list(state['positions'].keys()):
+                rate = _get_funding_rate(fc, symbol)
+                if rate < 0:
+                    _close_position(
+                        symbol, state,
+                        reason=f'Rate negatife döndü ({rate*100:.4f}%)'
+                    )
+                    state = _load_state()
+        except Exception as e:
+            print(f'[Funding] Monitor hata: {e}')
 
         _stop.wait(MONITOR_INTERVAL)
 

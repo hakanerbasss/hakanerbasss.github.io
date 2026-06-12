@@ -598,9 +598,10 @@ def seans_analiz():
         from binance.client import Client as BClient
         klines = client.get_klines(symbol=symbol, interval=BClient.KLINE_INTERVAL_1HOUR, limit=180*24)
 
-        import pytz, datetime
-        TR_TZ = pytz.timezone('Europe/Istanbul')
-        UTC_TZ = pytz.utc
+        import datetime
+        # pytz sunucuda kurulu değil — TR 2016'dan beri sabit UTC+3
+        TR_TZ = datetime.timezone(datetime.timedelta(hours=3))
+        UTC_TZ = datetime.timezone.utc
 
         candles = []
         for k in klines:

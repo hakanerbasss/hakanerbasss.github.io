@@ -540,8 +540,13 @@ class EdgeAgent:
         except Exception:
             pass
 
-        # Funding rates al
+        # Funding rates al — bu ajanın ANA sinyali. API erişilemezse (boş dict)
+        # tüm coinler funding=0 görünür ve kalan sinyallerle körlemesine alım
+        # yapılırdı; onun yerine bu taramayı atla.
         fundings = _all_funding()
+        if not fundings:
+            print('[Edge] Funding verisi alınamadı (futures API?) — tarama atlandı')
+            return
         symbols  = _futures_symbols()
         scan_no  = self.state.get('scan_count', 0) + 1
         print(f'[Edge] Tarama #{scan_no}: {len(symbols)} futures sembol, açık={open_count}')
