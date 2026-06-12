@@ -143,17 +143,20 @@ Koç (`coach_agent.py`) günde bir kez (ilk analiz boot+15dk):
 
 Config anahtarları (Koç'un oynayabildiği): `breakout_min_score`,
 `breakout_min_chg_2h`, `breakout_min_vol_spike`, `breakout_max_chg_24h`,
-`breakout_fg_min`, `breakout_max_pos`, `otonom_min_score`, `otonom_fg_min`,
-`edge_min_score`, `max_positions`, `reentry_cooldown_hours`,
-`sl_cooldown_hours`, `hour_ban_enabled`, `min_position_usd`, `global_halt_pct`
+`breakout_min_vol_24h`, `breakout_fg_min`, `breakout_max_pos`,
+`otonom_min_score`, `otonom_fg_min`, `edge_min_score`, `max_positions`,
+`reentry_cooldown_hours`, `sl_cooldown_hours`, `hour_ban_enabled`,
+`hour_ban_start`, `hour_ban_end`, `min_position_usd`, `global_halt_pct`
 
 Diğer önemli anahtarlar: `data_epoch` (öğrenme bu tarihten sonrasına bakar —
 kirli trades.json geçmişini dışlar; Koç ilk çalışmada otomatik kurar),
-`coach_enabled` (vars. true), `coach_interval_hours` (vars. 24),
-`hour_ban_start`/`hour_ban_end` (vars. 13/20 TR).
+`coach_enabled` (vars. true), `coach_interval_hours` (vars. 24).
 
-**Saat yasağı muafiyeti:** MANUEL, WYCKOFF ve BREAKOUT kaynakları 13-20 TR
-yasağından muaftır (momentum ajanı piyasa hareketliyken alabilmeli).
+**Saat yasağı:** Varsayılan 16-19 TR (ABD açılışı türbülansı; eski 13-20'lik
+7 saatlik blok fırsat maliyeti yüzünden daraltıldı). MANUEL, WYCKOFF ve
+BREAKOUT kaynakları muaftır. Telegram açılış mesajları yasağı/eşikleri
+`bot.hour_ban_text()` ve config üzerinden GÜNCEL haliyle gösterir — yeni
+sabit ekleyince mesajına hardcode değer yazma, config'den oku.
 
 **Veri/emir ayrımı (`bot.get_data_client`):** Piyasa VERİSİ (fiyat, kline,
 ticker) testnet modunda bile GERÇEK Binance'ten okunur — testnet'in sığ emir

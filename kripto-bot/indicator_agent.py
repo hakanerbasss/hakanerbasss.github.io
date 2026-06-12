@@ -10,7 +10,7 @@ Indicator Agent — Kodlanmış İndikatörler ile Otonom Tarayıcı
 import time, threading, json, os, datetime
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, get_price, send_telegram, get_usdt_balance,
-                 update_position, check_breakeven)
+                 update_position, check_breakeven, hour_ban_text)
 from signal_engine import calc_ut_bot, get_klines
 from smart_strategy import check_smart_sell   # sadece açık SMART pozisyonların çıkışı için
 
@@ -150,7 +150,7 @@ class IndicatorAgent:
             f'  • UT Bot (key={UTBOT_KEY}, atr={UTBOT_ATR}, {UTBOT_PERIOD}, {UTBOT_MODE})\n'
             f'  ⓘ Smart + Seans kaldırıldı (0% kazanma, -$292)\n'
             f'🪙 Evren: Top 50 coin (hacme göre, otomatik)\n'
-            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)'
+            f'{hour_ban_text()}'
         )
         return True
 

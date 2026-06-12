@@ -17,7 +17,7 @@ import time, threading, json, os, datetime
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, get_price, send_telegram, get_usdt_balance,
                  update_position, check_breakeven, get_total_equity,
-                 position_size_by_score)
+                 position_size_by_score, hour_ban_text)
 
 STATE_FILE = 'accumulation_state.json'
 
@@ -39,7 +39,8 @@ MAX_DROP_7D_PCT = -20.0      # 7 günde -%20 altı = dağıtım bölgesi, atla
 TP_PCT          = 12.0
 SL_PCT          = 4.0
 TIMEOUT_H       = 72
-FG_MIN          = 30    # Fear & Greed bu değerin altında yeni alım yok
+FG_MIN          = 20    # 30→20: sessiz birikim korku döneminde olur; dip stratejisini
+                        # FG<30'da kapatmak çelişkiliydi. 20 altı panik = yine dur.
 
 
 # ── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
@@ -236,9 +237,9 @@ class AccumulationAgent:
             f'💰 Bakiye: ${bal:.2f}\n'
             f'🔍 Sessiz Birikim: Hacim Squeeze + BB Sıkışması\n'
             f'⚡ Tarama: {SCAN_INTERVAL//60}dk | Tetik: {TRIGGER_SEC}s\n'
-            f'🎯 TP: +%{TP_PCT} | SL: -%{SL_PCT} | Timeout: {TIMEOUT_H}s\n'
+            f'🎯 TP: +%{TP_PCT} | SL: -%{SL_PCT} | Timeout: {TIMEOUT_H} saat\n'
             f'📦 Ajan slotu: {AGENT_MAX} pozisyon\n'
-            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)'
+            f'{hour_ban_text()}'
         )
         print('[Accum] Başladı')
         return True

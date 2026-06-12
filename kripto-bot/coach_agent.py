@@ -43,6 +43,7 @@ PARAM_BOUNDS = {
     'breakout_min_chg_2h':    (2.5, 8.0,  5.0,  'Breakout son-2s min fiyat hareketi %'),
     'breakout_min_vol_spike': (1.5, 5.0,  3.0,  'Breakout min hacim spike çarpanı'),
     'breakout_max_chg_24h':   (15.0, 50.0, 30.0, 'Breakout 24s max pompalanma %'),
+    'breakout_min_vol_24h':   (500_000, 10_000_000, 2_000_000, 'Breakout min 24s hacim $ (düşük=slippage riski)'),
     'breakout_fg_min':        (0, 50, 35, 'Breakout Fear&Greed alt eşiği (0=filtre yok)'),
     'breakout_max_pos':       (1, 5, 3, 'Breakout aynı anda max pozisyon'),
     'otonom_min_score':       (5.0, 7.5, 6.0, 'Otonom ajan min skor (0-10)'),
@@ -51,7 +52,9 @@ PARAM_BOUNDS = {
     'max_positions':          (3, 10, 6, 'Tüm ajanların toplam max pozisyonu'),
     'reentry_cooldown_hours': (0.5, 6.0, 2.0, 'Satış sonrası tekrar alım bekleme (saat)'),
     'sl_cooldown_hours':      (0.0, 12.0, 3.0, 'Zararlı çıkış sonrası bekleme (saat)'),
-    'hour_ban_enabled':       (0, 1, 1, '13-20 TR alım yasağı (1=açık 0=kapalı; BREAKOUT zaten muaf)'),
+    'hour_ban_enabled':       (0, 1, 1, 'Saat yasağı (1=açık 0=kapalı; BREAKOUT/WYCKOFF muaf)'),
+    'hour_ban_start':         (0, 23, 16, 'Saat yasağı başlangıcı (TR saati)'),
+    'hour_ban_end':           (0, 23, 19, 'Saat yasağı bitişi (TR saati)'),
     'min_position_usd':       (5.0, 50.0, 10.0, 'Minimum pozisyon büyüklüğü $'),
     'global_halt_pct':        (5.0, 20.0, 10.0, 'Günlük portföy devre kesici eşiği %'),
 }
@@ -214,7 +217,9 @@ def _missed_movers(client, cfg):
         if slots_full:
             reasons.append(f'pozisyon slotları dolu ({len(held)}/{max_pos})')
         if cfg.get('hour_ban_enabled', True):
-            reasons.append('gün içinde 13-20 TR yasağı vardı (BREAKOUT muaf)')
+            hs = int(cfg.get('hour_ban_start', 16))
+            he = int(cfg.get('hour_ban_end', 19))
+            reasons.append(f'gün içinde {hs}-{he} TR yasağı vardı (BREAKOUT muaf)')
         if not reasons:
             reasons.append('skor/hacim-spike eşiğine takılmış olabilir')
         m['reasons'] = reasons
@@ -311,7 +316,8 @@ def _apply_tool_calls(tool_calls, state):
             lo, hi, default, _ = PARAM_BOUNDS[key]
             val = max(lo, min(hi, float(args['value'])))
             if key in ('max_positions', 'breakout_max_pos', 'hour_ban_enabled',
-                       'breakout_fg_min', 'otonom_fg_min'):
+                       'hour_ban_start', 'hour_ban_end',
+                       'breakout_fg_min', 'otonom_fg_min', 'breakout_min_vol_24h'):
                 val = int(round(val))
             old = cfg.get(key, default)
             if old == val:

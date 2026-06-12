@@ -19,7 +19,7 @@ from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
                  send_telegram, get_usdt_balance,
-                 update_position, clear_position, check_breakeven)
+                 update_position, clear_position, check_breakeven, hour_ban_text)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE   = 'edge_state.json'
@@ -492,8 +492,9 @@ class EdgeAgent:
             f'💰 Bakiye: ${bal:.2f}\n'
             f'📡 Sinyal: Funding + Sweep + OI + CVD + Haber\n'
             f'⚡ Tarama: {SCAN_INTERVAL}s | Takip: {MONITOR_SEC}s\n'
-            f'🎯 Min Skor: {MIN_SCORE}/10 | Max Pos: {MAX_POSITIONS}\n'
-            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)\n'
+            f'🎯 Min Skor: {float(cfg.get("edge_min_score", MIN_SCORE)):g}/10 | '
+            f'Max Pos: {int(cfg.get("max_positions", MAX_POSITIONS))}\n'
+            f'{hour_ban_text()}\n'
             f'⚠️ Geleneksel indikatör yok. Piyasa mekaniği.'
         )
         return True
