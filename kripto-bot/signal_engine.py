@@ -1,6 +1,6 @@
 import time, datetime, json, threading, os
-from bot import (load_config, get_client, execute_buy, execute_sell,
-                 load_positions, get_price, send_telegram)
+from bot import (load_config, get_client, get_data_client, execute_buy,
+                 execute_sell, load_positions, get_price, send_telegram)
 from seans_strategy import check_seans_signal, check_seans_sell
 
 SIGNAL_STATE_FILE = 'signal_state.json'
@@ -126,7 +126,8 @@ def get_klines(client, symbol, interval, limit=150):
         '4h':  Client.KLINE_INTERVAL_4HOUR,
         '1d':  Client.KLINE_INTERVAL_1DAY,
     }
-    kl = client.get_klines(
+    # Veri her zaman gerçek piyasadan (testnet kline'ları çarpık olabilir)
+    kl = get_data_client().get_klines(
         symbol=symbol,
         interval=interval_map.get(interval, Client.KLINE_INTERVAL_1HOUR),
         limit=limit

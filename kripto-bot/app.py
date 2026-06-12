@@ -178,9 +178,9 @@ def smart_backtest():
         if not symbol:
             return jsonify({'ok': False, 'error': 'Sembol gerekli'})
 
-        client = get_client()
+        from bot import get_data_client
         from binance.client import Client as BClient
-        klines = client.get_klines(
+        klines = get_data_client().get_klines(
             symbol=symbol,
             interval=BClient.KLINE_INTERVAL_1HOUR,
             limit=180 * 24
@@ -579,7 +579,8 @@ def api_chart():
             '4h': Client.KLINE_INTERVAL_4HOUR,
             '1d': Client.KLINE_INTERVAL_1DAY,
         }
-        kl = client.get_klines(symbol=symbol, interval=interval_map.get(interval, Client.KLINE_INTERVAL_5MINUTE), limit=100)
+        from bot import get_data_client
+        kl = get_data_client().get_klines(symbol=symbol, interval=interval_map.get(interval, Client.KLINE_INTERVAL_5MINUTE), limit=100)
         kl = kl[:-1]
         candles = [{'t': int(k[0]), 'o': float(k[1]), 'h': float(k[2]), 'l': float(k[3]), 'c': float(k[4])} for k in kl]
 
@@ -596,7 +597,8 @@ def seans_analiz():
         if not symbol:
             return jsonify({'ok': False, 'error': 'Sembol gerekli'})
 
-        client = get_client()
+        from bot import get_data_client
+        client = get_data_client()   # seans analizi gerçek piyasa verisiyle anlamlı
         from binance.client import Client as BClient
         klines = client.get_klines(symbol=symbol, interval=BClient.KLINE_INTERVAL_1HOUR, limit=180*24)
 

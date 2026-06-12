@@ -12,7 +12,8 @@ def _rsi(closes, n=14):
 
 
 def _get_klines(client, symbol, limit=60):
-    klines = client.get_klines(
+    from bot import get_data_client
+    klines = get_data_client().get_klines(
         symbol=symbol,
         interval=BClient.KLINE_INTERVAL_1HOUR,
         limit=limit + 1,

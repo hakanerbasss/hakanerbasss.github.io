@@ -32,7 +32,8 @@ def _build_stable_cache(client):
     """Binance top 200'de fiyatı $0.90-$1.10 arası olan coinleri tespit eder."""
     global _stable_cache
     try:
-        tickers = client.get_ticker()
+        from bot import get_data_client
+        tickers = get_data_client().get_ticker()
         found = set()
         for t in tickers:
             sym = t.get('symbol', '')
@@ -133,7 +134,8 @@ def _klines(client, sym, interval='1h', limit=120):
     imap = {'1m': BC.KLINE_INTERVAL_1MINUTE,  '5m':  BC.KLINE_INTERVAL_5MINUTE,
             '15m': BC.KLINE_INTERVAL_15MINUTE, '1h':  BC.KLINE_INTERVAL_1HOUR,
             '4h': BC.KLINE_INTERVAL_4HOUR,     '1d':  BC.KLINE_INTERVAL_1DAY}
-    kl = client.get_klines(symbol=sym, interval=imap.get(interval, BC.KLINE_INTERVAL_1HOUR), limit=limit)
+    from bot import get_data_client
+    kl = get_data_client().get_klines(symbol=sym, interval=imap.get(interval, BC.KLINE_INTERVAL_1HOUR), limit=limit)
     kl = kl[:-1]
     o = [float(k[1]) for k in kl]; h = [float(k[2]) for k in kl]
     l = [float(k[3]) for k in kl]; c = [float(k[4]) for k in kl]
@@ -141,7 +143,8 @@ def _klines(client, sym, interval='1h', limit=120):
     return o, h, l, c, v
 
 def _top_100(client):
-    tickers = client.get_ticker()
+    from bot import get_data_client
+    tickers = get_data_client().get_ticker()
     all_stable = STABLECOINS | _stable_cache
     usdt = [t for t in tickers
             if t['symbol'].endswith('USDT')

@@ -46,7 +46,8 @@ def check_seans_signal(client, symbol, strategy='both'):
         return {'signal': 'buy', 'reason': f'{session_name} seansı ({hour}:00)'}
 
     try:
-        klines = client.get_klines(
+        from bot import get_data_client
+        klines = get_data_client().get_klines(
             symbol=symbol,
             interval=BClient.KLINE_INTERVAL_1HOUR,
             limit=26,

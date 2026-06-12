@@ -155,6 +155,14 @@ kirli trades.json geçmişini dışlar; Koç ilk çalışmada otomatik kurar),
 **Saat yasağı muafiyeti:** MANUEL, WYCKOFF ve BREAKOUT kaynakları 13-20 TR
 yasağından muaftır (momentum ajanı piyasa hareketliyken alabilmeli).
 
+**Veri/emir ayrımı (`bot.get_data_client`):** Piyasa VERİSİ (fiyat, kline,
+ticker) testnet modunda bile GERÇEK Binance'ten okunur — testnet'in sığ emir
+defteri çarpık fiyat/hacim üretir, ajanlar yanlış öğrenir. EMİR, BAKİYE ve
+SEMBOL FİLTRELERİ (`get_symbol_filters`) her zaman `get_client()` ile gider
+(testnet'te testnet'e). `data_from_real: false` → eski davranış. NOT: gerçek
+piyasada olup testnet'te olmayan sembollerde alım "Invalid symbol" hatasıyla
+temiz şekilde reddedilir; bu beklenen davranıştır.
+
 Telegram: `/koc` durum, `/kocanaliz` manuel analiz. Web: `/coach/status`, `/coach/run`.
 
 ## 7. Sık Yapılan Hatalar

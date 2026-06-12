@@ -94,7 +94,8 @@ def _save_state(state):
 
 def _klines_with_vol(client, symbol, limit=26):
     """1h kline: close + quoteVolume (USDT bazlı). Son açık mumu çıkarır."""
-    kl = client.get_klines(
+    from bot import get_data_client
+    kl = get_data_client().get_klines(
         symbol=symbol,
         interval=BC.KLINE_INTERVAL_1HOUR,
         limit=limit + 1
@@ -108,7 +109,8 @@ def _klines_with_vol(client, symbol, limit=26):
 def _btc_ok(client):
     """BTC son 2 saatte flat veya yukarı olmalı (≥-1%). Daha sert düşüşte breakout = sahte."""
     try:
-        kl = client.get_klines(symbol='BTCUSDT', interval=BC.KLINE_INTERVAL_1HOUR, limit=4)
+        from bot import get_data_client
+        kl = get_data_client().get_klines(symbol='BTCUSDT', interval=BC.KLINE_INTERVAL_1HOUR, limit=4)
         kl = kl[:-1]
         closes = [float(k[4]) for k in kl]
         return closes[-1] >= closes[-3] * 0.99
@@ -145,7 +147,10 @@ def _detect_breakouts(client, cfg=None):
     max_chg_24h  = _tun(cfg, 'breakout_max_chg_24h', MAX_CHG_24H)
 
     try:
-        tickers = client.get_ticker()
+        # Gerçek piyasa tickerları — testnet hacimleri sahte, kırılım tespiti
+        # ancak gerçek hacim/fiyat verisiyle anlamlı
+        from bot import get_data_client
+        tickers = get_data_client().get_ticker()
     except Exception as e:
         print(f'[Breakout] Ticker hatası: {e}')
         return []

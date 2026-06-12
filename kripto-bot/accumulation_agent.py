@@ -52,7 +52,8 @@ def _klines_vol(client, symbol, interval, limit=25):
         '4h': Client.KLINE_INTERVAL_4HOUR,
         '1d': Client.KLINE_INTERVAL_1DAY,
     }
-    kl = client.get_klines(symbol=symbol, interval=imap[interval], limit=limit)
+    from bot import get_data_client
+    kl = get_data_client().get_klines(symbol=symbol, interval=imap[interval], limit=limit)
     kl = kl[:-1]  # açık mumu çıkar
     closes = [float(k[4]) for k in kl]
     highs  = [float(k[2]) for k in kl]
@@ -267,7 +268,8 @@ class AccumulationAgent:
         if not _fear_greed_ok():
             return
 
-        tickers = client.get_ticker()
+        from bot import get_data_client
+        tickers = get_data_client().get_ticker()
         pool = [
             t for t in tickers
             if t['symbol'].endswith('USDT')
