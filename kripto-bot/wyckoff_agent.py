@@ -121,7 +121,8 @@ class WyckoffAgent:
     # ── Veri ─────────────────────────────────────────────────────────────────
 
     def _get_daily(self, client, sym, days=120):
-        klines = client.get_klines(
+        from bot import get_data_client
+        klines = get_data_client().get_klines(
             symbol=sym,
             interval=BClient.KLINE_INTERVAL_1DAY,
             limit=days + 1,
@@ -264,7 +265,8 @@ class WyckoffAgent:
         if open_cnt >= MAX_POSITIONS:
             return
 
-        tickers = client.get_ticker()
+        from bot import get_data_client
+        tickers = get_data_client().get_ticker()
         usdt = [
             t for t in tickers
             if t['symbol'].endswith('USDT')

@@ -123,9 +123,28 @@ def get_client():
         client = Client(api_key, api_secret)
     return client
 
+# ── Veri Client'ı (gerçek piyasa) ────────────────
+# Testnet'in emir defteri sığdır: fiyat fitilleri ve hacim verisi çarpıktır.
+# Ajanlar bu çarpık veriden sinyal üretirse öğrenilen şey gerçek piyasayı
+# temsil etmez. Bu yüzden VERİ (fiyat/kline/ticker) her zaman GERÇEK
+# Binance'ten okunur (public endpoint, key gerektirmez); EMİR ve BAKİYE ise
+# get_client() ile gider (testnet modunda testnet'e).
+# Gerçek hesaba geçilince iki taraf zaten aynı olur.
+# config 'data_from_real': false → eski davranış (veri de testnet'ten).
+_DATA_CLIENT = None
+
+def get_data_client():
+    global _DATA_CLIENT
+    cfg = load_config()
+    if not cfg.get('testnet', True) or not cfg.get('data_from_real', True):
+        return get_client()
+    if _DATA_CLIENT is None:
+        _DATA_CLIENT = Client('', '')   # public production — sadece veri okur
+    return _DATA_CLIENT
+
 # ── Market Data ─────────────────────────────────
 def get_market_summary(client):
-    tickers = client.get_ticker()
+    tickers = get_data_client().get_ticker()
     usdt_pairs = [t for t in tickers if t['symbol'].endswith('USDT')]
     total = len(usdt_pairs)
     red = [t for t in usdt_pairs if float(t['priceChangePercent']) < 0]
@@ -160,7 +179,7 @@ def get_fear_greed():
 
 def get_price(client, symbol):
     try:
-        t = client.get_ticker(symbol=symbol)
+        t = get_data_client().get_ticker(symbol=symbol)
         return float(t['lastPrice'])
     except:
         return 0.0
@@ -460,7 +479,7 @@ def round_step(qty, step):
 def _calc_atr_pct(client, symbol, atr_period=7):
     """Saatlik ATR'yi fiyata göre yüzde olarak döndür."""
     try:
-        klines = client.get_klines(
+        klines = get_data_client().get_klines(
             symbol=symbol,
             interval=Client.KLINE_INTERVAL_1HOUR,
             limit=atr_period + 5

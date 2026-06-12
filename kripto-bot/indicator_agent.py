@@ -52,7 +52,8 @@ def _fear_greed_ok():
 
 
 def _scan_candidates(client):
-    tickers = client.get_ticker()
+    from bot import get_data_client
+    tickers = get_data_client().get_ticker()
     usdt = [
         t for t in tickers
         if t['symbol'].endswith('USDT')
