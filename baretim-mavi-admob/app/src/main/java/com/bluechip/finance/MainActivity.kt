@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
 data class NavItem(val route: String, val label: String, val icon: ImageVector?)
 
 // Araçlar alt sayfaları
-val toolsSubRoutes = setOf("leave", "bordro", "unemployment", "retirement", "inflation", "comparison", "profile", "rights", "payments", "savings", "overtime_track", "earnings_ticker", "salary_coach", "budget", "rights_chat")
+val toolsSubRoutes = setOf("leave", "bordro", "unemployment", "retirement", "inflation", "comparison", "profile", "rights", "payments", "savings", "overtime_track", "earnings_ticker", "salary_coach", "budget", "rights_chat", "ai_assistant")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -505,6 +505,7 @@ fun BlueChipApp() {
             composable("salary_coach")   { com.bluechip.finance.ui.screens.SalaryCoachScreen() }
             composable("budget")         { com.bluechip.finance.ui.screens.BudgetScreen() }
             composable("rights_chat")    { com.bluechip.finance.ui.screens.RightsChatScreen() }
+            composable("ai_assistant")   { com.bluechip.finance.ui.screens.AiAssistantScreen() }
             }
         }
         }

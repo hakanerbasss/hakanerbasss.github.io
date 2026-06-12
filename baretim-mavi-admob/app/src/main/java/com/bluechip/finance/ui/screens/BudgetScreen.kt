@@ -30,11 +30,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bluechip.finance.data.PaymentCategory
+import com.bluechip.finance.data.PaymentManager
 import com.bluechip.finance.data.ProfileManager
 import com.bluechip.finance.ui.components.CurrencyField
 import com.bluechip.finance.ui.components.SectionHeader
 import com.bluechip.finance.ui.components.formatMoney
 import com.bluechip.finance.ui.theme.GradientPrimary
+import com.bluechip.finance.ui.theme.IndigoDeep
 import com.bluechip.finance.ui.theme.LocalAppColors
 
 @Composable
@@ -48,13 +51,23 @@ fun BudgetScreen() {
     var billsText     by remember { mutableStateOf("") }
     var transportText by remember { mutableStateOf("") }
     var savingsText   by remember { mutableStateOf("") }
+    var autoFilledFields by remember { mutableStateOf(emptyList<String>()) }
 
-    // Auto-fill net salary from profile
+    // Auto-fill net salary from profile and payments from PaymentManager
     LaunchedEffect(Unit) {
         val profile = ProfileManager(context).load()
         if (profile.netSalary > 0) {
             incomeText = profile.netSalary.toLong().toString()
         }
+        val payments = PaymentManager.getPayments(context).filter { it.isActive }
+        val filled = mutableListOf<String>()
+        // KIRA category → rentText
+        payments.filter { it.category == PaymentCategory.KIRA }
+            .sumOf { it.amount }.let { if (it > 0) { rentText = it.toLong().toString(); filled.add("kira") } }
+        // FATURA + ABONELIK + SIGORTA + DIGER → billsText
+        payments.filter { it.category == PaymentCategory.FATURA || it.category == PaymentCategory.ABONELIK || it.category == PaymentCategory.SIGORTA || it.category == PaymentCategory.DIGER }
+            .sumOf { it.amount }.let { if (it > 0) { billsText = it.toLong().toString(); filled.add("fatura") } }
+        autoFilledFields = filled
     }
 
     val income        = incomeText.toDoubleOrNull() ?: 0.0
@@ -128,6 +141,20 @@ fun BudgetScreen() {
                     fontSize = 12.sp,
                     color = colors.success
                 )
+            }
+            if (autoFilledFields.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = IndigoDeep.copy(alpha = 0.10f)
+                ) {
+                    Text(
+                        text = "Ödeme takibinden otomatik dolduruldu",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        fontSize = 12.sp,
+                        color = IndigoDeep
+                    )
+                }
             }
         }
 

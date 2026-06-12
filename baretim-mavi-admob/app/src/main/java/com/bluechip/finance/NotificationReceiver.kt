@@ -31,6 +31,7 @@ class NotificationReceiver : BroadcastReceiver() {
         const val CHANNEL_SALARY  = "ch_salary"
         const val CHANNEL_PAYMENT = "ch_payment"
         const val CHANNEL_INCOME  = "ch_income"
+        const val CHANNEL_BACKUP  = "ch_backup"
 
         fun createChannels(context: Context) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -38,7 +39,8 @@ class NotificationReceiver : BroadcastReceiver() {
             listOf(
                 Triple(CHANNEL_SALARY,  "Maas ve Gelir Bildirimleri", NotificationManager.IMPORTANCE_DEFAULT),
                 Triple(CHANNEL_PAYMENT, "Odeme Hatirlatici",          NotificationManager.IMPORTANCE_DEFAULT),
-                Triple(CHANNEL_INCOME,  "Yan Gelir Bildirimleri",     NotificationManager.IMPORTANCE_LOW)
+                Triple(CHANNEL_INCOME,  "Yan Gelir Bildirimleri",     NotificationManager.IMPORTANCE_LOW),
+                Triple(CHANNEL_BACKUP,  "Yedekleme Hatirlatici",      NotificationManager.IMPORTANCE_DEFAULT)
             ).forEach { (id, name, imp) ->
                 nm.createNotificationChannel(NotificationChannel(id, name, imp))
             }
@@ -122,6 +124,16 @@ class NotificationReceiver : BroadcastReceiver() {
                         val detail = if (day.subtitle.isNotEmpty()) day.subtitle else day.title
                         send(msg, detail, CHANNEL_INCOME)
                     }
+                }
+            }
+
+            // Yedekleme hatirlatici
+            if (settings.backupReminderEnabled) {
+                val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                val prefs = context.getSharedPreferences("notif_settings", Context.MODE_PRIVATE)
+                val lastBackup = prefs.getString(NotificationSettingsManager.KEY_LAST_BACKUP_DATE, "")
+                if (lastBackup != today) {
+                    send("Yedekleme Hatirlatici", "Bugun yedekleme yapmadiniz. Verileriniz kaybolmasin!", CHANNEL_BACKUP)
                 }
             }
         }

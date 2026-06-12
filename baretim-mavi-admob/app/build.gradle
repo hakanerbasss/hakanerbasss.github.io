@@ -19,6 +19,7 @@ android {
         def localPropsFile = rootProject.file('local.properties')
         if (localPropsFile.exists()) localProps.load(localPropsFile.newDataInputStream())
         buildConfigField "String", "NEWS_API_KEY", "\"${localProps.getProperty('NEWS_API_KEY', '')}\""
+        buildConfigField "String", "DEEPSEEK_API_KEY", "\"${localProps.getProperty('DEEPSEEK_API_KEY', '')}\""
     }
 
     compileOptions {

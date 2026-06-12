@@ -57,6 +57,7 @@ fun ToolsScreen(onNavigate: (String) -> Unit) {
         ToolItem("salary_coach",   "Maaş Koçu", "Sektör maaşınla karşılaştır", Icons.Default.TrendingUp, Color(0xFF5E35B1)),
         ToolItem("budget",         "Bütçe & Acil Fon", "50/30/20 kuralı, finansal skor", Icons.Default.AccountBalanceWallet, Color(0xFF2E7D32)),
         ToolItem("rights_chat",    "Haklarım Chatbot", "Hızlı hak sorgulama", Icons.Default.Chat, Color(0xFFC62828)),
+        ToolItem("ai_assistant",   "AI Asistan", "DeepSeek ile finansal koç", Icons.Default.SmartToy, Color(0xFF1565C0)),
     )
 
     val context2b = LocalContext.current

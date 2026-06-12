@@ -40,6 +40,13 @@ object BackupManager {
         root.put("prefs", prefs)
         out.write(root.toString(2).toByteArray())
         out.flush()
+        markBackupDone(context)
+    }
+
+    fun markBackupDone(context: Context) {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        context.getSharedPreferences("notif_settings", Context.MODE_PRIVATE).edit()
+            .putString(NotificationSettingsManager.KEY_LAST_BACKUP_DATE, today).apply()
     }
 
     fun import(context: Context, input: InputStream): Boolean {
