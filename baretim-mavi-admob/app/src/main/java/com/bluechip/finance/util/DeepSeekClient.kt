@@ -1,7 +1,6 @@
 package com.bluechip.finance.util
 
 import android.content.Context
-import com.bluechip.finance.BuildConfig
 import com.bluechip.finance.data.PaymentManager
 import com.bluechip.finance.data.ProfileManager
 import kotlinx.coroutines.Dispatchers
@@ -84,11 +83,14 @@ object DeepSeekClient {
             body.put("max_tokens", 1024)
             body.put("temperature", 0.7)
 
+            val apiKey = DeepSeekKeyManager.getKey(context)
+            if (apiKey.isBlank()) return@withContext Result.failure(Exception("API_KEY_MISSING"))
+
             val url = URL(API_URL)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
-            conn.setRequestProperty("Authorization", "Bearer ${BuildConfig.DEEPSEEK_API_KEY}")
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
             conn.doOutput = true
             conn.connectTimeout = 30000
             conn.readTimeout = 60000

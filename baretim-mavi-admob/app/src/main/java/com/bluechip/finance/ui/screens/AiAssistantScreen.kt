@@ -31,6 +31,12 @@ import com.bluechip.finance.ui.theme.IndigoDeep
 import com.bluechip.finance.ui.theme.LocalAppColors
 import com.bluechip.finance.util.ChatMessage
 import com.bluechip.finance.util.DeepSeekClient
+import com.bluechip.finance.util.DeepSeekKeyManager
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import kotlinx.coroutines.launch
 
 private val quickQuestions = listOf(
@@ -51,10 +57,72 @@ fun AiAssistantScreen() {
     val listState = rememberLazyListState()
     val keyboard  = LocalSoftwareKeyboardController.current
 
+    var hasKey    by remember { mutableStateOf(DeepSeekKeyManager.hasKey(context)) }
+    var keyInput  by remember { mutableStateOf("") }
+    var keyVisible by remember { mutableStateOf(false) }
+
     var inputText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val history         = remember { mutableStateListOf<ChatMessage>() }
     val displayMessages = remember { mutableStateListOf<Pair<String, Boolean>>() }
+
+    // Key setup screen
+    if (!hasKey) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.Key, null, tint = IndigoDeep, modifier = Modifier.size(56.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("DeepSeek API Anahtari", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "AI asistani kullanmak icin kendi API anahtarinizi girin.\n\n" +
+                "platform.deepseek.com → API Keys → Create API Key\n\n" +
+                "Anahtar sifrelenerek cihazinizda saklanir, hicbir yere gonderilmez.",
+                fontSize = 13.sp,
+                color = Color.Gray,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
+            OutlinedTextField(
+                value = keyInput,
+                onValueChange = { keyInput = it },
+                label = { Text("sk-...") },
+                placeholder = { Text("API anahtarinizi yapistirin") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = if (keyVisible) VisualTransformation.None
+                                       else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { keyVisible = !keyVisible }) {
+                        Icon(
+                            if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            null
+                        )
+                    }
+                }
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    if (keyInput.trim().startsWith("sk-")) {
+                        DeepSeekKeyManager.saveKey(context, keyInput.trim())
+                        hasKey = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = keyInput.trim().startsWith("sk-")
+            ) {
+                Text("Kaydet ve Baslat")
+            }
+        }
+        return
+    }
 
     fun sendMessage(text: String) {
         if (text.isBlank() || isLoading) return
@@ -101,9 +169,17 @@ fun AiAssistantScreen() {
                     Icon(Icons.Default.SmartToy, null, tint = Color.White, modifier = Modifier.size(24.dp))
                 }
                 Spacer(Modifier.width(12.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text("AI Asistan", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text("DeepSeek — Tum verilerinize erisim var", color = Color.White.copy(0.8f), fontSize = 12.sp)
+                }
+                IconButton(onClick = {
+                    DeepSeekKeyManager.clearKey(context)
+                    hasKey = false
+                    keyInput = ""
+                }) {
+                    Icon(Icons.Default.Key, "API Key degistir", tint = Color.White.copy(0.7f),
+                        modifier = Modifier.size(20.dp))
                 }
             }
         }
