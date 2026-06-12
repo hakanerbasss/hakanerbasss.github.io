@@ -71,7 +71,7 @@ fun AiAssistantScreen() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colors.background)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -150,7 +150,7 @@ fun AiAssistantScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
         Box(
