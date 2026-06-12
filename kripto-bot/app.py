@@ -21,6 +21,8 @@ from manager_agent import (start_ceo_agent, stop_ceo_agent, ceo_agent_status,
                             trigger_ceo_review, restart_ceo_agent)
 from funding_agent import (start_funding_agent, stop_funding_agent,
                             funding_agent_status)
+from coach_agent import (start_coach_agent, stop_coach_agent,
+                          coach_agent_status, trigger_coach_review)
 
 app = Flask(__name__)  # deploy test
 app.secret_key = 'kripto-bot-secret-2024'
@@ -1198,6 +1200,18 @@ def funding_stop():
     stop_funding_agent()
     return jsonify({'ok': True})
 
+# ── Koç Ajanı API ────────────────────────────────
+@app.route('/coach/status')
+@login_required
+def coach_status_api():
+    return jsonify(coach_agent_status())
+
+@app.route('/coach/run', methods=['POST'])
+@login_required
+def coach_run_api():
+    trigger_coach_review()
+    return jsonify({'ok': True, 'msg': '🎓 Koç analizi başlatıldı'})
+
 # ── CEO Manuel Analiz API ─────────────────────────
 @app.route('/api/ceo_analyze_now', methods=['POST'])
 @login_required
@@ -1275,4 +1289,7 @@ if __name__ == '__main__':
         start_ceo_agent()     # CEO: ajan performans analizi + parametre optimizasyonu
     if cfg.get('funding_agent_enabled', False):
         start_funding_agent() # Funding: delta-nötr funding rate toplama
+    if cfg.get('coach_enabled', True):
+        start_coach_agent()   # Koç: günlük öğrenme — performans + kaçan fırsat analizi,
+                              # DeepSeek ile sınırlı parametre optimizasyonu
     app.run(host='0.0.0.0', port=5000, debug=False)

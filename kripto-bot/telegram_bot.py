@@ -367,6 +367,26 @@ def handle_command(cmd, chat_id):
         icon = '🟢' if enabled else '🔴'
         send_reply(chat_id, f'{icon} <b>{name}</b> ajanı {"açıldı" if enabled else "kapatıldı"}')
 
+    elif cmd in ['/koc', '/koç']:
+        from coach_agent import coach_agent_status
+        st = coach_agent_status()
+        icon = '🟢' if st.get('running') else '🔴'
+        hist = st.get('history', [])[-5:]
+        hlines = [f"  {h['time'][:16]} {h['key']}: {h['old']}→{h['new']}" for h in hist]
+        send_reply(chat_id,
+            f'🎓 <b>Koç Ajanı</b> (günlük öğrenme katmanı)\n'
+            f'{icon} Durum: {"Aktif" if st.get("running") else "Kapalı"}\n'
+            f'📊 Analiz sayısı: {st.get("review_count", 0)}\n'
+            f'🕐 Son analiz: {(st.get("last_review") or "—")[:16]}\n'
+            + ('📜 Son parametre değişiklikleri:\n' + '\n'.join(hlines) if hlines
+               else '📜 Henüz parametre değişikliği yok')
+            + '\n\nKomut: /kocanaliz — hemen analiz et')
+
+    elif cmd in ['/koc analiz', '/koc_analiz', '/kocanaliz']:
+        from coach_agent import trigger_coach_review
+        send_reply(chat_id, '🎓 Koç analizi başlatıldı, rapor birazdan gelecek...')
+        trigger_coach_review()
+
     elif cmd in ['/start', '/yardim']:
         send_reply(chat_id, '''🤖 <b>Kripto Bot Komutları</b>
 
@@ -379,6 +399,7 @@ def handle_command(cmd, chat_id):
 /rapor_ayar 1h|4h|12h|1d — Rapor sıklığı
 /edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff /breakouton /breakoutoff
 /ceoon /ceooff /ceoanaliz
+/koc — Koç ajanı durumu | /kocanaliz — hemen analiz
 /baslat — Botu başlat
 /durdur — Botu duraklat
 /restart — Botu yeniden başlat

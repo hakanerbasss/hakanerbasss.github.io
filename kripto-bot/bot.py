@@ -27,6 +27,26 @@ def save_config(data):
     with open(CONFIG_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
+# ── Veri Miladı (data epoch) ────────────────────
+# trades.json'da test alımları, kod hatası kaynaklı işlemler vb. kirli veri var.
+# Öğrenme/analiz katmanları (Koç, adaptif ağırlıklar) SADECE miladdan sonraki
+# işlemlere bakar. Milad config'de 'data_epoch' ('YYYY-MM-DD HH:MM:SS').
+def get_data_epoch():
+    try:
+        return str(load_config().get('data_epoch', '') or '')
+    except Exception:
+        return ''
+
+def trades_since_epoch(trades=None):
+    """Veri miladından sonraki işlemler. Milad yoksa tümü döner."""
+    if trades is None:
+        trades = load_trades()
+    epoch = get_data_epoch()
+    if not epoch:
+        return trades
+    # 'YYYY-MM-DD HH:MM:SS' formatı leksikografik olarak da kronolojiktir
+    return [t for t in trades if t.get('time', '') >= epoch]
+
 # ── Trades ──────────────────────────────────────
 def load_trades():
     if os.path.exists(TRADES_FILE):
@@ -595,17 +615,28 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
         if price <= 0:
             return {'ok': False, 'error': 'Fiyat alınamadı'}
 
-        # Saat filtresi: 13:00-20:00 TR (UTC+3) arası yeni alım yok.
+        # Config'i erken yükle — saat filtresi ve cooldown'lar buna bakar
+        cfg_data   = load_config()
+
+        # Saat filtresi: varsayılan 13:00-20:00 TR (UTC+3) arası yeni alım yok.
         # Londra-NY örtüşmesi — stop-hunt riski en yüksek pencere.
-        # Manuel işlemler ('MANUEL' source) ve WYCKOFF (uzun vadeli) hariç tutulur.
-        if source not in ('MANUEL',) and 'WYCKOFF' not in (source or ''):
+        # MUAF: MANUEL, WYCKOFF (uzun vadeli) ve BREAKOUT (momentum ajanı tam da
+        # piyasanın hareketlendiği saatlerde alım yapabilmeli — coinler en çok
+        # ABD seansında fırlıyor, bu yasak onu kör bırakıyordu).
+        # Koç ajanı hour_ban_enabled / hour_ban_start / hour_ban_end ile ayarlar.
+        src_up = (source or '').upper()
+        exempt = (source == 'MANUEL' or 'WYCKOFF' in src_up or 'BREAKOUT' in src_up)
+        if not exempt and cfg_data.get('hour_ban_enabled', True):
+            ban_start = int(cfg_data.get('hour_ban_start', 13))
+            ban_end   = int(cfg_data.get('hour_ban_end', 20))
             tr_hour = (datetime.datetime.utcnow().hour + 3) % 24
-            if 13 <= tr_hour < 20:
-                print(f'[Bot] {symbol} saat filtresi: {tr_hour:02d}:xx TR — 13-20 arası yeni alım yok')
-                return {'ok': False, 'error': f'Saat filtresi: {tr_hour:02d}:xx TR (13-20 arası kapalı)'}
+            in_ban = (ban_start <= tr_hour < ban_end) if ban_start <= ban_end \
+                     else (tr_hour >= ban_start or tr_hour < ban_end)
+            if in_ban:
+                print(f'[Bot] {symbol} saat filtresi: {tr_hour:02d}:xx TR — {ban_start}-{ban_end} arası yeni alım yok')
+                return {'ok': False, 'error': f'Saat filtresi: {tr_hour:02d}:xx TR ({ban_start}-{ban_end} arası kapalı)'}
 
         # SL cooldown kontrolü — öncelik: coin ayarı > global ayar > hardcoded default (3s)
-        cfg_data   = load_config()
         coin_cfg   = next((c for c in cfg_data.get('coins', []) if c['symbol'] == symbol), {})
         global_cd  = float(cfg_data.get('sl_cooldown_hours', 3))
         cooldown_h = float(coin_cfg.get('sl_cooldown_hours', global_cd))

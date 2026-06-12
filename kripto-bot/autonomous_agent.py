@@ -495,12 +495,14 @@ class AutonomousAgent:
                         continue
 
                     # Fear & Greed filtresi — aşırı korkuda yanlış sinyal fazla çıkar
+                    # Eşik Koç ajanı tarafından ayarlanabilir (otonom_fg_min)
+                    fg_min = float(cfg.get('otonom_fg_min', self.FG_MIN))
                     try:
                         import urllib.request as _ur
                         with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
                             _fg = int(json.loads(_r.read())['data'][0]['value'])
-                        if _fg < self.FG_MIN:
-                            print(f'[Otonom] Fear & Greed={_fg} < {self.FG_MIN} — tarama atlandı')
+                        if _fg < fg_min:
+                            print(f'[Otonom] Fear & Greed={_fg} < {fg_min} — tarama atlandı')
                             self.state['scan_count'] += 1
                             self._save()
                             time.sleep(self.SCAN_INTERVAL)
@@ -508,8 +510,10 @@ class AutonomousAgent:
                     except Exception:
                         _fg = 50  # API erişilemezse engelleme
 
-                    # SIDEWAYS rejimde daha katı skor eşiği
-                    min_sc = self.MIN_SCORE_SIDEWAY if regime == 'SIDEWAYS' else self.MIN_SCORE
+                    # Skor eşiği Koç tarafından ayarlanabilir (otonom_min_score);
+                    # SIDEWAYS rejimde +0.5 daha katı
+                    base_sc = float(cfg.get('otonom_min_score', self.MIN_SCORE))
+                    min_sc  = base_sc + 0.5 if regime == 'SIDEWAYS' else base_sc
 
                     positions = load_positions()
                     held = {s for s, p in positions.items() if p.get('qty',0) > 0}
@@ -608,7 +612,10 @@ class AutonomousAgent:
         while self.running:
             time.sleep(12 * 3600)
             try:
-                trades = load_trades()
+                # Veri miladından sonraki işlemler — eski kirli veri (test alımları,
+                # kod hatası kaynaklı işlemler) öğrenmeyi zehirlemesin.
+                from bot import trades_since_epoch
+                trades = trades_since_epoch()
                 # Satış kayıtlarında period=çıkış nedeni ('KAR HEDEFİ' vb.) olur,
                 # 'Ajan' değil — eski filtre hiç eşleşmiyordu, ağırlıklar donuktu.
                 ajan_sells = [t for t in trades

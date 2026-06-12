@@ -41,11 +41,21 @@ MIN_VOL_24H      = 500_000  # $500K min 24h hacim — düşük likidite → slip
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 MIN_COIN_PRICE   = 0.01     # $0.01 altı coinler: step size granülaritesi %10+ → stop güvenilmez
 
-# Kırılım kriterleri
+# Kırılım kriterleri — VARSAYILANLAR. Koç ajanı config üzerinden ayarlar:
+#   breakout_min_chg_2h / breakout_min_vol_spike / breakout_max_chg_24h /
+#   breakout_min_score / breakout_fg_min / breakout_max_pos
 MIN_PRICE_CHG_2H = 5.0   # 4→5%: güçlü kırılım filtresi, zayıf sinyalleri eler
 MIN_VOL_SPIKE    = 3.0   # minimum 3x hacim spike
-MAX_CHG_24H      = 20.0  # 35→20%: daha önce pompanmış coinlere geç girişi önle
+MAX_CHG_24H      = 30.0  # 20→30%: günlük fırlayanlar %20'de kalıcı eleniyordu;
+                         # geç giriş riskini -%5 hard stop zaten sınırlıyor
 MIN_SCORE        = 5.5   # minimum skor eşiği — düşük skorda işlem açma
+
+def _tun(cfg, key, default):
+    """Koç ayarı: config'de varsa onu, yoksa modül varsayılanını kullan."""
+    try:
+        return float(cfg.get(key, default))
+    except (TypeError, ValueError):
+        return default
 
 # Re-entry — config'deki reentry_cooldown_hours sıfırlanmış olsa bile
 # aynı coinden çıkıp 1 saat geçmeden tekrar girme (25sn re-entry bug'ını kapatır)
@@ -106,28 +116,34 @@ def _btc_ok(client):
         return True
 
 
-def _fear_greed_ok():
-    """Fear & Greed Index ≥ FG_MIN ise True. Aşırı korkuda breakout = sahte breakout."""
+def _fear_greed_ok(cfg=None):
+    """Fear & Greed Index ≥ eşik ise True. Aşırı korkuda breakout = sahte breakout."""
+    fg_min = _tun(cfg or {}, 'breakout_fg_min', FG_MIN)
     try:
         import urllib.request
         url = 'https://api.alternative.me/fng/?limit=1'
         with urllib.request.urlopen(url, timeout=4) as r:
             data = json.loads(r.read())
             val = int(data['data'][0]['value'])
-            if val < FG_MIN:
-                print(f'[Breakout] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+            if val < fg_min:
+                print(f'[Breakout] Fear & Greed={val} < {fg_min} — aşırı korku, tarama atlandı')
                 return False
         return True
     except Exception:
         return True  # API erişilemezse engelleme
 
 
-def _detect_breakouts(client):
+def _detect_breakouts(client, cfg=None):
     """
     2 aşamalı tarama:
     Aşama 1 — Ticker: 24h değişim > MIN_PRICE_CHG_2H olan top-50 aday
     Aşama 2 — Kline:  son 2 saatin hareketi ve hacim spike kontrolü
     """
+    cfg          = cfg or {}
+    min_chg_2h   = _tun(cfg, 'breakout_min_chg_2h', MIN_PRICE_CHG_2H)
+    min_volspike = _tun(cfg, 'breakout_min_vol_spike', MIN_VOL_SPIKE)
+    max_chg_24h  = _tun(cfg, 'breakout_max_chg_24h', MAX_CHG_24H)
+
     try:
         tickers = client.get_ticker()
     except Exception as e:
@@ -152,9 +168,9 @@ def _detect_breakouts(client):
             continue
         if price < MIN_COIN_PRICE:  # çok düşük fiyat → step size stop'u bozar
             continue
-        if chg24 < MIN_PRICE_CHG_2H:
+        if chg24 < min_chg_2h:
             continue
-        if chg24 > MAX_CHG_24H:     # zaten aşırı pompalanmış → tepeden alma
+        if chg24 > max_chg_24h:     # zaten aşırı pompalanmış → tepeden alma
             continue
         candidates.append({'symbol': sym, 'price': price, 'chg24': chg24, 'vol24': vol24})
 
@@ -186,9 +202,9 @@ def _detect_breakouts(client):
             price_now    = closes[-1]
             pct_2h       = (price_now - price_2h_ago) / price_2h_ago * 100
 
-            if pct_2h < MIN_PRICE_CHG_2H:
+            if pct_2h < min_chg_2h:
                 continue
-            if vol_spike < MIN_VOL_SPIKE:
+            if vol_spike < min_volspike:
                 continue
 
             # Skor: kırılım gücü (0-10)
@@ -250,7 +266,7 @@ class BreakoutAgent:
             f'📊 Min Skor: {MIN_SCORE}/10 | Min Hacim: ${MIN_VOL_24H/1_000:.0f}K\n'
             f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-8% | +25%+→-15%\n'
             f'🛑 Hard Stop: -%{HARD_STOP_PCT}\n'
-            f'⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)\n'
+            f'⏰ 7/24 alım — saat yasağından MUAF (momentum saat seçmez)\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler'
         )
         return True
@@ -288,19 +304,20 @@ class BreakoutAgent:
             return
         positions = load_positions()
 
+        max_bo_pos = int(_tun(cfg, 'breakout_max_pos', MAX_BREAKOUT_POS))
         breakout_open = [
             s for s, p in positions.items()
             if p.get('agent') == 'BREAKOUT' and p.get('qty', 0) > 0
         ]
-        if len(breakout_open) >= MAX_BREAKOUT_POS:
-            print(f'[Breakout] Maks pozisyon ({MAX_BREAKOUT_POS}) doldu')
+        if len(breakout_open) >= max_bo_pos:
+            print(f'[Breakout] Maks pozisyon ({max_bo_pos}) doldu')
             return
 
         if not _btc_ok(client):
             print('[Breakout] BTC düşüşte — tarama atlandı')
             return
 
-        if not _fear_greed_ok():
+        if not _fear_greed_ok(cfg):
             return
 
         # Günlük zarar limiti: -%8
@@ -313,12 +330,13 @@ class BreakoutAgent:
         except Exception:
             pass
 
-        candidates = _detect_breakouts(client)
+        candidates = _detect_breakouts(client, cfg)
         scan_no    = self.state.get('scan_count', 0) + 1
         self.state['scan_count'] = scan_no
         print(f'[Breakout] Tarama #{scan_no}: {len(candidates)} kırılım adayı')
 
         max_total = cfg.get('max_positions', 6)
+        min_score = _tun(cfg, 'breakout_min_score', MIN_SCORE)
         already_open = set(positions.keys())
 
         for r in candidates:
@@ -326,12 +344,12 @@ class BreakoutAgent:
             if sym in already_open:
                 continue
             total_open = sum(1 for p in positions.values() if p.get('qty', 0) > 0)
-            if total_open >= max_total or len(breakout_open) >= MAX_BREAKOUT_POS:
+            if total_open >= max_total or len(breakout_open) >= max_bo_pos:
                 break
 
             # Skor filtresi — zayıf sinyalde işlem açma
-            if r['score'] < MIN_SCORE:
-                print(f'[Breakout] {sym} skor yetersiz: {r["score"]:.1f} < {MIN_SCORE}')
+            if r['score'] < min_score:
+                print(f'[Breakout] {sym} skor yetersiz: {r["score"]:.1f} < {min_score}')
                 continue
 
             # Hard-coded min re-entry: config reentry_cooldown_hours=0 olsa bile

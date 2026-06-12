@@ -363,7 +363,11 @@ def _score(client, symbol, funding, weights, cfg):
     )), 2)
 
     # Dinamik eşik: ASIA seansında veya BTC zayıfken (SMA altı) daha yüksek skor iste
-    eff_min = MIN_SCORE
+    # Taban eşik Koç ajanı tarafından ayarlanabilir (edge_min_score)
+    try:
+        eff_min = float((cfg or {}).get('edge_min_score', MIN_SCORE))
+    except (TypeError, ValueError):
+        eff_min = MIN_SCORE
     if sess == 'ASIA':
         eff_min = max(eff_min, ASIA_MIN_SCORE)
     if parts['btc_trend'][0] < 0:
