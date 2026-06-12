@@ -4,15 +4,25 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset as GeoOffset
+import androidx.compose.ui.graphics.drawscope.Stroke as DsStroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
 import com.commandiron.wheel_picker_compose.WheelDatePicker
 import com.commandiron.wheel_picker_compose.core.WheelPickerDefaults
 import java.time.LocalDate
@@ -180,19 +190,68 @@ fun ResultCard(visible: Boolean, content: @Composable ColumnScope.() -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     var cardBounds by remember { mutableStateOf<android.graphics.Rect?>(null) }
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(300)) +
-                expandVertically(spring(dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow)) +
-                scaleIn(initialScale = 0.94f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-    ) {
+
+    // Konfeti halkası — kart ilk açıldığında 4 halka dışa doğru patlar
+    val rings   = remember { List(4) { Animatable(0f) } }
+    val ringScope = androidx.compose.runtime.rememberCoroutineScope()
+    var burst by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        if (visible && !burst) {
+            burst = true
+            ringScope.launch {
+                rings.forEachIndexed { i, ring ->
+                    launch {
+                        kotlinx.coroutines.delay(i * 90L)
+                        ring.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
+                    }
+                }
+            }
+        }
+        if (!visible) { burst = false; rings.forEach { it.snapTo(0f) } }
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // Halkalar kartın üstünden dışarı doğru yayılır
+        Canvas(modifier = Modifier
+            .zIndex(2f)
+            .align(Alignment.TopCenter)
+            .fillMaxWidth()
+            .height(160.dp)) {
+            rings.forEachIndexed { i, ring ->
+                if (ring.value > 0f && ring.value < 1f) {
+                    val r = ring.value * (size.width * (0.28f + i * 0.12f))
+                    val a = (1f - ring.value).coerceIn(0f, 1f) * 0.55f
+                    drawCircle(
+                        color = PurplePrimary,
+                        radius = r,
+                        center = GeoOffset(size.width / 2f, size.height * 0.6f),
+                        alpha = a,
+                        style = DsStroke(width = (2.5f - i * 0.4f).coerceAtLeast(1f).dp.toPx())
+                    )
+                    drawCircle(
+                        color = FuchsiaAccent,
+                        radius = r * 0.72f,
+                        center = GeoOffset(size.width / 2f, size.height * 0.6f),
+                        alpha = a * 0.5f,
+                        style = DsStroke(width = 1.5f.dp.toPx())
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(300)) +
+                    expandVertically(spring(dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow)) +
+                    scaleIn(initialScale = 0.92f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+        ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp)
-                .shadow(16.dp, RoundedCornerShape(20.dp),
+                .shadow(20.dp, RoundedCornerShape(20.dp),
                     spotColor = PurplePrimary, ambientColor = PurplePrimary)
                 .onGloballyPositioned { coords ->
                     val r = coords.boundsInRoot()
@@ -221,7 +280,8 @@ fun ResultCard(visible: Boolean, content: @Composable ColumnScope.() -> Unit) {
                 }
             }
         }
-    }
+        } // AnimatedVisibility
+    } // Box
 }
 
 @Composable
@@ -250,14 +310,32 @@ fun BigResult(label: String, value: String, color: Color = LocalAppColors.curren
         value.replaceRange(match.range, formatted)
     } else value
     val scale by animateFloatAsState(
-        targetValue = if (progress.value >= 1f) 1f else 1.04f,
+        targetValue = if (progress.value >= 1f) 1f else 1.06f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "resultScale"
     )
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    // Nabız atan glow halo — sadece animasyon tamamlandıktan sonra başlar
+    val glow by rememberInfiniteTransition(label = "glow").animateFloat(
+        0.08f, 0.36f,
+        infiniteRepeatable(tween(1300, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        "ga"
+    )
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+           horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, fontSize = 13.sp, color = color)
-        Text(display, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = color,
-            modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale })
+        Box(contentAlignment = Alignment.Center) {
+            // Glow arkası
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                    listOf(color.copy(alpha = if (progress.value >= 1f) glow else 0f),
+                           androidx.compose.ui.graphics.Color.Transparent),
+                    center = GeoOffset(size.width / 2f, size.height / 2f),
+                    radius = size.width * 0.6f
+                ))
+            }
+            Text(display, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = color,
+                modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale })
+        }
     }
 }
 

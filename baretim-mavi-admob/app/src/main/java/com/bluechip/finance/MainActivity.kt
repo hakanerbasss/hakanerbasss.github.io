@@ -121,6 +121,7 @@ fun BlueChipApp() {
     )
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Baretim Mavi", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp,
