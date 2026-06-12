@@ -145,13 +145,28 @@ def _read_blacklists():
     return bl
 
 
+def _public_tickers():
+    """GERÇEK piyasanın 24s tickerları — auth gerektirmez.
+    KRİTİK: testnet'te client.get_ticker() testnet'in kendi (minicik) işlem
+    hacmini döndürür → $2M hacim filtresi her coini eler ve 'kaçırılan fırsat'
+    analizi hiç çalışmaz. Fırsat taraması HER ZAMAN gerçek piyasaya bakmalı."""
+    import urllib.request
+    with urllib.request.urlopen(
+            'https://api.binance.com/api/v3/ticker/24hr', timeout=15) as r:
+        return json.loads(r.read())
+
+
 def _missed_movers(client, cfg):
     """Son 24 saatte fırlayan ama botun almadığı coinler + engel teşhisi."""
     try:
-        tickers = client.get_ticker()
+        tickers = _public_tickers()
     except Exception as e:
-        print(f'[Koç] Ticker hatası: {e}')
-        return []
+        print(f'[Koç] Gerçek piyasa ticker hatası ({e}) — client fallback')
+        try:
+            tickers = client.get_ticker()
+        except Exception as e2:
+            print(f'[Koç] Ticker hatası: {e2}')
+            return []
 
     movers = []
     for t in tickers:
