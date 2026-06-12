@@ -87,6 +87,8 @@ Sadece birini yapmak yeterli değil — ikisi de gerekli.
 | `wyckoff_agent.py` | ✅ | Wyckoff akümülasyon ajanı |
 | `accumulation_agent.py` | ✅ | BB squeeze birikim ajanı |
 | `manager_agent.py` | ✅ | CEO portföy yönetim ajanı |
+| `coach_agent.py` | ✅ | Koç: günlük öğrenme — performans + kaçan fırsat analizi, DeepSeek ile sınırlı parametre ayarı |
+| `funding_agent.py` | ✅ | Delta-nötr funding toplama (vars. kapalı) |
 | `telegram_bot.py` | ✅ | Telegram komut işleyici |
 | `seans_strategy.py` | ✅ | Seans stratejisi (pasif) |
 | `smart_strategy.py` | ✅ | Smart stratejisi (pasif) |
@@ -129,6 +131,31 @@ journalctl -u kripto-bot -n 100 # son 100 satır log
 - `FG_MIN = 30` — Fear & Greed filtresi
 
 ---
+
+## 6b. Koç Ajanı ve Ayarlanabilir Parametreler
+
+Koç (`coach_agent.py`) günde bir kez (ilk analiz boot+15dk):
+1. `data_epoch` (veri miladı) sonrası kapanan işlemleri ajan bazında analiz eder
+2. Son 24s %15+ fırlayan ama alınamayan coinleri ve engelleyen filtreyi teşhis eder
+3. DeepSeek'e gönderir; model `set_param` ile parametre değiştirebilir —
+   sınırlar `PARAM_BOUNDS` içinde KODDA sabittir, tur başına max 3 değişiklik
+4. Tüm değişiklikler Telegram'a + `coach_state.json` history'ye yazılır
+
+Config anahtarları (Koç'un oynayabildiği): `breakout_min_score`,
+`breakout_min_chg_2h`, `breakout_min_vol_spike`, `breakout_max_chg_24h`,
+`breakout_fg_min`, `breakout_max_pos`, `otonom_min_score`, `otonom_fg_min`,
+`edge_min_score`, `max_positions`, `reentry_cooldown_hours`,
+`sl_cooldown_hours`, `hour_ban_enabled`, `min_position_usd`, `global_halt_pct`
+
+Diğer önemli anahtarlar: `data_epoch` (öğrenme bu tarihten sonrasına bakar —
+kirli trades.json geçmişini dışlar; Koç ilk çalışmada otomatik kurar),
+`coach_enabled` (vars. true), `coach_interval_hours` (vars. 24),
+`hour_ban_start`/`hour_ban_end` (vars. 13/20 TR).
+
+**Saat yasağı muafiyeti:** MANUEL, WYCKOFF ve BREAKOUT kaynakları 13-20 TR
+yasağından muaftır (momentum ajanı piyasa hareketliyken alabilmeli).
+
+Telegram: `/koc` durum, `/kocanaliz` manuel analiz. Web: `/coach/status`, `/coach/run`.
 
 ## 7. Sık Yapılan Hatalar
 

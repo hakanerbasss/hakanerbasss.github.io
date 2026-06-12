@@ -363,7 +363,11 @@ def _score(client, symbol, funding, weights, cfg):
     )), 2)
 
     # Dinamik eşik: ASIA seansında veya BTC zayıfken (SMA altı) daha yüksek skor iste
-    eff_min = MIN_SCORE
+    # Taban eşik Koç ajanı tarafından ayarlanabilir (edge_min_score)
+    try:
+        eff_min = float((cfg or {}).get('edge_min_score', MIN_SCORE))
+    except (TypeError, ValueError):
+        eff_min = MIN_SCORE
     if sess == 'ASIA':
         eff_min = max(eff_min, ASIA_MIN_SCORE)
     if parts['btc_trend'][0] < 0:
@@ -540,8 +544,13 @@ class EdgeAgent:
         except Exception:
             pass
 
-        # Funding rates al
+        # Funding rates al — bu ajanın ANA sinyali. API erişilemezse (boş dict)
+        # tüm coinler funding=0 görünür ve kalan sinyallerle körlemesine alım
+        # yapılırdı; onun yerine bu taramayı atla.
         fundings = _all_funding()
+        if not fundings:
+            print('[Edge] Funding verisi alınamadı (futures API?) — tarama atlandı')
+            return
         symbols  = _futures_symbols()
         scan_no  = self.state.get('scan_count', 0) + 1
         print(f'[Edge] Tarama #{scan_no}: {len(symbols)} futures sembol, açık={open_count}')
