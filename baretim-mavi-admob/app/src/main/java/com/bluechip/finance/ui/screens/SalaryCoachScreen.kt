@@ -35,7 +35,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -110,6 +110,7 @@ private data class CoachResult(
 
 private enum class SalaryStatus { BELOW_80, BETWEEN_80_100, AT_OR_ABOVE }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SalaryCoachScreen() {
     val colors = LocalAppColors.current
@@ -205,7 +206,7 @@ fun SalaryCoachScreen() {
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = PurplePrimary,
@@ -263,7 +264,7 @@ fun SalaryCoachScreen() {
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = PurplePrimary,
@@ -321,7 +322,7 @@ fun SalaryCoachScreen() {
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = PurplePrimary,
