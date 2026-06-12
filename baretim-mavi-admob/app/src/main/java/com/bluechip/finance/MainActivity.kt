@@ -2,6 +2,8 @@ package com.bluechip.finance
 
 import android.os.Bundle
 import com.google.android.play.core.review.ReviewManagerFactory
+import com.google.android.ump.ConsentRequestParameters
+import com.google.android.ump.UserMessagingPlatform
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -36,8 +38,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Unity Ads init
-        UnityAdsManager.init(this)
+        // AdMob + Unity Ads init (AdMob once, basarisiz olursa Unity fallback)
+        AdManager.init(this)
+        // UMP: kullanici rizasi (AB/ABD kullanicilari icin gerekli)
+        val consentInfo = UserMessagingPlatform.getConsentInformation(this)
+        consentInfo.requestConsentInfoUpdate(this, ConsentRequestParameters.Builder().build(), {
+            UserMessagingPlatform.loadAndShowConsentFormIfRequired(this) {}
+        }, {})
         NotificationWorker.createChannels(this)
         NotificationWorker.schedule(this)
         // Android 13+ bildirim izni iste
@@ -333,7 +340,7 @@ fun BlueChipApp() {
                                             onClick = {
                                                 showRewardedDialog = false
                                                 activity?.let { act ->
-                                                    UnityAdsManager.showRewarded(
+                                                    AdManager.showRewarded(
                                                         activity = act,
                                                         onRewarded = {
                                                             com.bluechip.finance.data.AdFreeManager.activate(context)
@@ -394,7 +401,7 @@ fun BlueChipApp() {
                                     onClick = {
                                         showRewardedDialog = false
                                         activity?.let { act ->
-                                            UnityAdsManager.showRewarded(
+                                            AdManager.showRewarded(
                                                 activity = act,
                                                 onRewarded = {
                                                     com.bluechip.finance.data.AdFreeManager.activate(context)

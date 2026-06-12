@@ -12,7 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.bluechip.finance.UnityAdsManager
+import com.bluechip.finance.AdManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -105,7 +105,7 @@ fun TaxScreen() {
             val gross = salary.toDoubleOrNull() ?: run { android.widget.Toast.makeText(context, "Gecersiz deger", android.widget.Toast.LENGTH_SHORT).show(); return }
             calcBrutToNet(gross, selectedMonth + 1)
             activity?.let { act ->
-                UnityAdsManager.showInterstitial(act) {
+                AdManager.showInterstitial(act) {
                     showResult = true
                     scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
                 }
@@ -126,7 +126,7 @@ fun TaxScreen() {
         repeat(50) { val mid = (low + high) / 2.0; val (calcNet, _, _) = calcBrutToNet(mid, monthIdx); if (calcNet < targetNet) low = mid else high = mid }
         calcBrutToNet((low + high) / 2.0, monthIdx)
         activity?.let { act ->
-            UnityAdsManager.showInterstitial(act) {
+            AdManager.showInterstitial(act) {
                 showResult = true
                 scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
             }
