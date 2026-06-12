@@ -24,7 +24,8 @@ from binance.client import Client as BC
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
                  send_telegram, get_usdt_balance, get_total_equity,
-                 position_size_by_score, update_position, check_breakeven)
+                 position_size_by_score, update_position, check_breakeven,
+                 hour_ban_text)
 
 STATE_FILE = 'breakout_state.json'
 
@@ -37,7 +38,8 @@ STABLECOINS = {
 
 SCAN_INTERVAL    = 180      # saniye (3 dakika) — pump genellikle 10-30dk sürer, 3dk'da içerideyiz
 MONITOR_SEC      = 5        # saniye
-MIN_VOL_24H      = 500_000  # $500K min 24h hacim — düşük likidite → slippage hard stop'u aşıyor
+MIN_VOL_24H      = 2_000_000  # 500K→2M: $500K/24s defter çok sığ — girişte/çıkışta
+                              # slippage -%5 hard stop'u aşabiliyor (Koç: breakout_min_vol_24h)
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 MIN_COIN_PRICE   = 0.01     # $0.01 altı coinler: step size granülaritesi %10+ → stop güvenilmez
 
@@ -145,6 +147,7 @@ def _detect_breakouts(client, cfg=None):
     min_chg_2h   = _tun(cfg, 'breakout_min_chg_2h', MIN_PRICE_CHG_2H)
     min_volspike = _tun(cfg, 'breakout_min_vol_spike', MIN_VOL_SPIKE)
     max_chg_24h  = _tun(cfg, 'breakout_max_chg_24h', MAX_CHG_24H)
+    min_vol24    = _tun(cfg, 'breakout_min_vol_24h', MIN_VOL_24H)
 
     try:
         # Gerçek piyasa tickerları — testnet hacimleri sahte, kırılım tespiti
@@ -169,7 +172,7 @@ def _detect_breakouts(client, cfg=None):
             continue
         if 0.85 <= price <= 1.15:   # stablecoin fiyat aralığı
             continue
-        if vol24 < MIN_VOL_24H:     # çok illiquid
+        if vol24 < min_vol24:       # çok illiquid
             continue
         if price < MIN_COIN_PRICE:  # çok düşük fiyat → step size stop'u bozar
             continue
@@ -267,11 +270,14 @@ class BreakoutAgent:
             f'💰 Bakiye: ${bal:.2f}\n'
             f'📡 Yöntem: Hacim spike + fiyat kırılımı (2s)\n'
             f'⚡ Tarama: {SCAN_INTERVAL//60}dk | Takip: {MONITOR_SEC}s\n'
-            f'🎯 Min Hareket: +%{MIN_PRICE_CHG_2H} | Vol Spike: {MIN_VOL_SPIKE}x\n'
-            f'📊 Min Skor: {MIN_SCORE}/10 | Min Hacim: ${MIN_VOL_24H/1_000:.0f}K\n'
+            f'🎯 Min Hareket: +%{_tun(cfg, "breakout_min_chg_2h", MIN_PRICE_CHG_2H):g} | '
+            f'Vol Spike: {_tun(cfg, "breakout_min_vol_spike", MIN_VOL_SPIKE):g}x\n'
+            f'📊 Min Skor: {_tun(cfg, "breakout_min_score", MIN_SCORE):g}/10 | '
+            f'Min Hacim: ${_tun(cfg, "breakout_min_vol_24h", MIN_VOL_24H)/1_000_000:g}M | '
+            f'Max 24s: +%{_tun(cfg, "breakout_max_chg_24h", MAX_CHG_24H):g}\n'
             f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-8% | +25%+→-15%\n'
             f'🛑 Hard Stop: -%{HARD_STOP_PCT}\n'
-            f'⏰ 7/24 alım — saat yasağından MUAF (momentum saat seçmez)\n'
+            f'{hour_ban_text(exempt=True)}\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler'
         )
         return True

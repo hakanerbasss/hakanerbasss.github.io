@@ -39,7 +39,9 @@ BE_ARM_PCT     = 4.0   # +%4 görüldüyse başabaş koruması devreye girer
 BE_FLOOR_PCT   = 0.3   # bu seviyeye düşerse çık — komisyonu (~%0.2) çıkarır, NET ZARAR YOK
 TRAIL_ARM_PCT  = 10.0  # +%10'dan sonra zirve takibi (büyük Wyckoff hareketini sür)
 TRAIL_DIST_PCT = 5.0   # zirveden %5 düşünce çık
-FG_MIN         = 30    # Fear & Greed bu değerin altında yeni alım yok
+FG_MIN         = 20    # 30→20: Wyckoff akümülasyonu TAM DA korku döneminde oluşur;
+                       # FG<30'da kapanmak stratejinin doğasıyla çelişiyordu.
+                       # 20 altı = panik/kapitülasyon, orada yine durulur.
 
 
 def _fear_greed_ok():

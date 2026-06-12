@@ -15,7 +15,8 @@ import time, datetime, threading, json, os, math
 from collections import deque
 from bot import (load_config, get_client, execute_buy, execute_sell,
                  load_positions, load_trades, get_price,
-                 send_telegram, get_usdt_balance, update_position, check_breakeven)
+                 send_telegram, get_usdt_balance, update_position, check_breakeven,
+                 hour_ban_text)
 
 # ─── Sabitler ────────────────────────────────────────────────────────────────
 STATE_FILE    = 'agent_state.json'
@@ -388,12 +389,13 @@ class AutonomousAgent:
             f"{'🔴 GERÇEK' if is_real else '🧪 TESTNET'} <b>Otonom Ajan v2 AKTİF</b>\n"
             f"━━━━━━━━━━━━━━\n"
             f"💰 Başlangıç Bakiye: ${round(self._balance_start,2)}\n"
-            f"📊 Min Skor: {self.MIN_SCORE}/10\n"
-            f"📦 Max Pozisyon: {self.MAX_POSITIONS}\n"
+            f"📊 Min Skor: {float(cfg.get('otonom_min_score', self.MIN_SCORE)):g}/10 "
+            f"(SIDEWAYS'te +0.5)\n"
+            f"📦 Max Pozisyon: {int(cfg.get('max_positions', self.MAX_POSITIONS))}\n"
             f"🛡 Günlük Kayıp Limiti: -%{self.DAILY_LOSS_LIMIT}\n"
             f"⚡ Pozisyon Takip: her {self.MONITOR_INTERVAL}s\n"
             f"🔍 Fırsat Tarama: her {self.SCAN_INTERVAL}s\n"
-            f"⏰ Alım saatleri: 20:00–13:00 TR (13-20 arası kapalı)\n"
+            f"{hour_ban_text()}\n"
             "Piyasa izleniyor..."
         )
 

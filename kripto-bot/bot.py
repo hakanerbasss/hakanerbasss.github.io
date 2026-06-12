@@ -394,6 +394,22 @@ def is_trading_halted(client=None):
     except Exception:
         return False
 
+def hour_ban_text(exempt=False):
+    """Telegram açılış mesajları için saat yasağının GÜNCEL config halini üretir.
+    Mesajlar sabit string'di → Koç parametreyi değiştirince mesaj yalan
+    söylüyordu. Artık tek kaynaktan (config) okunur."""
+    try:
+        cfg = load_config()
+        if exempt:
+            return '⏰ 7/24 alım — saat yasağından MUAF'
+        if not cfg.get('hour_ban_enabled', True):
+            return '⏰ 7/24 alım (saat yasağı kapalı)'
+        s = int(cfg.get('hour_ban_start', 16))
+        e = int(cfg.get('hour_ban_end', 19))
+        return f'⏰ Alım saatleri: {e:02d}:00–{s:02d}:00 TR ({s}-{e} arası kapalı)'
+    except Exception:
+        return '⏰ Saat yasağı: config.json → hour_ban_*'
+
 # ── Portfolio ────────────────────────────────────
 def get_portfolio_summary(client):
     positions = load_positions()
@@ -637,17 +653,18 @@ def execute_buy(client, symbol, usdt_amount, source='MANUEL', period='—', agen
         # Config'i erken yükle — saat filtresi ve cooldown'lar buna bakar
         cfg_data   = load_config()
 
-        # Saat filtresi: varsayılan 13:00-20:00 TR (UTC+3) arası yeni alım yok.
-        # Londra-NY örtüşmesi — stop-hunt riski en yüksek pencere.
+        # Saat filtresi: varsayılan 16:00-19:00 TR (UTC+3) arası yeni alım yok.
+        # ABD açılışı (16:30 TR) civarı — stop-hunt/whipsaw riski en yüksek dilim.
+        # NOT: Eski 13-20 yasağı günün 7 saatini (Londra öğleden sonrası dahil)
+        # blokluyordu; fırsat maliyeti korumadan büyüktü → 3 saate daraltıldı.
         # MUAF: MANUEL, WYCKOFF (uzun vadeli) ve BREAKOUT (momentum ajanı tam da
-        # piyasanın hareketlendiği saatlerde alım yapabilmeli — coinler en çok
-        # ABD seansında fırlıyor, bu yasak onu kör bırakıyordu).
+        # piyasanın hareketlendiği saatlerde alım yapabilmeli).
         # Koç ajanı hour_ban_enabled / hour_ban_start / hour_ban_end ile ayarlar.
         src_up = (source or '').upper()
         exempt = (source == 'MANUEL' or 'WYCKOFF' in src_up or 'BREAKOUT' in src_up)
         if not exempt and cfg_data.get('hour_ban_enabled', True):
-            ban_start = int(cfg_data.get('hour_ban_start', 13))
-            ban_end   = int(cfg_data.get('hour_ban_end', 20))
+            ban_start = int(cfg_data.get('hour_ban_start', 16))
+            ban_end   = int(cfg_data.get('hour_ban_end', 19))
             tr_hour = (datetime.datetime.utcnow().hour + 3) % 24
             in_ban = (ban_start <= tr_hour < ban_end) if ban_start <= ban_end \
                      else (tr_hour >= ban_start or tr_hour < ban_end)
