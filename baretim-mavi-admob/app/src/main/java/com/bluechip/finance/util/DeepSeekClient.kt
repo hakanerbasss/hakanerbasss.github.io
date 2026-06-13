@@ -3,6 +3,8 @@ package com.bluechip.finance.util
 import android.content.Context
 import com.bluechip.finance.data.BackupManager
 import com.bluechip.finance.data.KnownCoins
+import com.bluechip.finance.data.SideIncome
+import com.bluechip.finance.data.SideIncomeCategory
 import com.bluechip.finance.data.SpecialDay
 import com.bluechip.finance.data.SpecialDayManager
 import com.bluechip.finance.data.KnownCurrencies
@@ -245,7 +247,8 @@ object DeepSeekClient {
 
             appendLine()
             appendLine("Islem araclari: add_overtime, delete_overtime, update_payment, add_payment, delete_payment,")
-            appendLine("add_savings, delete_savings, update_profile, get_summary")
+            appendLine("add_savings, delete_savings, add_side_income, delete_side_income,")
+            appendLine("add_special_day, delete_special_day, update_profile, get_summary")
             appendLine("Turkiye calisma mevzuatini biliyorsun: kidem, ihbar, izin, mesai, SGK vs.")
         }
     }
@@ -349,6 +352,21 @@ object DeepSeekClient {
                 JSONObject().apply {
                     put("title_or_id", param("string", "Baslik kismi veya id ilk 8 hanesi"))
                 }, listOf("title_or_id")))
+
+            // Ek Gelirler
+            put(tool("add_side_income",
+                "Ek gelir ekle (yemek/yol yardımı, kira geliri, freelance, faiz vb.).",
+                JSONObject().apply {
+                    put("label",    param("string", "Ad: Yemek Yardimi, Yol Yardimi, Kira Geliri, Freelance vb."))
+                    put("amount",   param("number", "Aylik sabit tutar TL"))
+                    put("category", param("string", "Kategori", listOf("KIRA","FAIZ","DIJITAL","FREELANCE","DIGER")))
+                }, listOf("label","amount")))
+
+            put(tool("delete_side_income",
+                "Ek geliri sil.",
+                JSONObject().apply {
+                    put("label", param("string", "Ek gelir adinin bir kismi"))
+                }, listOf("label")))
 
             // Özet
             put(tool("get_summary",
@@ -462,6 +480,26 @@ object DeepSeekClient {
                         SpecialDayManager.delete(context, match.id)
                         "BASARILI: '${match.title}${if (match.subtitle.isNotEmpty()) " (${match.subtitle})" else ""}' silindi."
                     } else "HATA: '$query' bulunamadi. Mevcut: ${all.map { it.title }}"
+                }
+
+                "add_side_income" -> {
+                    val pm  = ProfileManager(context)
+                    val p   = pm.load()
+                    val cat = try { SideIncomeCategory.valueOf(args.optString("category","DIGER")) } catch (_: Exception) { SideIncomeCategory.DIGER }
+                    val si  = SideIncome(label = args.getString("label"), amount = args.getDouble("amount"), category = cat)
+                    pm.save(p.copy(sideIncomes = p.sideIncomes + si))
+                    "BASARILI: '${si.label}' ek geliri eklendi — ${si.amount.toLong()} TL/ay (${cat.label})"
+                }
+
+                "delete_side_income" -> {
+                    val kw = args.getString("label").lowercase()
+                    val pm = ProfileManager(context)
+                    val p  = pm.load()
+                    val match = p.sideIncomes.firstOrNull { it.label.lowercase().contains(kw) }
+                    if (match != null) {
+                        pm.save(p.copy(sideIncomes = p.sideIncomes.filter { it.id != match.id }))
+                        "BASARILI: '${match.label}' ek geliri silindi."
+                    } else "HATA: '$kw' ek geliri bulunamadi. Mevcut: ${p.sideIncomes.map { it.label }}"
                 }
 
                 "update_profile" -> {
