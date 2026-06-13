@@ -13,7 +13,8 @@ object BackupManager {
         "payment_prefs",
         "savings_prefs",
         "special_days",
-        "notif_settings"
+        "notif_settings",
+        "deepseek_prefs"
     )
 
     fun export(context: Context, out: OutputStream) {
