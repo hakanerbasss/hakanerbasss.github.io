@@ -8,7 +8,12 @@ import com.bluechip.finance.data.Payment
 import com.bluechip.finance.data.PaymentCategory
 import com.bluechip.finance.data.PaymentManager
 import com.bluechip.finance.data.ProfileManager
+import com.bluechip.finance.data.KnownCoins
+import com.bluechip.finance.data.KnownCurrencies
+import com.bluechip.finance.data.KnownMetals
+import com.bluechip.finance.data.SavingsCategory
 import com.bluechip.finance.data.SavingsManager
+import com.bluechip.finance.data.SavingsRecord
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -31,7 +36,9 @@ object DeepSeekClient {
         val totalPayments = payments.sumOf { it.amount }
         val overtimeAll   = OvertimeManager.loadAll(context)
         val overtimeMonth = OvertimeManager.thisMonthRecords(context)
-        val savings       = SavingsManager(context).loadAll()
+        val sm            = SavingsManager(context)
+        val savings       = sm.loadAll()
+        val priceCache    = sm.loadPriceCache()
 
         return buildString {
             appendLine("Sen 'Baretim' adli Turkce konusan bir finansal asistansin.")
@@ -97,14 +104,37 @@ object DeepSeekClient {
             if (savings.isNotEmpty()) {
                 appendLine()
                 appendLine("=== BIRIKIMLER ===")
-                val totalCost = savings.sumOf { it.totalCostTry() }
+                val hasPrices = !priceCache.isStale()
+                var totalCost    = 0.0
+                var totalCurrent = 0.0
                 savings.groupBy { it.category }.forEach { (cat, records) ->
                     appendLine("${cat.emoji} ${cat.label}:")
                     records.forEach { s ->
-                        appendLine("  - ${s.assetName}: ${s.quantity} adet/birim (alis maliyeti: ${s.totalCostTry().toLong()} TL)")
+                        val cost    = s.totalCostTry()
+                        val curPrice = priceCache.priceOf(s.assetId)
+                        val curVal  = if (curPrice > 0) s.quantity * curPrice else 0.0
+                        totalCost    += cost
+                        totalCurrent += curVal
+                        val line = buildString {
+                            append("  - ${s.assetName}: ${s.quantity} adet")
+                            append(", alis: ${cost.toLong()} TL")
+                            if (curVal > 0) {
+                                val pnl = curVal - cost
+                                val pct = if (cost > 0) pnl / cost * 100 else 0.0
+                                append(", guncel deger: ${curVal.toLong()} TL")
+                                append(", K/Z: ${if (pnl >= 0) "+" else ""}${pnl.toLong()} TL (${if (pct >= 0) "+" else ""}${"%.1f".format(pct)}%)")
+                            }
+                        }
+                        appendLine(line)
                     }
                 }
                 appendLine("Toplam alis maliyeti: ${totalCost.toLong()} TL")
+                if (totalCurrent > 0) {
+                    val totalPnl = totalCurrent - totalCost
+                    appendLine("Toplam guncel deger: ${totalCurrent.toLong()} TL")
+                    appendLine("Toplam kar/zarar: ${if (totalPnl >= 0) "+" else ""}${totalPnl.toLong()} TL")
+                }
+                if (!hasPrices) appendLine("(Fiyat verisi eski veya yok — guncelleme icin Birikimler ekranini acin)")
             }
 
             appendLine()
@@ -155,6 +185,15 @@ object DeepSeekClient {
                     put("category", param("string", "Kategori", listOf("KIRA","FATURA","KREDI","ABONELIK","SIGORTA","DIGER")))
                     put("due_day",  param("integer", "Ayın kaçında ödeniyor (1-31)"))
                 }, listOf("name", "amount", "category")))
+
+            put(tool("add_savings",
+                "Birikime/portföye varlık ekle. Kullanıcı kripto/altın/döviz aldığını söylediğinde çağır.",
+                JSONObject().apply {
+                    put("asset_symbol", param("string", "Varlık sembolü: BTC, ETH, TIA, SOL, DOGE, ALTIN, USD, EUR vb."))
+                    put("quantity",     param("number", "Miktar/adet"))
+                    put("buy_price",    param("number", "Alış fiyatı (TL cinsinden, birim başına)"))
+                    put("note",         param("string", "Opsiyonel not"))
+                }, listOf("asset_symbol", "quantity", "buy_price")))
 
             put(tool("get_summary",
                 "Bu ayın mali özetini hesapla: harcamalar, mesai kazancı, yan gelirler, kalan para.",
@@ -210,6 +249,36 @@ object DeepSeekClient {
                     val payment = Payment(name = name, amount = amount, category = cat, dueDayOfMonth = dueDay)
                     PaymentManager.savePayment(context, payment)
                     "BASARILI: '${name}' odeme eklendi — ${amount.toLong()} TL/ay, her ayin ${dueDay}. gunu."
+                }
+
+                "add_savings" -> {
+                    val symbol   = args.getString("asset_symbol").uppercase().trim()
+                    val quantity = args.getDouble("quantity")
+                    val buyPrice = args.getDouble("buy_price")
+                    val note     = args.optString("note", "")
+
+                    // Kategori ve assetId belirle
+                    val coinId  = KnownCoins.idOf(symbol)
+                    val metalId = KnownMetals.list.firstOrNull { it.second.contains(symbol, ignoreCase = true) }?.first
+                    val currId  = KnownCurrencies.list.firstOrNull { it.first.equals(symbol, ignoreCase = true) }?.first
+
+                    val (category, assetId, assetName) = when {
+                        coinId  != null -> Triple(SavingsCategory.CRYPTO, coinId,  symbol)
+                        metalId != null -> Triple(SavingsCategory.METAL,  metalId, symbol)
+                        currId  != null -> Triple(SavingsCategory.DOVIZ,  currId,  KnownCurrencies.list.first { it.first == currId }.second)
+                        symbol.contains("ALTIN", ignoreCase = true) || symbol.contains("GOLD", ignoreCase = true) ->
+                            Triple(SavingsCategory.METAL, "tether-gold", "Altin (gram)")
+                        else -> Triple(SavingsCategory.CRYPTO, symbol.lowercase(), symbol)
+                    }
+
+                    val record = SavingsRecord(
+                        category = category, assetId = assetId,
+                        assetName = assetName, quantity = quantity,
+                        buyPriceTry = buyPrice, note = note
+                    )
+                    SavingsManager(context).add(record)
+                    val totalCost = quantity * buyPrice
+                    "BASARILI: ${quantity} adet ${assetName} eklendi. Alis maliyeti: ${totalCost.toLong()} TL (${buyPrice} TL/adet)"
                 }
 
                 "get_summary" -> {
