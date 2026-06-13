@@ -197,11 +197,12 @@ def _missed_movers(client, cfg):
               if t.get('type') == 'buy' and t.get('time', '') >= cutoff}
     held = {s for s, p in load_positions().items() if p.get('qty', 0) > 0}
 
-    blacklists  = _read_blacklists()
-    max_chg     = float(cfg.get('breakout_max_chg_24h', 30.0))
-    max_pos     = int(cfg.get('max_positions', 6))
-    slots_full  = len(held) >= max_pos
-    now         = time.time()
+    blacklists   = _read_blacklists()
+    max_chg      = float(cfg.get('breakout_max_chg_24h', 30.0))
+    min_vol_24h  = float(cfg.get('breakout_min_vol_24h', 2_000_000))
+    max_pos      = int(cfg.get('max_positions', 6))
+    slots_full   = len(held) >= max_pos
+    now          = time.time()
 
     missed = []
     for m in movers:
@@ -211,17 +212,20 @@ def _missed_movers(client, cfg):
         reasons = []
         if m['chg24'] > max_chg:
             reasons.append(f"24s +%{m['chg24']} > breakout_max_chg_24h({max_chg:.0f})")
+        if m['vol24'] < min_vol_24h:
+            reasons.append(f"24s hacim ${m['vol24']/1e6:.1f}M < breakout_min_vol_24h(${min_vol_24h/1e6:.0f}M)")
         if blacklists.get(sym, 0) > now:
             kalan = (blacklists[sym] - now) / 3600
             reasons.append(f'blacklist ({kalan:.1f}s kaldı)')
         if slots_full:
             reasons.append(f'pozisyon slotları dolu ({len(held)}/{max_pos})')
-        if cfg.get('hour_ban_enabled', True):
-            hs = int(cfg.get('hour_ban_start', 16))
-            he = int(cfg.get('hour_ban_end', 19))
-            reasons.append(f'gün içinde {hs}-{he} TR yasağı vardı (BREAKOUT muaf)')
         if not reasons:
-            reasons.append('skor/hacim-spike eşiğine takılmış olabilir')
+            # Breakout muaf olduğu için saat yasağı nadiren gerçek engel;
+            # büyük ihtimalle tarama anında 2s momentum/hacim spike eşiği aşılmamıştı
+            if cfg.get('hour_ban_enabled', True):
+                hs = int(cfg.get('hour_ban_start', 16))
+                he = int(cfg.get('hour_ban_end', 19))
+                reasons.append(f'tarama anında 2s momentum/hacim-spike yetersiz (Otonom/Edge için {hs}-{he} TR yasağı da aktifti)')
         m['reasons'] = reasons
         missed.append(m)
     return missed
