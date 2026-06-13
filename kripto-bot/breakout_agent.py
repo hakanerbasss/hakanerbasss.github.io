@@ -38,8 +38,8 @@ STABLECOINS = {
 
 SCAN_INTERVAL    = 180      # saniye (3 dakika) — pump genellikle 10-30dk sürer, 3dk'da içerideyiz
 MONITOR_SEC      = 5        # saniye
-MIN_VOL_24H      = 2_000_000  # 500K→2M: $500K/24s defter çok sığ — girişte/çıkışta
-                              # slippage -%5 hard stop'u aşabiliyor (Koç: breakout_min_vol_24h)
+MIN_VOL_24H      = 500_000   # Testnet'te coin sınırlı; gerçek Binance veri, testnet alım
+                              # (Koç: breakout_min_vol_24h ile real'de 2M kontrol)
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
 MIN_COIN_PRICE   = 0.01     # $0.01 altı coinler: step size granülaritesi %10+ → stop güvenilmez
 

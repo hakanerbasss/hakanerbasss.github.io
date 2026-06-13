@@ -342,7 +342,7 @@ class AutonomousAgent:
     MONITOR_INTERVAL = 3
     MOMENTUM_EVERY   = 20
     MAX_POSITIONS    = 6
-    MIN_SCORE        = 6.0   # 5.5→6.0: korku ortamında düşük skora güvenme
+    MIN_SCORE        = 5.5   # Testnet'te az coin, skor eşiği düşük (Koç: otonom_min_score)
     MIN_SCORE_SIDEWAY = 6.5  # SIDEWAYS rejimde daha katı eşik
     DAILY_LOSS_LIMIT = 8.0
     FG_MIN           = 30    # Fear & Greed bu değerin altında yeni alım yok
