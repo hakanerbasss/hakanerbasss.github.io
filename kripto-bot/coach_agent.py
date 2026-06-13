@@ -240,7 +240,25 @@ def _current_params(cfg):
     return out
 
 
-def _build_prompt(perf, missed, params, equity, days):
+def _recent_changes(state, n=5):
+    """Son n parametre değişikliğini metin olarak döndür."""
+    hist = state.get('history', [])[-n:]
+    if not hist:
+        return '  (henüz değişiklik yapılmadı)'
+    lines = []
+    now_dt = datetime.datetime.now()
+    for h in reversed(hist):
+        try:
+            dt = datetime.datetime.strptime(h['time'], '%Y-%m-%d %H:%M:%S')
+            ago = (now_dt - dt).total_seconds() / 3600
+            lines.append(f"  {h['key']}: {h['old']} → {h['new']} "
+                         f"({ago:.0f}s önce) — {h.get('reason','')[:80]}")
+        except Exception:
+            pass
+    return '\n'.join(lines) if lines else '  (henüz değişiklik yapılmadı)'
+
+
+def _build_prompt(perf, missed, params, equity, days, state=None):
     plines = [f"  {k} = {v}  (sınır: {PARAM_BOUNDS[k][0]}–{PARAM_BOUNDS[k][1]}, {PARAM_BOUNDS[k][3]})"
               for k, v in params.items()]
     if perf:
@@ -272,12 +290,17 @@ KAÇIRILAN FIRSATLAR (son 24s %15+ fırlayan, botun ALAMADIĞI coinler ve engel 
 MEVCUT PARAMETRELER:
 {chr(10).join(plines)}
 
+SON PARAMETRE DEĞİŞİKLİKLERİ (son 5 tur):
+{_recent_changes(state or {})}
+
 KURALLAR:
 - En fazla {MAX_CHANGES_PER_RUN} parametre değiştir; küçük adımlar at (tek seferde
   bir eşiği en fazla ~%20 oynat). Değişiklik gerekmiyorsa hiç araç çağırma.
 - 10'dan az işlem olan ajan hakkında kesin hüküm verme; önce veri biriksin.
 - Filtreler art arda fırsat kaçırıyorsa GEVŞET; bir ajan net zarardaysa ve
   yeterli örneklem varsa o ajanın eşiğini SIKILAŞTIR.
+- AYNI PARAMETREYE ART ARDA AYNI YÖNDE iki tur dokunma: zaten değiştirildiyse bekle.
+  Sistem 48 saat bekleme uygular; üst üste değişiklik önlenir.
 - Cevabının metin kısmında 2-3 cümleyle ne öğrendiğini Türkçe özetle.
 Gerekli görürsen set_param aracını çağır."""
 
@@ -303,11 +326,25 @@ def _call_deepseek(prompt, api_key):
         return None
 
 
+PARAM_COOLDOWN_HOURS = 48   # aynı parametre en az bu kadar bekler
+
+def _last_changed(state, key):
+    """key'nin state['history']'deki son değişiklik zamanını döndür (veya None)."""
+    for entry in reversed(state.get('history', [])):
+        if entry.get('key') == key:
+            try:
+                return datetime.datetime.strptime(entry['time'], '%Y-%m-%d %H:%M:%S')
+            except Exception:
+                pass
+    return None
+
+
 def _apply_tool_calls(tool_calls, state):
     """set_param çağrılarını sınır kıskacıyla uygula. Dönen: değişiklik satırları."""
     results = []
     cfg = load_config()
     changed = False
+    now_dt = datetime.datetime.now()
     for tc in tool_calls[:MAX_CHANGES_PER_RUN]:
         try:
             if tc['function']['name'] != 'set_param':
@@ -317,6 +354,15 @@ def _apply_tool_calls(tool_calls, state):
             if key not in PARAM_BOUNDS:
                 results.append(f'❌ {key}: izin listesinde yok, reddedildi')
                 continue
+            # Per-parametre cooldown: aynı parametreyi 48 saat içinde iki kez değiştirme
+            last = _last_changed(state, key)
+            if last is not None:
+                elapsed_h = (now_dt - last).total_seconds() / 3600
+                if elapsed_h < PARAM_COOLDOWN_HOURS:
+                    wait_h = PARAM_COOLDOWN_HOURS - elapsed_h
+                    results.append(f'⏸ {key}: son değişiklik {elapsed_h:.0f}s önce, '
+                                   f'{wait_h:.0f}s daha beklenecek (aşırı-öğrenme koruması)')
+                    continue
             lo, hi, default, _ = PARAM_BOUNDS[key]
             val = max(lo, min(hi, float(args['value'])))
             if key in ('max_positions', 'breakout_max_pos', 'hour_ban_enabled',
@@ -332,7 +378,7 @@ def _apply_tool_calls(tool_calls, state):
             line = f'{key}: {old} → {val} ({reason})'
             results.append(f'✅ {line}')
             state.setdefault('history', []).append({
-                'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'time': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 'key': key, 'old': old, 'new': val, 'reason': reason,
             })
         except Exception as e:
@@ -401,7 +447,7 @@ def run_coach_review():
     api_key = cfg.get('deepseek_api_key', '')
     tool_results = []
     if api_key:
-        resp = _call_deepseek(_build_prompt(perf, missed, params, equity, days), api_key)
+        resp = _call_deepseek(_build_prompt(perf, missed, params, equity, days, state), api_key)
         if resp:
             if resp.get('content'):
                 lines += ['', f'🧠 <b>Koç dersi:</b> {resp["content"][:600]}']
