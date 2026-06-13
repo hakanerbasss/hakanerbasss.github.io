@@ -117,15 +117,15 @@ journalctl -u kripto-bot -n 100 # son 100 satır log
 - `send_telegram()` — kuyruk sistemi, tek thread, 2 mesaj/sn max
 
 ### breakout_agent.py
-- `MIN_VOL_24H = 500_000` — $500K min 24s hacim (düşük likidite slippage önlemi)
+- `MIN_VOL_24H = 500_000` — $500K min 24s hacim (testnet sınırlı coin; real'de Koç → 2M)
 - `MIN_PRICE_CHG_2H = 5.0` — minimum %5 hareket
-- `MAX_CHG_24H = 20.0` — 24s %20+ pompanmış coinlere girme
+- `MAX_CHG_24H = 30.0` — 24s %30+ pompanmış coinlere girme (Koç: breakout_max_chg_24h)
 - `MIN_SCORE = 5.5` — minimum skor eşiği
 - `MIN_REENTRY_HOURS = 1.0` — re-entry hard floor (config bağımsız)
 - `FG_MIN = 35` — Fear & Greed bu değerin altında tarama yok
 
 ### autonomous_agent.py
-- `MIN_SCORE = 6.0` — standart skor eşiği
+- `MIN_SCORE = 5.5` — standart skor eşiği (testnet, Koç: otonom_min_score)
 - `MIN_SCORE_SIDEWAY = 6.5` — SIDEWAYS rejimde daha katı
 - `DAILY_LOSS_LIMIT = 8.0` — günlük -%8 limiti
 - `FG_MIN = 30` — Fear & Greed filtresi
