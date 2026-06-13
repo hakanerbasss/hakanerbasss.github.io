@@ -293,6 +293,15 @@ MEVCUT PARAMETRELER:
 SON PARAMETRE DEĞİŞİKLİKLERİ (son 5 tur):
 {_recent_changes(state or {})}
 
+ÖNEMLI — KAÇIRILAN FIRSATLAR HAKKINDA:
+"Kaçırılan fırsatlar" listesi günün KAPANIŞ fiyatına göre hesaplanır. Breakout ajanı
+ise her 3 dakikada bir tarar; coin o anda zaten yüksek 24s değişimiyle taramaya giriyorsa
+`breakout_max_chg_24h` filtresi çalışır (pompa tepesinde alımı önler). AMA coin gün
+içinde yavaş yavaş yükseldiyse, ajan onu ERKEN bir aşamada (+10-20% 24s) yakalamış
+olabilirdi — sonunda +45% kapansa da. Yani günlük +45% gören bir coin için max_chg_24h
+artırmak HER ZAMAN doğru değildir; zaten yakalanmış ama düşük 2s momentumla geçilmiş
+olabilir. Bu nedenle breakout_max_chg_24h'ı sık değiştirme.
+
 KURALLAR:
 - En fazla {MAX_CHANGES_PER_RUN} parametre değiştir; küçük adımlar at (tek seferde
   bir eşiği en fazla ~%20 oynat). Değişiklik gerekmiyorsa hiç araç çağırma.
