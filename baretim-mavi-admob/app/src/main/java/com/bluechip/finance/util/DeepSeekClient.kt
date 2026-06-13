@@ -3,6 +3,8 @@ package com.bluechip.finance.util
 import android.content.Context
 import com.bluechip.finance.data.BackupManager
 import com.bluechip.finance.data.KnownCoins
+import com.bluechip.finance.data.SpecialDay
+import com.bluechip.finance.data.SpecialDayManager
 import com.bluechip.finance.data.KnownCurrencies
 import com.bluechip.finance.data.KnownMetals
 import com.bluechip.finance.data.OvertimeManager
@@ -43,11 +45,99 @@ object DeepSeekClient {
         val savings       = sm.loadAll()
         val priceCache    = sm.loadPriceCache()
 
+        val specialDays  = SpecialDayManager.getAll(context)
+        val upcoming     = SpecialDayManager.getUpcoming(context, withinDays = 60)
+
         return buildString {
             appendLine("Sen 'Baretim' adli Turkce konusan bir finansal asistan ve islem yardimcisin.")
             appendLine("Kullanicinin tum uygulama verisine tam erisimin var.")
             appendLine("Kullanici bir islem yapmani isterse direkt araci cagir, onay isteme.")
             appendLine("Her zaman Turkce yaz, kisa ve net cevaplar ver.")
+            appendLine()
+
+            // ── UYGULAMA EKRANLARI VE OZELLIKLER ──────────────────────
+            appendLine("=== UYGULAMANIN TUM OZELLIKLERI VE EKRANLARI ===")
+            appendLine("Kullanici bir islem yapmak istediginde asagidaki ekran/ozellik rehberini kullan.")
+            appendLine("AI yapabilecekleri: dogrudan arac cagir. Kullanicinin elle gitmesi gerekenler: yonlendir.")
+            appendLine()
+            appendLine("[ Ana Ekran ]")
+            appendLine("  Profil ozeti, maaş bilgisi, maşa kac gun kaldi, yaklaşan odemeler, yan gelirler, mutluluk skoru.")
+            appendLine("  AI yapabilir: profil guncelleme (update_profile)")
+            appendLine()
+            appendLine("[ Mesai Hesaplama — Alt nav: Mesai ]")
+            appendLine("  Tek seferlik mesai ucreti hesapla: brut maas gir, saat gir, tur sec (%%50/%%100 vb).")
+            appendLine("  AI yapabilir: hesaplamayı anlat, mesai kaydını ekle (add_overtime)")
+            appendLine()
+            appendLine("[ Mesai Takip — Araçlar menusunden ]")
+            appendLine("  Yapılan mesaileri tarih/saat/tur ile kaydet, grafik goster, aylik toplam.")
+            appendLine("  AI yapabilir: add_overtime, delete_overtime (son kaydi sil vb.)")
+            appendLine()
+            appendLine("[ Kidem & Ihbar Tazminati — Araçlar: Kıdem & İhbar ]")
+            appendLine("  Calişma süresi, maas, işten ayrılma nednei girerek tazminat hesapla.")
+            appendLine("  Kullanici gitmeli: tazminat hesaplamak icin manuel giriş gerekli.")
+            appendLine()
+            appendLine("[ Vergi & Bordro — Araçlar: Vergi & Bordro ]")
+            appendLine("  Brut maaştan net hesapla, SGK, gelir vergisi dilimleri.")
+            appendLine("  AI yapabilir: hesaplama mantığını anlat.")
+            appendLine()
+            appendLine("[ Yıllık İzin — Araçlar: Yıllık İzin ]")
+            appendLine("  Işe başlama tarihine göre kazanılan yıllık izin günü hesapla.")
+            appendLine("  AI yapabilir: izin hakkını hesapla ve anlat.")
+            appendLine()
+            appendLine("[ Bordro Simülasyon — Araçlar: Bordro ]")
+            appendLine("  Tam bordro simülasyonu: tüm kesintiler, yan haklar, net hesap.")
+            appendLine("  Bordro fotoğrafı ile OCR tarama özelliği var (Bordronu Tara butonu).")
+            appendLine("  AI yapabilir: bordro kalemlerini açıkla.")
+            appendLine()
+            appendLine("[ İşsizlik Maaşı — Araçlar: İşsizlik Maaşı ]")
+            appendLine("  İşten çıkma durumunda alınacak işsizlik ödeneği hesapla.")
+            appendLine()
+            appendLine("[ Emeklilik — Araçlar: Emeklilik ]")
+            appendLine("  Sigorta giriş tarihi, yaş ve prim gününe göre emeklilik tarihi hesapla.")
+            appendLine()
+            appendLine("[ Enflasyon — Araçlar: Enflasyon ]")
+            appendLine("  Belirli bir tutarın enflasyona göre gerçek değerini hesapla.")
+            appendLine()
+            appendLine("[ Maaş Karşılaştır — Araçlar: Maaş Karşılaştır ]")
+            appendLine("  İki iş teklifini net değer, yan haklar ve maliyet açısından karşılaştır.")
+            appendLine()
+            appendLine("[ Haklarım — Araçlar: Hakkımı Arıyorum ]")
+            appendLine("  Tazminatlı ayrılıp ayrılamayacağını hesapla (mobbing, kötü niyet vb.).")
+            appendLine()
+            appendLine("[ Ödeme Takip — Araçlar: Ödeme Takip ]")
+            appendLine("  Fatura, kira, kredi, abonelik ödemelerini kaydet ve takip et.")
+            appendLine("  AI yapabilir: add_payment, update_payment, delete_payment")
+            appendLine()
+            appendLine("[ Özel Günler — Araçlar: Özel Günler ]")
+            appendLine("  Doğum günü, yıldönümü, özel tarihler ekle, bildirim al.")
+            appendLine("  AI yapabilir: add_special_day, delete_special_day")
+            appendLine()
+            appendLine("[ Birikimlerim — Araçlar: Birikimlerim ]")
+            appendLine("  Kripto, altın, döviz varlıklarını kaydet, anlık fiyat & kar/zarar gör.")
+            appendLine("  AI yapabilir: add_savings, delete_savings")
+            appendLine()
+            appendLine("[ Anlık Kazanç — Araçlar: Anlık Kazanç ]")
+            appendLine("  Saniye saniye çalışma saatlerinde ne kadar kazandığını gösterir.")
+            appendLine()
+            appendLine("[ Maaş Koçu — Araçlar: Maaş Koçu ]")
+            appendLine("  Sektör, şehir ve deneyime göre maaşını piyasayla karşılaştır.")
+            appendLine("  AI yapabilir: karşılaştırmayı anlat ve müzakere stratejisi öner.")
+            appendLine()
+            appendLine("[ Bütçe & Acil Fon — Araçlar: Bütçe & Acil Fon ]")
+            appendLine("  50/30/20 kuralı ile bütçe planla, 6 aylık acil fon hedefi, finansal skor.")
+            appendLine("  Ödeme takibinden otomatik veri çeker.")
+            appendLine()
+            appendLine("[ Haklarım Chatbot — Araçlar: Haklarım Chatbot ]")
+            appendLine("  Kıdem, ihbar, fazla mesai, SGK, işten çıkarma gibi 12 konu hakkında hızlı bilgi.")
+            appendLine("  ALO 170 / 182 / 150 iş hattı bağlantıları var.")
+            appendLine()
+            appendLine("[ Bildirim Ayarları — Ana ekran çan ikonu ]")
+            appendLine("  Hangi olaylar için bildirim geleceğini ayarla (maaş, ödeme, özel gün, yedekleme).")
+            appendLine("  AI yapabilir: neyi açıp kapatacağını anlat, kullanıcıyı yönlendir.")
+            appendLine()
+            appendLine("[ Profil — Ana ekran profil bölümü ]")
+            appendLine("  Ad, brüt/net maaş, maaş günü, işe başlama tarihi, avans bilgileri.")
+            appendLine("  AI yapabilir: update_profile")
             appendLine()
 
             // PROFIL
@@ -116,6 +206,19 @@ object DeepSeekClient {
                 appendLine("Toplam alis: ${totalCost.toLong()} TL" +
                     if (totalCurrent > 0) ", guncel: ${totalCurrent.toLong()} TL, K/Z: ${if (totalCurrent - totalCost >= 0) "+" else ""}${(totalCurrent - totalCost).toLong()} TL" else "")
                 if (priceCache.isStale()) appendLine("(Fiyat verisi eski — Birikimler ekranini acp guncelle)")
+            }
+
+            // ÖZEL GÜNLER
+            if (specialDays.isNotEmpty()) {
+                appendLine()
+                appendLine("=== OZEL GUNLER ===")
+                specialDays.forEach { d ->
+                    val daysLeft = SpecialDayManager.daysUntil(d.day, d.month)
+                    appendLine("- [${d.id.take(8)}] ${d.title}${if (d.subtitle.isNotEmpty()) " (${d.subtitle})" else ""}: ${d.day}.${d.month} — $daysLeft gun kaldi")
+                }
+                if (upcoming.isNotEmpty()) {
+                    appendLine("Yaklasan (60 gun icinde): ${upcoming.joinToString(", ") { "${it.first.title} (${it.second} gun)" }}")
+                }
             }
 
             // HAM VERİ (BackupManager ile otomatik — yeni özellikler buraya dahil olur)
@@ -231,6 +334,22 @@ object DeepSeekClient {
                     put("salary_day",   param("integer", "Maas gunu (0 = degistirme)"))
                 }, listOf()))
 
+            // Özel Günler
+            put(tool("add_special_day",
+                "Özel gün / doğum günü / yıldönümü ekle.",
+                JSONObject().apply {
+                    put("title",    param("string", "Tur: Dogum Gunu / Evlilik Yildonumu / Anma vb."))
+                    put("subtitle", param("string", "Kisi adi veya aciklama (opsiyonel)"))
+                    put("day",      param("integer", "Gun (1-31)"))
+                    put("month",    param("integer", "Ay (1-12)"))
+                }, listOf("title","day","month")))
+
+            put(tool("delete_special_day",
+                "Özel günü sil.",
+                JSONObject().apply {
+                    put("title_or_id", param("string", "Baslik kismi veya id ilk 8 hanesi"))
+                }, listOf("title_or_id")))
+
             // Özet
             put(tool("get_summary",
                 "Bu ayın mali özetini hesapla.",
@@ -321,6 +440,28 @@ object DeepSeekClient {
                     if (match != null) { SavingsManager(context).delete(match.id)
                         "BASARILI: ${match.assetName} (${match.quantity} adet) silindi."
                     } else "HATA: '$sym' birikim bulunamadi. Mevcut: ${all.map { it.assetName }}"
+                }
+
+                "add_special_day" -> {
+                    val sd = SpecialDay(
+                        title    = args.getString("title"),
+                        subtitle = args.optString("subtitle", ""),
+                        day      = args.getInt("day"),
+                        month    = args.getInt("month")
+                    )
+                    SpecialDayManager.save(context, sd)
+                    val daysLeft = SpecialDayManager.daysUntil(sd.day, sd.month)
+                    "BASARILI: '${sd.title}${if (sd.subtitle.isNotEmpty()) " (${sd.subtitle})" else ""}' ${sd.day}.${sd.month} tarihinde eklendi — $daysLeft gun kaldi."
+                }
+
+                "delete_special_day" -> {
+                    val query = args.getString("title_or_id").lowercase()
+                    val all   = SpecialDayManager.getAll(context)
+                    val match = all.firstOrNull { it.title.lowercase().contains(query) || it.subtitle.lowercase().contains(query) || it.id.startsWith(query) }
+                    if (match != null) {
+                        SpecialDayManager.delete(context, match.id)
+                        "BASARILI: '${match.title}${if (match.subtitle.isNotEmpty()) " (${match.subtitle})" else ""}' silindi."
+                    } else "HATA: '$query' bulunamadi. Mevcut: ${all.map { it.title }}"
                 }
 
                 "update_profile" -> {
