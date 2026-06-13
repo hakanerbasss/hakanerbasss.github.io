@@ -1,6 +1,10 @@
 package com.bluechip.finance.util
 
 import android.content.Context
+import com.bluechip.finance.data.BackupManager
+import com.bluechip.finance.data.KnownCoins
+import com.bluechip.finance.data.KnownCurrencies
+import com.bluechip.finance.data.KnownMetals
 import com.bluechip.finance.data.OvertimeManager
 import com.bluechip.finance.data.OvertimeRecord
 import com.bluechip.finance.data.OvertimeTrackType
@@ -8,9 +12,6 @@ import com.bluechip.finance.data.Payment
 import com.bluechip.finance.data.PaymentCategory
 import com.bluechip.finance.data.PaymentManager
 import com.bluechip.finance.data.ProfileManager
-import com.bluechip.finance.data.KnownCoins
-import com.bluechip.finance.data.KnownCurrencies
-import com.bluechip.finance.data.KnownMetals
 import com.bluechip.finance.data.SavingsCategory
 import com.bluechip.finance.data.SavingsManager
 import com.bluechip.finance.data.SavingsRecord
@@ -18,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
@@ -30,6 +32,7 @@ object DeepSeekClient {
     private const val API_URL = "https://api.deepseek.com/chat/completions"
     private const val MODEL   = "deepseek-chat"
 
+    // ── Sistem promptu: yapılandırılmış + otomatik ham veri ─────────────
     fun buildSystemPrompt(context: Context): String {
         val profile       = ProfileManager(context).load()
         val payments      = PaymentManager.getPayments(context).filter { it.isActive }
@@ -41,9 +44,10 @@ object DeepSeekClient {
         val priceCache    = sm.loadPriceCache()
 
         return buildString {
-            appendLine("Sen 'Baretim' adli Turkce konusan bir finansal asistansin.")
-            appendLine("Asagida kullanicinin TUM uygulama verileri verilmistir.")
-            appendLine("Her zaman Turkce yaz. Kisa ve net cevaplar ver.")
+            appendLine("Sen 'Baretim' adli Turkce konusan bir finansal asistan ve islem yardimcisin.")
+            appendLine("Kullanicinin tum uygulama verisine tam erisimin var.")
+            appendLine("Kullanici bir islem yapmani isterse direkt araci cagir, onay isteme.")
+            appendLine("Her zaman Turkce yaz, kisa ve net cevaplar ver.")
             appendLine()
 
             // PROFIL
@@ -51,18 +55,15 @@ object DeepSeekClient {
             if (profile.name.isNotEmpty()) appendLine("Ad: ${profile.name}")
             if (profile.grossSalary > 0)   appendLine("Brut Maas: ${profile.grossSalary.toLong()} TL")
             if (profile.netSalary > 0)     appendLine("Net Maas: ${profile.netSalary.toLong()} TL")
-            if (profile.salaryDay > 0)     appendLine("Maas Gunu: Ayin ${profile.salaryDay}. gunu")
+            if (profile.salaryDay > 0)     appendLine("Maas Gunu: Ayin ${profile.salaryDay}.")
             if (profile.advanceAmount > 0) appendLine("Avans: ${profile.advanceAmount.toLong()} TL (Ayin ${profile.advanceDay}.)")
             val totalIncome = profile.totalIncome()
             if (totalIncome > profile.netSalary && totalIncome > 0)
                 appendLine("Toplam Gelir (yan gelirler dahil): ${totalIncome.toLong()} TL")
-
-            // YAN GELİRLER
             if (profile.sideIncomes.isNotEmpty()) {
-                appendLine()
-                appendLine("=== YAN GELIRLER ===")
+                appendLine("Yan Gelirler:")
                 profile.sideIncomes.forEach { si ->
-                    appendLine("- ${si.label} (${si.category.label}): ~${si.effectiveAmount().toLong()} TL/ay")
+                    appendLine("  - ${si.label} (${si.category.label}): ~${si.effectiveAmount().toLong()} TL/ay")
                 }
             }
 
@@ -71,31 +72,23 @@ object DeepSeekClient {
                 appendLine()
                 appendLine("=== AYLIK SABIT ODEMELER ===")
                 payments.forEach { p ->
-                    appendLine("- ${p.name} (${p.category.label}): ${p.amount.toLong()} TL")
+                    appendLine("- [${p.id.take(8)}] ${p.name} (${p.category.label}): ${p.amount.toLong()} TL, ayin ${p.dueDayOfMonth}.")
                 }
                 appendLine("Toplam: ${totalPayments.toLong()} TL/ay")
-                if (profile.netSalary > 0) {
-                    val left = profile.netSalary - totalPayments
-                    appendLine("Sabit odemeler sonrasi kalan: ${left.toLong()} TL")
-                }
+                if (profile.netSalary > 0)
+                    appendLine("Sabit odemeler sonrasi kalan: ${(profile.netSalary - totalPayments).toLong()} TL")
             }
 
             // FAZLA MESAİ
             if (overtimeAll.isNotEmpty()) {
                 appendLine()
                 appendLine("=== FAZLA MESAI ===")
-                appendLine("Toplam kayit sayisi: ${overtimeAll.size}")
-                val totalNet  = overtimeAll.sumOf { it.netAmount }
-                val totalBrut = overtimeAll.sumOf { it.brutAmount }
-                appendLine("Tum zamanlar toplam (net): ${totalNet.toLong()} TL")
-                appendLine("Tum zamanlar toplam (brut): ${totalBrut.toLong()} TL")
+                appendLine("Toplam ${overtimeAll.size} kayit — tum zamanlar net: ${overtimeAll.sumOf { it.netAmount }.toLong()} TL")
                 if (overtimeMonth.isNotEmpty()) {
-                    val monthNet = overtimeMonth.sumOf { it.netAmount }
-                    appendLine("Bu ay mesai (${overtimeMonth.size} kayit): ${monthNet.toLong()} TL net")
+                    appendLine("Bu ay (${overtimeMonth.size} kayit, ${overtimeMonth.sumOf { it.netAmount }.toLong()} TL net):")
                     overtimeMonth.forEach { r ->
-                        val tarih = java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault())
-                            .format(java.util.Date(r.dateMillis))
-                        appendLine("  $tarih — ${r.hours}s — ${r.netAmount.toLong()} TL net (${r.type.name})")
+                        val d = SimpleDateFormat("dd.MM", Locale.getDefault()).format(java.util.Date(r.dateMillis))
+                        appendLine("  - [${r.id.take(8)}] $d ${r.hours}s ${r.type.label}: net ${r.netAmount.toLong()} TL")
                     }
                 }
             }
@@ -104,45 +97,57 @@ object DeepSeekClient {
             if (savings.isNotEmpty()) {
                 appendLine()
                 appendLine("=== BIRIKIMLER ===")
-                val hasPrices = !priceCache.isStale()
-                var totalCost    = 0.0
-                var totalCurrent = 0.0
+                var totalCost = 0.0; var totalCurrent = 0.0
                 savings.groupBy { it.category }.forEach { (cat, records) ->
                     appendLine("${cat.emoji} ${cat.label}:")
                     records.forEach { s ->
-                        val cost    = s.totalCostTry()
+                        val cost = s.totalCostTry()
                         val curPrice = priceCache.priceOf(s.assetId)
-                        val curVal  = if (curPrice > 0) s.quantity * curPrice else 0.0
-                        totalCost    += cost
-                        totalCurrent += curVal
-                        val line = buildString {
-                            append("  - ${s.assetName}: ${s.quantity} adet")
-                            append(", alis: ${cost.toLong()} TL")
-                            if (curVal > 0) {
-                                val pnl = curVal - cost
-                                val pct = if (cost > 0) pnl / cost * 100 else 0.0
-                                append(", guncel deger: ${curVal.toLong()} TL")
-                                append(", K/Z: ${if (pnl >= 0) "+" else ""}${pnl.toLong()} TL (${if (pct >= 0) "+" else ""}${"%.1f".format(pct)}%)")
-                            }
-                        }
-                        appendLine(line)
+                        val curVal = if (curPrice > 0) s.quantity * curPrice else 0.0
+                        totalCost += cost; totalCurrent += curVal
+                        val pnlStr = if (curVal > 0) {
+                            val pnl = curVal - cost
+                            val pct = if (cost > 0) pnl / cost * 100 else 0.0
+                            " | K/Z: ${if (pnl >= 0) "+" else ""}${pnl.toLong()} TL (${"%.1f".format(pct)}%)"
+                        } else ""
+                        appendLine("  - [${s.id.take(8)}] ${s.assetName}: ${s.quantity} adet, alis: ${cost.toLong()} TL$pnlStr")
                     }
                 }
-                appendLine("Toplam alis maliyeti: ${totalCost.toLong()} TL")
-                if (totalCurrent > 0) {
-                    val totalPnl = totalCurrent - totalCost
-                    appendLine("Toplam guncel deger: ${totalCurrent.toLong()} TL")
-                    appendLine("Toplam kar/zarar: ${if (totalPnl >= 0) "+" else ""}${totalPnl.toLong()} TL")
-                }
-                if (!hasPrices) appendLine("(Fiyat verisi eski veya yok — guncelleme icin Birikimler ekranini acin)")
+                appendLine("Toplam alis: ${totalCost.toLong()} TL" +
+                    if (totalCurrent > 0) ", guncel: ${totalCurrent.toLong()} TL, K/Z: ${if (totalCurrent - totalCost >= 0) "+" else ""}${(totalCurrent - totalCost).toLong()} TL" else "")
+                if (priceCache.isStale()) appendLine("(Fiyat verisi eski — Birikimler ekranini acp guncelle)")
             }
 
+            // HAM VERİ (BackupManager ile otomatik — yeni özellikler buraya dahil olur)
             appendLine()
-            appendLine("Kullanicinin finansal sorularini cevapla, tasarruf onerileri ver, harcama analizi yap.")
-            appendLine("Turkiye calisma mevzuatini da biliyorsun: kidem, ihbar, yillik izin, fazla mesai, SGK vs.")
+            appendLine("=== TUM UYGULAMA VERILERI (ham) ===")
+            appendLine("Asagida uygulamadaki tum kaydedilmis veri JSON formatinda. Yukarida ozetlenmeyenler buradadir.")
+            try {
+                val bos = ByteArrayOutputStream()
+                BackupManager.export(context, bos)
+                val root  = JSONObject(bos.toString("UTF-8"))
+                val prefs = root.optJSONObject("prefs") ?: JSONObject()
+                prefs.keys().forEach { prefName ->
+                    val obj = prefs.optJSONObject(prefName) ?: return@forEach
+                    if (obj.length() == 0) return@forEach
+                    appendLine("[$prefName]")
+                    obj.keys().forEach { key ->
+                        val entry = obj.optJSONObject(key)
+                        val value = entry?.optString("v") ?: return@forEach
+                        if (value.isNotBlank() && value != "[]" && value != "{}" && value != "0" && value != "false")
+                            appendLine("  $key = $value")
+                    }
+                }
+            } catch (_: Exception) { appendLine("(Veri okunamadi)") }
+
+            appendLine()
+            appendLine("Islem araclari: add_overtime, delete_overtime, update_payment, add_payment, delete_payment,")
+            appendLine("add_savings, delete_savings, update_profile, get_summary")
+            appendLine("Turkiye calisma mevzuatini biliyorsun: kidem, ihbar, izin, mesai, SGK vs.")
         }
     }
 
+    // ── Araç tanımları ───────────────────────────────────────────────────
     private fun toolDefinitions(): JSONArray {
         fun param(type: String, desc: String, enumVals: List<String>? = null) = JSONObject().apply {
             put("type", type); put("description", desc)
@@ -161,148 +166,190 @@ object DeepSeekClient {
             }
 
         return JSONArray().apply {
+            // Mesai
             put(tool("add_overtime",
-                "Fazla mesai kaydı ekle. Kullanıcı mesai yaptığını söylediğinde çağır.",
+                "Fazla mesai kaydı ekle.",
                 JSONObject().apply {
-                    put("hours",  param("number", "Mesai saati (örn: 2, 1.5)"))
-                    put("type",   param("string", "Mesai türü", listOf("PCT25","PCT50","PCT75","PCT100","PCT125","PCT200")))
-                    put("date",   param("string", "Tarih YYYY-MM-DD formatında, bugünse today yaz"))
-                    put("note",   param("string", "Opsiyonel not"))
-                }, listOf("hours", "type")))
+                    put("hours", param("number", "Saat"))
+                    put("type",  param("string", "Tur", listOf("PCT25","PCT50","PCT75","PCT100","PCT125","PCT200")))
+                    put("date",  param("string", "YYYY-MM-DD veya today"))
+                    put("note",  param("string", "Not"))
+                }, listOf("hours","type")))
 
-            put(tool("update_payment",
-                "Mevcut ödemenin tutarını güncelle. Kullanıcı kira/fatura tutarının değiştiğini söylediğinde.",
+            put(tool("delete_overtime",
+                "Fazla mesai kaydını sil. id veya 'last' (son kayit) ile.",
                 JSONObject().apply {
-                    put("payment_name", param("string", "Ödeme adının bir kısmı (kira, elektrik, internet vb.)"))
+                    put("id", param("string", "Kayit id'sinin ilk 8 hanesi veya 'last'"))
+                }, listOf("id")))
+
+            // Ödemeler
+            put(tool("update_payment",
+                "Mevcut ödemenin tutarını güncelle.",
+                JSONObject().apply {
+                    put("payment_name", param("string", "Odeme adinin bir kismi"))
                     put("new_amount",   param("number", "Yeni tutar TL"))
-                }, listOf("payment_name", "new_amount")))
+                }, listOf("payment_name","new_amount")))
 
             put(tool("add_payment",
                 "Yeni sabit ödeme/fatura ekle.",
                 JSONObject().apply {
-                    put("name",     param("string", "Ödeme adı"))
-                    put("amount",   param("number", "Aylık tutar TL"))
+                    put("name",     param("string", "Ad"))
+                    put("amount",   param("number", "Tutar TL"))
                     put("category", param("string", "Kategori", listOf("KIRA","FATURA","KREDI","ABONELIK","SIGORTA","DIGER")))
-                    put("due_day",  param("integer", "Ayın kaçında ödeniyor (1-31)"))
-                }, listOf("name", "amount", "category")))
+                    put("due_day",  param("integer", "Ayin kacinda (1-31)"))
+                }, listOf("name","amount","category")))
 
-            put(tool("add_savings",
-                "Birikime/portföye varlık ekle. Kullanıcı kripto/altın/döviz aldığını söylediğinde çağır.",
+            put(tool("delete_payment",
+                "Ödemeyi sil.",
                 JSONObject().apply {
-                    put("asset_symbol", param("string", "Varlık sembolü: BTC, ETH, TIA, SOL, DOGE, ALTIN, USD, EUR vb."))
-                    put("quantity",     param("number", "Miktar/adet"))
-                    put("buy_price",    param("number", "Alış fiyatı (TL cinsinden, birim başına)"))
-                    put("note",         param("string", "Opsiyonel not"))
-                }, listOf("asset_symbol", "quantity", "buy_price")))
+                    put("payment_name", param("string", "Odeme adinin bir kismi"))
+                }, listOf("payment_name")))
 
+            // Birikimler
+            put(tool("add_savings",
+                "Birikime varlık ekle (kripto/altın/döviz).",
+                JSONObject().apply {
+                    put("asset_symbol", param("string", "BTC ETH TIA SOL ALTIN USD EUR vb."))
+                    put("quantity",     param("number", "Miktar"))
+                    put("buy_price",    param("number", "Alis fiyati TL/birim"))
+                    put("note",         param("string", "Not"))
+                }, listOf("asset_symbol","quantity","buy_price")))
+
+            put(tool("delete_savings",
+                "Birikim kaydını sil.",
+                JSONObject().apply {
+                    put("asset_symbol", param("string", "Sembol veya id ilk 8 hanesi"))
+                }, listOf("asset_symbol")))
+
+            // Profil
+            put(tool("update_profile",
+                "Kullanıcı profilini güncelle (maaş, isim, maaş günü vb.).",
+                JSONObject().apply {
+                    put("name",         param("string", "Ad (degismiyorsa bos birak)"))
+                    put("gross_salary", param("number", "Brut maas TL (0 = degistirme)"))
+                    put("net_salary",   param("number", "Net maas TL (0 = degistirme)"))
+                    put("salary_day",   param("integer", "Maas gunu (0 = degistirme)"))
+                }, listOf()))
+
+            // Özet
             put(tool("get_summary",
-                "Bu ayın mali özetini hesapla: harcamalar, mesai kazancı, yan gelirler, kalan para.",
+                "Bu ayın mali özetini hesapla.",
                 JSONObject().apply {}, listOf()))
         }
     }
 
+    // ── Araç çalıştırıcı ────────────────────────────────────────────────
     private fun executeTool(context: Context, name: String, args: JSONObject): String {
         return try {
             when (name) {
                 "add_overtime" -> {
                     val profile = ProfileManager(context).load()
                     val hours   = args.getDouble("hours")
-                    val typeStr = args.optString("type", "PCT50")
-                    val type    = try { OvertimeTrackType.valueOf(typeStr) } catch (_: Exception) { OvertimeTrackType.PCT50 }
-                    val note    = args.optString("note", "")
-                    val dateStr = args.optString("date", "today")
-                    val dateMs  = if (dateStr == "today" || dateStr.isBlank()) {
-                        System.currentTimeMillis()
-                    } else {
-                        try { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateStr)?.time ?: System.currentTimeMillis() }
-                        catch (_: Exception) { System.currentTimeMillis() }
+                    val type    = try { OvertimeTrackType.valueOf(args.optString("type","PCT50")) } catch (_: Exception) { OvertimeTrackType.PCT50 }
+                    val dateMs  = args.optString("date","today").let { d ->
+                        if (d == "today" || d.isBlank()) System.currentTimeMillis()
+                        else try { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(d)?.time ?: System.currentTimeMillis() } catch (_: Exception) { System.currentTimeMillis() }
                     }
                     val brut = OvertimeManager.calcBrutAmount(profile.grossSalary, hours, type)
                     val net  = OvertimeManager.calcNetAmount(brut)
-                    val record = OvertimeRecord(
-                        dateMillis = dateMs, hours = hours, type = type,
-                        brutAmount = brut, netAmount = net, note = note
-                    )
-                    OvertimeManager.add(context, record)
-                    "BASARILI: ${hours}s ${type.label} mesai eklendi. Net kazanc: ${net.toLong()} TL, Brut: ${brut.toLong()} TL"
+                    OvertimeManager.add(context, OvertimeRecord(dateMillis = dateMs, hours = hours, type = type,
+                        brutAmount = brut, netAmount = net, note = args.optString("note","")))
+                    "BASARILI: ${hours}s ${type.label} mesai eklendi — net ${net.toLong()} TL, brut ${brut.toLong()} TL"
+                }
+
+                "delete_overtime" -> {
+                    val idPrefix = args.getString("id")
+                    val all = OvertimeManager.loadAll(context)
+                    val target = if (idPrefix == "last") all.maxByOrNull { it.dateMillis }
+                                 else all.firstOrNull { it.id.startsWith(idPrefix) }
+                    if (target != null) {
+                        OvertimeManager.delete(context, target.id)
+                        val d = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(java.util.Date(target.dateMillis))
+                        "BASARILI: $d tarihli ${target.hours}s mesai kaydi silindi."
+                    } else "HATA: Kayit bulunamadi."
                 }
 
                 "update_payment" -> {
-                    val keyword   = args.getString("payment_name").lowercase()
-                    val newAmount = args.getDouble("new_amount")
-                    val payments  = PaymentManager.getPayments(context)
-                    val match     = payments.firstOrNull { it.name.lowercase().contains(keyword) }
-                    if (match != null) {
-                        PaymentManager.savePayment(context, match.copy(amount = newAmount))
-                        "BASARILI: '${match.name}' odeme tutari ${newAmount.toLong()} TL olarak guncellendi."
-                    } else {
-                        "HATA: '${keyword}' adinda odeme bulunamadi. Mevcut odemeler: ${payments.map { it.name }}"
-                    }
+                    val kw = args.getString("payment_name").lowercase()
+                    val amt = args.getDouble("new_amount")
+                    val match = PaymentManager.getPayments(context).firstOrNull { it.name.lowercase().contains(kw) }
+                    if (match != null) { PaymentManager.savePayment(context, match.copy(amount = amt))
+                        "BASARILI: '${match.name}' -> ${amt.toLong()} TL olarak guncellendi."
+                    } else "HATA: '$kw' odeme bulunamadi."
                 }
 
                 "add_payment" -> {
-                    val name    = args.getString("name")
-                    val amount  = args.getDouble("amount")
-                    val catStr  = args.optString("category", "DIGER")
-                    val cat     = try { PaymentCategory.valueOf(catStr) } catch (_: Exception) { PaymentCategory.DIGER }
-                    val dueDay  = args.optInt("due_day", 1)
-                    val payment = Payment(name = name, amount = amount, category = cat, dueDayOfMonth = dueDay)
-                    PaymentManager.savePayment(context, payment)
-                    "BASARILI: '${name}' odeme eklendi — ${amount.toLong()} TL/ay, her ayin ${dueDay}. gunu."
+                    val cat = try { PaymentCategory.valueOf(args.optString("category","DIGER")) } catch (_: Exception) { PaymentCategory.DIGER }
+                    val p   = Payment(name = args.getString("name"), amount = args.getDouble("amount"),
+                        category = cat, dueDayOfMonth = args.optInt("due_day",1))
+                    PaymentManager.savePayment(context, p)
+                    "BASARILI: '${p.name}' odeme eklendi — ${p.amount.toLong()} TL/ay"
+                }
+
+                "delete_payment" -> {
+                    val kw = args.getString("payment_name").lowercase()
+                    val match = PaymentManager.getPayments(context).firstOrNull { it.name.lowercase().contains(kw) }
+                    if (match != null) { PaymentManager.deletePayment(context, match.id)
+                        "BASARILI: '${match.name}' odeme silindi."
+                    } else "HATA: '$kw' odeme bulunamadi."
                 }
 
                 "add_savings" -> {
-                    val symbol   = args.getString("asset_symbol").uppercase().trim()
-                    val quantity = args.getDouble("quantity")
-                    val buyPrice = args.getDouble("buy_price")
-                    val note     = args.optString("note", "")
-
-                    // Kategori ve assetId belirle
-                    val coinId  = KnownCoins.idOf(symbol)
-                    val metalId = KnownMetals.list.firstOrNull { it.second.contains(symbol, ignoreCase = true) }?.first
-                    val currId  = KnownCurrencies.list.firstOrNull { it.first.equals(symbol, ignoreCase = true) }?.first
-
-                    val (category, assetId, assetName) = when {
-                        coinId  != null -> Triple(SavingsCategory.CRYPTO, coinId,  symbol)
-                        metalId != null -> Triple(SavingsCategory.METAL,  metalId, symbol)
-                        currId  != null -> Triple(SavingsCategory.DOVIZ,  currId,  KnownCurrencies.list.first { it.first == currId }.second)
-                        symbol.contains("ALTIN", ignoreCase = true) || symbol.contains("GOLD", ignoreCase = true) ->
-                            Triple(SavingsCategory.METAL, "tether-gold", "Altin (gram)")
-                        else -> Triple(SavingsCategory.CRYPTO, symbol.lowercase(), symbol)
+                    val sym   = args.getString("asset_symbol").uppercase().trim()
+                    val qty   = args.getDouble("quantity")
+                    val price = args.getDouble("buy_price")
+                    val coinId  = KnownCoins.idOf(sym)
+                    val metalId = KnownMetals.list.firstOrNull { it.second.contains(sym, ignoreCase = true) }?.first
+                    val currId  = KnownCurrencies.list.firstOrNull { it.first.equals(sym, ignoreCase = true) }?.first
+                    val (cat, assetId, assetName) = when {
+                        coinId  != null -> Triple(SavingsCategory.CRYPTO, coinId, sym)
+                        metalId != null -> Triple(SavingsCategory.METAL, metalId, sym)
+                        currId  != null -> Triple(SavingsCategory.DOVIZ, currId, KnownCurrencies.list.first { it.first == currId }.second)
+                        sym.contains("ALTIN", ignoreCase = true) -> Triple(SavingsCategory.METAL, "tether-gold", "Altin (gram)")
+                        else -> Triple(SavingsCategory.CRYPTO, sym.lowercase(), sym)
                     }
+                    SavingsManager(context).add(SavingsRecord(category = cat, assetId = assetId,
+                        assetName = assetName, quantity = qty, buyPriceTry = price,
+                        note = args.optString("note","")))
+                    "BASARILI: $qty adet $assetName eklendi — alis maliyeti: ${(qty * price).toLong()} TL"
+                }
 
-                    val record = SavingsRecord(
-                        category = category, assetId = assetId,
-                        assetName = assetName, quantity = quantity,
-                        buyPriceTry = buyPrice, note = note
+                "delete_savings" -> {
+                    val sym = args.getString("asset_symbol").uppercase().trim()
+                    val all = SavingsManager(context).loadAll()
+                    val match = all.firstOrNull { it.assetName.uppercase().contains(sym) || it.id.startsWith(sym.lowercase()) }
+                    if (match != null) { SavingsManager(context).delete(match.id)
+                        "BASARILI: ${match.assetName} (${match.quantity} adet) silindi."
+                    } else "HATA: '$sym' birikim bulunamadi. Mevcut: ${all.map { it.assetName }}"
+                }
+
+                "update_profile" -> {
+                    val pm = ProfileManager(context)
+                    val p  = pm.load()
+                    val updated = p.copy(
+                        name         = args.optString("name","").ifBlank { p.name },
+                        grossSalary  = args.optDouble("gross_salary", 0.0).let { if (it > 0) it else p.grossSalary },
+                        netSalary    = args.optDouble("net_salary",   0.0).let { if (it > 0) it else p.netSalary },
+                        salaryDay    = args.optInt("salary_day",      0  ).let { if (it > 0) it else p.salaryDay }
                     )
-                    SavingsManager(context).add(record)
-                    val totalCost = quantity * buyPrice
-                    "BASARILI: ${quantity} adet ${assetName} eklendi. Alis maliyeti: ${totalCost.toLong()} TL (${buyPrice} TL/adet)"
+                    pm.save(updated)
+                    "BASARILI: Profil guncellendi. Net: ${updated.netSalary.toLong()} TL, Brut: ${updated.grossSalary.toLong()} TL"
                 }
 
                 "get_summary" -> {
-                    val profile   = ProfileManager(context).load()
-                    val payments  = PaymentManager.getPayments(context).filter { it.isActive }
-                    val totalPay  = payments.sumOf { it.amount }
-                    val otMonth   = OvertimeManager.thisMonthRecords(context)
-                    val otNet     = otMonth.sumOf { it.netAmount }
-                    val sideTotal = profile.sideIncomes.sumOf { it.currentMonthAmount() }
-                    val cal       = java.util.Calendar.getInstance()
-                    val today     = cal.get(java.util.Calendar.DAY_OF_MONTH)
-                    val daysLeft  = if (profile.salaryDay > 0) {
-                        val diff = profile.salaryDay - today
-                        if (diff < 0) diff + 30 else diff
-                    } else -1
-
+                    val p     = ProfileManager(context).load()
+                    val pays  = PaymentManager.getPayments(context).filter { it.isActive }
+                    val otM   = OvertimeManager.thisMonthRecords(context)
+                    val today = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+                    val daysLeft = if (p.salaryDay > 0) { val d = p.salaryDay - today; if (d < 0) d + 30 else d } else -1
                     buildString {
-                        appendLine("Bu ayin ozeti:")
-                        if (profile.netSalary > 0) appendLine("Net maas: ${profile.netSalary.toLong()} TL")
-                        appendLine("Sabit odemeler: ${totalPay.toLong()} TL")
-                        if (profile.netSalary > 0) appendLine("Sabit odemeler sonrasi kalan: ${(profile.netSalary - totalPay).toLong()} TL")
-                        if (otNet > 0) appendLine("Bu ay mesai kazanci: ${otNet.toLong()} TL (${otMonth.size} kayit)")
-                        if (sideTotal > 0) appendLine("Yan gelirler: ${sideTotal.toLong()} TL")
-                        if (daysLeft >= 0) appendLine("Masaya ${daysLeft} gun kaldi.")
+                        if (p.netSalary > 0) appendLine("Net maas: ${p.netSalary.toLong()} TL")
+                        appendLine("Sabit odemeler: ${pays.sumOf { it.amount }.toLong()} TL")
+                        if (p.netSalary > 0) appendLine("Kalan: ${(p.netSalary - pays.sumOf { it.amount }).toLong()} TL")
+                        if (otM.isNotEmpty()) appendLine("Bu ay mesai: ${otM.sumOf { it.netAmount }.toLong()} TL (${otM.size} kayit)")
+                        val side = p.sideIncomes.sumOf { it.currentMonthAmount() }
+                        if (side > 0) appendLine("Yan gelirler: ${side.toLong()} TL")
+                        if (daysLeft >= 0) appendLine("Masaya $daysLeft gun kaldi.")
                     }
                 }
 
@@ -311,6 +358,7 @@ object DeepSeekClient {
         } catch (e: Exception) { "Arac hatasi: ${e.message}" }
     }
 
+    // ── API çağrısı ──────────────────────────────────────────────────────
     private fun callApi(apiKey: String, body: JSONObject): JSONObject {
         val conn = (URL(API_URL).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -326,6 +374,7 @@ object DeepSeekClient {
         return JSONObject(raw)
     }
 
+    // ── Ana mesaj gönderici (tool call döngüsü dahil) ────────────────────
     suspend fun sendMessage(
         context: Context,
         history: List<ChatMessage>,
@@ -345,33 +394,26 @@ object DeepSeekClient {
             var body = JSONObject().apply {
                 put("model", MODEL); put("messages", messages)
                 put("max_tokens", 1024); put("temperature", 0.7)
-                put("tools", toolDefinitions())
-                put("tool_choice", "auto")
+                put("tools", toolDefinitions()); put("tool_choice", "auto")
             }
 
             var response = callApi(apiKey, body)
             var choice   = response.getJSONArray("choices").getJSONObject(0)
 
-            // Tool call loop — maks 3 tur
-            repeat(3) {
+            repeat(5) {
                 if (choice.optString("finish_reason") != "tool_calls") return@repeat
                 val assistantMsg = choice.getJSONObject("message")
                 messages.put(assistantMsg)
-
                 val toolCalls = assistantMsg.getJSONArray("tool_calls")
                 for (i in 0 until toolCalls.length()) {
-                    val tc       = toolCalls.getJSONObject(i)
-                    val toolId   = tc.getString("id")
-                    val toolName = tc.getJSONObject("function").getString("name")
-                    val toolArgs = JSONObject(tc.getJSONObject("function").getString("arguments"))
-                    val result   = executeTool(context, toolName, toolArgs)
+                    val tc = toolCalls.getJSONObject(i)
+                    val result = executeTool(context,
+                        tc.getJSONObject("function").getString("name"),
+                        JSONObject(tc.getJSONObject("function").getString("arguments")))
                     messages.put(JSONObject().apply {
-                        put("role", "tool")
-                        put("tool_call_id", toolId)
-                        put("content", result)
+                        put("role","tool"); put("tool_call_id", tc.getString("id")); put("content", result)
                     })
                 }
-
                 body = JSONObject().apply {
                     put("model", MODEL); put("messages", messages)
                     put("max_tokens", 1024); put("temperature", 0.7)
