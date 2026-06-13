@@ -69,7 +69,7 @@ TRAIL_ACTIVATE_PCT = 3.0   # bu kadar kazanç → trailing başlasın
 HARD_STOP_PCT      = 5.0   # bu kadar zarar → anında çık
 
 # Piyasa durumu eşiği — Aşırı Korku ortamında breakout stratejisi başarısız olur
-FG_MIN           = 35     # Fear & Greed bu değerin altındaysa yeni alım yok
+FG_MIN           = 15     # Fear & Greed bu değerin altındaysa yeni alım yok (Koç: breakout_fg_min)
 
 def _trail_distance(peak_pct):
     """Peak kâr yüzdesine göre trail mesafesi (peak'ten % düşüş).

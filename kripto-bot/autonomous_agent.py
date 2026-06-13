@@ -345,7 +345,7 @@ class AutonomousAgent:
     MIN_SCORE        = 5.5   # Testnet'te az coin, skor eşiği düşük (Koç: otonom_min_score)
     MIN_SCORE_SIDEWAY = 6.5  # SIDEWAYS rejimde daha katı eşik
     DAILY_LOSS_LIMIT = 8.0
-    FG_MIN           = 30    # Fear & Greed bu değerin altında yeni alım yok
+    FG_MIN           = 20    # Fear & Greed bu değerin altında yeni alım yok (Koç: otonom_fg_min, config 10)
 
     def __init__(self):
         self.running     = False
