@@ -109,9 +109,19 @@ def _sandbox_exec(code_str):
     """
     try:
         import numpy as np
+        import statistics as _stat
+
+        # Yalnızca güvenli modüllere izin veren import fonksiyonu
+        _ALLOWED_MODS = {'numpy', 'np', 'math', 'statistics', 'collections'}
+        def _safe_import(name, *args, **kwargs):
+            base = name.split('.')[0]
+            if base not in _ALLOWED_MODS:
+                raise ImportError(f"'{name}' modülüne izin yok (sandbox)")
+            return __import__(name, *args, **kwargs)
+
         namespace = {
-            '__builtins__': _SAFE_BUILTINS,
-            'np': np, 'numpy': np, 'math': math,
+            '__builtins__': {**_SAFE_BUILTINS, '__import__': _safe_import},
+            'np': np, 'numpy': np, 'math': math, 'statistics': _stat,
         }
         exec(compile(code_str, '<evolution_strategy>', 'exec'), namespace)
         fn = namespace.get('score')
@@ -124,7 +134,7 @@ def _sandbox_exec(code_str):
         return None
 
 def _validate_fn(fn):
-    """Fonksiyonu dummy verilerle test et — 0-10 arası float döndürmeli."""
+    """Fonksiyonu dummy verilerle test et — 0-10 arası sayısal değer döndürmeli."""
     try:
         import numpy as np
         n = 60
@@ -136,9 +146,15 @@ def _validate_fn(fn):
         result = fn(c, h, l, v, btc, 55,
                     {'vol_ratio': 1.8, 'rsi1h': 52.0, 'rsi15m': 48.0,
                      'adx': 26.0, 'regime': 'BULL'})
-        ok = isinstance(result, (int, float)) and 0.0 <= float(result) <= 10.0
+        # numpy float64, float32 vb. dahil tüm sayısal tipler kabul
+        try:
+            val = float(result)
+        except (TypeError, ValueError):
+            print(f'[Evrim] Sonuç float\'a çevrilemiyor: {result!r} ({type(result).__name__})')
+            return False
+        ok = 0.0 <= val <= 10.0
         if not ok:
-            print(f'[Evrim] Fonksiyon geçersiz sonuç: {result!r}')
+            print(f'[Evrim] Sonuç 0-10 aralığı dışında: {val}')
         return ok
     except Exception as e:
         print(f'[Evrim] Fonksiyon doğrulama hatası: {e}')
