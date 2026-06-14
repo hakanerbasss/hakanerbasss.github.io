@@ -549,9 +549,9 @@ class AutonomousAgent:
                         if sc.get('vol_ratio', -1) == 0:
                             print(f'[Otonom] {sym} veto: hacim=0 (veri hatası)')
                             continue
-                        # Veto 3b: Düşük hacim → sinyal güvenilmez (empirik: <1.2x avg = kayıp)
-                        if sc.get('vol_ratio', 0) < 1.2:
-                            print(f'[Otonom] {sym} veto: hacim={sc["vol_ratio"]:.1f}x avg (<1.2x, sinyal zayıf)')
+                        # Veto 3b: Düşük hacim → sinyal güvenilmez (empirik: <1.5x avg = kayıp)
+                        if sc.get('vol_ratio', 0) < 1.5:
+                            print(f'[Otonom] {sym} veto: hacim={sc["vol_ratio"]:.1f}x avg (<1.5x, sinyal zayıf)')
                             continue
                         # Veto 4: ADX < 18 → trend yok, yatay piyasa gürültüsü
                         if sc.get('adx', 0) < 18:
