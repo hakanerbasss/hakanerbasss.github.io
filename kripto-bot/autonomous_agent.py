@@ -589,6 +589,34 @@ class AutonomousAgent:
                     self.state['scan_count'] += 1
                     self._save()
 
+                    # ── Gölge (shadow) değerlendirmesi ──────────────────────
+                    # Challenger stratejisini GERÇEK ALIM YAPMADAN test et.
+                    # Aynı en iyi adayı challenger skoruyla değerlendirir;
+                    # 4 saat sonra fiyat kontrol edilip WR karşılaştırılır.
+                    try:
+                        from evolution_engine import (get_challenger_fn,
+                                                      shadow_log, shadow_evaluate)
+                        shadow_evaluate('OTONOM', lambda s: get_price(client, s))
+                        ch_fn, ch_ver = get_challenger_fn('OTONOM')
+                        if ch_fn and best_sym:
+                            _, h_s, l_s, c_s, v_s = _klines(client, best_sym, '1h', 60)
+                            _, _, _, btc_c, _       = _klines(client, 'BTCUSDT', '1h', 50)
+                            ch_val = float(ch_fn(
+                                c_s, h_s, l_s, v_s, btc_c, _fg,
+                                {'vol_ratio': best_sc.get('vol_ratio', 1.0),
+                                 'rsi1h':     best_sc.get('rsi1h', 50.0),
+                                 'rsi15m':    best_sc.get('rsi15m', 50.0),
+                                 'adx':       best_sc.get('adx', 20.0),
+                                 'regime':    regime}
+                            ))
+                            if ch_val >= min_sc:
+                                price_now = get_price(client, best_sym)
+                                shadow_log('OTONOM', best_sym, price_now, ch_val, ch_ver)
+                                print(f'[Otonom] 👻 Gölge: {best_sym} '
+                                      f'ch={ch_val:.1f} v{ch_ver}')
+                    except Exception as _e:
+                        print(f'[Otonom] Shadow hata: {_e}')
+
             except Exception as e:
                 print(f'[Scanner] {e}')
             time.sleep(self.SCAN_INTERVAL)

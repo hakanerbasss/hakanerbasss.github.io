@@ -479,6 +479,25 @@ def run_coach_review():
     print(f'[Koç] Analiz #{state["review_count"]} tamamlandı '
           f'({len(tool_results)} değişiklik)')
 
+    # ── Evrim tetikleyicisi ──────────────────────────────────────────────────
+    # Otonom'un WR < %40 ve en az 10 işlem varsa yeni strateji üret.
+    # DeepSeek key gerekli — yoksa parametre ayar da zaten çalışmıyor.
+    if api_key:
+        otonom = perf.get('OTONOM', {})
+        o_total = otonom.get('n', 0)
+        o_wr    = otonom.get('winrate', 100.0)
+        if o_total >= 10 and o_wr < 40.0:
+            try:
+                from evolution_engine import run_evolution
+                ev_result = run_evolution('OTONOM', {
+                    'wins':  round(o_total * o_wr / 100),
+                    'total': o_total,
+                    'pnl':   otonom.get('pnl', 0.0),
+                })
+                print(f'[Koç] Evrim sonucu: {ev_result}')
+            except Exception as _ev_err:
+                print(f'[Koç] Evrim hata: {_ev_err}')
+
 
 # ─── Thread Yönetimi ──────────────────────────────────────────────────────────
 

@@ -87,7 +87,8 @@ Sadece birini yapmak yeterli değil — ikisi de gerekli.
 | `wyckoff_agent.py` | ✅ | Wyckoff akümülasyon ajanı |
 | `accumulation_agent.py` | ✅ | BB squeeze birikim ajanı |
 | `manager_agent.py` | ✅ | CEO portföy yönetim ajanı |
-| `coach_agent.py` | ✅ | Koç: günlük öğrenme — performans + kaçan fırsat analizi, DeepSeek ile sınırlı parametre ayarı |
+| `coach_agent.py` | ✅ | Koç: günlük öğrenme — performans + kaçan fırsat analizi, DeepSeek ile parametre ayarı + evrim tetikleyici |
+| `evolution_engine.py` | ✅ | Strateji evrimi: düşük WR'da DeepSeek yeni score() yazar, gölge modda test eder, kazanırsa terfi eder |
 | `funding_agent.py` | ✅ | Delta-nötr funding toplama (vars. kapalı) |
 | `telegram_bot.py` | ✅ | Telegram komut işleyici |
 | `seans_strategy.py` | ✅ | Seans stratejisi (pasif) |
