@@ -24,8 +24,8 @@ STABLECOINS = {
 MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 90    # saniye
 MONITOR_SEC    = 8
-MIN_VOLUME     = 3_000_000   # $3M günlük hacim
-FG_MIN         = 30          # Fear & Greed bu değerin altında yeni alım yok
+MIN_VOLUME     = 1_000_000   # $1M günlük hacim (testnet sınırlı coin; real'de 3M)
+FG_MIN         = 20          # Fear & Greed bu değerin altında yeni alım yok
 
 # UT Bot sabit parametreler (tüm coinlere aynı uygulanır)
 UTBOT_KEY    = 2.0
@@ -43,8 +43,9 @@ def _fear_greed_ok():
         import urllib.request as _ur
         with _ur.urlopen('https://api.alternative.me/fng/?limit=1', timeout=4) as _r:
             val = int(json.loads(_r.read())['data'][0]['value'])
-        if val < FG_MIN:
-            print(f'[Indicator] Fear & Greed={val} < {FG_MIN} — aşırı korku, tarama atlandı')
+        threshold = float(load_config().get('indicator_fg_min', FG_MIN))
+        if val < threshold:
+            print(f'[Indicator] Fear & Greed={val} < {threshold:.0f} — aşırı korku, tarama atlandı')
             return False
         return True
     except Exception:
