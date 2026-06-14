@@ -24,7 +24,7 @@ STABLECOINS = {
 MAX_POSITIONS  = 6
 SCAN_INTERVAL  = 90    # saniye
 MONITOR_SEC    = 8
-MIN_VOLUME     = 1_000_000   # $1M günlük hacim (testnet sınırlı coin; real'de 3M)
+MIN_VOLUME     = 3_000_000   # $3M günlük hacim (gerçek Binance API'den çekilir)
 FG_MIN         = 20          # Fear & Greed bu değerin altında yeni alım yok
 
 # UT Bot sabit parametreler (tüm coinlere aynı uygulanır)
