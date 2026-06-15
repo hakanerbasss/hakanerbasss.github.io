@@ -411,16 +411,33 @@ async def upload_youtube(
     if not video_path.exists():
         raise HTTPException(404, "Video bulunamadı")
 
+    from google.auth.transport.requests import Request as GRequest
     creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(GRequest())
+        TOKEN_FILE.write_text(creds.to_json())
     youtube = build("youtube", "v3", credentials=creds)
 
+    # Tag listesi + Shorts her zaman ekle
     tag_list = [t.strip().lstrip("#") for t in tags.split(",") if t.strip()]
+    if "Shorts" not in tag_list:
+        tag_list.insert(0, "Shorts")
+
+    # Hashtagleri description'a ekle (YouTube'da tıklanabilir gösterir)
+    hashtag_str = " ".join(
+        f"#{t}" if not t.startswith("#") else t
+        for t in tag_list
+    )
+    full_description = f"{description}\n\n{hashtag_str}".strip() if description else hashtag_str
+
+    # Başlığa #Shorts ekle (Shorts algoritması için)
+    yt_title = title if "#Shorts" in title else f"{title} #Shorts"
 
     body = {
         "snippet": {
-            "title": title,
-            "description": description,
-            "tags": tag_list,
+            "title": yt_title[:100],
+            "description": full_description[:5000],
+            "tags": tag_list[:500],
             "categoryId": "22",
         },
         "status": {"privacyStatus": privacy},
