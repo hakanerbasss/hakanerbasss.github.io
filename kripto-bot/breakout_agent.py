@@ -484,6 +484,8 @@ class BreakoutAgent:
             elif trail_active:
                 trail_dist  = _trail_distance(peak_pct)
                 trail_price = peak * (1 - trail_dist / 100)
+                # Trail stop asla entry'nin altına inemez — kazananı kaybedene çevirme
+                trail_price = max(trail_price, entry)
                 if price <= trail_price:
                     reason = (f'TRAIL STOP -{trail_dist:.0f}% | peak=+{peak_pct:.1f}% '
                               f'pnl=+{pnl_pct:.1f}%')
