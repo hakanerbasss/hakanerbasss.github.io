@@ -395,8 +395,18 @@ Rules:
     full_script = " ".join(s["text"] for s in scenes)
     generated_title = data.get("title", topic or scenes[0]["text"][:60])
 
+    # Thumbnail (ilk sahnenin fotoğrafından)
+    thumb_path = None
+    try:
+        thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
+        create_thumbnail(png_files[0].read_bytes(), generated_title, thumb_out, size=(1080, 1920))
+        thumb_path = f"/api/thumbnail/{thumb_out.name}"
+    except Exception:
+        pass
+
     return {
         "video": f"/api/video/{output_file.name}",
+        "thumbnail": thumb_path,
         "script": full_script,
         "title": generated_title,
         "scene_count": len(scenes),
@@ -406,6 +416,75 @@ Rules:
 
 
 from trends import get_trends
+
+THUMB_DIR = Path("thumbnails")
+THUMB_DIR.mkdir(exist_ok=True)
+
+
+def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720)):
+    from PIL import Image, ImageDraw, ImageFont
+    import io
+    import textwrap
+
+    img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+    img = img.resize(size, Image.LANCZOS)
+
+    # Gradient overlay (altta koyu)
+    overlay = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw_ov = ImageDraw.Draw(overlay)
+    for y in range(size[1]):
+        alpha = int(200 * (y / size[1]) ** 1.5)
+        draw_ov.line([(0, y), (size[0], y)], fill=(0, 0, 0, alpha))
+    img = img.convert("RGBA")
+    img = Image.alpha_composite(img, overlay).convert("RGB")
+
+    draw = ImageDraw.Draw(img)
+
+    # Font bul
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((f for f in font_candidates if Path(f).exists()), None)
+
+    title_font_size = 72 if size[0] == 1280 else 60
+    small_font_size = 36
+
+    if font_path:
+        try:
+            title_font = ImageFont.truetype(font_path, title_font_size)
+            small_font = ImageFont.truetype(font_path, small_font_size)
+        except Exception:
+            title_font = ImageFont.load_default()
+            small_font = title_font
+    else:
+        title_font = ImageFont.load_default()
+        small_font = title_font
+
+    # Başlığı sar
+    max_chars = 30 if size[0] == 1280 else 22
+    lines = textwrap.wrap(title, width=max_chars)[:3]
+
+    # Başlık konumu (alttan yukarı)
+    y = size[1] - 80
+    for line in reversed(lines):
+        bbox = draw.textbbox((0, 0), line, font=title_font)
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+        x = (size[0] - w) // 2
+        y -= h + 12
+        # Gölge
+        draw.text((x + 3, y + 3), line, font=title_font, fill=(0, 0, 0, 180))
+        draw.text((x, y), line, font=title_font, fill="white")
+
+    # Üst köşe etiket
+    draw.rounded_rectangle([16, 16, 180, 56], radius=8, fill="#7c3aed")
+    draw.text((24, 22), "YENİ VİDEO", font=small_font, fill="white")
+
+    img.save(str(out_path), "JPEG", quality=95)
+    return out_path
 
 
 @app.post("/api/generate-long-video")
@@ -593,10 +672,23 @@ Rules:
 
     full_script = " ".join(s["text"] for s in scenes)
     total_dur = round(sum(durations), 1)
+    lv_title = data.get("title", topic)
+
+    # Thumbnail
+    thumb_path = None
+    try:
+        first_img = scene_dir / "scene_0.jpg"
+        if first_img.exists():
+            thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
+            create_thumbnail(first_img.read_bytes(), lv_title, thumb_out, size=(1280, 720))
+            thumb_path = f"/api/thumbnail/{thumb_out.name}"
+    except Exception:
+        pass
 
     return {
         "video": f"/api/video/{output_file.name}",
-        "title": data.get("title", topic),
+        "thumbnail": thumb_path,
+        "title": lv_title,
         "description": data.get("description", ""),
         "script": full_script,
         "duration_sec": total_dur,
@@ -730,6 +822,7 @@ async def upload_youtube(
     privacy: str = Form("public"),
     category_id: str = Form("25"),
     age_restricted: str = Form("false"),
+    thumbnail_filename: str = Form(""),
 ):
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
@@ -785,7 +878,29 @@ async def upload_youtube(
     while response is None:
         _, response = req.next_chunk()
 
-    return {"youtube_id": response["id"], "url": f"https://youtu.be/{response['id']}"}
+    video_id = response["id"]
+
+    # Thumbnail yükle
+    if thumbnail_filename:
+        thumb_path = THUMB_DIR / thumbnail_filename
+        if thumb_path.exists():
+            try:
+                youtube.thumbnails().set(
+                    videoId=video_id,
+                    media_body=MediaFileUpload(str(thumb_path), mimetype="image/jpeg"),
+                ).execute()
+            except Exception:
+                pass
+
+    return {"youtube_id": video_id, "url": f"https://youtu.be/{video_id}"}
+
+
+@app.get("/api/thumbnail/{filename}")
+async def get_thumbnail(filename: str):
+    path = THUMB_DIR / filename
+    if not path.exists():
+        raise HTTPException(404, "Thumbnail bulunamadı")
+    return FileResponse(str(path), media_type="image/jpeg")
 
 
 @app.get("/api/audio/{filename}")

@@ -464,6 +464,12 @@
     <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
     <a id="dl-shorts" class="dl-btn" download="shorts.mp4">İndir</a>
 
+    <div id="shorts-thumb-wrap" style="display:none;margin-top:16px;">
+      <p>Kapak Fotoğrafı</p>
+      <img id="shorts-thumb" style="max-width:180px;border-radius:8px;margin-top:8px;display:block;border:1px solid #333;">
+      <a id="dl-shorts-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
+    </div>
+
     <div id="yt-upload-form" style="margin-top:24px;border-top:1px solid #222;padding-top:20px;">
       <p style="margin-bottom:16px;color:#fff;font-size:14px;">YouTube'a Yükle</p>
 
@@ -584,6 +590,63 @@
     <video id="lv-video" controls style="width:100%;margin-top:8px;border-radius:6px;"></video>
     <a id="dl-lv" class="dl-btn" download="video.mp4">İndir</a>
     <p style="margin-top:12px;font-size:12px;color:#666;" id="lv-duration-out"></p>
+
+    <div id="lv-thumb-wrap" style="display:none;margin-top:16px;">
+      <p>Kapak Fotoğrafı</p>
+      <img id="lv-thumb" style="max-width:320px;border-radius:8px;margin-top:8px;display:block;border:1px solid #333;">
+      <a id="dl-lv-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
+    </div>
+
+    <div id="lv-yt-upload-section" style="display:none;margin-top:24px;border-top:1px solid #222;padding-top:20px;">
+      <p style="margin-bottom:16px;color:#fff;font-size:14px;">YouTube'a Yükle</p>
+      <div id="lv-yt-not-linked" style="display:none;">
+        <p style="font-size:13px;color:#888;margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
+        <button onclick="window.location='/auth/youtube'" style="background:#c00;">Google ile Bağlan</button>
+      </div>
+      <div id="lv-yt-linked" style="display:none;">
+        <div class="field">
+          <label>Başlık</label>
+          <input type="text" id="lv-yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Açıklama</label>
+          <textarea id="lv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Hashtagler (virgülle ayır)</label>
+          <input type="text" id="lv-yt-tags" placeholder="#belgesel, #eğitim, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="field">
+            <label>Gizlilik</label>
+            <select id="lv-yt-privacy">
+              <option value="public">Herkese Açık</option>
+              <option value="unlisted">Listelenmemiş</option>
+              <option value="private">Gizli</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="lv-yt-category">
+              <option value="27">Eğitim</option>
+              <option value="28">Bilim & Teknoloji</option>
+              <option value="25">Haberler & Politika</option>
+              <option value="22">İnsanlar & Bloglar</option>
+              <option value="19">Seyahat & Etkinlikler</option>
+              <option value="17">Spor</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="uploadLVToYouTube()" id="btn-lv-yt-upload" style="margin-top:16px;background:#c00;">
+          <div class="spinner" id="spin-lv-yt"></div>
+          YouTube'a Yükle
+        </button>
+        <div class="error" id="err-lv-yt"></div>
+        <div id="lv-yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
+          Yüklendi! → <a id="lv-yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -717,7 +780,24 @@ async function generateLongVideo() {
     const mins = Math.floor(d.duration_sec / 60);
     const secs = Math.round(d.duration_sec % 60);
     document.getElementById('lv-duration-out').textContent = `Süre: ${mins}:${secs.toString().padStart(2,'0')} · ${d.scene_count} sahne`;
+
+    currentLVFilename = d.video.split('/').pop();
+    currentLVThumbnailFilename = null;
+    if (d.thumbnail) {
+      currentLVThumbnailFilename = d.thumbnail.split('/').pop();
+      document.getElementById('lv-thumb').src = d.thumbnail;
+      document.getElementById('dl-lv-thumb').href = d.thumbnail;
+      document.getElementById('lv-thumb-wrap').style.display = 'block';
+    } else {
+      document.getElementById('lv-thumb-wrap').style.display = 'none';
+    }
+
+    document.getElementById('lv-yt-title').value = d.title || '';
+    document.getElementById('lv-yt-desc').value = d.description || '';
+    document.getElementById('lv-yt-upload-section').style.display = 'block';
+
     document.getElementById('result-lv').classList.add('show');
+    checkYTStatus();
   } catch(e) {
     showError('err-lv', e.message);
   } finally {
@@ -857,6 +937,9 @@ async function translateAndSynth() {
 }
 
 let currentVideoFilename = null;
+let currentThumbnailFilename = null;
+let currentLVFilename = null;
+let currentLVThumbnailFilename = null;
 
 async function checkYTStatus() {
   try {
@@ -870,12 +953,22 @@ async function checkYTStatus() {
   try {
     const r = await fetch('/api/yt/config');
     const d = await r.json();
-    if (d.authorized) {
+    const authorized = d.authorized;
+    // Shorts upload bölümü
+    if (authorized) {
       document.getElementById('yt-linked').style.display = 'block';
       document.getElementById('yt-not-linked').style.display = 'none';
     } else {
       document.getElementById('yt-linked').style.display = 'none';
       document.getElementById('yt-not-linked').style.display = 'block';
+    }
+    // Uzun video upload bölümü
+    if (authorized) {
+      document.getElementById('lv-yt-linked').style.display = 'block';
+      document.getElementById('lv-yt-not-linked').style.display = 'none';
+    } else {
+      document.getElementById('lv-yt-linked').style.display = 'none';
+      document.getElementById('lv-yt-not-linked').style.display = 'block';
     }
     // Modal durumu
     if (d.configured) {
@@ -956,6 +1049,7 @@ async function uploadToYouTube() {
     fd.append('privacy', document.getElementById('yt-privacy').value);
     fd.append('category_id', document.getElementById('yt-category').value);
     fd.append('age_restricted', document.getElementById('yt-age').checked ? 'true' : 'false');
+    if (currentThumbnailFilename) fd.append('thumbnail_filename', currentThumbnailFilename);
 
     const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
     if (!r.ok) {
@@ -1056,12 +1150,58 @@ async function generateShorts(allowEmpty = false) {
     if (d.title) document.getElementById('yt-title').value = d.title;
     if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
     if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
+
+    currentThumbnailFilename = null;
+    if (d.thumbnail) {
+      currentThumbnailFilename = d.thumbnail.split('/').pop();
+      document.getElementById('shorts-thumb').src = d.thumbnail;
+      document.getElementById('dl-shorts-thumb').href = d.thumbnail;
+      document.getElementById('shorts-thumb-wrap').style.display = 'block';
+    } else {
+      document.getElementById('shorts-thumb-wrap').style.display = 'none';
+    }
+
     document.getElementById('result-shorts').classList.add('show');
     checkYTStatus();
   } catch(e) {
     showError('err-shorts', e.message);
   } finally {
     setLoading('btn-shorts', 'spin-shorts', false);
+  }
+}
+
+async function uploadLVToYouTube() {
+  if (!currentLVFilename) return;
+  showError('err-lv-yt', '');
+  setLoading('btn-lv-yt-upload', 'spin-lv-yt', true);
+  document.getElementById('lv-yt-success').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentLVFilename);
+    fd.append('title', document.getElementById('lv-yt-title').value || 'Video');
+    fd.append('description', document.getElementById('lv-yt-desc').value);
+    fd.append('tags', document.getElementById('lv-yt-tags').value);
+    fd.append('privacy', document.getElementById('lv-yt-privacy').value);
+    fd.append('category_id', document.getElementById('lv-yt-category').value);
+    fd.append('age_restricted', 'false');
+    if (currentLVThumbnailFilename) fd.append('thumbnail_filename', currentLVThumbnailFilename);
+
+    const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+    const link = document.getElementById('lv-yt-link');
+    link.href = d.url;
+    link.textContent = d.url;
+    document.getElementById('lv-yt-success').style.display = 'block';
+  } catch(e) {
+    showError('err-lv-yt', e.message);
+  } finally {
+    setLoading('btn-lv-yt-upload', 'spin-lv-yt', false);
   }
 }
 
