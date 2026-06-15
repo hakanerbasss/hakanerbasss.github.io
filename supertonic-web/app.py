@@ -565,8 +565,7 @@ async def upload_youtube(
     )
     full_description = f"{description}\n\n{hashtag_str}".strip() if description else hashtag_str
 
-    # Başlığa #Shorts ekle (Shorts algoritması için)
-    yt_title = title if "#Shorts" in title else f"{title} #Shorts"
+    yt_title = title
 
     body = {
         "snippet": {
