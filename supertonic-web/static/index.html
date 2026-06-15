@@ -357,8 +357,12 @@
 
   <div class="field">
     <label>DeepSeek API Key</label>
-    <input type="password" id="shorts-apikey" placeholder="sk-..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
-    <div style="font-size:12px;color:#444;margin-top:6px;">Tarayıcıda saklanır, sunucuya gönderilmez sadece istek sırasında kullanılır.</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="password" id="shorts-apikey" placeholder="sk-..." style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+      <button onclick="saveApiKey()" style="padding:12px 16px;font-size:13px;white-space:nowrap;">Kaydet</button>
+      <button onclick="clearApiKey()" style="padding:12px 16px;font-size:13px;background:#2a1a1a;white-space:nowrap;">Temizle</button>
+    </div>
+    <div id="apikey-status" style="font-size:12px;color:#444;margin-top:6px;">Tarayıcıda saklanır, sunucuya gönderilmez.</div>
   </div>
 
   <div class="field">
@@ -445,24 +449,30 @@
   <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;">
     <h3 style="color:#fff;margin-bottom:4px;font-size:16px;">YouTube OAuth Ayarları</h3>
     <p style="color:#666;font-size:12px;margin-bottom:20px;">Google Cloud Console → API & Services → Credentials → OAuth 2.0 Client</p>
-    <div class="field">
-      <label>Client ID</label>
-      <input type="text" id="cfg-client-id" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    <div id="yt-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:16px;">
+      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Kayıtlı — bağlantı aktif</div>
+      <button onclick="resetYTConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir / Sıfırla</button>
     </div>
-    <div class="field" style="margin-top:12px;">
-      <label>Client Secret</label>
-      <input type="password" id="cfg-client-secret" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-    </div>
-    <div style="display:flex;gap:12px;margin-top:20px;">
-      <button onclick="saveYTConfig()">Kaydet</button>
-      <button onclick="document.getElementById('yt-modal').style.display='none'" style="background:#333;">İptal</button>
+    <div id="yt-input-state">
+      <div class="field">
+        <label>Client ID</label>
+        <input type="text" id="cfg-client-id" placeholder="337037...apps.googleusercontent.com" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Client Secret</label>
+        <input type="password" id="cfg-client-secret" placeholder="GOCSPX-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+      </div>
+      <div style="display:flex;gap:12px;margin-top:20px;">
+        <button onclick="saveYTConfig()">Kaydet ve Bağlan</button>
+        <button onclick="document.getElementById('yt-modal').style.display='none'" style="background:#333;">İptal</button>
+      </div>
     </div>
     <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
 
 <div style="position:fixed;top:16px;right:16px;">
-  <button onclick="document.getElementById('yt-modal').style.display='flex'" style="background:#222;font-size:12px;padding:8px 14px;">⚙ YouTube Ayarları</button>
+  <button onclick="document.getElementById('yt-modal').style.display='flex';checkYTStatus()" style="background:#222;font-size:12px;padding:8px 14px;">⚙ YouTube Ayarları</button>
 </div>
 
 <script>
@@ -662,7 +672,19 @@ async function checkYTStatus() {
       document.getElementById('yt-linked').style.display = 'none';
       document.getElementById('yt-not-linked').style.display = 'block';
     }
+    // Modal durumu
+    if (d.configured) {
+      document.getElementById('yt-saved-state').style.display = 'block';
+      document.getElementById('yt-input-state').style.display = 'none';
+    }
   } catch(e) {}
+}
+
+function resetYTConfig() {
+  document.getElementById('yt-saved-state').style.display = 'none';
+  document.getElementById('yt-input-state').style.display = 'block';
+  document.getElementById('cfg-client-id').value = '';
+  document.getElementById('cfg-client-secret').value = '';
 }
 
 async function saveYTConfig() {
@@ -752,10 +774,25 @@ async function generateShorts() {
   }
 }
 
-// DeepSeek key localStorage
+// DeepSeek key
 const dsKey = document.getElementById('shorts-apikey');
 dsKey.value = localStorage.getItem('ds_api_key') || '';
-dsKey.addEventListener('input', () => localStorage.setItem('ds_api_key', dsKey.value));
+function saveApiKey() {
+  const v = dsKey.value.trim();
+  if (!v) return;
+  localStorage.setItem('ds_api_key', v);
+  const s = document.getElementById('apikey-status');
+  s.textContent = '✓ Kaydedildi';
+  s.style.color = '#4ade80';
+  setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
+}
+function clearApiKey() {
+  localStorage.removeItem('ds_api_key');
+  dsKey.value = '';
+  const s = document.getElementById('apikey-status');
+  s.textContent = 'Temizlendi.'; s.style.color = '#f87171';
+  setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
+}
 
 loadMeta();
 if (new URLSearchParams(window.location.search).get('yt') === 'ok') {
