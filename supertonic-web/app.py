@@ -2,10 +2,11 @@ import os
 import uuid
 import asyncio
 import subprocess
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import traceback
 import aiofiles
@@ -316,6 +317,110 @@ Rules:
         "script": full_script,
         "scene_count": len(scenes),
     }
+
+
+CONFIG_FILE = Path("yt_config.json")
+TOKEN_FILE = Path("yt_token.json")
+SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+
+
+def load_yt_config():
+    if CONFIG_FILE.exists():
+        return json.loads(CONFIG_FILE.read_text())
+    return {}
+
+
+@app.post("/api/yt/config")
+async def save_yt_config(client_id: str = Form(...), client_secret: str = Form(...)):
+    CONFIG_FILE.write_text(json.dumps({"client_id": client_id, "client_secret": client_secret}))
+    return {"ok": True}
+
+
+@app.get("/api/yt/config")
+async def get_yt_config():
+    cfg = load_yt_config()
+    return {"configured": bool(cfg), "authorized": TOKEN_FILE.exists()}
+
+
+@app.get("/auth/youtube")
+async def youtube_auth(request: Request):
+    from google_auth_oauthlib.flow import Flow
+    cfg = load_yt_config()
+    if not cfg:
+        raise HTTPException(400, "Önce client_id ve client_secret girin")
+    redirect_uri = str(request.base_url) + "auth/youtube/callback"
+    flow = Flow.from_client_config(
+        {"web": {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
+                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                 "token_uri": "https://oauth2.googleapis.com/token",
+                 "redirect_uris": [redirect_uri]}},
+        scopes=SCOPES,
+        redirect_uri=redirect_uri,
+    )
+    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+    return RedirectResponse(auth_url)
+
+
+@app.get("/auth/youtube/callback")
+async def youtube_callback(request: Request, code: str):
+    from google_auth_oauthlib.flow import Flow
+    cfg = load_yt_config()
+    redirect_uri = str(request.base_url) + "auth/youtube/callback"
+    flow = Flow.from_client_config(
+        {"web": {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
+                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                 "token_uri": "https://oauth2.googleapis.com/token",
+                 "redirect_uris": [redirect_uri]}},
+        scopes=SCOPES,
+        redirect_uri=redirect_uri,
+    )
+    flow.fetch_token(code=code)
+    TOKEN_FILE.write_text(flow.credentials.to_json())
+    return RedirectResponse("/?yt=ok")
+
+
+@app.post("/api/yt/upload")
+async def upload_youtube(
+    filename: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(""),
+    tags: str = Form(""),
+    privacy: str = Form("private"),
+):
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+
+    if not TOKEN_FILE.exists():
+        raise HTTPException(401, "YouTube hesabı bağlı değil")
+
+    video_path = OUTPUT_DIR / filename
+    if not video_path.exists():
+        raise HTTPException(404, "Video bulunamadı")
+
+    creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    youtube = build("youtube", "v3", credentials=creds)
+
+    tag_list = [t.strip().lstrip("#") for t in tags.split(",") if t.strip()]
+
+    body = {
+        "snippet": {
+            "title": title,
+            "description": description,
+            "tags": tag_list,
+            "categoryId": "22",
+        },
+        "status": {"privacyStatus": privacy},
+    }
+
+    media = MediaFileUpload(str(video_path), mimetype="video/mp4", resumable=True)
+    req = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+
+    response = None
+    while response is None:
+        _, response = req.next_chunk()
+
+    return {"youtube_id": response["id"], "url": f"https://youtu.be/{response['id']}"}
 
 
 @app.get("/api/audio/{filename}")

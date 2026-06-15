@@ -397,7 +397,72 @@
     <p style="margin-top:16px">Video</p>
     <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
     <a id="dl-shorts" class="dl-btn" download="shorts.mp4">İndir</a>
+
+    <div id="yt-upload-form" style="margin-top:24px;border-top:1px solid #222;padding-top:20px;">
+      <p style="margin-bottom:16px;color:#fff;font-size:14px;">YouTube'a Yükle</p>
+
+      <div id="yt-not-linked" style="display:none;">
+        <p style="font-size:13px;color:#888;margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
+        <button onclick="window.location='/auth/youtube'" style="background:#c00;">Google ile Bağlan</button>
+      </div>
+
+      <div id="yt-linked" style="display:none;">
+        <div class="field">
+          <label>Başlık</label>
+          <input type="text" id="yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Açıklama</label>
+          <textarea id="yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Hashtagler (virgülle ayır)</label>
+          <input type="text" id="yt-tags" placeholder="#shorts, #yapay zeka, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Gizlilik</label>
+          <select id="yt-privacy">
+            <option value="private">Gizli (Private)</option>
+            <option value="unlisted">Listelenmemiş (Unlisted)</option>
+            <option value="public">Herkese Açık (Public)</option>
+          </select>
+        </div>
+        <button onclick="uploadToYouTube()" id="btn-yt-upload" style="margin-top:16px;background:#c00;">
+          <div class="spinner" id="spin-yt"></div>
+          YouTube'a Yükle
+        </button>
+        <div class="error" id="err-yt"></div>
+        <div id="yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
+          Yüklendi! → <a id="yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
+        </div>
+      </div>
+    </div>
   </div>
+</div>
+
+<!-- YouTube Ayarları Modal -->
+<div id="yt-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:16px;">YouTube OAuth Ayarları</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:20px;">Google Cloud Console → API & Services → Credentials → OAuth 2.0 Client</p>
+    <div class="field">
+      <label>Client ID</label>
+      <input type="text" id="cfg-client-id" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Client Secret</label>
+      <input type="password" id="cfg-client-secret" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+    <div style="display:flex;gap:12px;margin-top:20px;">
+      <button onclick="saveYTConfig()">Kaydet</button>
+      <button onclick="document.getElementById('yt-modal').style.display='none'" style="background:#333;">İptal</button>
+    </div>
+    <div class="error" id="err-cfg" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<div style="position:fixed;top:16px;right:16px;">
+  <button onclick="document.getElementById('yt-modal').style.display='flex'" style="background:#222;font-size:12px;padding:8px 14px;">⚙ YouTube Ayarları</button>
 </div>
 
 <script>
@@ -584,6 +649,70 @@ async function translateAndSynth() {
   }
 }
 
+let currentVideoFilename = null;
+
+async function checkYTStatus() {
+  try {
+    const r = await fetch('/api/yt/config');
+    const d = await r.json();
+    if (d.authorized) {
+      document.getElementById('yt-linked').style.display = 'block';
+      document.getElementById('yt-not-linked').style.display = 'none';
+    } else {
+      document.getElementById('yt-linked').style.display = 'none';
+      document.getElementById('yt-not-linked').style.display = 'block';
+    }
+  } catch(e) {}
+}
+
+async function saveYTConfig() {
+  const client_id = document.getElementById('cfg-client-id').value.trim();
+  const client_secret = document.getElementById('cfg-client-secret').value.trim();
+  if (!client_id || !client_secret) return showError('err-cfg', 'Her iki alanı doldurun.');
+  const fd = new FormData();
+  fd.append('client_id', client_id);
+  fd.append('client_secret', client_secret);
+  const r = await fetch('/api/yt/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('yt-modal').style.display = 'none';
+    window.location = '/auth/youtube';
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+async function uploadToYouTube() {
+  if (!currentVideoFilename) return;
+  showError('err-yt', '');
+  setLoading('btn-yt-upload', 'spin-yt', true);
+  document.getElementById('yt-success').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentVideoFilename);
+    fd.append('title', document.getElementById('yt-title').value || 'Shorts');
+    fd.append('description', document.getElementById('yt-desc').value);
+    fd.append('tags', document.getElementById('yt-tags').value);
+    fd.append('privacy', document.getElementById('yt-privacy').value);
+
+    const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+    const link = document.getElementById('yt-link');
+    link.href = d.url;
+    link.textContent = d.url;
+    document.getElementById('yt-success').style.display = 'block';
+  } catch(e) {
+    showError('err-yt', e.message);
+  } finally {
+    setLoading('btn-yt-upload', 'spin-yt', false);
+  }
+}
+
 async function generateShorts() {
   const apiKey = document.getElementById('shorts-apikey').value.trim();
   const topic = document.getElementById('shorts-topic').value.trim();
@@ -612,7 +741,10 @@ async function generateShorts() {
     document.getElementById('shorts-script').textContent = d.script;
     document.getElementById('shorts-video').src = d.video;
     document.getElementById('dl-shorts').href = d.video;
+    currentVideoFilename = d.video.split('/').pop();
+    document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
     document.getElementById('result-shorts').classList.add('show');
+    checkYTStatus();
   } catch(e) {
     showError('err-shorts', e.message);
   } finally {
@@ -621,6 +753,10 @@ async function generateShorts() {
 }
 
 loadMeta();
+if (new URLSearchParams(window.location.search).get('yt') === 'ok') {
+  switchTab('shorts');
+  checkYTStatus();
+}
 </script>
 </body>
 </html>
