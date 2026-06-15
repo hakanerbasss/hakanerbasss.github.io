@@ -103,7 +103,8 @@ async def synthesize(
     out_file = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
     tts.save_audio(wav, str(out_file))
 
-    return {"file": f"/api/audio/{out_file.name}", "duration": round(duration[0], 2)}
+    dur = float(duration[0]) if hasattr(duration, '__getitem__') else float(duration)
+    return {"file": f"/api/audio/{out_file.name}", "duration": round(dur, 2)}
 
 
 @app.post("/api/translate")
