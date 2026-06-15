@@ -413,6 +413,18 @@
     <textarea id="shorts-topic" placeholder="Örn: Yapay zekanın geleceği, Mars'a yolculuk, Kuantum fiziği nedir..." style="min-height:90px;"></textarea>
   </div>
 
+  <div style="margin-bottom:20px;">
+    <button onclick="fetchTrends()" id="btn-trends" style="background:#1a3a1a;font-size:13px;padding:10px 18px;">
+      <div class="spinner" id="spin-trends"></div>
+      Günün Trendlerini Getir
+    </button>
+    <div id="trends-box" style="display:none;margin-top:12px;background:#111;border:1px solid #222;border-radius:8px;padding:14px;">
+      <div style="font-size:12px;color:#666;margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
+      <div id="trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <div style="font-size:11px;color:#444;margin-top:10px;" id="trends-time"></div>
+    </div>
+  </div>
+
   <div class="controls">
     <div class="field">
       <label>Dil</label>
@@ -828,6 +840,37 @@ async function uploadToYouTube() {
     showError('err-yt', e.message);
   } finally {
     setLoading('btn-yt-upload', 'spin-yt', false);
+  }
+}
+
+async function fetchTrends() {
+  setLoading('btn-trends', 'spin-trends', true);
+  try {
+    const lang = document.getElementById('shorts-lang').value || 'tr';
+    const r = await fetch(`/api/trends/refresh`, { method: 'POST' });
+    if (!r.ok) throw new Error('Trend verisi alınamadı');
+    const d = await r.json();
+
+    const list = document.getElementById('trends-list');
+    list.innerHTML = '';
+    (d.topics || []).forEach(topic => {
+      const btn = document.createElement('button');
+      btn.textContent = topic;
+      btn.style.cssText = 'background:#1a2a1a;border:1px solid #2a4a2a;border-radius:20px;padding:6px 14px;font-size:13px;color:#86efac;cursor:pointer;';
+      btn.onclick = () => {
+        document.getElementById('shorts-topic').value = topic;
+        btn.style.background = '#2a4a2a';
+      };
+      list.appendChild(btn);
+    });
+
+    const ts = new Date(d.ts * 1000).toLocaleTimeString('tr-TR');
+    document.getElementById('trends-time').textContent = `Son güncelleme: ${ts}`;
+    document.getElementById('trends-box').style.display = 'block';
+  } catch(e) {
+    alert(e.message);
+  } finally {
+    setLoading('btn-trends', 'spin-trends', false);
   }
 }
 
