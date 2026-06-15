@@ -4,9 +4,10 @@ import asyncio
 import subprocess
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+import traceback
 import aiofiles
 
 from supertonic import TTS
@@ -14,6 +15,13 @@ from deep_translator import GoogleTranslator
 import whisper
 
 app = FastAPI()
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "trace": traceback.format_exc()},
+    )
 
 OUTPUT_DIR = Path("outputs")
 UPLOAD_DIR = Path("uploads")

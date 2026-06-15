@@ -412,7 +412,11 @@ async function synthesize() {
     fd.append('speed', document.getElementById('tts-speed').value);
 
     const r = await fetch('/api/synthesize', { method: 'POST', body: fd });
-    if (!r.ok) throw new Error((await r.json()).detail);
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
     const d = await r.json();
 
     document.getElementById('audio-synth').src = d.file;
