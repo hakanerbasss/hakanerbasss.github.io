@@ -247,6 +247,7 @@
   <div class="tab" onclick="switchTab('video')">Video Seslendirme</div>
   <div class="tab" onclick="switchTab('translate')">Çeviri + Seslendir</div>
   <div class="tab" onclick="switchTab('shorts')">Shorts Üret</div>
+  <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
 </div>
 
 <!-- TEXT TO SPEECH -->
@@ -527,6 +528,65 @@
   </div>
 </div>
 
+<!-- UZUN VİDEO -->
+<div class="panel" id="tab-longvideo">
+
+  <div class="field">
+    <label>Konu</label>
+    <textarea id="lv-topic" placeholder="Örn: Pamukkale travertenleri nasıl oluşur, Kuantum bilgisayarlar nedir, Osmanlı İmparatorluğu'nun çöküşü..." style="min-height:90px;"></textarea>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="lv-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="lv-voice"></select>
+    </div>
+    <div class="field">
+      <label>Süre (dakika)</label>
+      <select id="lv-duration">
+        <option value="3">~3 dakika</option>
+        <option value="5" selected>~5 dakika</option>
+        <option value="8">~8 dakika</option>
+        <option value="10">~10 dakika</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Hız: <span id="speed-val-5">1.0</span>x</label>
+    <div class="speed-row">
+      <input type="range" id="lv-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+        oninput="document.getElementById('speed-val-5').textContent = parseFloat(this.value).toFixed(2)">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>DeepSeek API Key</label>
+    <input type="password" id="lv-apikey" placeholder="sk-..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+    <div style="font-size:12px;color:#444;margin-top:4px;">Shorts sekmesinde kaydettiysen buraya da gir.</div>
+  </div>
+
+  <button onclick="generateLongVideo()" id="btn-lv">
+    <div class="spinner" id="spin-lv"></div>
+    Video Üret
+  </button>
+
+  <div class="error" id="err-lv"></div>
+
+  <div class="result" id="result-lv">
+    <p>Başlık</p>
+    <div class="transcript" id="lv-title-out" style="font-size:16px;font-weight:600;color:#fff;"></div>
+    <p style="margin-top:12px">Video</p>
+    <video id="lv-video" controls style="width:100%;margin-top:8px;border-radius:6px;"></video>
+    <a id="dl-lv" class="dl-btn" download="video.mp4">İndir</a>
+    <p style="margin-top:12px;font-size:12px;color:#666;" id="lv-duration-out"></p>
+  </div>
+</div>
+
 <!-- YouTube Ayarları Modal -->
 <div id="yt-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;">
   <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;position:relative;">
@@ -579,8 +639,8 @@ async function loadMeta() {
   voices = d.voices;
   langs = d.languages;
 
-  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice'];
-  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang'];
+  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice', 'lv-voice'];
+  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang', 'lv-lang'];
   const translateSelect = document.getElementById('vid-translate');
   const sourceSelect = document.getElementById('tr-source');
 
@@ -615,12 +675,54 @@ async function loadMeta() {
 }
 
 function switchTab(name) {
-  const names = ['text','video','translate','shorts'];
+  const names = ['text','video','translate','shorts','longvideo'];
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
+}
+
+async function generateLongVideo() {
+  const apiKey = document.getElementById('lv-apikey').value.trim()
+    || document.getElementById('shorts-apikey').value.trim();
+  const topic = document.getElementById('lv-topic').value.trim();
+  if (!apiKey) return showError('err-lv', 'DeepSeek API key girin.');
+  if (!topic) return showError('err-lv', 'Konu boş olamaz.');
+  showError('err-lv', '');
+  setLoading('btn-lv', 'spin-lv', true);
+  document.getElementById('result-lv').classList.remove('show');
+
+  try {
+    const fd = new FormData();
+    fd.append('topic', topic);
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('lv-lang').value);
+    fd.append('voice', document.getElementById('lv-voice').value);
+    fd.append('speed', document.getElementById('lv-speed').value);
+    fd.append('duration_min', document.getElementById('lv-duration').value);
+
+    const r = await fetch('/api/generate-long-video', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+
+    document.getElementById('lv-title-out').textContent = d.title;
+    document.getElementById('lv-video').src = d.video;
+    document.getElementById('dl-lv').href = d.video;
+    document.getElementById('dl-lv').download = `${d.title || 'video'}.mp4`;
+    const mins = Math.floor(d.duration_sec / 60);
+    const secs = Math.round(d.duration_sec % 60);
+    document.getElementById('lv-duration-out').textContent = `Süre: ${mins}:${secs.toString().padStart(2,'0')} · ${d.scene_count} sahne`;
+    document.getElementById('result-lv').classList.add('show');
+  } catch(e) {
+    showError('err-lv', e.message);
+  } finally {
+    setLoading('btn-lv', 'spin-lv', false);
+  }
 }
 
 function setLoading(btnId, spinId, loading) {

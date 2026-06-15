@@ -407,6 +407,202 @@ Rules:
 
 from trends import get_trends
 
+
+@app.post("/api/generate-long-video")
+async def generate_long_video(
+    topic: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    duration_min: int = Form(3),
+):
+    import json
+    import httpx
+    from openai import OpenAI
+
+    if not topic.strip():
+        raise HTTPException(400, "Konu boş olamaz")
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+
+    pexels_key = get_pexels_key()
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    lang_name = LANG_MAP.get(lang, "Turkish")
+
+    scene_count = max(8, duration_min * 4)
+
+    prompt = f"""Create a detailed educational/documentary YouTube video about: {topic}
+Narration language: {lang_name}
+Target duration: {duration_min} minutes ({scene_count} scenes)
+
+Return ONLY valid JSON, no markdown:
+{{
+  "title": "engaging YouTube title (max 80 chars, in {lang_name})",
+  "description": "detailed video description (3-4 sentences, in {lang_name})",
+  "scenes": [
+    {{
+      "text": "detailed narration for this scene (3-5 sentences, informative)",
+      "keyword": "english search keyword for stock photo (2-3 words)"
+    }}
+  ]
+}}
+
+Rules:
+- Exactly {scene_count} scenes
+- Each scene: 3-5 informative sentences, flows naturally
+- Cover the topic thoroughly: introduction, details, interesting facts, conclusion
+- keyword: English, specific and visual"""
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=4000,
+    )
+
+    content = response.choices[0].message.content.strip()
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0]
+    elif "```" in content:
+        content = content.split("```")[1].split("```")[0]
+
+    data = json.loads(content.strip())
+    scenes = data["scenes"]
+
+    uid = uuid.uuid4().hex
+    scene_dir = UPLOAD_DIR / uid
+    scene_dir.mkdir()
+
+    tts = get_tts()
+    style = tts.get_voice_style(voice_name=voice)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((f for f in font_candidates if Path(f).exists()), None)
+
+    audio_files = []
+    clip_files = []
+    durations = []
+
+    for i, scene in enumerate(scenes):
+        # TTS
+        wav, dur = tts.synthesize(
+            text=scene["text"], lang=lang, voice_style=style,
+            total_steps=8, speed=speed,
+        )
+        dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
+        audio_path = scene_dir / f"audio_{i}.wav"
+        tts.save_audio(wav, str(audio_path))
+        audio_files.append(audio_path)
+        durations.append(dur_val)
+
+        # Pexels fotoğraf (yatay)
+        img_path = scene_dir / f"scene_{i}.jpg"
+        photo_saved = False
+        if pexels_key:
+            try:
+                resp = httpx.get(
+                    "https://api.pexels.com/v1/search",
+                    params={"query": scene.get("keyword", topic), "orientation": "landscape", "per_page": 1},
+                    headers={"Authorization": pexels_key},
+                    timeout=10,
+                )
+                photos = resp.json().get("photos", [])
+                if photos:
+                    img_url = photos[0]["src"].get("large2x") or photos[0]["src"]["large"]
+                    img_path.write_bytes(httpx.get(img_url, timeout=15).content)
+                    photo_saved = True
+            except Exception:
+                pass
+
+        if not photo_saved:
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "lavfi",
+                "-i", "color=black:size=1920x1080:rate=1",
+                "-frames:v", "1", str(img_path)
+            ], capture_output=True)
+
+        # Clip oluştur (yatay 1920x1080)
+        clip_path = scene_dir / f"clip_{i}.mp4"
+        words = scene["text"].split()
+        lines, line = [], []
+        for w in words:
+            if len(" ".join(line + [w])) > 70:
+                lines.append(" ".join(line))
+                line = [w]
+            else:
+                line.append(w)
+        if line:
+            lines.append(" ".join(line))
+        text_file = scene_dir / f"text_{i}.txt"
+        text_file.write_text("\n".join(lines), encoding="utf-8")
+
+        drawtext = (
+            f"scale=1920:1080:force_original_aspect_ratio=increase,"
+            f"crop=1920:1080,"
+            f"drawtext=textfile={text_file.absolute()}"
+            f":fontsize=36:fontcolor=white:bordercolor=black:borderw=2"
+            f":x=(w-text_w)/2:y=h-th-80:line_spacing=10"
+            f":box=1:boxcolor=black@0.6:boxborderw=16"
+        )
+        if font_path:
+            drawtext += f":fontfile={font_path}"
+
+        subprocess.run([
+            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+            "-t", str(dur_val),
+            "-vf", drawtext,
+            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+        ], check=True, capture_output=True)
+        clip_files.append(clip_path)
+
+    # Sesleri birleştir
+    audio_list = scene_dir / "audio_list.txt"
+    combined_audio = scene_dir / "combined.wav"
+    with open(audio_list, "w") as f:
+        for af in audio_files:
+            f.write(f"file '{af.absolute()}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list), "-c", "copy", str(combined_audio)],
+        check=True, capture_output=True
+    )
+
+    # Klipleri birleştir
+    clip_list = scene_dir / "clip_list.txt"
+    merged = scene_dir / "merged.mp4"
+    with open(clip_list, "w") as f:
+        for cp in clip_files:
+            f.write(f"file '{cp.absolute()}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list), "-c", "copy", str(merged)],
+        check=True, capture_output=True
+    )
+
+    # Ses ekle
+    output_file = OUTPUT_DIR / f"{uid}_long.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
+    ], check=True, capture_output=True)
+
+    full_script = " ".join(s["text"] for s in scenes)
+    total_dur = round(sum(durations), 1)
+
+    return {
+        "video": f"/api/video/{output_file.name}",
+        "title": data.get("title", topic),
+        "description": data.get("description", ""),
+        "script": full_script,
+        "duration_sec": total_dur,
+        "scene_count": len(scenes),
+    }
+
 CONFIG_FILE = Path("yt_config.json")
 TOKEN_FILE = Path("yt_token.json")
 PEXELS_CONFIG = Path("pexels_config.json")
