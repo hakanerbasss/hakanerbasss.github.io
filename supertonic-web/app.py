@@ -342,14 +342,12 @@ async def get_yt_config():
     return {"configured": bool(cfg), "authorized": TOKEN_FILE.exists()}
 
 
-@app.get("/auth/youtube")
-async def youtube_auth(request: Request):
+VERIFIER_FILE = Path("yt_verifier.txt")
+
+
+def _build_flow(cfg, redirect_uri):
     from google_auth_oauthlib.flow import Flow
-    cfg = load_yt_config()
-    if not cfg:
-        raise HTTPException(400, "Önce client_id ve client_secret girin")
-    redirect_uri = str(request.base_url) + "auth/youtube/callback"
-    flow = Flow.from_client_config(
+    return Flow.from_client_config(
         {"web": {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
                  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                  "token_uri": "https://oauth2.googleapis.com/token",
@@ -357,24 +355,39 @@ async def youtube_auth(request: Request):
         scopes=SCOPES,
         redirect_uri=redirect_uri,
     )
-    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+
+
+@app.get("/auth/youtube")
+async def youtube_auth(request: Request):
+    import secrets, hashlib, base64
+    cfg = load_yt_config()
+    if not cfg:
+        raise HTTPException(400, "Önce client_id ve client_secret girin")
+    redirect_uri = str(request.base_url) + "auth/youtube/callback"
+    flow = _build_flow(cfg, redirect_uri)
+
+    code_verifier = secrets.token_urlsafe(64)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).rstrip(b"=").decode()
+    VERIFIER_FILE.write_text(code_verifier)
+
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        prompt="consent",
+        code_challenge=code_challenge,
+        code_challenge_method="S256",
+    )
     return RedirectResponse(auth_url)
 
 
 @app.get("/auth/youtube/callback")
 async def youtube_callback(request: Request, code: str):
-    from google_auth_oauthlib.flow import Flow
     cfg = load_yt_config()
     redirect_uri = str(request.base_url) + "auth/youtube/callback"
-    flow = Flow.from_client_config(
-        {"web": {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
-                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                 "token_uri": "https://oauth2.googleapis.com/token",
-                 "redirect_uris": [redirect_uri]}},
-        scopes=SCOPES,
-        redirect_uri=redirect_uri,
-    )
-    flow.fetch_token(code=code)
+    flow = _build_flow(cfg, redirect_uri)
+    code_verifier = VERIFIER_FILE.read_text() if VERIFIER_FILE.exists() else None
+    flow.fetch_token(code=code, code_verifier=code_verifier)
     TOKEN_FILE.write_text(flow.credentials.to_json())
     return RedirectResponse("/?yt=ok")
 
