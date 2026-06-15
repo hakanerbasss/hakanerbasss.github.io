@@ -752,6 +752,11 @@ async function generateShorts() {
   }
 }
 
+// DeepSeek key localStorage
+const dsKey = document.getElementById('shorts-apikey');
+dsKey.value = localStorage.getItem('ds_api_key') || '';
+dsKey.addEventListener('input', () => localStorage.setItem('ds_api_key', dsKey.value));
+
 loadMeta();
 if (new URLSearchParams(window.location.search).get('yt') === 'ok') {
   switchTab('shorts');
