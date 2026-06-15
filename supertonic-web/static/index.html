@@ -443,10 +443,16 @@
     </div>
   </div>
 
-  <button onclick="generateShorts()" id="btn-shorts">
-    <div class="spinner" id="spin-shorts"></div>
-    Shorts Üret
-  </button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button onclick="generateShorts()" id="btn-shorts">
+      <div class="spinner" id="spin-shorts"></div>
+      Shorts Üret
+    </button>
+    <button onclick="generateFromTrend()" id="btn-trend-gen" style="background:#1a3a1a;">
+      <div class="spinner" id="spin-trend-gen"></div>
+      Trend Haberden Üret
+    </button>
+  </div>
 
   <div class="error" id="err-shorts"></div>
 
@@ -871,6 +877,23 @@ async function fetchTrends() {
     alert(e.message);
   } finally {
     setLoading('btn-trends', 'spin-trends', false);
+  }
+}
+
+async function generateFromTrend() {
+  const apiKey = document.getElementById('shorts-apikey').value.trim();
+  if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
+  // Konu alanını boş bırak — backend trend haberlerden seçecek
+  const prev = document.getElementById('shorts-topic').value;
+  document.getElementById('shorts-topic').value = '';
+  document.getElementById('btn-trend-gen').disabled = true;
+  document.getElementById('spin-trend-gen').style.display = 'block';
+  try {
+    await generateShorts();
+  } finally {
+    document.getElementById('shorts-topic').value = prev;
+    document.getElementById('btn-trend-gen').disabled = false;
+    document.getElementById('spin-trend-gen').style.display = 'none';
   }
 }
 

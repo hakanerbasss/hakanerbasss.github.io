@@ -214,9 +214,15 @@ async def generate_shorts(
     trend_tags = " ".join(trend_data["hashtags"][:8])
 
     lang_name = LANG_MAP.get(lang, "Turkish")
-    prompt = f"""Create a YouTube Shorts video about: {topic}
+    topic_instruction = (
+        f"Topic: {topic}\n"
+        f"Use these TODAY'S real trending news to make the content timely and relevant:\n{trend_topics}"
+        if topic.strip() else
+        f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}"
+    )
+    prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
-Current trending topics (use these to make content more relevant): {trend_topics}
+{topic_instruction}
 Suggested hashtags: {trend_tags}
 
 Return ONLY valid JSON, no markdown, no explanation:
