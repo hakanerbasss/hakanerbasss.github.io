@@ -190,6 +190,49 @@
     border-radius: 20px;
     margin-top: 8px;
   }
+
+  @media (max-width: 640px) {
+    header { padding: 16px; }
+    header h1 { font-size: 17px; }
+
+    .tabs { padding: 0 8px; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { padding: 12px 14px; font-size: 13px; white-space: nowrap; }
+
+    .panel { padding: 16px; }
+
+    .controls { grid-template-columns: 1fr 1fr; }
+    .controls .field:last-child { grid-column: span 2; }
+
+    .translate-row { grid-template-columns: 1fr 1fr; }
+    .translate-row .arrow { display: none; }
+
+    button { width: 100%; justify-content: center; padding: 14px; font-size: 15px; }
+
+    .upload-area { padding: 24px 16px; }
+
+    .result video { max-height: 280px; }
+
+    #yt-upload-form button { width: auto; }
+
+    /* Modal tam ekran mobilde */
+    #yt-modal > div {
+      width: 100% !important;
+      max-width: 100% !important;
+      border-radius: 16px 16px 0 0 !important;
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+    }
+    #yt-modal { align-items: flex-end !important; }
+
+    /* Ayarlar butonu */
+    div[style*="position:fixed;top:16px;right:16px"] {
+      top: auto !important;
+      bottom: 16px !important;
+    }
+  }
 </style>
 </head>
 <body>
