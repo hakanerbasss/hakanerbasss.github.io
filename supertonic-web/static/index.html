@@ -511,6 +511,17 @@
         <button onclick="document.getElementById('yt-modal').style.display='none'" style="background:#333;">İptal</button>
       </div>
     </div>
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">Pexels API</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">pexels.com → Üye ol → API Key</p>
+    <div id="pexels-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Pexels bağlı</div>
+      <button onclick="resetPexelsConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
+    </div>
+    <div id="pexels-input-state">
+      <input type="password" id="cfg-pexels-key" placeholder="Pexels API Key..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+      <button onclick="savePexelsConfig()">Kaydet</button>
+    </div>
     <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
@@ -707,6 +718,14 @@ let currentVideoFilename = null;
 
 async function checkYTStatus() {
   try {
+    const pr = await fetch('/api/pexels/config');
+    const pd = await pr.json();
+    if (pd.configured) {
+      document.getElementById('pexels-saved-state').style.display = 'block';
+      document.getElementById('pexels-input-state').style.display = 'none';
+    }
+  } catch(e) {}
+  try {
     const r = await fetch('/api/yt/config');
     const d = await r.json();
     if (d.authorized) {
@@ -736,6 +755,26 @@ window.addEventListener('popstate', function(e) {
 document.getElementById('yt-modal').addEventListener('click', function(e) {
   if (e.target === this) closeYTModal();
 });
+
+async function savePexelsConfig() {
+  const key = document.getElementById('cfg-pexels-key').value.trim();
+  if (!key) return showError('err-cfg', 'API key girin.');
+  const fd = new FormData();
+  fd.append('api_key', key);
+  const r = await fetch('/api/pexels/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('pexels-saved-state').style.display = 'block';
+    document.getElementById('pexels-input-state').style.display = 'none';
+    document.getElementById('cfg-pexels-key').value = '';
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+function resetPexelsConfig() {
+  document.getElementById('pexels-saved-state').style.display = 'none';
+  document.getElementById('pexels-input-state').style.display = 'block';
+}
 
 function resetYTConfig() {
   document.getElementById('yt-saved-state').style.display = 'none';

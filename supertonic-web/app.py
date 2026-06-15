@@ -332,7 +332,25 @@ from trends import get_trends
 
 CONFIG_FILE = Path("yt_config.json")
 TOKEN_FILE = Path("yt_token.json")
+PEXELS_CONFIG = Path("pexels_config.json")
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+
+
+def get_pexels_key():
+    if PEXELS_CONFIG.exists():
+        return json.loads(PEXELS_CONFIG.read_text()).get("api_key", "")
+    return ""
+
+
+@app.post("/api/pexels/config")
+async def save_pexels_config(api_key: str = Form(...)):
+    PEXELS_CONFIG.write_text(json.dumps({"api_key": api_key}))
+    return {"ok": True}
+
+
+@app.get("/api/pexels/config")
+async def get_pexels_config():
+    return {"configured": bool(get_pexels_key())}
 
 
 def load_yt_config():
