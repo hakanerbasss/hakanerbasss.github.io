@@ -822,6 +822,8 @@ async function generateShorts() {
     document.getElementById('dl-shorts').href = d.video;
     currentVideoFilename = d.video.split('/').pop();
     document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
+    if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
+    if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
     document.getElementById('result-shorts').classList.add('show');
     checkYTStatus();
   } catch(e) {

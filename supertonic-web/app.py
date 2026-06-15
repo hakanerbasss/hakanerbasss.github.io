@@ -206,9 +206,16 @@ async def generate_shorts(
 
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
+    # Trend verileri al
+    trend_data = get_trends(region_code="TR", lang=lang)
+    trend_topics = ", ".join(trend_data["topics"][:5])
+    trend_tags = " ".join(trend_data["hashtags"][:8])
+
     lang_name = LANG_MAP.get(lang, "Turkish")
     prompt = f"""Create a YouTube Shorts video about: {topic}
 Narration language: {lang_name}
+Current trending topics (use these to make content more relevant): {trend_topics}
+Suggested hashtags: {trend_tags}
 
 Return ONLY valid JSON, no markdown, no explanation:
 {{
@@ -316,8 +323,12 @@ Rules:
         "video": f"/api/video/{output_file.name}",
         "script": full_script,
         "scene_count": len(scenes),
+        "suggested_tags": trend_tags,
+        "suggested_description": f"{full_script[:200]}...\n\n{trend_tags}",
     }
 
+
+from trends import get_trends
 
 CONFIG_FILE = Path("yt_config.json")
 TOKEN_FILE = Path("yt_token.json")
@@ -328,6 +339,33 @@ def load_yt_config():
     if CONFIG_FILE.exists():
         return json.loads(CONFIG_FILE.read_text())
     return {}
+
+
+@app.get("/api/trends")
+async def trends_endpoint(region: str = "TR", lang: str = "tr"):
+    yt_client = None
+    if TOKEN_FILE.exists():
+        try:
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request as GRequest
+            from googleapiclient.discovery import build
+            creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+            if creds.expired and creds.refresh_token:
+                creds.refresh(GRequest())
+                TOKEN_FILE.write_text(creds.to_json())
+            yt_client = build("youtube", "v3", credentials=creds)
+        except Exception:
+            pass
+    data = get_trends(youtube_client=yt_client, region_code=region, lang=lang)
+    return data
+
+
+@app.post("/api/trends/refresh")
+async def trends_refresh():
+    from trends import CACHE_FILE
+    if CACHE_FILE.exists():
+        CACHE_FILE.unlink()
+    return await trends_endpoint()
 
 
 @app.post("/api/yt/config")
