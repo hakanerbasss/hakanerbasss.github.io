@@ -199,8 +199,6 @@ async def generate_shorts(
     import httpx
     from openai import OpenAI
 
-    if not topic.strip():
-        raise HTTPException(400, "Konu boş olamaz")
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
 

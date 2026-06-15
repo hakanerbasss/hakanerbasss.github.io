@@ -889,7 +889,7 @@ async function generateFromTrend() {
   document.getElementById('btn-trend-gen').disabled = true;
   document.getElementById('spin-trend-gen').style.display = 'block';
   try {
-    await generateShorts();
+    await generateShorts(true);
   } finally {
     document.getElementById('shorts-topic').value = prev;
     document.getElementById('btn-trend-gen').disabled = false;
@@ -897,11 +897,11 @@ async function generateFromTrend() {
   }
 }
 
-async function generateShorts() {
+async function generateShorts(allowEmpty = false) {
   const apiKey = document.getElementById('shorts-apikey').value.trim();
   const topic = document.getElementById('shorts-topic').value.trim();
   if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
-  if (!topic) return showError('err-shorts', 'Konu boş olamaz.');
+  if (!topic && !allowEmpty) return showError('err-shorts', 'Konu boş olamaz.');
   showError('err-shorts', '');
   setLoading('btn-shorts', 'spin-shorts', true);
   document.getElementById('result-shorts').classList.remove('show');
