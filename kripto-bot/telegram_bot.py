@@ -387,6 +387,27 @@ def handle_command(cmd, chat_id):
         send_reply(chat_id, '🎓 Koç analizi başlatıldı, rapor birazdan gelecek...')
         trigger_coach_review()
 
+    elif cmd.startswith('/log'):
+        try:
+            import subprocess
+            parts = cmd.split()
+            n = int(parts[1]) if len(parts) > 1 else 30
+            n = min(n, 100)
+            result = subprocess.run(
+                ['journalctl', '-u', 'kripto-bot', '-n', str(n), '--no-pager', '-o', 'short'],
+                capture_output=True, text=True, timeout=10
+            )
+            output = result.stdout.strip()
+            if not output:
+                send_reply(chat_id, '📋 Log boş')
+                return
+            # Telegram 4096 karakter limiti
+            if len(output) > 3800:
+                output = '...(kısaltıldı)\n' + output[-3800:]
+            send_reply(chat_id, f'📋 <b>Son {n} Log Satırı</b>\n<pre>{output}</pre>')
+        except Exception as e:
+            send_reply(chat_id, f'❌ Log alınamadı: {e}')
+
     elif cmd in ['/start', '/yardim']:
         send_reply(chat_id, '''🤖 <b>Kripto Bot Komutları</b>
 
@@ -400,6 +421,7 @@ def handle_command(cmd, chat_id):
 /edgeon /edgeoff /otonomon /otonomoff /indicatoron /indicatoroff /wyckoffon /wyckoffoff /breakouton /breakoutoff
 /ceoon /ceooff /ceoanaliz
 /koc — Koç ajanı durumu | /kocanaliz — hemen analiz
+/log [n] — Son N log satırı (varsayılan 30)
 /baslat — Botu başlat
 /durdur — Botu duraklat
 /restart — Botu yeniden başlat
