@@ -306,34 +306,51 @@ Rules:
 
         png_files.append(png_path)
 
+    # Mevcut font bul
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((f for f in font_candidates if Path(f).exists()), None)
+
     # Her sahne için video klibi oluştur (fotoğraf + metin overlay)
     clip_files = []
     for i, (png, dur, scene) in enumerate(zip(png_files, durations, scenes)):
         clip_path = scene_dir / f"clip_{i}.mp4"
-        safe_text = scene["text"].replace("'", "\\'").replace(":", "\\:").replace(",", "\\,")
-        # 42 karakterde satır kır
-        words = safe_text.split()
+
+        # Metni dosyaya yaz — özel karakter sorununu çözer
+        words = scene["text"].split()
         lines, line = [], []
         for w in words:
-            if len(" ".join(line + [w])) > 42:
+            if len(" ".join(line + [w])) > 38:
                 lines.append(" ".join(line))
                 line = [w]
             else:
                 line.append(w)
         if line:
             lines.append(" ".join(line))
-        wrapped = "\\n".join(lines)
+        wrapped_text = "\n".join(lines)
+
+        text_file = scene_dir / f"text_{i}.txt"
+        text_file.write_text(wrapped_text, encoding="utf-8")
+
+        drawtext = (
+            f"scale=1080:1920:force_original_aspect_ratio=increase,"
+            f"crop=1080:1920,"
+            f"drawtext=textfile={text_file.absolute()}"
+            f":fontsize=42:fontcolor=white:bordercolor=black:borderw=3"
+            f":x=(w-text_w)/2:y=h-th-140:line_spacing=12"
+        )
+        if font_path:
+            drawtext += f":fontfile={font_path}"
 
         subprocess.run([
             "ffmpeg", "-y",
             "-loop", "1", "-i", str(png),
             "-t", str(dur),
-            "-vf", (
-                f"scale=1080:1920:force_original_aspect_ratio=increase,"
-                f"crop=1080:1920,"
-                f"drawtext=fontsize=40:fontcolor=white:bordercolor=black:borderw=3"
-                f":x=(w-text_w)/2:y=h-th-140:line_spacing=10:text='{wrapped}'"
-            ),
+            "-vf", drawtext,
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
         ], check=True, capture_output=True)
         clip_files.append(clip_path)
