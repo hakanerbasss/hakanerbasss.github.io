@@ -196,13 +196,15 @@ async def generate_shorts(
     speed: float = Form(1.0),
 ):
     import json
-    import cairosvg
+    import httpx
     from openai import OpenAI
 
     if not topic.strip():
         raise HTTPException(400, "Konu boş olamaz")
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
+
+    pexels_key = get_pexels_key()
 
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
@@ -222,16 +224,14 @@ Return ONLY valid JSON, no markdown, no explanation:
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
-      "svg": "<svg width='1080' height='1920' xmlns='http://www.w3.org/2000/svg'>...</svg>"
+      "keyword": "english search keyword for stock photo (2-3 words, specific and visual)"
     }}
   ]
 }}
 
 Rules:
 - 5 to 7 scenes
-- SVG: 1080x1920 portrait, dark background, large readable text, simple shapes and gradients
-- No external images, fonts, or URLs in SVG — only basic SVG elements
-- Consistent color theme across all scenes
+- keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds"""
 
     response = client.chat.completions.create(
@@ -274,14 +274,69 @@ Rules:
         audio_files.append(audio_path)
         durations.append(dur_val)
 
-        png_path = scene_dir / f"scene_{i}.png"
-        cairosvg.svg2png(
-            bytestring=scene["svg"].encode(),
-            write_to=str(png_path),
-            output_width=1080,
-            output_height=1920,
-        )
+        # Pexels'ten fotoğraf çek
+        png_path = scene_dir / f"scene_{i}.jpg"
+        keyword = scene.get("keyword", topic)
+        photo_saved = False
+
+        if pexels_key:
+            try:
+                resp = httpx.get(
+                    "https://api.pexels.com/v1/search",
+                    params={"query": keyword, "orientation": "portrait", "per_page": 1},
+                    headers={"Authorization": pexels_key},
+                    timeout=10,
+                )
+                photos = resp.json().get("photos", [])
+                if photos:
+                    img_url = photos[0]["src"].get("portrait") or photos[0]["src"]["large"]
+                    img_data = httpx.get(img_url, timeout=15).content
+                    png_path.write_bytes(img_data)
+                    photo_saved = True
+            except Exception:
+                pass
+
+        # Fallback: siyah arka plan
+        if not photo_saved:
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "lavfi",
+                "-i", f"color=black:size=1080x1920:rate=1",
+                "-frames:v", "1", str(png_path)
+            ], capture_output=True)
+
         png_files.append(png_path)
+
+    # Her sahne için video klibi oluştur (fotoğraf + metin overlay)
+    clip_files = []
+    for i, (png, dur, scene) in enumerate(zip(png_files, durations, scenes)):
+        clip_path = scene_dir / f"clip_{i}.mp4"
+        safe_text = scene["text"].replace("'", "\\'").replace(":", "\\:").replace(",", "\\,")
+        # 42 karakterde satır kır
+        words = safe_text.split()
+        lines, line = [], []
+        for w in words:
+            if len(" ".join(line + [w])) > 42:
+                lines.append(" ".join(line))
+                line = [w]
+            else:
+                line.append(w)
+        if line:
+            lines.append(" ".join(line))
+        wrapped = "\\n".join(lines)
+
+        subprocess.run([
+            "ffmpeg", "-y",
+            "-loop", "1", "-i", str(png),
+            "-t", str(dur),
+            "-vf", (
+                f"scale=1080:1920:force_original_aspect_ratio=increase,"
+                f"crop=1080:1920,"
+                f"drawtext=fontsize=40:fontcolor=white:bordercolor=black:borderw=3"
+                f":x=(w-text_w)/2:y=h-th-140:line_spacing=10:text='{wrapped}'"
+            ),
+            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+        ], check=True, capture_output=True)
+        clip_files.append(clip_path)
 
     # Ses dosyalarını birleştir
     audio_list_file = scene_dir / "audio_list.txt"
@@ -294,19 +349,16 @@ Rules:
         check=True, capture_output=True
     )
 
-    # Slideshow oluştur
-    concat_file = scene_dir / "video_list.txt"
-    with open(concat_file, "w") as f:
-        for png, dur in zip(png_files, durations):
-            f.write(f"file '{png.absolute()}'\n")
-            f.write(f"duration {dur:.3f}\n")
-        f.write(f"file '{png_files[-1].absolute()}'\n")
+    # Video kliplerini birleştir
+    clip_list_file = scene_dir / "clip_list.txt"
+    with open(clip_list_file, "w") as f:
+        for cp in clip_files:
+            f.write(f"file '{cp.absolute()}'\n")
 
     slideshow = scene_dir / "slideshow.mp4"
     subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black",
-        "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(slideshow)
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file),
+        "-c", "copy", str(slideshow)
     ], check=True, capture_output=True)
 
     # Ses ekle
