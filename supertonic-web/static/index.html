@@ -203,6 +203,7 @@
   <div class="tab active" onclick="switchTab('text')">Metin → Ses</div>
   <div class="tab" onclick="switchTab('video')">Video Seslendirme</div>
   <div class="tab" onclick="switchTab('translate')">Çeviri + Seslendir</div>
+  <div class="tab" onclick="switchTab('shorts')">Shorts Üret</div>
 </div>
 
 <!-- TEXT TO SPEECH -->
@@ -351,6 +352,54 @@
   </div>
 </div>
 
+<!-- SHORTS -->
+<div class="panel" id="tab-shorts">
+
+  <div class="field">
+    <label>DeepSeek API Key</label>
+    <input type="password" id="shorts-apikey" placeholder="sk-..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+    <div style="font-size:12px;color:#444;margin-top:6px;">Tarayıcıda saklanır, sunucuya gönderilmez sadece istek sırasında kullanılır.</div>
+  </div>
+
+  <div class="field">
+    <label>Konu</label>
+    <textarea id="shorts-topic" placeholder="Örn: Yapay zekanın geleceği, Mars'a yolculuk, Kuantum fiziği nedir..." style="min-height:90px;"></textarea>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="shorts-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="shorts-voice"></select>
+    </div>
+    <div class="field">
+      <label>Hız: <span id="speed-val-4">1.0</span>x</label>
+      <div class="speed-row">
+        <input type="range" id="shorts-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          oninput="document.getElementById('speed-val-4').textContent = parseFloat(this.value).toFixed(2)">
+      </div>
+    </div>
+  </div>
+
+  <button onclick="generateShorts()" id="btn-shorts">
+    <div class="spinner" id="spin-shorts"></div>
+    Shorts Üret
+  </button>
+
+  <div class="error" id="err-shorts"></div>
+
+  <div class="result" id="result-shorts">
+    <p>Script</p>
+    <div class="transcript" id="shorts-script"></div>
+    <p style="margin-top:16px">Video</p>
+    <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
+    <a id="dl-shorts" class="dl-btn" download="shorts.mp4">İndir</a>
+  </div>
+</div>
+
 <script>
 let voices = [], langs = {};
 
@@ -360,8 +409,8 @@ async function loadMeta() {
   voices = d.voices;
   langs = d.languages;
 
-  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice'];
-  const langSelects = ['tts-lang', 'vid-lang', 'tr-target'];
+  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice'];
+  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang'];
   const translateSelect = document.getElementById('vid-translate');
   const sourceSelect = document.getElementById('tr-source');
 
@@ -396,8 +445,9 @@ async function loadMeta() {
 }
 
 function switchTab(name) {
+  const names = ['text','video','translate','shorts'];
   document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active', ['text','video','translate'][i] === name);
+    t.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
@@ -531,6 +581,42 @@ async function translateAndSynth() {
     showError('err-tr', e.message);
   } finally {
     setLoading('btn-tr', 'spin-tr', false);
+  }
+}
+
+async function generateShorts() {
+  const apiKey = document.getElementById('shorts-apikey').value.trim();
+  const topic = document.getElementById('shorts-topic').value.trim();
+  if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
+  if (!topic) return showError('err-shorts', 'Konu boş olamaz.');
+  showError('err-shorts', '');
+  setLoading('btn-shorts', 'spin-shorts', true);
+  document.getElementById('result-shorts').classList.remove('show');
+
+  try {
+    const fd = new FormData();
+    fd.append('topic', topic);
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('shorts-lang').value);
+    fd.append('voice', document.getElementById('shorts-voice').value);
+    fd.append('speed', document.getElementById('shorts-speed').value);
+
+    const r = await fetch('/api/generate-shorts', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+
+    document.getElementById('shorts-script').textContent = d.script;
+    document.getElementById('shorts-video').src = d.video;
+    document.getElementById('dl-shorts').href = d.video;
+    document.getElementById('result-shorts').classList.add('show');
+  } catch(e) {
+    showError('err-shorts', e.message);
+  } finally {
+    setLoading('btn-shorts', 'spin-shorts', false);
   }
 }
 

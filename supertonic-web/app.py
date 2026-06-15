@@ -186,6 +186,138 @@ async def voice_video(
     }
 
 
+@app.post("/api/generate-shorts")
+async def generate_shorts(
+    topic: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+):
+    import json
+    import cairosvg
+    from openai import OpenAI
+
+    if not topic.strip():
+        raise HTTPException(400, "Konu boş olamaz")
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+
+    lang_name = LANG_MAP.get(lang, "Turkish")
+    prompt = f"""Create a YouTube Shorts video about: {topic}
+Narration language: {lang_name}
+
+Return ONLY valid JSON, no markdown, no explanation:
+{{
+  "scenes": [
+    {{
+      "text": "narration for this scene (1-2 short sentences)",
+      "svg": "<svg width='1080' height='1920' xmlns='http://www.w3.org/2000/svg'>...</svg>"
+    }}
+  ]
+}}
+
+Rules:
+- 5 to 7 scenes
+- SVG: 1080x1920 portrait, dark background, large readable text, simple shapes and gradients
+- No external images, fonts, or URLs in SVG — only basic SVG elements
+- Consistent color theme across all scenes
+- Total narration under 55 seconds"""
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+    )
+
+    content = response.choices[0].message.content.strip()
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0]
+    elif "```" in content:
+        content = content.split("```")[1].split("```")[0]
+
+    data = json.loads(content.strip())
+    scenes = data["scenes"]
+
+    uid = uuid.uuid4().hex
+    scene_dir = UPLOAD_DIR / uid
+    scene_dir.mkdir()
+
+    tts = get_tts()
+    style = tts.get_voice_style(voice_name=voice)
+
+    audio_files = []
+    png_files = []
+    durations = []
+
+    for i, scene in enumerate(scenes):
+        wav, dur = tts.synthesize(
+            text=scene["text"],
+            lang=lang,
+            voice_style=style,
+            total_steps=8,
+            speed=speed,
+        )
+        dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
+        audio_path = scene_dir / f"audio_{i}.wav"
+        tts.save_audio(wav, str(audio_path))
+        audio_files.append(audio_path)
+        durations.append(dur_val)
+
+        png_path = scene_dir / f"scene_{i}.png"
+        cairosvg.svg2png(
+            bytestring=scene["svg"].encode(),
+            write_to=str(png_path),
+            output_width=1080,
+            output_height=1920,
+        )
+        png_files.append(png_path)
+
+    # Ses dosyalarını birleştir
+    audio_list_file = scene_dir / "audio_list.txt"
+    combined_audio = scene_dir / "combined.wav"
+    with open(audio_list_file, "w") as f:
+        for af in audio_files:
+            f.write(f"file '{af.absolute()}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list_file), "-c", "copy", str(combined_audio)],
+        check=True, capture_output=True
+    )
+
+    # Slideshow oluştur
+    concat_file = scene_dir / "video_list.txt"
+    with open(concat_file, "w") as f:
+        for png, dur in zip(png_files, durations):
+            f.write(f"file '{png.absolute()}'\n")
+            f.write(f"duration {dur:.3f}\n")
+        f.write(f"file '{png_files[-1].absolute()}'\n")
+
+    slideshow = scene_dir / "slideshow.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black",
+        "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(slideshow)
+    ], check=True, capture_output=True)
+
+    # Ses ekle
+    output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-i", str(slideshow), "-i", str(combined_audio),
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
+    ], check=True, capture_output=True)
+
+    full_script = " ".join(s["text"] for s in scenes)
+
+    return {
+        "video": f"/api/video/{output_file.name}",
+        "script": full_script,
+        "scene_count": len(scenes),
+    }
+
+
 @app.get("/api/audio/{filename}")
 async def get_audio(filename: str):
     path = OUTPUT_DIR / filename
