@@ -225,6 +225,7 @@ Suggested hashtags: {trend_tags}
 
 Return ONLY valid JSON, no markdown, no explanation:
 {{
+  "title": "catchy YouTube title for this video (max 80 chars, in {lang_name})",
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
@@ -392,10 +393,12 @@ Rules:
     ], check=True, capture_output=True)
 
     full_script = " ".join(s["text"] for s in scenes)
+    generated_title = data.get("title", topic or scenes[0]["text"][:60])
 
     return {
         "video": f"/api/video/{output_file.name}",
         "script": full_script,
+        "title": generated_title,
         "scene_count": len(scenes),
         "suggested_tags": trend_tags,
         "suggested_description": f"{full_script[:200]}...\n\n{trend_tags}",
@@ -528,7 +531,9 @@ async def upload_youtube(
     title: str = Form(...),
     description: str = Form(""),
     tags: str = Form(""),
-    privacy: str = Form("private"),
+    privacy: str = Form("public"),
+    category_id: str = Form("25"),
+    age_restricted: str = Form("false"),
 ):
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
@@ -568,10 +573,15 @@ async def upload_youtube(
             "title": yt_title[:100],
             "description": full_description[:5000],
             "tags": tag_list[:500],
-            "categoryId": "22",
+            "categoryId": category_id,
         },
-        "status": {"privacyStatus": privacy},
+        "status": {
+            "privacyStatus": privacy,
+            **({"selfDeclaredMadeForKids": False} if age_restricted == "true" else {"selfDeclaredMadeForKids": False}),
+        },
     }
+    if age_restricted == "true":
+        body["ageGating"] = {"restricted": True}
 
     media = MediaFileUpload(str(video_path), mimetype="video/mp4", resumable=True)
     req = youtube.videos().insert(part="snippet,status", body=body, media_body=media)

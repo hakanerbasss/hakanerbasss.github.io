@@ -484,13 +484,35 @@
           <label>Hashtagler (virgülle ayır)</label>
           <input type="text" id="yt-tags" placeholder="#shorts, #yapay zeka, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
-        <div class="field" style="margin-top:12px;">
-          <label>Gizlilik</label>
-          <select id="yt-privacy">
-            <option value="private">Gizli (Private)</option>
-            <option value="unlisted">Listelenmemiş (Unlisted)</option>
-            <option value="public">Herkese Açık (Public)</option>
-          </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="field">
+            <label>Gizlilik</label>
+            <select id="yt-privacy">
+              <option value="public">Herkese Açık</option>
+              <option value="unlisted">Listelenmemiş</option>
+              <option value="private">Gizli</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="yt-category">
+              <option value="25">Haberler & Politika</option>
+              <option value="24">Eğlence</option>
+              <option value="22">İnsanlar & Bloglar</option>
+              <option value="28">Bilim & Teknoloji</option>
+              <option value="27">Eğitim</option>
+              <option value="17">Spor</option>
+              <option value="19">Seyahat & Etkinlikler</option>
+              <option value="23">Komedi</option>
+              <option value="26">Nasıl Yapılır & Stil</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#888;font-size:13px;">
+            <input type="checkbox" id="yt-age" style="width:16px;height:16px;accent-color:#7c3aed;">
+            Yetişkin içerik (18+ yaş kısıtlaması)
+          </label>
         </div>
         <button onclick="uploadToYouTube()" id="btn-yt-upload" style="margin-top:16px;background:#c00;">
           <div class="spinner" id="spin-yt"></div>
@@ -830,6 +852,8 @@ async function uploadToYouTube() {
     fd.append('description', document.getElementById('yt-desc').value);
     fd.append('tags', document.getElementById('yt-tags').value);
     fd.append('privacy', document.getElementById('yt-privacy').value);
+    fd.append('category_id', document.getElementById('yt-category').value);
+    fd.append('age_restricted', document.getElementById('yt-age').checked ? 'true' : 'false');
 
     const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
     if (!r.ok) {
@@ -927,6 +951,7 @@ async function generateShorts(allowEmpty = false) {
     document.getElementById('dl-shorts').href = d.video;
     currentVideoFilename = d.video.split('/').pop();
     document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
+    if (d.title) document.getElementById('yt-title').value = d.title;
     if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
     if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
     document.getElementById('result-shorts').classList.add('show');
