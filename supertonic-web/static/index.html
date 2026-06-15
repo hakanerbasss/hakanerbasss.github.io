@@ -166,6 +166,21 @@
     color: #555; font-size: 20px; padding-bottom: 10px; text-align: center;
   }
 
+  .dl-btn {
+    display: inline-block;
+    margin-top: 12px;
+    background: #1a1a2e;
+    color: #a78bfa;
+    border: 1px solid #3b2d6e;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13px;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+
+  .dl-btn:hover { background: #2a1a4e; }
+
   .filename-badge {
     display: inline-block;
     background: #1f1433;
@@ -225,6 +240,7 @@
   <div class="result" id="result-synth">
     <p>Oluşturulan ses</p>
     <audio id="audio-synth" controls></audio>
+    <a id="dl-synth" class="dl-btn" download="ses.wav">İndir</a>
   </div>
 </div>
 
@@ -280,6 +296,7 @@
     <div class="transcript" id="video-transcript"></div>
     <p style="margin-top:16px">Seslendirilmiş Video</p>
     <video id="video-out" controls></video>
+    <a id="dl-video" class="dl-btn" download="video.mp4">İndir</a>
   </div>
 </div>
 
@@ -330,6 +347,7 @@
     <div class="transcript" id="tr-translated"></div>
     <p style="margin-top:16px">Oluşturulan ses</p>
     <audio id="audio-tr" controls></audio>
+    <a id="dl-tr" class="dl-btn" download="ceviri.wav">İndir</a>
   </div>
 </div>
 
@@ -420,6 +438,7 @@ async function synthesize() {
     const d = await r.json();
 
     document.getElementById('audio-synth').src = d.file;
+    document.getElementById('dl-synth').href = d.file;
     document.getElementById('result-synth').classList.add('show');
     document.getElementById('audio-synth').play();
   } catch(e) {
@@ -467,6 +486,7 @@ async function voiceVideo() {
 
     document.getElementById('video-transcript').textContent = d.transcript;
     document.getElementById('video-out').src = d.video;
+    document.getElementById('dl-video').href = d.video;
     document.getElementById('result-video').classList.add('show');
   } catch(e) {
     showError('err-video', e.message);
@@ -504,6 +524,7 @@ async function translateAndSynth() {
     const sd = await sr.json();
 
     document.getElementById('audio-tr').src = sd.file;
+    document.getElementById('dl-tr').href = sd.file;
     document.getElementById('result-tr').classList.add('show');
     document.getElementById('audio-tr').play();
   } catch(e) {
