@@ -240,10 +240,11 @@ def _detect_breakouts(client, cfg=None):
 
 class BreakoutAgent:
     def __init__(self):
-        self.state       = _load_state()
-        self._running    = False
-        self._stop_event = threading.Event()
-        self.scan_log    = deque(maxlen=30)
+        self.state        = _load_state()
+        self._running     = False
+        self._stop_event  = threading.Event()
+        self._monitor_lock = threading.Lock()
+        self.scan_log     = deque(maxlen=30)
 
     def start(self):
         if self._running:
@@ -422,6 +423,14 @@ class BreakoutAgent:
             self._stop_event.wait(MONITOR_SEC)
 
     def _monitor(self):
+        if not self._monitor_lock.acquire(blocking=False):
+            return
+        try:
+            self._do_monitor()
+        finally:
+            self._monitor_lock.release()
+
+    def _do_monitor(self):
         client    = get_client()
         positions = load_positions()
 
