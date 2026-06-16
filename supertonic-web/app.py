@@ -982,6 +982,9 @@ def save_lv_sched_log(status: str, message: str, url: str = ""):
         {"status": status, "message": message, "url": url, "ts": time.time()},
         ensure_ascii=False,
     ))
+
+
+def load_sched_config():
     if SCHED_CONFIG.exists():
         return json.loads(SCHED_CONFIG.read_text())
     return {"enabled": False, "times": ["09:00", "15:00", "21:00"]}
