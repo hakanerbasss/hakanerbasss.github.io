@@ -1290,6 +1290,8 @@ async function openSettings() {
   } catch(e) {}
   loadSchedulerStatus();
   loadLVSchedulerStatus();
+  loadTNLVSchedulerStatus();
+  updateTNLVApiKeyStatus();
 }
 
 function closeYTModal() {
@@ -1536,6 +1538,7 @@ function updateLVApiKeyStatus() {
   }
 }
 updateLVApiKeyStatus();
+updateTNLVApiKeyStatus();
 
 function saveApiKey() {
   const v = dsKey.value.trim();
@@ -1545,6 +1548,7 @@ function saveApiKey() {
   s.textContent = '✓ Kaydedildi';
   s.style.color = '#4ade80';
   updateLVApiKeyStatus();
+  updateTNLVApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
 }
 function clearApiKey() {
@@ -1553,6 +1557,7 @@ function clearApiKey() {
   const s = document.getElementById('apikey-status');
   s.textContent = 'Temizlendi.'; s.style.color = '#f87171';
   updateLVApiKeyStatus();
+  updateTNLVApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
 }
 
@@ -1618,6 +1623,163 @@ async function runLVNow() {
     setLoading('btn-lv-run-now', 'spin-lv-run-now', false);
     showError('err-cfg', e.message);
   }
+}
+
+// ── Trend Haber LV ───────────────────────────────────────────────────────────
+function updateTNLVApiKeyStatus() {
+  const key = localStorage.getItem('ds_api_key') || '';
+  const el = document.getElementById('tnlv-apikey-status');
+  if (!el) return;
+  el.innerHTML = key
+    ? '<span style="color:#4ade80;">✓ API key var (Ayarlar\'dan değiştirilebilir)</span>'
+    : '<span style="color:#f87171;">⚠ API key girilmedi — Ayarlar\'dan ekle</span>';
+}
+
+async function generateTrendLongVideo() {
+  const apiKey = localStorage.getItem('ds_api_key') || '';
+  if (!apiKey) { document.getElementById('err-tnlv').textContent = 'DeepSeek API key girilmedi. Ayarlardan ekleyin.'; return; }
+
+  document.getElementById('err-tnlv').textContent = '';
+  document.getElementById('result-tnlv').style.display = 'none';
+  document.getElementById('spin-tnlv').style.display = 'inline-block';
+  document.getElementById('btn-tnlv').disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('tnlv-lang').value);
+    fd.append('voice', document.getElementById('tnlv-voice').value);
+    fd.append('speed', document.getElementById('tnlv-speed').value);
+    fd.append('region', 'TR');
+
+    const r = await fetch('/api/generate-trend-long-video', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('err-tnlv').textContent = d.detail || 'Hata oluştu'; return; }
+
+    currentTNLVFilename = d.video.split('/').pop();
+    currentTNLVThumbnailFilename = d.thumbnail ? d.thumbnail.split('/').pop() : null;
+
+    document.getElementById('tnlv-title-out').textContent = d.title;
+    document.getElementById('tnlv-topics-out').textContent = d.topics ? 'Konular: ' + d.topics.join(' • ') : '';
+    document.getElementById('tnlv-duration-out').textContent = `Süre: ${Math.round(d.duration_sec)}s • ${d.scene_count} sahne`;
+    document.getElementById('tnlv-video').src = d.video;
+    document.getElementById('dl-tnlv').href = d.video;
+
+    if (d.thumbnail) {
+      document.getElementById('tnlv-thumb').src = d.thumbnail;
+      document.getElementById('dl-tnlv-thumb').href = d.thumbnail;
+      document.getElementById('tnlv-thumb-wrap').style.display = 'block';
+    } else {
+      document.getElementById('tnlv-thumb-wrap').style.display = 'none';
+    }
+
+    document.getElementById('tnlv-yt-title').value = d.title;
+    document.getElementById('tnlv-yt-desc').value = d.description || '';
+    document.getElementById('tnlv-yt-tags').value = d.suggested_tags || '';
+
+    document.getElementById('tnlv-yt-upload-section').style.display = 'block';
+    document.getElementById('tnlv-yt-success').style.display = 'none';
+    checkYTStatusTNLV();
+
+    document.getElementById('result-tnlv').style.display = 'block';
+  } catch(e) {
+    document.getElementById('err-tnlv').textContent = 'İstek hatası: ' + e.message;
+  } finally {
+    document.getElementById('spin-tnlv').style.display = 'none';
+    document.getElementById('btn-tnlv').disabled = false;
+  }
+}
+
+async function checkYTStatusTNLV() {
+  try {
+    const r = await fetch('/api/yt/config');
+    const d = await r.json();
+    const linked = d.authorized;
+    document.getElementById('tnlv-yt-linked').style.display = linked ? 'block' : 'none';
+    document.getElementById('tnlv-yt-not-linked').style.display = linked ? 'none' : 'block';
+  } catch(e) {}
+}
+
+async function uploadTNLVToYouTube() {
+  if (!currentTNLVFilename) return;
+  document.getElementById('err-tnlv-yt').textContent = '';
+  document.getElementById('spin-tnlv-yt').style.display = 'inline-block';
+  document.getElementById('btn-tnlv-yt-upload').disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentTNLVFilename);
+    fd.append('title', document.getElementById('tnlv-yt-title').value);
+    fd.append('description', document.getElementById('tnlv-yt-desc').value);
+    fd.append('tags', document.getElementById('tnlv-yt-tags').value);
+    fd.append('privacy', document.getElementById('tnlv-yt-privacy').value);
+    fd.append('category_id', document.getElementById('tnlv-yt-category').value);
+    fd.append('age_restricted', 'false');
+    if (currentTNLVThumbnailFilename) fd.append('thumbnail_filename', currentTNLVThumbnailFilename);
+
+    const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('err-tnlv-yt').textContent = d.detail || 'Yükleme hatası'; return; }
+
+    document.getElementById('tnlv-yt-link').href = d.url;
+    document.getElementById('tnlv-yt-link').textContent = d.url;
+    document.getElementById('tnlv-yt-success').style.display = 'block';
+  } catch(e) {
+    document.getElementById('err-tnlv-yt').textContent = 'İstek hatası: ' + e.message;
+  } finally {
+    document.getElementById('spin-tnlv-yt').style.display = 'none';
+    document.getElementById('btn-tnlv-yt-upload').disabled = false;
+  }
+}
+
+async function loadTNLVSchedulerStatus() {
+  try {
+    const r = await fetch('/api/tnlv-scheduler/config');
+    const d = await r.json();
+    document.getElementById('tnlv-sched-enabled').checked = d.enabled;
+    document.getElementById('tnlv-sched-times').value = (d.times || ['08:00','20:00']).join(',');
+    if (d.lang) document.getElementById('tnlv-sched-lang').value = d.lang;
+    if (d.voice) document.getElementById('tnlv-sched-voice').value = d.voice;
+
+    const st = document.getElementById('tnlv-sched-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('tnlv-sched-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#facc15';
+      const label = log.status === 'success' ? 'Başarılı' : log.status === 'error' ? 'Hata' : 'Çalışıyor';
+      document.getElementById('tnlv-sched-last-status').innerHTML = log.status ? `<span style="color:${color}">${label}</span>` : '';
+      document.getElementById('tnlv-sched-last-msg').textContent = log.message || '';
+      document.getElementById('tnlv-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
+    }
+  } catch(e) {}
+}
+
+async function saveTNLVScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('tnlv-sched-enabled').checked ? 'true' : 'false');
+  fd.append('times', document.getElementById('tnlv-sched-times').value);
+  fd.append('lang', document.getElementById('tnlv-sched-lang').value);
+  fd.append('voice', document.getElementById('tnlv-sched-voice').value);
+  await fetch('/api/tnlv-scheduler/config', { method: 'POST', body: fd });
+  loadTNLVSchedulerStatus();
+}
+
+async function runTNLVNow() {
+  document.getElementById('spin-tnlv-run-now').style.display = 'inline-block';
+  document.getElementById('btn-tnlv-run-now').disabled = true;
+  await fetch('/api/tnlv-scheduler/run-now', { method: 'POST' });
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/tnlv-scheduler/config');
+    const d = await r.json();
+    const log = d.log || {};
+    if (log.status && log.status !== 'running') {
+      clearInterval(poll);
+      document.getElementById('spin-tnlv-run-now').style.display = 'none';
+      document.getElementById('btn-tnlv-run-now').disabled = false;
+      loadTNLVSchedulerStatus();
+    }
+  }, 5000);
 }
 
 // ── DeepSeek sunucu config ────────────────────────────────────────────────────
