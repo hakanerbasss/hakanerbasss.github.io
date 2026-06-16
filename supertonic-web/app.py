@@ -4,6 +4,7 @@ import asyncio
 import subprocess
 import json
 import time
+import re
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
@@ -234,7 +235,7 @@ async def generate_shorts(
     # Trend verileri al
     trend_data = get_trends(region_code="TR", lang=lang)
     trend_topics = ", ".join(trend_data["topics"][:5])
-    trend_tags = " ".join(trend_data["hashtags"][:8])
+    trend_tags = ", ".join(trend_data["hashtags"][:8])
 
     lang_name = LANG_MAP.get(lang, "Turkish")
     topic_instruction = (
@@ -430,7 +431,7 @@ Rules:
         "title": generated_title,
         "scene_count": len(scenes),
         "suggested_tags": trend_tags,
-        "suggested_description": f"{full_script[:200]}...\n\n{trend_tags}",
+        "suggested_description": f"{full_script[:200]}...\n\n{' '.join(trend_data['hashtags'][:8])}",
     }
 
 
@@ -691,9 +692,9 @@ Rules:
 
     # Hashtag'leri oluştur
     raw_tags = data.get("hashtags", [])
-    suggested_tags = " ".join(f"#{t.lstrip('#')}" for t in raw_tags[:12] if t)
+    suggested_tags = ", ".join(f"#{t.lstrip('#')}" for t in raw_tags[:12] if t)
     if not suggested_tags:
-        suggested_tags = f"#{topic.split()[0]} #belgesel #eğitim #keşfet"
+        suggested_tags = f"#{topic.split()[0]}, #belgesel, #eğitim, #keşfet, #teknoloji"
 
     # Thumbnail
     thumb_path = None
@@ -867,8 +868,8 @@ async def upload_youtube(
         TOKEN_FILE.write_text(creds.to_json())
     youtube = build("youtube", "v3", credentials=creds)
 
-    # Tag listesi + Shorts her zaman ekle
-    tag_list = [t.strip().lstrip("#") for t in tags.split(",") if t.strip()]
+    # Tag listesi — virgül veya boşluk ayırıcı kabul et
+    tag_list = [t.lstrip("#").strip() for t in re.split(r"[\s,]+", tags) if t.strip().lstrip("#")]
     if "Shorts" not in tag_list:
         tag_list.insert(0, "Shorts")
 
@@ -1041,7 +1042,7 @@ async def auto_shorts_job():
                     "filename": filename,
                     "title": d.get("title", "Gündem Shorts"),
                     "description": d.get("suggested_description", ""),
-                    "tags": d.get("suggested_tags", "#Shorts #gündem #viral"),
+                    "tags": d.get("suggested_tags", "#Shorts, #gündem, #viral, #keşfet"),
                     "privacy": "public",
                     "category_id": "25",
                     "age_restricted": "false",
@@ -1143,7 +1144,7 @@ Pick something different and interesting each time."""}],
                     "filename": filename,
                     "title": d.get("title", topic),
                     "description": d.get("description", ""),
-                    "tags": d.get("suggested_tags", f"#belgesel #eğitim #{lang}"),
+                    "tags": d.get("suggested_tags", f"#belgesel, #eğitim, #teknoloji, #keşfet"),
                     "privacy": "public",
                     "category_id": "28",
                     "age_restricted": "false",
