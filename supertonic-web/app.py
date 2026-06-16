@@ -729,6 +729,222 @@ Rules:
         "scene_count": len(scenes),
     }
 
+@app.post("/api/generate-trend-long-video")
+async def generate_trend_long_video(
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    region: str = Form("TR"),
+):
+    from openai import OpenAI
+    from datetime import datetime
+
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+
+    pexels_key = get_pexels_key()
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    lang_name = LANG_MAP.get(lang, "Turkish")
+
+    trend_data = get_trends(region_code=region, lang=lang)
+    topics_list = trend_data["topics"][:6]
+    topics_str = "\n".join(f"- {t}" for t in topics_list)
+    today = datetime.now().strftime("%d.%m.%Y")
+
+    prompt = f"""Create a news roundup YouTube video covering today's trending topics in {lang_name}.
+Date: {today}
+
+Trending topics:
+{topics_str}
+
+Create a news digest with one segment per topic. Each segment has 2 scenes.
+
+Return ONLY valid JSON, no markdown:
+{{
+  "title": "news roundup title in {lang_name} (mention date or 'günün haberleri', max 80 chars)",
+  "description": "video description mentioning all topics (3-4 sentences, in {lang_name})",
+  "hashtags": ["relevant", "tags", "for", "news", "no", "hash", "symbol"],
+  "segments": [
+    {{
+      "topic": "short topic title (in {lang_name})",
+      "scenes": [
+        {{"text": "opening sentence for this news story (1-2 sentences with key facts)", "keyword": "english keyword for photo (2-3 words)"}},
+        {{"text": "follow-up with more detail (1-2 sentences)", "keyword": "english keyword for photo (2-3 words)"}}
+      ]
+    }}
+  ]
+}}
+
+Rules:
+- One segment per trending topic ({len(topics_list)} segments total, {len(topics_list)*2} scenes)
+- Each segment: exactly 2 scenes, informative and engaging
+- hashtags: 10-15 tags mixing {lang_name} and English, always include news-related tags, no # symbol
+- keyword: English, 2-3 words, visual and specific"""
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=4000,
+    )
+
+    data = _parse_llm_json(response.choices[0].message.content)
+    scenes = []
+    for seg in data.get("segments", []):
+        for sc in seg.get("scenes", []):
+            scenes.append(sc)
+
+    if not scenes:
+        raise HTTPException(500, "Video sahneleri üretilemedi")
+
+    uid = uuid.uuid4().hex
+    scene_dir = UPLOAD_DIR / uid
+    scene_dir.mkdir()
+
+    tts = get_tts()
+    style = tts.get_voice_style(voice_name=voice)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((f for f in font_candidates if Path(f).exists()), None)
+
+    audio_files = []
+    clip_files = []
+    durations = []
+
+    for i, scene in enumerate(scenes):
+        wav, dur = tts.synthesize(
+            text=scene["text"], lang=lang, voice_style=style,
+            total_steps=8, speed=speed,
+        )
+        dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
+        audio_path = scene_dir / f"audio_{i}.wav"
+        tts.save_audio(wav, str(audio_path))
+        audio_files.append(audio_path)
+        durations.append(dur_val)
+
+        img_path = scene_dir / f"scene_{i}.jpg"
+        photo_saved = False
+        if pexels_key:
+            try:
+                resp = httpx.get(
+                    "https://api.pexels.com/v1/search",
+                    params={"query": scene.get("keyword", "breaking news"), "orientation": "landscape", "per_page": 1},
+                    headers={"Authorization": pexels_key},
+                    timeout=10,
+                )
+                photos = resp.json().get("photos", [])
+                if photos:
+                    img_url = photos[0]["src"].get("large2x") or photos[0]["src"]["large"]
+                    img_path.write_bytes(httpx.get(img_url, timeout=15).content)
+                    photo_saved = True
+            except Exception:
+                pass
+
+        if not photo_saved:
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "lavfi",
+                "-i", "color=black:size=1920x1080:rate=1",
+                "-frames:v", "1", str(img_path)
+            ], capture_output=True)
+
+        clip_path = scene_dir / f"clip_{i}.mp4"
+        words = scene["text"].split()
+        lines, line = [], []
+        for w in words:
+            if len(" ".join(line + [w])) > 70:
+                lines.append(" ".join(line))
+                line = [w]
+            else:
+                line.append(w)
+        if line:
+            lines.append(" ".join(line))
+        text_file = scene_dir / f"text_{i}.txt"
+        text_file.write_text("\n".join(lines), encoding="utf-8")
+
+        drawtext = (
+            f"scale=1920:1080:force_original_aspect_ratio=increase,"
+            f"crop=1920:1080,"
+            f"drawtext=textfile={text_file.absolute()}"
+            f":fontsize=36:fontcolor=white:bordercolor=black:borderw=2"
+            f":x=(w-text_w)/2:y=h-th-80:line_spacing=10"
+            f":box=1:boxcolor=black@0.6:boxborderw=16"
+        )
+        if font_path:
+            drawtext += f":fontfile={font_path}"
+
+        subprocess.run([
+            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+            "-t", str(dur_val),
+            "-vf", drawtext,
+            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+        ], check=True, capture_output=True)
+        clip_files.append(clip_path)
+
+    audio_list = scene_dir / "audio_list.txt"
+    combined_audio = scene_dir / "combined.wav"
+    with open(audio_list, "w") as f:
+        for af in audio_files:
+            f.write(f"file '{af.absolute()}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list), "-c", "copy", str(combined_audio)],
+        check=True, capture_output=True
+    )
+
+    clip_list = scene_dir / "clip_list.txt"
+    merged = scene_dir / "merged.mp4"
+    with open(clip_list, "w") as f:
+        for cp in clip_files:
+            f.write(f"file '{cp.absolute()}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list), "-c", "copy", str(merged)],
+        check=True, capture_output=True
+    )
+
+    output_file = OUTPUT_DIR / f"{uid}_tnlv.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
+    ], check=True, capture_output=True)
+
+    full_script = " ".join(s["text"] for s in scenes)
+    total_dur = round(sum(durations), 1)
+    tnlv_title = data.get("title", f"Günün Trend Haberleri - {today}")
+
+    raw_tags = data.get("hashtags", [])
+    suggested_tags = ", ".join(f"#{t.lstrip('#')}" for t in raw_tags[:15] if t)
+    if not suggested_tags:
+        suggested_tags = "#gündem, #haberler, #trendler, #güncel, #viral"
+
+    thumb_path = None
+    try:
+        first_img = scene_dir / "scene_0.jpg"
+        if first_img.exists():
+            thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
+            create_thumbnail(first_img.read_bytes(), tnlv_title, thumb_out, size=(1280, 720))
+            thumb_path = f"/api/thumbnail/{thumb_out.name}"
+    except Exception:
+        pass
+
+    return {
+        "video": f"/api/video/{output_file.name}",
+        "thumbnail": thumb_path,
+        "title": tnlv_title,
+        "description": data.get("description", ""),
+        "suggested_tags": suggested_tags,
+        "script": full_script,
+        "duration_sec": total_dur,
+        "scene_count": len(scenes),
+        "topics": topics_list,
+    }
+
+
 CONFIG_FILE = Path("yt_config.json")
 TOKEN_FILE = Path("yt_token.json")
 PEXELS_CONFIG = Path("pexels_config.json")
@@ -1194,11 +1410,108 @@ def _rebuild_lv_scheduler():
         pass
 
 
+TNLV_SCHED_CONFIG = Path("tnlv_scheduler_config.json")
+TNLV_SCHED_LOG    = Path("tnlv_scheduler_log.json")
+
+
+def load_tnlv_sched_config():
+    if TNLV_SCHED_CONFIG.exists():
+        return json.loads(TNLV_SCHED_CONFIG.read_text())
+    return {
+        "enabled": False,
+        "times": ["08:00", "20:00"],
+        "lang": "tr",
+        "voice": "F1",
+    }
+
+
+def save_tnlv_sched_log(status: str, message: str, url: str = ""):
+    TNLV_SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "url": url, "ts": time.time()},
+        ensure_ascii=False,
+    ))
+
+
+async def auto_tnlv_job():
+    save_tnlv_sched_log("running", "Trend haberleri getiriliyor…")
+    try:
+        api_key = get_deepseek_key()
+        if not api_key:
+            save_tnlv_sched_log("error", "DeepSeek API key sunucuda kayıtlı değil")
+            return
+        if not TOKEN_FILE.exists():
+            save_tnlv_sched_log("error", "YouTube hesabı bağlı değil")
+            return
+
+        cfg = load_tnlv_sched_config()
+        lang  = cfg.get("lang", "tr")
+        voice = cfg.get("voice", "F1")
+
+        timeout = httpx.Timeout(connect=30, read=1800, write=60, pool=30)
+        async with httpx.AsyncClient(timeout=timeout) as hc:
+            r = await hc.post(
+                "http://localhost:8001/api/generate-trend-long-video",
+                data={"api_key": api_key, "lang": lang, "voice": voice, "speed": "1.0", "region": "TR"},
+            )
+            if r.status_code != 200:
+                save_tnlv_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
+                return
+            d = r.json()
+
+            filename  = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
+
+            r2 = await hc.post(
+                "http://localhost:8001/api/yt/upload",
+                data={
+                    "filename": filename,
+                    "title": d.get("title", "Günün Trend Haberleri"),
+                    "description": d.get("description", ""),
+                    "tags": d.get("suggested_tags", "#gündem, #haberler, #trendler, #viral"),
+                    "privacy": "public",
+                    "category_id": "25",
+                    "age_restricted": "false",
+                    "thumbnail_filename": thumbnail,
+                },
+                timeout=300,
+            )
+            if r2.status_code != 200:
+                save_tnlv_sched_log("error", f"YouTube yüklenemedi: {r2.text[:300]}")
+                return
+
+            save_tnlv_sched_log("success", d.get("title", "Günün Trend Haberleri"), r2.json().get("url", ""))
+
+    except Exception as e:
+        save_tnlv_sched_log("error", str(e))
+
+
+def _rebuild_tnlv_scheduler():
+    for job in scheduler.get_jobs():
+        if job.id.startswith("tnlv_"):
+            job.remove()
+    cfg = load_tnlv_sched_config()
+    if not cfg.get("enabled"):
+        return
+    for t in cfg.get("times", []):
+        try:
+            hour, minute = t.strip().split(":")
+            scheduler.add_job(
+                auto_tnlv_job,
+                CronTrigger(hour=int(hour), minute=int(minute)),
+                id=f"tnlv_{t.replace(':', '')}",
+                replace_existing=True,
+                max_instances=1,
+            )
+        except Exception:
+            pass
+
+
 @app.on_event("startup")
 async def startup_event():
     scheduler.start()
     _rebuild_scheduler()
     _rebuild_lv_scheduler()
+    _rebuild_tnlv_scheduler()
 
 
 @app.on_event("shutdown")
@@ -1279,6 +1592,41 @@ async def save_lv_scheduler_config(
 @app.post("/api/lv-scheduler/run-now")
 async def run_lv_now():
     asyncio.create_task(auto_long_video_job())
+    return {"ok": True}
+
+
+@app.get("/api/tnlv-scheduler/config")
+async def get_tnlv_scheduler_config():
+    cfg = load_tnlv_sched_config()
+    log = {}
+    if TNLV_SCHED_LOG.exists():
+        log = json.loads(TNLV_SCHED_LOG.read_text())
+    jobs = [j for j in scheduler.get_jobs() if j.id.startswith("tnlv_")]
+    next_run = None
+    if jobs:
+        nxt = [j.next_run_time for j in jobs if j.next_run_time]
+        if nxt:
+            next_run = min(nxt).strftime("%d.%m.%Y %H:%M")
+    return {**cfg, "log": log, "next_run": next_run}
+
+
+@app.post("/api/tnlv-scheduler/config")
+async def save_tnlv_scheduler_config(
+    enabled: str = Form("false"),
+    times: str = Form("08:00,20:00"),
+    lang: str = Form("tr"),
+    voice: str = Form("F1"),
+):
+    time_list = [t.strip() for t in times.split(",") if t.strip()]
+    cfg = {"enabled": enabled == "true", "times": time_list, "lang": lang, "voice": voice}
+    TNLV_SCHED_CONFIG.write_text(json.dumps(cfg))
+    _rebuild_tnlv_scheduler()
+    return cfg
+
+
+@app.post("/api/tnlv-scheduler/run-now")
+async def run_tnlv_now():
+    asyncio.create_task(auto_tnlv_job())
     return {"ok": True}
 
 

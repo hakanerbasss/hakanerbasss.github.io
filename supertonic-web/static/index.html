@@ -250,6 +250,7 @@
   <div class="tab" onclick="switchTab('translate')">Çeviri + Seslendir</div>
   <div class="tab" onclick="switchTab('shorts')">Shorts Üret</div>
   <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
+  <div class="tab" onclick="switchTab('tnlv')">Trend Haber LV</div>
 </div>
 
 <!-- TEXT TO SPEECH -->
@@ -653,6 +654,106 @@
   </div>
 </div>
 
+<div class="panel" id="tab-tnlv">
+
+  <p style="color:#888;font-size:13px;margin-bottom:20px;">Günün trend haberlerini otomatik olarak çekip tüm konuları kapsayan bir uzun video üretir.</p>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="tnlv-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="tnlv-voice"></select>
+    </div>
+    <div class="field">
+      <label>Hız: <span id="speed-val-tnlv">1.0</span>x</label>
+      <input type="range" id="tnlv-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+        oninput="document.getElementById('speed-val-tnlv').textContent = parseFloat(this.value).toFixed(2)">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>DeepSeek API Key</label>
+    <div id="tnlv-apikey-status" style="font-size:13px;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#888;">
+      Kontrol ediliyor...
+    </div>
+  </div>
+
+  <button onclick="generateTrendLongVideo()" id="btn-tnlv">
+    <div class="spinner" id="spin-tnlv"></div>
+    Trend Video Üret
+  </button>
+
+  <div class="error" id="err-tnlv"></div>
+
+  <div class="result" id="result-tnlv">
+    <p>Başlık</p>
+    <div class="transcript" id="tnlv-title-out" style="font-size:16px;font-weight:600;color:#fff;"></div>
+    <p style="margin-top:8px;font-size:12px;color:#666;" id="tnlv-topics-out"></p>
+    <p style="margin-top:12px">Video</p>
+    <video id="tnlv-video" controls style="width:100%;margin-top:8px;border-radius:6px;"></video>
+    <a id="dl-tnlv" class="dl-btn" download="trend-haber-video.mp4">İndir</a>
+    <p style="margin-top:12px;font-size:12px;color:#666;" id="tnlv-duration-out"></p>
+
+    <div id="tnlv-thumb-wrap" style="display:none;margin-top:16px;">
+      <p>Kapak Fotoğrafı</p>
+      <img id="tnlv-thumb" style="max-width:320px;border-radius:8px;margin-top:8px;display:block;border:1px solid #333;">
+      <a id="dl-tnlv-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
+    </div>
+
+    <div id="tnlv-yt-upload-section" style="display:none;margin-top:24px;border-top:1px solid #222;padding-top:20px;">
+      <p style="margin-bottom:16px;color:#fff;font-size:14px;">YouTube'a Yükle</p>
+      <div id="tnlv-yt-not-linked" style="display:none;">
+        <p style="font-size:13px;color:#888;margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
+        <button onclick="window.location='/auth/youtube'" style="background:#c00;">Google ile Bağlan</button>
+      </div>
+      <div id="tnlv-yt-linked" style="display:none;">
+        <div class="field">
+          <label>Başlık</label>
+          <input type="text" id="tnlv-yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Açıklama</label>
+          <textarea id="tnlv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Hashtagler (virgülle ayır)</label>
+          <input type="text" id="tnlv-yt-tags" placeholder="#gündem, #haberler, #trendler" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="field">
+            <label>Gizlilik</label>
+            <select id="tnlv-yt-privacy">
+              <option value="public">Herkese Açık</option>
+              <option value="unlisted">Listelenmemiş</option>
+              <option value="private">Gizli</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="tnlv-yt-category">
+              <option value="25" selected>Haberler & Politika</option>
+              <option value="27">Eğitim</option>
+              <option value="28">Bilim & Teknoloji</option>
+              <option value="22">İnsanlar & Bloglar</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="uploadTNLVToYouTube()" id="btn-tnlv-yt-upload" style="margin-top:16px;background:#c00;">
+          <div class="spinner" id="spin-tnlv-yt"></div>
+          YouTube'a Yükle
+        </button>
+        <div class="error" id="err-tnlv-yt"></div>
+        <div id="tnlv-yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
+          Yüklendi! → <a id="tnlv-yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- YouTube Ayarları Modal -->
 <div id="yt-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;">
   <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;position:relative;max-height:88vh;overflow-y:auto;">
@@ -824,6 +925,61 @@
       <div id="lv-sched-last-url"></div>
     </div>
 
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📰 Otomatik Trend Haber LV</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">Günde 2 kez trend haberlerden otomatik uzun video üretir ve YouTube'a yükler</p>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+        <input type="checkbox" id="tnlv-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveTNLVScheduler()">
+        Otomatik trend haber LV'yi etkinleştir
+      </label>
+    </div>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+      <input type="text" id="tnlv-sched-times" value="08:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div class="field">
+        <label>Dil</label>
+        <select id="tnlv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          <option value="tr" selected>Türkçe</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ses</label>
+        <select id="tnlv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          <option value="F1" selected>F1 (Kadın)</option>
+          <option value="F2">F2 (Kadın)</option>
+          <option value="F3">F3 (Kadın)</option>
+          <option value="M1">M1 (Erkek)</option>
+          <option value="M2">M2 (Erkek)</option>
+          <option value="M3">M3 (Erkek)</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button onclick="saveTNLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+      <button onclick="runTNLVNow()" id="btn-tnlv-run-now" style="background:#2a1a0a;font-size:12px;padding:8px 16px;">
+        <div class="spinner" id="spin-tnlv-run-now"></div>
+        Şimdi Çalıştır
+      </button>
+    </div>
+
+    <div id="tnlv-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+      <div id="tnlv-sched-next" style="color:#888;"></div>
+      <div id="tnlv-sched-last-status"></div>
+      <div id="tnlv-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+      <div id="tnlv-sched-last-url"></div>
+    </div>
+
     <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
@@ -841,8 +997,8 @@ async function loadMeta() {
   voices = d.voices;
   langs = d.languages;
 
-  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice', 'lv-voice'];
-  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang', 'lv-lang'];
+  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice', 'lv-voice', 'tnlv-voice'];
+  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang', 'lv-lang', 'tnlv-lang'];
   const translateSelect = document.getElementById('vid-translate');
   const sourceSelect = document.getElementById('tr-source');
 
@@ -877,7 +1033,7 @@ async function loadMeta() {
 }
 
 function switchTab(name) {
-  const names = ['text','video','translate','shorts','longvideo'];
+  const names = ['text','video','translate','shorts','longvideo','tnlv'];
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', names[i] === name);
   });
@@ -1079,6 +1235,8 @@ let currentVideoFilename = null;
 let currentThumbnailFilename = null;
 let currentLVFilename = null;
 let currentLVThumbnailFilename = null;
+let currentTNLVFilename = null;
+let currentTNLVThumbnailFilename = null;
 
 async function checkYTStatus() {
   try {
