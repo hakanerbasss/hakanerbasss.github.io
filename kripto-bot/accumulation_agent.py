@@ -24,6 +24,9 @@ STATE_FILE = 'accumulation_state.json'
 STABLECOINS = {
     'USDCUSDT', 'BUSDUSDT', 'TUSDUSDT', 'FDUSDUSDT', 'EURUSDT',
     'GBPUSDT',  'DAIUSDT',  'FRAXUSDT', 'USDPUSDT',  'PYUSDUSDT', 'USDTUSDT',
+    'BFUSDUSDT','UUSDT',    'USDEUSDT', 'SUSDEUSDT', 'GHOUSDT',   'USDTBUSDT',
+    'AEURUSDT', 'EURSUSDT', 'IDRTUSDT', 'BIDRUSDT',  'BRLAUSDT',  'USDSBUSDT',
+    'CRVUSDUSDT',
 }
 
 GLOBAL_MAX      = 6          # sistem geneli maksimum açık pozisyon
@@ -275,6 +278,7 @@ class AccumulationAgent:
             t for t in tickers
             if t['symbol'].endswith('USDT')
             and t['symbol'] not in STABLECOINS
+            and not (0.97 <= float(t.get('lastPrice', 0)) <= 1.03)  # fiyat filtresi ile stablecoin
             and MIN_VOL_CURR < float(t.get('quoteVolume', 0)) < MAX_VOL_CURR
             and float(t.get('lastPrice', 0)) > 0.001
         ]
