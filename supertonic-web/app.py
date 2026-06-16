@@ -509,7 +509,7 @@ async def generate_long_video(
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
     lang_name = LANG_MAP.get(lang, "Turkish")
 
-    scene_count = max(8, duration_min * 4)
+    scene_count = max(6, duration_min * 2)
 
     prompt = f"""Create a detailed educational/documentary YouTube video about: {topic}
 Narration language: {lang_name}
@@ -521,7 +521,7 @@ Return ONLY valid JSON, no markdown:
   "description": "detailed video description (3-4 sentences, in {lang_name})",
   "scenes": [
     {{
-      "text": "detailed narration for this scene (3-5 sentences, informative)",
+      "text": "narration for this scene (2-3 sentences, informative, max 30 seconds when spoken)",
       "keyword": "english search keyword for stock photo (2-3 words)"
     }}
   ]
@@ -529,7 +529,7 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - Exactly {scene_count} scenes
-- Each scene: 3-5 informative sentences, flows naturally
+- Each scene: 2-3 informative sentences, flows naturally, fits in ~25-30 seconds
 - Cover the topic thoroughly: introduction, details, interesting facts, conclusion
 - keyword: English, specific and visual"""
 
