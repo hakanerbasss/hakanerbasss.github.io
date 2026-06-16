@@ -519,9 +519,10 @@ Return ONLY valid JSON, no markdown:
 {{
   "title": "engaging YouTube title (max 80 chars, in {lang_name})",
   "description": "detailed video description (3-4 sentences, in {lang_name})",
+  "hashtags": ["relevant", "hashtag", "words", "no", "hash", "symbol"],
   "scenes": [
     {{
-      "text": "narration for this scene (2-3 sentences, informative, max 30 seconds when spoken)",
+      "text": "narration for this scene (2-3 rich, detailed sentences with facts and context, max 30 seconds when spoken)",
       "keyword": "english search keyword for stock photo (2-3 words)"
     }}
   ]
@@ -529,8 +530,9 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - Exactly {scene_count} scenes
-- Each scene: 2-3 informative sentences, flows naturally, fits in ~25-30 seconds
-- Cover the topic thoroughly: introduction, details, interesting facts, conclusion
+- Each scene: 2-3 sentences packed with facts, context and detail — NOT simple or vague
+- Cover the topic thoroughly: introduction, key facts, interesting details, historical context, conclusion
+- hashtags: 8-12 relevant tags mixing {lang_name} and English terms, no # symbol
 - keyword: English, specific and visual"""
 
     response = client.chat.completions.create(
@@ -674,6 +676,12 @@ Rules:
     total_dur = round(sum(durations), 1)
     lv_title = data.get("title", topic)
 
+    # Hashtag'leri oluştur
+    raw_tags = data.get("hashtags", [])
+    suggested_tags = " ".join(f"#{t.lstrip('#')}" for t in raw_tags[:12] if t)
+    if not suggested_tags:
+        suggested_tags = f"#{topic.split()[0]} #belgesel #eğitim #keşfet"
+
     # Thumbnail
     thumb_path = None
     try:
@@ -690,6 +698,7 @@ Rules:
         "thumbnail": thumb_path,
         "title": lv_title,
         "description": data.get("description", ""),
+        "suggested_tags": suggested_tags,
         "script": full_script,
         "duration_sec": total_dur,
         "scene_count": len(scenes),

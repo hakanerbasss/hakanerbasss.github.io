@@ -794,6 +794,7 @@ async function generateLongVideo() {
 
     document.getElementById('lv-yt-title').value = d.title || '';
     document.getElementById('lv-yt-desc').value = d.description || '';
+    document.getElementById('lv-yt-tags').value = d.suggested_tags || '';
     document.getElementById('lv-yt-upload-section').style.display = 'block';
 
     document.getElementById('result-lv').classList.add('show');
