@@ -57,6 +57,26 @@ LANG_MAP = {
 VOICES = ["M1", "M2", "M3", "F1", "F2", "F3"]
 
 
+def _parse_llm_json(text: str) -> dict:
+    """DeepSeek/LLM yanıtından JSON objesini güvenilir şekilde çıkar."""
+    import re
+    t = text.strip()
+    # Markdown kod bloğunu soy
+    if "```json" in t:
+        t = t.split("```json", 1)[1].split("```", 1)[0]
+    elif "```" in t:
+        t = t.split("```", 1)[1].split("```", 1)[0]
+    t = t.strip()
+    # En dıştaki { ... } arasını al
+    start = t.find("{")
+    end   = t.rfind("}") + 1
+    if start >= 0 and end > start:
+        t = t[start:end]
+    # Trailing comma temizle: ,] ve ,}
+    t = re.sub(r",\s*([}\]])", r"\1", t)
+    return json.loads(t)
+
+
 def get_tts():
     global tts_model
     if tts_model is None:
@@ -250,13 +270,7 @@ Rules:
         temperature=0.7,
     )
 
-    content = response.choices[0].message.content.strip()
-    if "```json" in content:
-        content = content.split("```json")[1].split("```")[0]
-    elif "```" in content:
-        content = content.split("```")[1].split("```")[0]
-
-    data = json.loads(content.strip())
+    data = _parse_llm_json(response.choices[0].message.content)
     scenes = data["scenes"]
 
     uid = uuid.uuid4().hex
@@ -547,13 +561,7 @@ Rules:
         max_tokens=4000,
     )
 
-    content = response.choices[0].message.content.strip()
-    if "```json" in content:
-        content = content.split("```json")[1].split("```")[0]
-    elif "```" in content:
-        content = content.split("```")[1].split("```")[0]
-
-    data = json.loads(content.strip())
+    data = _parse_llm_json(response.choices[0].message.content)
     scenes = data["scenes"]
 
     uid = uuid.uuid4().hex
@@ -1107,10 +1115,9 @@ Make it specific and fascinating — NOT generic. Examples:
 Pick something different and interesting each time."""}],
             temperature=0.95,
         )
-        raw = topic_resp.choices[0].message.content.strip()
-        if "```" in raw:
-            raw = raw.split("```")[1].split("```")[0].replace("json", "", 1)
-        topic = json.loads(raw.strip()).get("topic", categories.split(",")[0].strip())
+        topic = _parse_llm_json(topic_resp.choices[0].message.content).get(
+            "topic", categories.split(",")[0].strip()
+        )
 
         save_lv_sched_log("running", f"Video üretiliyor: {topic}")
 
