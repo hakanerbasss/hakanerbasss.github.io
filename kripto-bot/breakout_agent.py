@@ -13,9 +13,10 @@ Bu ajan tam tersini yapar:
   • Hard stop:  -%5   (yanlış kırılım koruması)
   • Trail +%3'te aktif, peak kârına göre daralan mesafe:
       +3-10%  → peak'ten -%3  (küçük kârı hemen kilitle)
-      +10-25% → peak'ten -%8  (orta)
-      +25%+   → peak'ten -%15 (büyük trendi sür)
-  • Sonuç: %6 pump'ta +%3 kâr kilitlenir, %141 hareket → %120+ yakalanır
+      +10-25% → peak'ten -%5  (orta)
+      +25-40% → peak'ten -%6  (yüksek kârı koru)
+      +40%+   → peak'ten -%10 (moon shot, trendi sür)
+  • Sonuç: +35% görüp +27%'ye düşerse satar (~+28%'de tetiklenir)
 """
 
 import time, datetime, threading, json, os
@@ -73,10 +74,11 @@ FG_MIN           = 15     # Fear & Greed bu değerin altındaysa yeni alım yok 
 
 def _trail_distance(peak_pct):
     """Peak kâr yüzdesine göre trail mesafesi (peak'ten % düşüş).
-    Küçük pump'larda dar (kârı kilitle), büyük pump'larda geniş (moon'a izin ver)."""
-    if peak_pct >= 25:   return 15.0   # +25%+ : geniş trail, büyük trendi sür
-    if peak_pct >= 10:   return 8.0    # +10-25% : orta
-    return 3.0                          # +3-10% : dar, küçük kârı hemen kilitle
+    Küçük pump'larda dar (kârı kilitle), büyük pump'larda biraz geniş (moon'a izin ver)."""
+    if peak_pct >= 40:   return 10.0  # +40%+ : geniş trail, moon shot trendi sür
+    if peak_pct >= 25:   return 6.0   # +25-40%: yüksek kârı sıkı koru (eski: 15%)
+    if peak_pct >= 10:   return 5.0   # +10-25%: orta (eski: 8%)
+    return 3.0                         # +3-10% : dar, küçük kârı hemen kilitle
 
 
 # ─── Yardımcı Fonksiyonlar ────────────────────────────────────────────────────
@@ -275,7 +277,7 @@ class BreakoutAgent:
             f'📊 Min Skor: {_tun(cfg, "breakout_min_score", MIN_SCORE):g}/10 | '
             f'Min Hacim: ${_tun(cfg, "breakout_min_vol_24h", MIN_VOL_24H)/1_000_000:g}M | '
             f'Max 24s: +%{_tun(cfg, "breakout_max_chg_24h", MAX_CHG_24H):g}\n'
-            f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-8% | +25%+→-15%\n'
+            f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-5% | +25-40%→-6% | +40%+→-10%\n'
             f'🛑 Hard Stop: -%{HARD_STOP_PCT}\n'
             f'{hour_ban_text(exempt=True)}\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler'
@@ -406,7 +408,7 @@ class BreakoutAgent:
             f'📊 Hacim spike: {result["vol_spike"]}x\n'
             f'🎯 Skor: {result["score"]}/10\n'
             f'💵 Tutar: ${usdt}\n'
-            f'🔒 Kademeli Trail | Hard Stop -%{HARD_STOP_PCT}\n'
+            f'🔒 Trail: +3-10%→-3% | +10-25%→-5% | +25-40%→-6% | +40%+→-10%\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler\n'
             f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
         )
