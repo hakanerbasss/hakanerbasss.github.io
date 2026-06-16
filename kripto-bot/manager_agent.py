@@ -1,28 +1,29 @@
 """
-CEO Agent — Portföy Patron
+CEO Agent — Portföy Yöneticisi
 ────────────────────────────────────────────────────────────────
-Her 30 dakikada bir açık pozisyonlara bakar.
-DeepSeek gerçek piyasa verisini (mum, hacim, RSI, trend, BTC) görür
-ve kendi kararını verir:
-
-  sell_partial(symbol, pct, reason) — kısmi sat
-  sell_all(symbol, reason)          — tamamını kapat
-  set_agent_enabled(agent, bool)    — ajanı aç/kapat
-  set_position_mult(value)          — pozisyon büyüklüğünü ayarla
-
-Hiçbir hardcode eşik yok. Karar tamamen DeepSeek'e ait.
+Her 5 dakikada bir DeepSeek tüm portföyü görür ve karar verir.
+Hiçbir kural yok — DeepSeek bir insan yönetici gibi hareket eder.
 config.json → ceo_agent_enabled: true/false
 """
 
 import time, datetime, json, threading, os, requests
 from bot import (load_config, save_config, load_trades, load_positions,
                  get_price, send_telegram, get_usdt_balance,
-                 get_client, execute_sell, update_position,
+                 get_client, execute_buy, execute_sell, update_position,
                  get_data_client)
 
-STATE_FILE    = 'ceo_state.json'
-DEEPSEEK_URL  = 'https://api.deepseek.com/chat/completions'
-REVIEW_MIN    = 5    # dakika — kaç dakikada bir pozisyon gözden geçirilir
+STATE_FILE  = 'ceo_state.json'
+DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
+REVIEW_MIN  = 5   # dakika
+
+
+# ─── Trail stop hesabı (breakout_agent ile senkron) ──────────────────────────
+
+def _trail_distance(peak_pct):
+    if peak_pct >= 40:   return 10.0
+    if peak_pct >= 25:   return 6.0
+    if peak_pct >= 10:   return 5.0
+    return 3.0
 
 
 # ─── Araç Şemaları ────────────────────────────────────────────────────────────
@@ -32,19 +33,13 @@ TOOLS = [
         'type': 'function',
         'function': {
             'name': 'sell_partial',
-            'description': (
-                'Bir pozisyonun belirtilen yüzdesini sat. '
-                'Örnek kullanım: kâr zirveye çıktı geri çekildi, hacim düştü, '
-                'RSI aşırı alımdan iniyor, mum yapısı zayıflıyor. '
-                'Kalan pozisyon ajanda trail ile izlenmeye devam eder.'
-            ),
+            'description': 'Pozisyonun belirtilen yüzdesini sat.',
             'parameters': {
                 'type': 'object',
                 'properties': {
-                    'symbol': {'type': 'string', 'description': 'Sembol, örn: PORTALUSDT'},
-                    'pct':    {'type': 'integer', 'description': 'Satılacak yüzde (10-90 arası)',
-                               'minimum': 10, 'maximum': 90},
-                    'reason': {'type': 'string', 'description': 'Kararın teknik gerekçesi'},
+                    'symbol': {'type': 'string'},
+                    'pct':    {'type': 'integer', 'minimum': 10, 'maximum': 90},
+                    'reason': {'type': 'string'},
                 },
                 'required': ['symbol', 'pct', 'reason'],
             },
@@ -54,16 +49,12 @@ TOOLS = [
         'type': 'function',
         'function': {
             'name': 'sell_all',
-            'description': (
-                'Pozisyonun tamamını kapat. '
-                'Örnek: güçlü ters sinyal, kötüleşen hacim + fiyat, zarar yönetimi, '
-                'BTC sert düşüş, ya da pozisyon çok uzun tutuldu ve momentum bitti.'
-            ),
+            'description': 'Pozisyonun tamamını kapat.',
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'symbol': {'type': 'string'},
-                    'reason': {'type': 'string', 'description': 'Kararın teknik gerekçesi'},
+                    'reason': {'type': 'string'},
                 },
                 'required': ['symbol', 'reason'],
             },
@@ -72,12 +63,24 @@ TOOLS = [
     {
         'type': 'function',
         'function': {
+            'name': 'buy_more',
+            'description': 'Mevcut açık bir pozisyona ekleme yap (daha fazla al).',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'symbol': {'type': 'string'},
+                    'usdt':   {'type': 'number', 'description': 'Eklenecek USDT miktarı'},
+                    'reason': {'type': 'string'},
+                },
+                'required': ['symbol', 'usdt', 'reason'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'set_agent_enabled',
-            'description': (
-                'Bir ticaret ajanını aç veya kapat. '
-                'Yalnızca yeterli işlem sayısında (>15) sürekli zarar eden ajana uygula. '
-                'Tek kötü işleme bakıp kapatma. Piyasa koşuluna göre geçici kapatma yapma.'
-            ),
+            'description': 'Bir ticaret ajanını aç veya kapat.',
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -93,14 +96,11 @@ TOOLS = [
         'type': 'function',
         'function': {
             'name': 'set_position_mult',
-            'description': (
-                'Tüm ajanların pozisyon büyüklüğü çarpanını ayarla (0.5–1.2). '
-                'BTC güçlü bear trendinde küçült, bull trendinde normale döndür.'
-            ),
+            'description': 'Tüm ajanların pozisyon büyüklüğü çarpanını ayarla (0.3–1.5).',
             'parameters': {
                 'type': 'object',
                 'properties': {
-                    'value': {'type': 'number', 'description': '0.5 ile 1.2 arası'},
+                    'value': {'type': 'number'},
                 },
                 'required': ['value'],
             },
@@ -124,15 +124,9 @@ def _exec_sell_partial(symbol, pct, reason):
             update_position(symbol,
                 ceo_last_action=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 ceo_last_action_type=f'partial_{pct}pct')
-            send_telegram(
-                f'👔 <b>CEO Kısmi Sat</b>\n'
-                f'🔶 {symbol} — %{pct} satıldı\n'
-                f'💰 PnL: ${pnl:+.2f}\n'
-                f'📝 {reason}'
-            )
-            return f'{symbol}: %{pct} satıldı, PnL ${pnl:+.2f}'
-        else:
-            return f'{symbol}: satış BAŞARISIZ — {res.get("error")}'
+            send_telegram(f'👔 <b>CEO Kısmi Sat</b>\n🔶 {symbol} %{pct}\n💰 PnL: ${pnl:+.2f}\n📝 {reason}')
+            return f'{symbol}: %{pct} satıldı PnL ${pnl:+.2f}'
+        return f'{symbol}: BAŞARISIZ — {res.get("error")}'
     except Exception as e:
         return f'{symbol}: hata — {e}'
 
@@ -143,15 +137,26 @@ def _exec_sell_all(symbol, reason):
         res    = execute_sell(client, symbol, 100, source='CEO_SELL', period='ceo')
         if res.get('ok'):
             pnl = res.get('pnl', 0)
-            send_telegram(
-                f'👔 <b>CEO Tam Sat</b>\n'
-                f'🔴 {symbol} — tamamı kapatıldı\n'
-                f'💰 PnL: ${pnl:+.2f}\n'
-                f'📝 {reason}'
-            )
-            return f'{symbol}: tamamı kapatıldı, PnL ${pnl:+.2f}'
-        else:
-            return f'{symbol}: satış BAŞARISIZ — {res.get("error")}'
+            send_telegram(f'👔 <b>CEO Tam Sat</b>\n🔴 {symbol}\n💰 PnL: ${pnl:+.2f}\n📝 {reason}')
+            return f'{symbol}: kapatıldı PnL ${pnl:+.2f}'
+        return f'{symbol}: BAŞARISIZ — {res.get("error")}'
+    except Exception as e:
+        return f'{symbol}: hata — {e}'
+
+
+def _exec_buy_more(symbol, usdt, reason):
+    try:
+        client    = get_client()
+        positions = load_positions()
+        if symbol not in positions or positions[symbol].get('qty', 0) <= 0:
+            return f'{symbol}: açık pozisyon yok, ekleme iptal'
+        res = execute_buy(client, symbol, float(usdt),
+                          source='CEO_ADD', period='ceo_add',
+                          agent=positions[symbol].get('agent', 'CEO'))
+        if res.get('ok'):
+            send_telegram(f'👔 <b>CEO Ekleme</b>\n🟢 {symbol} +${usdt}\n📝 {reason}')
+            return f'{symbol}: +${usdt} eklendi'
+        return f'{symbol}: ekleme BAŞARISIZ — {res.get("error")}'
     except Exception as e:
         return f'{symbol}: hata — {e}'
 
@@ -173,7 +178,7 @@ def _exec_set_agent_enabled(agent, enabled):
 
 
 def _exec_set_position_mult(value):
-    value = round(max(0.5, min(1.2, float(value))), 2)
+    value = round(max(0.3, min(1.5, float(value))), 2)
     cfg   = load_config()
     old   = cfg.get('ceo_position_mult', 1.0)
     if old == value:
@@ -193,20 +198,16 @@ def _execute_tool_calls(tool_calls):
             print(f'[CEO] Bozuk araç argümanı ({name}): {e}')
             continue
         try:
-            if name == 'sell_partial':
-                r = _exec_sell_partial(args['symbol'], args['pct'], args['reason'])
-            elif name == 'sell_all':
-                r = _exec_sell_all(args['symbol'], args['reason'])
-            elif name == 'set_agent_enabled':
-                r = _exec_set_agent_enabled(args['agent'], args['enabled'])
-            elif name == 'set_position_mult':
-                r = _exec_set_position_mult(args['value'])
-            else:
-                r = f'Bilinmeyen araç: {name}'
+            if   name == 'sell_partial':       r = _exec_sell_partial(args['symbol'], args['pct'], args['reason'])
+            elif name == 'sell_all':           r = _exec_sell_all(args['symbol'], args['reason'])
+            elif name == 'buy_more':           r = _exec_buy_more(args['symbol'], args['usdt'], args['reason'])
+            elif name == 'set_agent_enabled':  r = _exec_set_agent_enabled(args['agent'], args['enabled'])
+            elif name == 'set_position_mult':  r = _exec_set_position_mult(args['value'])
+            else:                              r = f'Bilinmeyen araç: {name}'
         except Exception as e:
             r = f'{name} hata: {e}'
         if r is not None:
-            print(f'[CEO] Araç: {name} → {r}')
+            print(f'[CEO] {name} → {r}')
             results.append(r)
     return results
 
@@ -226,25 +227,18 @@ def _calc_rsi(closes, period=14):
     for i in range(period, len(gains)):
         ag = (ag * (period - 1) + gains[i]) / period
         al = (al * (period - 1) + losses[i]) / period
-    if al == 0:
-        return 100.0
-    return round(100 - 100 / (1 + ag / al), 1)
+    return round(100 - 100 / (1 + ag / al), 1) if al > 0 else 100.0
 
 
 def _klines_full(symbol, interval='1h', limit=30):
-    """OHLCV kline verisi — hacim dahil."""
     try:
         from binance.client import Client as BClient
-        interval_map = {
-            '1h': BClient.KLINE_INTERVAL_1HOUR,
-            '4h': BClient.KLINE_INTERVAL_4HOUR,
-        }
+        imap = {'1h': BClient.KLINE_INTERVAL_1HOUR, '4h': BClient.KLINE_INTERVAL_4HOUR,
+                '15m': BClient.KLINE_INTERVAL_15MINUTE}
         kl = get_data_client().get_klines(
-            symbol=symbol,
-            interval=interval_map.get(interval, BClient.KLINE_INTERVAL_1HOUR),
-            limit=limit + 1
-        )
-        kl = kl[:-1]   # son kapanmamış mumu çıkar
+            symbol=symbol, interval=imap.get(interval, BClient.KLINE_INTERVAL_1HOUR),
+            limit=limit + 1)
+        kl = kl[:-1]
         opens   = [float(k[1]) for k in kl]
         highs   = [float(k[2]) for k in kl]
         lows    = [float(k[3]) for k in kl]
@@ -256,57 +250,42 @@ def _klines_full(symbol, interval='1h', limit=30):
         return None
 
 
-def _position_analysis(symbol, entry_price, current_price):
-    """Bir pozisyon için teknik analiz özeti."""
-    data = _klines_full(symbol, '1h', 30)
-    if data is None:
-        return 'Veri alınamadı.'
+def _position_market_block(symbol):
+    """Bir pozisyon için tam teknik veri bloğu."""
+    lines = []
+    for tf, limit in (('1h', 30), ('4h', 20)):
+        data = _klines_full(symbol, tf, limit)
+        if not data:
+            lines.append(f'  [{tf}] veri alınamadı')
+            continue
+        opens, highs, lows, closes, volumes = data
+        n = len(closes)
+        if n < 5:
+            continue
+        rsi     = _calc_rsi(closes)
+        sma20   = sum(closes[-min(20, n):]) / min(20, n)
+        avg_vol = sum(volumes[-min(20, n):]) / min(20, n)
+        chg_1p  = round((closes[-1] - closes[-2]) / closes[-2] * 100, 2) if n >= 2 else 0
+        chg_5p  = round((closes[-1] - closes[-6]) / closes[-6] * 100, 2) if n >= 6 else 0
+        trend   = 'SMA20 ÜZERİNDE' if closes[-1] > sma20 else 'SMA20 ALTINDA'
+        high52  = max(closes[-min(n, limit):])
+        low52   = min(closes[-min(n, limit):])
 
-    opens, highs, lows, closes, volumes = data
-    n = len(closes)
-    if n < 5:
-        return 'Yetersiz mum.'
+        lines.append(f'  [{tf}] RSI={rsi} | {trend} | son={closes[-1]:.5g} | yüksek={high52:.5g} | düşük={low52:.5g}')
+        lines.append(f'        Değişim: son mum {chg_1p:+.2f}% | son 5 mum {chg_5p:+.2f}%')
+        lines.append(f'        Hacim son/ort: {volumes[-1]:.0f}/{avg_vol:.0f} ({volumes[-1]/avg_vol:.1f}x)')
 
-    rsi      = _calc_rsi(closes)
-    sma20    = sum(closes[-20:]) / min(20, n)
-    avg_vol  = sum(volumes[-20:]) / min(20, n)
-    last_vol = volumes[-1]
-    vol_x    = round(last_vol / avg_vol, 2) if avg_vol > 0 else 1.0
-
-    chg_1h   = round((closes[-1] - closes[-2]) / closes[-2] * 100, 2) if n >= 2 else 0
-    chg_4h   = round((closes[-1] - closes[-5]) / closes[-5] * 100, 2) if n >= 5 else 0
-    chg_24h  = round((closes[-1] - closes[-25]) / closes[-25] * 100, 2) if n >= 25 else 0
-
-    trend = 'SMA20 ÜZERİNDE (YUKARI)' if closes[-1] > sma20 else 'SMA20 ALTINDA (ASAGI)'
-
-    # Son 5 mum metin özeti
-    candle_lines = []
-    for i in range(-5, 0):
-        o, h, l, c, v = opens[i], highs[i], lows[i], closes[i], volumes[i]
-        yön    = '🟢' if c >= o else '🔴'
-        body   = round(abs(c - o) / o * 100, 2)
-        wick_u = round((h - max(o, c)) / o * 100, 2)
-        wick_d = round((min(o, c) - l) / o * 100, 2)
-        vx     = round(v / avg_vol, 1) if avg_vol > 0 else 1.0
-        candle_lines.append(
-            f'  {yön} kapanış={c:.5g} gövde={body:.1f}% '
-            f'üst-fitil={wick_u:.1f}% alt-fitil={wick_d:.1f}% hacim={vx:.1f}x'
-        )
-
-    lines = [
-        f'RSI(14): {rsi}  |  Trend: {trend}',
-        f'Değişim: 1s={chg_1h:+.2f}%  4s={chg_4h:+.2f}%  24s={chg_24h:+.2f}%',
-        f'Hacim (son mum): {vol_x:.1f}x 20-periyot ortalaması',
-        f'Son 5 saat mum:',
-    ] + candle_lines
-
-    # 4h RSI
-    data4 = _klines_full(symbol, '4h', 20)
-    if data4:
-        _, _, _, c4, _ = data4
-        rsi4 = _calc_rsi(c4)
-        lines.append(f'RSI(14) 4s: {rsi4}')
-
+        # Son 5 mum
+        candles = []
+        for i in range(-min(5, n), 0):
+            o, h, l, c, v = opens[i], highs[i], lows[i], closes[i], volumes[i]
+            d   = '🟢' if c >= o else '🔴'
+            bdy = round(abs(c - o) / o * 100, 2)
+            wu  = round((h - max(o, c)) / o * 100, 2)
+            wd  = round((min(o, c) - l) / o * 100, 2)
+            vx  = round(v / avg_vol, 1) if avg_vol > 0 else 1.0
+            candles.append(f'{d}gövde={bdy:.1f}%|üst={wu:.1f}%|alt={wd:.1f}%|vol={vx:.1f}x')
+        lines.append(f'        Son mumlar: {" | ".join(candles)}')
     return '\n'.join(lines)
 
 
@@ -317,43 +296,70 @@ def _collect_data():
     trades    = load_trades()
     positions = load_positions()
 
-    # Ajan bazında özet (son 100 işlem)
+    # Gerçekleşen toplam K/Z
+    realized_pnl = round(sum(t.get('pnl', 0) for t in trades if t.get('type') == 'sell'), 2)
+
+    # Son 50 işlem (tam log)
+    recent_trades = []
+    for t in reversed(trades[-50:]):
+        if t.get('type') == 'buy':
+            recent_trades.append(
+                f"🛒 {t.get('time','?')} | {t.get('symbol','?')} [{t.get('source','?')}] "
+                f"${t.get('usdt',0):.0f}"
+            )
+        elif t.get('type') == 'sell':
+            pnl = t.get('pnl', 0)
+            icon = '🟢' if pnl >= 0 else '🔴'
+            recent_trades.append(
+                f"{icon} {t.get('time','?')} | {t.get('symbol','?')} [{t.get('source','?')}] "
+                f"PnL ${pnl:+.2f}"
+            )
+
+    # Ajan bazında istatistik
     agent_stats = {}
     for t in trades[-100:]:
         if t.get('type') != 'sell':
             continue
-        source = t.get('source', 'UNKNOWN')
-        if source.startswith('CEO'):
+        src = t.get('source', 'UNKNOWN')
+        if src.startswith('CEO'):
             continue
-        agent  = ('EDGE'      if 'EDGE'      in source else
-                  'INDICATOR' if 'INDICATOR' in source else
-                  'WYCKOFF'   if 'WYCKOFF'   in source else
-                  'BREAKOUT'  if 'BREAKOUT'  in source else 'OTONOM')
-        if agent not in agent_stats:
-            agent_stats[agent] = {'wins': 0, 'losses': 0, 'total_pnl': 0.0}
+        ag = ('EDGE' if 'EDGE' in src else 'INDICATOR' if 'INDICATOR' in src
+              else 'WYCKOFF' if 'WYCKOFF' in src else 'BREAKOUT' if 'BREAKOUT' in src
+              else 'OTONOM')
+        if ag not in agent_stats:
+            agent_stats[ag] = {'wins': 0, 'losses': 0, 'pnl': 0.0}
         pnl = t.get('pnl', 0)
-        agent_stats[agent]['total_pnl'] = round(agent_stats[agent]['total_pnl'] + pnl, 2)
-        if pnl > 0:
-            agent_stats[agent]['wins'] += 1
-        else:
-            agent_stats[agent]['losses'] += 1
+        agent_stats[ag]['pnl'] = round(agent_stats[ag]['pnl'] + pnl, 2)
+        if pnl > 0: agent_stats[ag]['wins'] += 1
+        else:       agent_stats[ag]['losses'] += 1
 
-    # Açık pozisyonlar
+    # Açık pozisyonlar (trail stop hesabı dahil)
     try:
-        client   = get_client()
-        balance  = get_usdt_balance(client)
-        open_pos = []
+        client    = get_client()
+        balance   = get_usdt_balance(client)
+        open_pos  = []
+        unrealized = 0.0
+
         for sym, pos in positions.items():
             if pos.get('qty', 0) <= 0:
                 continue
             try:
                 price    = get_price(client, sym)
-                avg      = pos.get('avg_price', price)
+                entry    = pos.get('avg_price', price)
                 qty      = pos.get('qty', 0)
-                pct      = (price - avg) / avg * 100 if avg > 0 else 0
-                peak     = pos.get('peak_price', avg)
-                peak_pct = (peak - avg) / avg * 100 if avg > 0 else 0
+                pnl_abs  = (price - entry) * qty
+                pnl_pct  = (price - entry) / entry * 100 if entry > 0 else 0
+                peak     = pos.get('peak_price', entry)
+                peak_pct = (peak - entry) / entry * 100 if entry > 0 else 0
+                value    = price * qty
+                unrealized += pnl_abs
 
+                # Trail stop hesabı
+                trail_active = pos.get('trail_active', False)
+                trail_dist   = _trail_distance(peak_pct)
+                trail_price  = peak * (1 - trail_dist / 100) if trail_active else None
+
+                # Tutma süresi
                 buy_time = pos.get('buy_time', '')
                 hours_held = '?'
                 if buy_time:
@@ -364,146 +370,126 @@ def _collect_data():
                         pass
 
                 open_pos.append({
-                    'symbol':     sym,
-                    'agent':      pos.get('agent', '?'),
-                    'pct':        round(pct, 2),
-                    'peak_pct':   round(peak_pct, 1),
-                    'entry':      round(avg, 6),
-                    'price':      round(price, 6),
-                    'value':      round(price * qty, 2),
-                    'hours_held': hours_held,
-                    'ceo_action': pos.get('ceo_last_action_type', ''),
+                    'symbol':       sym,
+                    'agent':        pos.get('agent', '?'),
+                    'entry':        round(entry, 6),
+                    'price':        round(price, 6),
+                    'qty':          round(qty, 4),
+                    'value':        round(value, 2),
+                    'pnl_abs':      round(pnl_abs, 2),
+                    'pnl_pct':      round(pnl_pct, 2),
+                    'peak_price':   round(peak, 6),
+                    'peak_pct':     round(peak_pct, 1),
+                    'trail_active': trail_active,
+                    'trail_dist':   trail_dist if trail_active else None,
+                    'trail_price':  round(trail_price, 6) if trail_price else None,
+                    'hours_held':   hours_held,
+                    'ceo_action':   pos.get('ceo_last_action_type', ''),
                 })
             except Exception:
                 pass
+
         pos_total = round(sum(p['value'] for p in open_pos), 2)
     except Exception:
-        balance   = 0
-        open_pos  = []
-        pos_total = 0
+        balance = 0; open_pos = []; pos_total = 0; unrealized = 0.0
 
-    # BTC durumu
+    # BTC
     try:
         btc_data = _klines_full('BTCUSDT', '1h', 25)
         if btc_data:
             _, _, _, btc_c, _ = btc_data
             sma20      = sum(btc_c[-20:]) / 20
-            btc_pct    = round((btc_c[-1] - btc_c[-2]) / btc_c[-2] * 100, 2)
-            btc_vs_sma = round((btc_c[-1] - sma20) / sma20 * 100, 2)
+            btc_pct_1h = round((btc_c[-1] - btc_c[-2]) / btc_c[-2] * 100, 2)
+            btc_pct_4h = round((btc_c[-1] - btc_c[-5]) / btc_c[-5] * 100, 2) if len(btc_c) >= 5 else 0
             btc_trend  = 'YUKARI' if btc_c[-1] > sma20 else 'ASAGI'
+            btc_price  = round(btc_c[-1], 2)
         else:
-            btc_pct = 0; btc_vs_sma = 0; btc_trend = '?'
+            btc_pct_1h = btc_pct_4h = 0; btc_trend = '?'; btc_price = 0
     except Exception:
-        btc_pct = 0; btc_vs_sma = 0; btc_trend = '?'
+        btc_pct_1h = btc_pct_4h = 0; btc_trend = '?'; btc_price = 0
 
     # Fear & Greed
     try:
         fg_r = requests.get('https://api.alternative.me/fng/?limit=1', timeout=5)
-        fg   = int(fg_r.json()['data'][0]['value'])
+        fg_val   = int(fg_r.json()['data'][0]['value'])
+        fg_label = fg_r.json()['data'][0]['value_classification']
     except Exception:
-        fg = '?'
+        fg_val = '?'; fg_label = '?'
 
     return {
-        'balance':        round(balance, 2),
-        'pos_total':      pos_total,
-        'total':          round(balance + pos_total, 2),
-        'btc_trend':      btc_trend,
-        'btc_pct_1h':     btc_pct,
-        'btc_vs_sma':     btc_vs_sma,
+        'balance':       round(balance, 2),
+        'pos_total':     pos_total,
+        'total':         round(balance + pos_total, 2),
+        'realized_pnl':  realized_pnl,
+        'unrealized_pnl': round(unrealized, 2),
+        'btc_price':     btc_price,
+        'btc_trend':     btc_trend,
+        'btc_pct_1h':    btc_pct_1h,
+        'btc_pct_4h':    btc_pct_4h,
         'open_positions': open_pos,
-        'agent_stats':    agent_stats,
-        'fg':             fg,
-        'cfg':            cfg,
+        'agent_stats':   agent_stats,
+        'recent_trades': recent_trades,
+        'fg_val':        fg_val,
+        'fg_label':      fg_label,
+        'cfg':           cfg,
     }
 
 
 # ─── Prompt ───────────────────────────────────────────────────────────────────
 
 def _build_prompt(data):
-    fg    = data['fg']
+    cfg = data['cfg']
     lines = [
-        "Sen bir kripto portföy yöneticisisin. Her 5 dakikada bir açık pozisyonları inceliyorsun.",
+        "Sen bir kripto portföy yöneticisisin. Aşağıdaki tüm veriyi görüyorsun.",
+        "Araçların: sell_partial, sell_all, buy_more, set_agent_enabled, set_position_mult.",
+        "Kendi kararını ver.",
         "",
-        "TEMEL KURAL: ZARAR ETME. Kâr al. Trend bitti mi çık. Hacim düştü mü çık.",
-        "Her pozisyon için aktif karar ver. 'Bekleyeyim' deme — trend devam etmiyorsa çık.",
+        "=== PORTFÖY ÖZET ===",
+        f"Serbest USDT: ${data['balance']}",
+        f"Pozisyonlarda: ${data['pos_total']}",
+        f"Toplam Değer: ${data['total']}",
+        f"Gerçekleşen K/Z (tüm zamanlar): ${data['realized_pnl']:+.2f}",
+        f"Kağıt K/Z (anlık): ${data['unrealized_pnl']:+.2f}",
         "",
-        "ELİNDEKİ ARAÇLAR (tam yetki):",
-        "  sell_partial(symbol, pct, reason)",
-        "    → Pozisyonun %pct'ini sat. Trend zayıflıyor ama devam edebilir. Kâr al.",
-        "    → Örnek: peak kâr sonrası geri çekilme başladı → %40-60 sat, kalan trendle git",
-        "  sell_all(symbol, reason)",
-        "    → Tamamını kapat. Trend döndü, hacim bitti, RSI aşırı alımdan indi.",
-        "    → Zararda uzun süredir hareket yok → çık, parasını daha iyi yere koy.",
-        "  set_agent_enabled(agent, bool)",
-        "    → Ajan sürekli zarar ediyorsa kapat.",
-        "  set_position_mult(value)",
-        "    → Piyasa kötüye gidiyorsa pozisyon büyüklüğünü küçült (0.5-1.0).",
-        "",
-        "KARAR VERME MANTIĞI (sırayla kontrol et):",
-        "  1. Peak kâr vs şu anki kâr: Geri çekilme başladı mı? Ne kadar?",
-        "     → Geri çekilme + hacim düşüşü = trend bitti → sat",
-        "     → Geri çekilme ama hacim hâlâ yüksek = düzeltme → bekle veya kısmi sat",
-        "  2. RSI: Aşırı alım (>70) sonrası düşüyor mu?",
-        "     → RSI 70+ ve düşüş başladı → kısmi veya tam sat",
-        "  3. Mum yapısı: Son 3 mumda ne görüyorsun?",
-        "     → Uzun üst fitil + küçük gövde = satış baskısı → sat",
-        "     → Ardışık kırmızı + azalan hacim = güç kaybı → sat",
-        "  4. Trend: SMA20 üzerinde mi, altında mı?",
-        "     → Fiyat SMA20 altına düştüyse trend kırıldı → sat",
-        "  5. BTC: Piyasa geneli ne yapıyor?",
-        "     → BTC sert düşüyorsa altcoin de düşer → daha agresif sat",
-        "  6. Süre: Çok uzun tutulmuş, hareket yok mu?",
-        "     → 12+ saat kârsız bekleme = sermaye dondurma → çık",
-        "",
-        "ZARAR YÖNETİMİ:",
-        "  → Zarardaki pozisyon: trend hâlâ güçlüyse bekle, değilse hemen çık",
-        "  → Uzun süredir zararda + düşen hacim = umut bekleme → çık",
-        "  → Birden fazla zararda pozisyon varsa en kötüyü önce kes",
-        "",
-        f"=== PİYASA DURUMU ===",
-        f"BTC: {data['btc_trend']} | 1s: {data['btc_pct_1h']:+.2f}% | SMA20: {data['btc_vs_sma']:+.2f}%",
-        f"Korku/Açgözlülük: {fg}/100",
-        f"USDT: ${data['balance']} | Pozisyonlarda: ${data['pos_total']} | Toplam: ${data['total']}",
+        "=== PİYASA ===",
+        f"BTC: ${data['btc_price']} | Trend: {data['btc_trend']} | 1s: {data['btc_pct_1h']:+.2f}% | 4s: {data['btc_pct_4h']:+.2f}%",
+        f"Korku/Açgözlülük: {data['fg_val']}/100 ({data['fg_label']})",
         "",
     ]
 
     if data['open_positions']:
         lines.append("=== AÇIK POZİSYONLAR ===")
         for p in data['open_positions']:
-            sym  = p['symbol']
-            pct  = p['pct']
-            icon = '🟢' if pct >= 0 else '🔴'
-            ceo_note = f" | Son CEO eylem: {p['ceo_action']}" if p.get('ceo_action') else ''
-            lines.append(f"\n{icon} {sym} [{p['agent']}]{ceo_note}")
-            lines.append(
-                f"   Giriş: ${p['entry']} → Şu an: ${p['price']} | "
-                f"P&L: {pct:+.2f}% | Peak kâr: +{p['peak_pct']}% | Süredir: {p['hours_held']}s"
-            )
-            peak_gap = p['peak_pct'] - pct
-            if peak_gap > 1:
-                lines.append(f"   ⚠️ Peak'ten {peak_gap:.1f}% geri çekildi")
+            icon = '🟢' if p['pnl_pct'] >= 0 else '🔴'
+            ceo  = f" | CEO geçmişi: {p['ceo_action']}" if p.get('ceo_action') else ''
+            lines.append(f"\n{icon} {p['symbol']} [{p['agent']}]{ceo}")
+            lines.append(f"   Giriş: ${p['entry']} | Anlık: ${p['price']} | Miktar: {p['qty']}")
+            lines.append(f"   K/Z: {p['pnl_pct']:+.2f}% (${p['pnl_abs']:+.2f}) | Değer: ${p['value']}")
+            lines.append(f"   Peak: ${p['peak_price']} (+{p['peak_pct']}%) | Peak'ten geri: {p['peak_pct'] - p['pnl_pct']:.1f}%")
+            if p['trail_active']:
+                lines.append(f"   Trail AKTIF: mesafe -%{p['trail_dist']}% → stop fiyatı ${p['trail_price']}")
+            else:
+                lines.append(f"   Trail henüz aktif değil (aktivasyon: +%3 kâr)")
+            lines.append(f"   Tutulma süresi: {p['hours_held']} saat")
             lines.append("   Teknik:")
-            analysis = _position_analysis(sym, p['entry'], p['price'])
-            for al in analysis.split('\n'):
-                lines.append(f"   {al}")
+            lines.append(_position_market_block(p['symbol']))
     else:
         lines.append("Açık pozisyon yok.")
 
-    lines += ["", "=== AJAN PERFORMANSI (son 100 işlem) ==="]
-    for agent, stats in data['agent_stats'].items():
-        total = stats['wins'] + stats['losses']
-        wr    = round(stats['wins'] / total * 100, 1) if total > 0 else 0
-        lines.append(f"  {agent}: {total} işlem | %{wr} WR | PnL: ${stats['total_pnl']}")
+    lines += ["", "=== SON 50 İŞLEM (ALIM/SATIM GEÇMİŞİ) ==="]
+    lines += data['recent_trades']
 
-    params = data.get('cfg', {})
-    lines += [
-        "",
-        "=== AJAN DURUMU ===",
-        f"  Otonom: {'AÇIK' if params.get('otonom_enabled', True) else 'KAPALI'} | "
-        f"Breakout: {'AÇIK' if params.get('breakout_enabled', True) else 'KAPALI'} | "
-        f"Indicator: {'AÇIK' if params.get('indicator_enabled', True) else 'KAPALI'}",
-        f"  Pozisyon çarpanı: {params.get('ceo_position_mult', 1.0)}",
-    ]
+    lines += ["", "=== AJAN PERFORMANSI (son 100 işlem) ==="]
+    for ag, st in data['agent_stats'].items():
+        total = st['wins'] + st['losses']
+        wr    = round(st['wins'] / total * 100, 1) if total > 0 else 0
+        lines.append(f"  {ag}: {total} işlem | %{wr} kazanma | PnL: ${st['pnl']:+.2f}")
+
+    lines += ["", "=== AJAN DURUMU ==="]
+    for ag in _CEO_AGENTS:
+        status = 'AÇIK' if cfg.get(f'{ag}_enabled', True) else 'KAPALI'
+        lines.append(f"  {ag}: {status}")
+    lines.append(f"  Pozisyon çarpanı: {cfg.get('ceo_position_mult', 1.0)}")
 
     return '\n'.join(lines)
 
@@ -514,25 +500,21 @@ def _call_deepseek(prompt, api_key):
     try:
         r = requests.post(
             DEEPSEEK_URL,
-            headers={
-                'Authorization': f'Bearer {api_key}',
-                'Content-Type':  'application/json',
-            },
+            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
             json={
                 'model':       'deepseek-chat',
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'tools':       TOOLS,
                 'tool_choice': 'auto',
-                'max_tokens':  1500,
-                'temperature': 0.2,
+                'max_tokens':  2000,
+                'temperature': 0.1,
             },
             timeout=60,
         )
         r.raise_for_status()
-        msg        = r.json()['choices'][0]['message']
-        content    = msg.get('content') or ''
-        tool_calls = msg.get('tool_calls') or []
-        return {'content': content.strip(), 'tool_calls': tool_calls}
+        msg = r.json()['choices'][0]['message']
+        return {'content': (msg.get('content') or '').strip(),
+                'tool_calls': msg.get('tool_calls') or []}
     except Exception as e:
         print(f'[CEO] DeepSeek hata: {e}')
         return None
@@ -550,23 +532,19 @@ def _send_report(response, tool_results, data):
     if response is None:
         send_telegram('⚠️ <b>CEO</b>: DeepSeek yanıt vermedi.')
         return
-
     open_count = len(data['open_positions'])
     lines = [
         '👔 <b>CEO Değerlendirme</b>',
-        f'📊 Toplam: ${data["total"]} | Açık poz: {open_count} | BTC: {data["btc_trend"]}',
+        f'💼 Toplam: ${data["total"]} | Kağıt K/Z: ${data["unrealized_pnl"]:+.2f} | BTC: {data["btc_trend"]}',
     ]
-
     if response.get('content'):
         lines += ['', f'📝 {response["content"]}']
-
     if tool_results:
         lines += ['', '⚙️ <b>Kararlar:</b>']
         for r in tool_results:
             lines.append(f'  ✅ {r}')
     elif open_count > 0:
-        lines += ['', '⚙️ Müdahale gerekmedi — pozisyonlar tutuldu.']
-
+        lines += ['', '⚙️ Müdahale gerekmedi.']
     send_telegram('\n'.join(lines))
 
 
@@ -579,11 +557,10 @@ _thread  = None
 def _interruptible_sleep(seconds):
     end = time.time() + seconds
     while _running and time.time() < end:
-        time.sleep(15)
+        time.sleep(10)
 
 
 def _run_once(api_key):
-    """Manuel tetikleme."""
     try:
         data         = _collect_data()
         prompt       = _build_prompt(data)
@@ -605,52 +582,43 @@ def _run_once(api_key):
 def _run_loop():
     global _running
     state = _load_state()
-    print(f'[CEO] Başladı — her {REVIEW_MIN} dakikada bir pozisyon analizi')
+    interval = load_config().get('ceo_interval_min', REVIEW_MIN)
+    print(f'[CEO] Başladı — her {interval} dakikada bir analiz')
     send_telegram(
         f'👔 <b>CEO Agent AKTİF</b>\n'
-        f'Her {REVIEW_MIN} dakikada açık pozisyonları analiz ediyorum.\n'
-        f'Tam yetki: kısmi sat, tamamını sat, ajan yönetimi.\n'
-        f'Öncelik: kârlı kapanma, trend takibi, zarar etme.'
+        f'Her {interval} dakikada tam portföy analizi.\n'
+        f'Araçlar: kısmi sat, tamamını sat, ekleme yap, ajan yönetimi.'
     )
 
     while _running:
         cfg = load_config()
         if not cfg.get('ceo_agent_enabled', False):
-            print('[CEO] Devre dışı bırakıldı, duruyorum.')
+            print('[CEO] Devre dışı.')
             _running = False
             break
 
+        interval = cfg.get('ceo_interval_min', REVIEW_MIN)
         api_key  = cfg.get('deepseek_api_key', '')
-        interval = cfg.get('ceo_interval_min', REVIEW_MIN)  # config'den override edilebilir
 
         if not api_key:
-            print('[CEO] deepseek_api_key yok — analiz atlandı')
+            print('[CEO] deepseek_api_key yok')
             _interruptible_sleep(interval * 60)
             continue
 
         try:
             data = _collect_data()
-
-            # Açık pozisyon yoksa stratejik kontrol için kısa bekle
-            if not data['open_positions']:
-                print('[CEO] Açık pozisyon yok.')
-                _interruptible_sleep(interval * 60)
-                continue
-
             print(f'[CEO] Analiz #{state["review_count"] + 1} — {len(data["open_positions"])} açık poz')
             prompt       = _build_prompt(data)
             response     = _call_deepseek(prompt, api_key)
             tool_results = _execute_tool_calls(response['tool_calls']) if response else []
             _send_report(response, tool_results, data)
             _mark_ceo_success()
-
             state['review_count'] += 1
             state['last_review']   = datetime.datetime.now().isoformat()
             if tool_results:
                 state.setdefault('changes_made', []).extend(tool_results)
                 state['changes_made'] = state['changes_made'][-50:]
             _save_state(state)
-
         except Exception as e:
             print(f'[CEO] Analiz hata: {e}')
 
@@ -660,7 +628,6 @@ def _run_loop():
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def ceo_flag(cfg, key, default=True):
-    """Ajanın açık/kapalı bayrağını döndür."""
     return cfg.get(key, default)
 
 
@@ -689,34 +656,27 @@ def stop_ceo_agent():
     global _running
     _running = False
     cfg = load_config()
-    cfg['otonom_enabled']       = True
-    cfg['edge_enabled']         = True
-    cfg['indicator_enabled']    = True
-    cfg['wyckoff_enabled']      = True
-    cfg['breakout_enabled']     = True
+    for ag in _CEO_AGENTS:
+        cfg[f'{ag}_enabled'] = True
     cfg['accumulation_enabled'] = True
     cfg['ceo_position_mult']    = 1.0
     save_config(cfg)
-    send_telegram(
-        '👔 CEO Agent durduruldu.\n'
-        '✅ Tüm ajanlar varsayılan duruma döndürüldü.'
-    )
+    send_telegram('👔 CEO durduruldu. Tüm ajanlar varsayılan duruma döndü.')
 
 
 def ceo_agent_status():
     state = _load_state()
     cfg   = load_config()
     return {
-        'running':       _running,
-        'enabled':       cfg.get('ceo_agent_enabled', False),
-        'review_count':  state.get('review_count', 0),
-        'last_review':   state.get('last_review'),
-        'interval_min':  cfg.get('ceo_interval_min', REVIEW_MIN),
+        'running':      _running,
+        'enabled':      cfg.get('ceo_agent_enabled', False),
+        'review_count': state.get('review_count', 0),
+        'last_review':  state.get('last_review'),
+        'interval_min': cfg.get('ceo_interval_min', REVIEW_MIN),
     }
 
 
 def trigger_ceo_review():
-    """Manuel olarak analiz tetikle."""
     if not _running:
         return False
     cfg     = load_config()
