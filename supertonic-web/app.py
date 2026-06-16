@@ -252,6 +252,7 @@ Suggested hashtags: {trend_tags}
 Return ONLY valid JSON, no markdown, no explanation:
 {{
   "title": "catchy YouTube title for this video (max 80 chars, in {lang_name})",
+  "hashtags": ["Shorts", "topic", "specific", "tags", "no", "hash", "symbol"],
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
@@ -263,7 +264,8 @@ Return ONLY valid JSON, no markdown, no explanation:
 Rules:
 - 5 to 7 scenes
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
-- Total narration under 55 seconds"""
+- Total narration under 55 seconds
+- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol"""
 
     response = client.chat.completions.create(
         model="deepseek-chat",
@@ -415,6 +417,15 @@ Rules:
     full_script = " ".join(s["text"] for s in scenes)
     generated_title = data.get("title", topic or scenes[0]["text"][:60])
 
+    # Videoya özel hashtag'ler (DeepSeek'ten) + genel engagement tag'leri
+    raw_tags = data.get("hashtags", [])
+    if raw_tags:
+        video_tags = ", ".join(f"#{t.lstrip('#')}" for t in raw_tags[:12] if t.strip())
+    else:
+        # Fallback: trend hashtag'leri + başlık kelimelerinden üret
+        title_tags = [f"#{w.lower()}" for w in generated_title.split()[:3] if len(w) > 3]
+        video_tags = ", ".join(["#Shorts"] + title_tags + trend_data["hashtags"][1:6])
+
     # Thumbnail (ilk sahnenin fotoğrafından)
     thumb_path = None
     try:
@@ -430,8 +441,8 @@ Rules:
         "script": full_script,
         "title": generated_title,
         "scene_count": len(scenes),
-        "suggested_tags": trend_tags,
-        "suggested_description": f"{full_script[:200]}...\n\n{' '.join(trend_data['hashtags'][:8])}",
+        "suggested_tags": video_tags,
+        "suggested_description": f"{full_script[:200]}...\n\n{video_tags.replace(', ', ' ')}",
     }
 
 
