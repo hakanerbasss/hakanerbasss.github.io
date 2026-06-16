@@ -22,7 +22,7 @@ from bot import (load_config, save_config, load_trades, load_positions,
 
 STATE_FILE    = 'ceo_state.json'
 DEEPSEEK_URL  = 'https://api.deepseek.com/chat/completions'
-REVIEW_MIN    = 30   # dakika — kaç dakikada bir pozisyon gözden geçirilir
+REVIEW_MIN    = 5    # dakika — kaç dakikada bir pozisyon gözden geçirilir
 
 
 # ─── Araç Şemaları ────────────────────────────────────────────────────────────
@@ -420,74 +420,89 @@ def _collect_data():
 # ─── Prompt ───────────────────────────────────────────────────────────────────
 
 def _build_prompt(data):
-    fg  = data['fg']
+    fg    = data['fg']
     lines = [
-        "Sen bir kripto portföy yöneticisisin. Açık pozisyonları analiz et, karar ver.",
+        "Sen bir kripto portföy yöneticisisin. Her 5 dakikada bir açık pozisyonları inceliyorsun.",
         "",
-        "ELİNDEKİ ARAÇLAR:",
-        "  sell_partial(symbol, pct, reason) — pozisyonun bir kısmını sat",
-        "  sell_all(symbol, reason)          — tamamını kapat",
-        "  set_agent_enabled(agent, bool)    — ajanı aç/kapat (çok kötü ise)",
-        "  set_position_mult(value)          — pozisyon büyüklüğünü ayarla",
+        "TEMEL KURAL: ZARAR ETME. Kâr al. Trend bitti mi çık. Hacim düştü mü çık.",
+        "Her pozisyon için aktif karar ver. 'Bekleyeyim' deme — trend devam etmiyorsa çık.",
         "",
-        "KARAR VERİRKEN MUTLAKA BAK:",
-        "  - Son 5 saatlik mum: gövde büyüklüğü, fitil, yön değişimi",
-        "  - Hacim trendi: satış mı geliyor, hacim zayıflıyor mu?",
-        "  - RSI: aşırı alım bölgesinde mi, ivme kaybı var mı?",
-        "  - Giriş fiyatına göre pozisyon: kâr ne kadar, ne zamandır tutuluyor?",
-        "  - Peak kâr vs şu anki kâr: ne kadar geri çekildi?",
-        "  - BTC trendi: piyasa geneli ne yapıyor?",
-        "  - Korku/Açgözlülük",
+        "ELİNDEKİ ARAÇLAR (tam yetki):",
+        "  sell_partial(symbol, pct, reason)",
+        "    → Pozisyonun %pct'ini sat. Trend zayıflıyor ama devam edebilir. Kâr al.",
+        "    → Örnek: peak kâr sonrası geri çekilme başladı → %40-60 sat, kalan trendle git",
+        "  sell_all(symbol, reason)",
+        "    → Tamamını kapat. Trend döndü, hacim bitti, RSI aşırı alımdan indi.",
+        "    → Zararda uzun süredir hareket yok → çık, parasını daha iyi yere koy.",
+        "  set_agent_enabled(agent, bool)",
+        "    → Ajan sürekli zarar ediyorsa kapat.",
+        "  set_position_mult(value)",
+        "    → Piyasa kötüye gidiyorsa pozisyon büyüklüğünü küçült (0.5-1.0).",
         "",
-        "Müdahale etmek istemediğin pozisyonlar için hiçbir şey yapma (araç çağırma).",
-        "Sadece gerçek bir sinyal görürsen karar ver.",
+        "KARAR VERME MANTIĞI (sırayla kontrol et):",
+        "  1. Peak kâr vs şu anki kâr: Geri çekilme başladı mı? Ne kadar?",
+        "     → Geri çekilme + hacim düşüşü = trend bitti → sat",
+        "     → Geri çekilme ama hacim hâlâ yüksek = düzeltme → bekle veya kısmi sat",
+        "  2. RSI: Aşırı alım (>70) sonrası düşüyor mu?",
+        "     → RSI 70+ ve düşüş başladı → kısmi veya tam sat",
+        "  3. Mum yapısı: Son 3 mumda ne görüyorsun?",
+        "     → Uzun üst fitil + küçük gövde = satış baskısı → sat",
+        "     → Ardışık kırmızı + azalan hacim = güç kaybı → sat",
+        "  4. Trend: SMA20 üzerinde mi, altında mı?",
+        "     → Fiyat SMA20 altına düştüyse trend kırıldı → sat",
+        "  5. BTC: Piyasa geneli ne yapıyor?",
+        "     → BTC sert düşüyorsa altcoin de düşer → daha agresif sat",
+        "  6. Süre: Çok uzun tutulmuş, hareket yok mu?",
+        "     → 12+ saat kârsız bekleme = sermaye dondurma → çık",
         "",
-        f"=== PİYASA ===",
-        f"BTC: {data['btc_trend']} | 1s değişim: {data['btc_pct_1h']:+.2f}% | SMA20'ye: {data['btc_vs_sma']:+.2f}%",
-        f"Korku/Açgözlülük: {fg}",
+        "ZARAR YÖNETİMİ:",
+        "  → Zarardaki pozisyon: trend hâlâ güçlüyse bekle, değilse hemen çık",
+        "  → Uzun süredir zararda + düşen hacim = umut bekleme → çık",
+        "  → Birden fazla zararda pozisyon varsa en kötüyü önce kes",
+        "",
+        f"=== PİYASA DURUMU ===",
+        f"BTC: {data['btc_trend']} | 1s: {data['btc_pct_1h']:+.2f}% | SMA20: {data['btc_vs_sma']:+.2f}%",
+        f"Korku/Açgözlülük: {fg}/100",
         f"USDT: ${data['balance']} | Pozisyonlarda: ${data['pos_total']} | Toplam: ${data['total']}",
         "",
     ]
 
     if data['open_positions']:
-        lines.append("=== AÇIK POZİSYONLAR (teknik analiz dahil) ===")
+        lines.append("=== AÇIK POZİSYONLAR ===")
         for p in data['open_positions']:
             sym  = p['symbol']
             pct  = p['pct']
             icon = '🟢' if pct >= 0 else '🔴'
-            ceo_note = f" | Son CEO: {p['ceo_action']}" if p.get('ceo_action') else ''
-            lines.append(
-                f"\n{icon} {sym} [{p['agent']}]{ceo_note}"
-            )
+            ceo_note = f" | Son CEO eylem: {p['ceo_action']}" if p.get('ceo_action') else ''
+            lines.append(f"\n{icon} {sym} [{p['agent']}]{ceo_note}")
             lines.append(
                 f"   Giriş: ${p['entry']} → Şu an: ${p['price']} | "
-                f"P&L: {pct:+.2f}% | Peak kâr: +{p['peak_pct']}% | "
-                f"Süredir: {p['hours_held']}s"
+                f"P&L: {pct:+.2f}% | Peak kâr: +{p['peak_pct']}% | Süredir: {p['hours_held']}s"
             )
-            lines.append("   --- Teknik Analiz ---")
+            peak_gap = p['peak_pct'] - pct
+            if peak_gap > 1:
+                lines.append(f"   ⚠️ Peak'ten {peak_gap:.1f}% geri çekildi")
+            lines.append("   Teknik:")
             analysis = _position_analysis(sym, p['entry'], p['price'])
             for al in analysis.split('\n'):
                 lines.append(f"   {al}")
     else:
         lines.append("Açık pozisyon yok.")
 
-    lines += [
-        "",
-        "=== AJAN PERFORMANSI (son 100 işlem) ===",
-    ]
+    lines += ["", "=== AJAN PERFORMANSI (son 100 işlem) ==="]
     for agent, stats in data['agent_stats'].items():
         total = stats['wins'] + stats['losses']
         wr    = round(stats['wins'] / total * 100, 1) if total > 0 else 0
-        lines.append(f"{agent}: {total} işlem | %{wr} WR | PnL: ${stats['total_pnl']}")
+        lines.append(f"  {agent}: {total} işlem | %{wr} WR | PnL: ${stats['total_pnl']}")
 
     params = data.get('cfg', {})
     lines += [
         "",
         "=== AJAN DURUMU ===",
-        f"Otonom: {'AÇIK' if params.get('otonom_enabled', True) else 'KAPALI'} | "
+        f"  Otonom: {'AÇIK' if params.get('otonom_enabled', True) else 'KAPALI'} | "
         f"Breakout: {'AÇIK' if params.get('breakout_enabled', True) else 'KAPALI'} | "
         f"Indicator: {'AÇIK' if params.get('indicator_enabled', True) else 'KAPALI'}",
-        f"Pozisyon çarpanı: {params.get('ceo_position_mult', 1.0)}",
+        f"  Pozisyon çarpanı: {params.get('ceo_position_mult', 1.0)}",
     ]
 
     return '\n'.join(lines)
@@ -593,8 +608,9 @@ def _run_loop():
     print(f'[CEO] Başladı — her {REVIEW_MIN} dakikada bir pozisyon analizi')
     send_telegram(
         f'👔 <b>CEO Agent AKTİF</b>\n'
-        f'Her {REVIEW_MIN} dakikada açık pozisyonları analiz edip karar vereceğim.\n'
-        f'DeepSeek: mum, hacim, RSI, trend → satış/tutma kararı'
+        f'Her {REVIEW_MIN} dakikada açık pozisyonları analiz ediyorum.\n'
+        f'Tam yetki: kısmi sat, tamamını sat, ajan yönetimi.\n'
+        f'Öncelik: kârlı kapanma, trend takibi, zarar etme.'
     )
 
     while _running:
@@ -615,10 +631,10 @@ def _run_loop():
         try:
             data = _collect_data()
 
-            # Açık pozisyon yoksa daha az sıklıkla çalıştır
+            # Açık pozisyon yoksa stratejik kontrol için kısa bekle
             if not data['open_positions']:
-                print('[CEO] Açık pozisyon yok, 4 saatte bir stratejik kontrol.')
-                _interruptible_sleep(4 * 3600)
+                print('[CEO] Açık pozisyon yok.')
+                _interruptible_sleep(interval * 60)
                 continue
 
             print(f'[CEO] Analiz #{state["review_count"] + 1} — {len(data["open_positions"])} açık poz')
