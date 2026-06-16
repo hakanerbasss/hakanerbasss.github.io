@@ -482,9 +482,9 @@ class BreakoutAgent:
             if pnl_pct <= -HARD_STOP_PCT:
                 reason = f'HARD STOP ({pnl_pct:.1f}%)'
 
-            # 2. Kademeli trailing stop: peak kârına göre daralan mesafe
+            # 2. Kademeli trailing stop: CEO ayarlamışsa onu kullan, yoksa otomatik hesapla
             elif trail_active:
-                trail_dist  = _trail_distance(peak_pct)
+                trail_dist  = pos.get('ceo_trail_pct') or _trail_distance(peak_pct)
                 trail_price = peak * (1 - trail_dist / 100)
                 # Trail stop asla entry'nin altına inemez — kazananı kaybedene çevirme
                 trail_price = max(trail_price, entry)
