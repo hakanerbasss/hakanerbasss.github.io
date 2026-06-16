@@ -829,7 +829,21 @@ def execute_sell(client, symbol, sell_pct, source='MANUEL', period='—'):
             if qty <= 0:
                 return {'ok': False, 'error': 'Satılacak miktar hesaplanamadı'}
 
-            order = client.order_market_sell(symbol=symbol, quantity=qty)
+            # Son notional kontrolü — API'ye göndermeden önce kontrol
+            if qty * price < min_notional * 0.95:
+                print(f'[Bot] {symbol} pozisyon toz seviyesinde (${qty*price:.2f} < ${min_notional}), positions.json temizleniyor')
+                clear_position(symbol)
+                return {'ok': False, 'error': f'Toz pozisyon (${qty*price:.2f}), temizlendi'}
+
+            try:
+                order = client.order_market_sell(symbol=symbol, quantity=qty)
+            except Exception as api_err:
+                err_str = str(api_err)
+                if '-1013' in err_str or 'NOTIONAL' in err_str.upper():
+                    print(f'[Bot] {symbol} NOTIONAL hatası, toz pozisyon temizleniyor: {api_err}')
+                    clear_position(symbol)
+                    return {'ok': False, 'error': f'NOTIONAL ({qty*price:.2f}$), temizlendi'}
+                raise
 
             # Gerçekleşen satış: order yanıtından miktar + ortalama dolum fiyatı
             avg_price = pos['avg_price']
