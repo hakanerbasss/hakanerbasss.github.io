@@ -1,23 +1,40 @@
 """
-CEO Agent — Yönetici Yapay Zeka
+CEO Agent — Portföy Patron
 ────────────────────────────────────────────────────────────────
-• Her N saatte bir tüm ajanların performansını analiz eder
-• DeepSeek function calling ile araç tabanlı karar verir
-• ROL: Risk yöneticisi (trader DEĞİL). Tek pozisyona dokunmaz —
-  ajanlar kendi giriş VE çıkışlarını (TP/SL/trailing) yönetir.
-• 2 araç: set_agent_enabled (batan ajanı kapat),
-          set_position_mult (bear'de pozisyon boyutunu küçült)
-• config.json → ceo_agent_enabled: true/false ile açılır
+İKİ KATMANLI YÖNETİM:
+
+1. POZİSYON GÖZDEGEÇİRME (her 30 dakika, kural tabanlı — DeepSeek YOK):
+   • Yüksek kârdan geri çekilince %50 kısmi kar al
+   • Kısmi satış sonrası zarara dönerse kalanı kes
+   • Ağır zarar (>%9) → ajanın stop'unu beklemeden kes
+   • Genel portföy -%4+ zararda → en kötü pozisyonu kes
+
+2. STRATEJİK ANALİZ (her 4 saat, DeepSeek):
+   • Sürekli zarar eden ajanı kapat
+   • BTC bear trendinde pozisyon büyüklüğünü küçült
+
+config.json → ceo_agent_enabled: true/false
 """
 
 import time, datetime, json, threading, os, requests
 from bot import (load_config, save_config, load_trades, load_positions,
                  get_price, send_telegram, get_usdt_balance,
-                 get_client, execute_sell)
+                 get_client, execute_sell, update_position)
 
 STATE_FILE   = 'ceo_state.json'
 DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
-DEFAULT_INTERVAL = 1   # saat
+DEFAULT_INTERVAL = 4   # saat (stratejik analiz)
+
+# ─── Pozisyon Gözden Geçirme Sabitleri ───────────────────────────────────────
+REVIEW_INTERVAL_MIN = 30    # dakikada bir pozisyon gözden geçir
+CEO_COOLDOWN_MIN    = 90    # aynı pozisyona tekrar dokunma süresi (dk)
+
+PARTIAL_PEAK_MIN    = 22.0  # kısmi satış için min peak kâr %
+PARTIAL_RETREAT     = 7.0   # peak'ten bu kadar geri çekilince %50 sat
+PHASE1_LOSS_CUT     = -3.0  # kısmi satış sonrası bu kadar zarara → kalanı kes
+BIG_LOSS_CUT        = -9.0  # her zaman bu kadar zararda → CEO keser
+PORTFOLIO_LOSS_PCT  = -4.0  # portföy bu kadar zararda → en kötüyü kes
+PORTFOLIO_WORST_MIN = -5.0  # portföy koruması için min pozisyon zararı
 
 # ─── Araç Şemaları ────────────────────────────────────────────────────────────
 
@@ -110,6 +127,180 @@ def _execute_tool_calls(tool_calls):
             print(f'[CEO] Araç: {name} → {r}')
             results.append(r)
     return results
+
+
+# ─── Zaman Yardımcıları ──────────────────────────────────────────────────────
+
+def _now_str():
+    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def _minutes_since(ts_str):
+    try:
+        dt = datetime.datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S')
+        return (datetime.datetime.now() - dt).total_seconds() / 60
+    except Exception:
+        return 9999
+
+
+# ─── Pozisyon Gözden Geçirme (Kural Tabanlı, DeepSeek YOK) ──────────────────
+
+def _check_positions():
+    """
+    Patron döngüsü: Her 30 dakikada bir TÜM açık pozisyonlara bakar.
+    Ajanlar kendi trail/stop mantığıyla çalışmaya devam eder.
+    CEO bu kurallara EK olarak müdahale eder:
+      1. Peak kârdan geri çekildi → %50 kısmi sat
+      2. Kısmi satış sonrası zarara döndü → kalanı kes
+      3. Ağır zarar (>%9) → tamamını kes
+      4. Portföy genel zararda → en kötü pozisyonu kes
+    """
+    try:
+        client    = get_client()
+        positions = load_positions()
+        if not positions:
+            return []
+
+        actions = []
+
+        # Tüm pozisyonların anlık değerini hesapla (portföy K/Z için)
+        pos_snapshots = []
+        for sym, pos in positions.items():
+            if pos.get('qty', 0) <= 0:
+                continue
+            try:
+                price    = get_price(client, sym)
+                entry    = pos.get('avg_price', price)
+                qty      = pos.get('qty', 0)
+                value    = price * qty
+                invested = entry * qty
+                pnl_pct  = (price - entry) / entry * 100 if entry > 0 else 0
+                pos_snapshots.append({
+                    'sym': sym, 'pnl_pct': pnl_pct,
+                    'value': value, 'invested': invested,
+                    'pos': pos,
+                })
+            except Exception:
+                pass
+
+        total_invested = sum(s['invested'] for s in pos_snapshots)
+        total_current  = sum(s['value']    for s in pos_snapshots)
+        portfolio_pnl  = ((total_current - total_invested) / total_invested * 100
+                          if total_invested > 0 else 0)
+
+        # ── Her pozisyonu değerlendir ──────────────────────────────────────────
+        for snap in pos_snapshots:
+            sym     = snap['sym']
+            pos     = snap['pos']
+            pnl_pct = snap['pnl_pct']
+
+            # Son CEO müdahalesinden yeterince süre geçmeli
+            last_ceo = pos.get('ceo_last_action', '')
+            if last_ceo and _minutes_since(last_ceo) < CEO_COOLDOWN_MIN:
+                continue
+
+            try:
+                price    = get_price(client, sym)
+                entry    = pos.get('avg_price', price)
+                if entry <= 0:
+                    continue
+                peak     = pos.get('peak_price', entry)
+                pnl_pct  = (price - entry) / entry * 100
+                peak_pct = (peak  - entry) / entry * 100
+                ceo_phase = pos.get('ceo_phase', 0)
+
+                sell_pct  = None
+                reason    = None
+                new_phase = ceo_phase
+
+                if ceo_phase == 0:
+                    # KURAL 1: Yüksek kârdan geri çekildi → %50 kısmi kar al
+                    if (peak_pct >= PARTIAL_PEAK_MIN
+                            and pnl_pct <= peak_pct - PARTIAL_RETREAT):
+                        sell_pct  = 50
+                        new_phase = 1
+                        reason    = (f'Peak +{peak_pct:.0f}%, şu an +{pnl_pct:.0f}% '
+                                     f'({PARTIAL_RETREAT:.0f} puan geri çekildi) — '
+                                     f'%50 kar al')
+
+                    # KURAL 2: Ağır zarar → ajanı bekleme, kes
+                    elif pnl_pct <= BIG_LOSS_CUT:
+                        sell_pct  = 100
+                        new_phase = 99
+                        reason    = f'{pnl_pct:.1f}% ağır zarar — CEO kesiyor'
+
+                elif ceo_phase == 1:
+                    # KURAL 3: Kısmi satış sonrası zarara döndü → kalanı kes
+                    if pnl_pct <= PHASE1_LOSS_CUT:
+                        sell_pct  = 100
+                        new_phase = 99
+                        reason    = (f'Kısmi satış sonrası {pnl_pct:.1f}% zarara '
+                                     f'döndü — kalan kesildi')
+                    # Coin daha da yükseldi → bir daha yarı sat
+                    elif peak_pct >= 40 and pnl_pct <= peak_pct - PARTIAL_RETREAT:
+                        sell_pct  = 50
+                        new_phase = 2
+                        reason    = (f'İkinci geri çekilme: peak +{peak_pct:.0f}%, '
+                                     f'şu an +{pnl_pct:.0f}% — yeniden %50 sat')
+
+                if sell_pct is not None:
+                    src = 'CEO_PARTIAL' if sell_pct < 100 else 'CEO_SELL'
+                    res = execute_sell(client, sym, sell_pct, source=src, period='ceo')
+                    if res.get('ok'):
+                        pnl = res.get('pnl', 0)
+                        update_position(sym,
+                            ceo_phase=new_phase,
+                            ceo_last_action=_now_str(),
+                            ceo_last_action_type=reason[:60])
+                        emoji = '🔶' if sell_pct < 100 else '🔴'
+                        send_telegram(
+                            f'👔 <b>CEO Müdahale</b>\n'
+                            f'{emoji} {sym} — %{sell_pct} satıldı\n'
+                            f'💰 PnL: ${pnl:+.2f}\n'
+                            f'📝 {reason}'
+                        )
+                        actions.append(f'{sym}: {reason}')
+                        print(f'[CEO] {sym}: {reason}')
+
+            except Exception as e:
+                print(f'[CEO] {sym} inceleme hata: {e}')
+
+        # ── PORTFÖY KURALI: Genel zarar → en kötü pozisyonu kes ───────────────
+        if portfolio_pnl <= PORTFOLIO_LOSS_PCT and not actions:
+            worst_sym = None
+            worst_pct = 0
+            for snap in pos_snapshots:
+                sym = snap['sym']
+                pos = snap['pos']
+                last_ceo = pos.get('ceo_last_action', '')
+                if last_ceo and _minutes_since(last_ceo) < CEO_COOLDOWN_MIN:
+                    continue
+                if snap['pnl_pct'] < worst_pct and snap['pnl_pct'] <= PORTFOLIO_WORST_MIN:
+                    worst_pct = snap['pnl_pct']
+                    worst_sym = sym
+
+            if worst_sym:
+                res = execute_sell(client, worst_sym, 100,
+                                   source='CEO_SELL', period='ceo_portfolio')
+                if res.get('ok'):
+                    pnl = res.get('pnl', 0)
+                    update_position(worst_sym,
+                        ceo_phase=99,
+                        ceo_last_action=_now_str(),
+                        ceo_last_action_type='portföy_koruma')
+                    send_telegram(
+                        f'👔 <b>CEO Portföy Koruma</b>\n'
+                        f'🔴 {worst_sym} kesildi\n'
+                        f'💰 PnL: ${pnl:+.2f}\n'
+                        f'📝 Portföy {portfolio_pnl:.1f}% zararda — en kötüyü kes'
+                    )
+                    actions.append(f'{worst_sym}: portföy koruması')
+                    print(f'[CEO] Portföy koruma: {worst_sym} ({worst_pct:.1f}%)')
+
+        return actions
+
+    except Exception as e:
+        print(f'[CEO] Pozisyon gözden geçirme hata: {e}')
+        return []
 
 
 # ─── Teknik Analiz Yardımcıları ──────────────────────────────────────────────
@@ -293,13 +484,14 @@ def _collect_data():
 
 def _build_prompt(data):
     lines = [
-        "Sen bir kripto portföy RİSK YÖNETİCİSİSİN — trader değilsin.",
-        "5 ticaret ajanı var: EDGE, OTONOM, INDICATOR, WYCKOFF, BREAKOUT.",
-        "Her ajan kendi giriş VE çıkışını (TP/SL/trailing) kendi yönetir. Tek tek pozisyonlara ASLA karışmazsın.",
-        "Senin SADECE iki yetkin var:",
-        "  1) set_agent_enabled — bir ajan uzun vadede (yeterli işlem sayısıyla) sürekli zarar ediyorsa kapat. Tek kötü işleme bakıp kapatma.",
-        "  2) set_position_mult — BTC bear trendindeyse veya portföy genel zarardaysa tüm pozisyon boyutlarını küçült (0.3–1.0); güçlü bull'da normale döndür (1.0).",
-        "Sabırlı ol: az işlemle veya tek pozisyonun anlık zararına bakıp karar verme. Müdahale gerekmiyorsa hiç araç çağırma.",
+        "Sen bir kripto portföy STRATEJİ YÖNETİCİSİSİN.",
+        "NOT: Tek tek pozisyon satışları ayrı bir kural motoru tarafından otomatik yönetiliyor.",
+        "Senin görevin UZUN VADELİ STRATEJİK kararlar:",
+        "  1) set_agent_enabled — bir ajan yeterli sayıda işlemde (>10) sürekli zarar ediyorsa kapat.",
+        "     Tek kötü işleme bakıp kapatma. Kısa vadeli performansa göre de kapatma.",
+        "  2) set_position_mult — BTC bear trendindeyse tüm pozisyon büyüklüğünü küçült (0.5–0.8);",
+        "     güçlü bull'da normale döndür (1.0). 0.3'ün altına inme.",
+        "Müdahale gerekmiyorsa HİÇ araç çağırma. Gereksiz kapatma yaparsan bot durur.",
         "",
         f"=== ANLIK DURUM ===",
         f"Serbest USDT: ${data['balance']} | Pozisyonlarda: ${data['pos_total']} | Toplam: ${data['total']}",
@@ -423,12 +615,12 @@ def _interruptible_sleep(seconds):
         time.sleep(30)
 
 
-def _run_once(api_key):
+def _run_strategic(api_key, state):
+    """DeepSeek ile stratejik analiz: ajan açık/kapalı + pozisyon çarpanı."""
     try:
-        state = _load_state()
-        data  = _collect_data()
+        data = _collect_data()
         if data['balance'] == 0 and data['btc_trend'] == '?':
-            send_telegram('⚠️ CEO: Binance verisi alınamadı, analiz iptal edildi.')
+            print('[CEO] Veri alınamadı, stratejik analiz atlandı.')
             return
         prompt       = _build_prompt(data)
         response     = _call_deepseek(prompt, api_key)
@@ -442,15 +634,34 @@ def _run_once(api_key):
             state['changes_made'] = state['changes_made'][-50:]
         _save_state(state)
     except Exception as e:
+        print(f'[CEO] Stratejik analiz hata: {e}')
+        send_telegram(f'⚠️ CEO stratejik analiz hata: {e}')
+
+
+def _run_once(api_key):
+    """Manuel tetikleme: hem pozisyon gözden geçirme hem stratejik analiz."""
+    try:
+        pos_actions = _check_positions()
+        if pos_actions:
+            print(f'[CEO] Manuel: {len(pos_actions)} pozisyon aksiyonu alındı')
+        state = _load_state()
+        _run_strategic(api_key, state)
+    except Exception as e:
         send_telegram(f'⚠️ CEO manuel analiz hata: {e}')
 
 
 def _run_loop():
     global _running
-    state      = _load_state()
-    interval_h = load_config().get('ceo_interval_hours', DEFAULT_INTERVAL)
-    print(f'[CEO] Başladı — aralık: {interval_h}s')
-    send_telegram(f'👔 <b>CEO Agent AKTİF</b>\nHer {interval_h} saatte bir analiz yapacağım.')
+    state = _load_state()
+    print(f'[CEO] Başladı — pozisyon gözden geçirme her {REVIEW_INTERVAL_MIN}dk, '
+          f'stratejik analiz her {DEFAULT_INTERVAL}s')
+    send_telegram(
+        f'👔 <b>CEO Agent AKTİF</b>\n'
+        f'📋 Pozisyon gözden geçirme: her {REVIEW_INTERVAL_MIN} dakika\n'
+        f'🧠 DeepSeek stratejik analiz: her {DEFAULT_INTERVAL} saatte bir'
+    )
+
+    last_strategic = 0.0   # son stratejik analiz zamanı (epoch)
 
     while _running:
         cfg = load_config()
@@ -459,41 +670,23 @@ def _run_loop():
             _running = False
             break
 
-        interval = cfg.get('ceo_interval_hours', DEFAULT_INTERVAL)
-        api_key  = cfg.get('deepseek_api_key', '')
+        # 1. Pozisyon gözden geçirme — her REVIEW_INTERVAL_MIN dakika
+        pos_actions = _check_positions()
+        if pos_actions:
+            print(f'[CEO] {len(pos_actions)} pozisyon aksiyonu alındı')
 
-        if not api_key:
-            send_telegram('⚠️ CEO: deepseek_api_key config.json\'da tanımlı değil!')
-            _interruptible_sleep(3600)
-            continue
+        # 2. Stratejik DeepSeek analizi — her ceo_interval_hours saat
+        api_key           = cfg.get('deepseek_api_key', '')
+        strategic_interval = cfg.get('ceo_interval_hours', DEFAULT_INTERVAL) * 3600
+        if api_key and (time.time() - last_strategic) >= strategic_interval:
+            print(f'[CEO] Stratejik analiz başlıyor (#{state["review_count"] + 1})')
+            _run_strategic(api_key, state)
+            last_strategic = time.time()
+        elif not api_key and (time.time() - last_strategic) >= strategic_interval:
+            print('[CEO] deepseek_api_key yok — stratejik analiz atlandı')
+            last_strategic = time.time()  # tekrar tekrar loglamayı önle
 
-        print(f'[CEO] Analiz başlıyor (#{state["review_count"] + 1})')
-        try:
-            data = _collect_data()
-
-            # Binance bağlantısı henüz hazır değilse atla
-            if data['balance'] == 0 and data['btc_trend'] == '?':
-                print('[CEO] Veri alınamadı (Binance hazır değil), 2 dakika sonra tekrar deneniyor.')
-                _interruptible_sleep(120)
-                continue
-
-            prompt       = _build_prompt(data)
-            response     = _call_deepseek(prompt, api_key)
-            tool_results = _execute_tool_calls(response['tool_calls']) if response else []
-            _send_report(response, tool_results, data)
-            _mark_ceo_success()
-
-            state['review_count'] += 1
-            state['last_review']   = datetime.datetime.now().isoformat()
-            if tool_results:
-                state.setdefault('changes_made', []).extend(tool_results)
-                state['changes_made'] = state['changes_made'][-50:]
-            _save_state(state)
-        except Exception as e:
-            print(f'[CEO] Analiz hata: {e}')
-            send_telegram(f'⚠️ CEO hata: {e}')
-
-        _interruptible_sleep(interval * 3600)
+        _interruptible_sleep(REVIEW_INTERVAL_MIN * 60)
 
 
 # ─── Public API ───────────────────────────────────────────────────────────────
