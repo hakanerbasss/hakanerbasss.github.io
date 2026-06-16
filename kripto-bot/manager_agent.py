@@ -63,6 +63,23 @@ TOOLS = [
     {
         'type': 'function',
         'function': {
+            'name': 'set_trail_stop',
+            'description': 'Bir pozisyonun trail stop mesafesini ayarla. Peak fiyatından kaç % düşünce satılacağını belirler. Daraltırsan kârı hemen korur, genişletirsen trendi sürer.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'symbol':       {'type': 'string'},
+                    'distance_pct': {'type': 'number',
+                                     'description': 'Peak\'ten % düşüş mesafesi (örn: 3 = peak\'ten -%3)'},
+                    'reason':       {'type': 'string'},
+                },
+                'required': ['symbol', 'distance_pct', 'reason'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'buy_more',
             'description': 'Mevcut açık bir pozisyona ekleme yap (daha fazla al).',
             'parameters': {
@@ -144,6 +161,18 @@ def _exec_sell_all(symbol, reason):
         return f'{symbol}: hata — {e}'
 
 
+def _exec_set_trail_stop(symbol, distance_pct, reason):
+    try:
+        pct = round(max(1.0, min(25.0, float(distance_pct))), 1)
+        result = update_position(symbol, ceo_trail_pct=pct)
+        if result is None:
+            return f'{symbol}: pozisyon bulunamadı'
+        send_telegram(f'👔 <b>CEO Trail Ayar</b>\n⚙️ {symbol} → peak\'ten -%{pct}\n📝 {reason}')
+        return f'{symbol}: trail -%{pct} ayarlandı'
+    except Exception as e:
+        return f'{symbol}: trail ayar hata — {e}'
+
+
 def _exec_buy_more(symbol, usdt, reason):
     try:
         client    = get_client()
@@ -200,6 +229,7 @@ def _execute_tool_calls(tool_calls):
         try:
             if   name == 'sell_partial':       r = _exec_sell_partial(args['symbol'], args['pct'], args['reason'])
             elif name == 'sell_all':           r = _exec_sell_all(args['symbol'], args['reason'])
+            elif name == 'set_trail_stop':     r = _exec_set_trail_stop(args['symbol'], args['distance_pct'], args['reason'])
             elif name == 'buy_more':           r = _exec_buy_more(args['symbol'], args['usdt'], args['reason'])
             elif name == 'set_agent_enabled':  r = _exec_set_agent_enabled(args['agent'], args['enabled'])
             elif name == 'set_position_mult':  r = _exec_set_position_mult(args['value'])
