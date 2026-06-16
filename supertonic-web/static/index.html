@@ -572,8 +572,9 @@
 
   <div class="field">
     <label>DeepSeek API Key</label>
-    <input type="password" id="lv-apikey" placeholder="sk-..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
-    <div style="font-size:12px;color:#444;margin-top:4px;">Shorts sekmesinde kaydettiysen buraya da gir.</div>
+    <div id="lv-apikey-status" style="font-size:13px;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#888;">
+      Kontrol ediliyor...
+    </div>
   </div>
 
   <button onclick="generateLongVideo()" id="btn-lv">
@@ -747,10 +748,9 @@ function switchTab(name) {
 }
 
 async function generateLongVideo() {
-  const apiKey = document.getElementById('lv-apikey').value.trim()
-    || document.getElementById('shorts-apikey').value.trim();
+  const apiKey = localStorage.getItem('ds_api_key') || document.getElementById('shorts-apikey').value.trim();
   const topic = document.getElementById('lv-topic').value.trim();
-  if (!apiKey) return showError('err-lv', 'DeepSeek API key girin.');
+  if (!apiKey) return showError('err-lv', 'Önce "Shorts Üret" sekmesinden DeepSeek API key kaydedin.');
   if (!topic) return showError('err-lv', 'Konu boş olamaz.');
   showError('err-lv', '');
   setLoading('btn-lv', 'spin-lv', true);
@@ -1208,6 +1208,21 @@ async function uploadLVToYouTube() {
 // DeepSeek key
 const dsKey = document.getElementById('shorts-apikey');
 dsKey.value = localStorage.getItem('ds_api_key') || '';
+
+function updateLVApiKeyStatus() {
+  const el = document.getElementById('lv-apikey-status');
+  if (localStorage.getItem('ds_api_key')) {
+    el.innerHTML = '✓ API Key kayıtlı &nbsp;<span style="color:#555;font-size:11px;">· Shorts sekmesinden değiştirebilirsin</span>';
+    el.style.color = '#4ade80';
+    el.style.borderColor = '#1a4a1a';
+  } else {
+    el.textContent = '⚠ API Key yok — "Shorts Üret" sekmesinden kaydet';
+    el.style.color = '#f87171';
+    el.style.borderColor = '#4a1a1a';
+  }
+}
+updateLVApiKeyStatus();
+
 function saveApiKey() {
   const v = dsKey.value.trim();
   if (!v) return;
@@ -1215,6 +1230,7 @@ function saveApiKey() {
   const s = document.getElementById('apikey-status');
   s.textContent = '✓ Kaydedildi';
   s.style.color = '#4ade80';
+  updateLVApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
 }
 function clearApiKey() {
@@ -1222,6 +1238,7 @@ function clearApiKey() {
   dsKey.value = '';
   const s = document.getElementById('apikey-status');
   s.textContent = 'Temizlendi.'; s.style.color = '#f87171';
+  updateLVApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
 }
 
