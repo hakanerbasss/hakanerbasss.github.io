@@ -359,11 +359,11 @@ def settings():
         cfg['funding_futures_key']    = request.form.get('funding_futures_key', '').strip()
         cfg['funding_futures_secret'] = request.form.get('funding_futures_secret', '').strip()
     cfg['funding_allocation_usdt'] = float(request.form.get('funding_allocation_usdt', cfg.get('funding_allocation_usdt', 500)))
-    old_ceo_interval             = cfg.get('ceo_interval_hours', 1)
-    cfg['ceo_interval_hours']    = int(request.form.get('ceo_interval_hours', 1))
+    old_ceo_interval             = cfg.get('ceo_interval_min', 5)
+    cfg['ceo_interval_min']      = int(request.form.get('ceo_interval_min', 5))
     cfg['report_interval_hours'] = int(request.form.get('report_interval_hours', 1))
     save_config(cfg)
-    if old_ceo_interval != cfg['ceo_interval_hours'] and ceo_agent_status()['running']:
+    if old_ceo_interval != cfg['ceo_interval_min'] and ceo_agent_status()['running']:
         restart_ceo_agent()
     return jsonify({'ok': True})
 
