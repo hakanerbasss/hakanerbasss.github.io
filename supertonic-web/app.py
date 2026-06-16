@@ -960,7 +960,28 @@ async def get_deepseek_config():
 scheduler = AsyncIOScheduler(timezone="Europe/Istanbul")
 
 
-def load_sched_config():
+LV_SCHED_CONFIG = Path("lv_scheduler_config.json")
+LV_SCHED_LOG    = Path("lv_scheduler_log.json")
+
+
+def load_lv_sched_config():
+    if LV_SCHED_CONFIG.exists():
+        return json.loads(LV_SCHED_CONFIG.read_text())
+    return {
+        "enabled": False,
+        "time": "10:00",
+        "categories": "teknoloji, bilim, tarih, uzay, doğa, yapay zeka",
+        "duration_min": 5,
+        "lang": "tr",
+        "voice": "F1",
+    }
+
+
+def save_lv_sched_log(status: str, message: str, url: str = ""):
+    LV_SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "url": url, "ts": time.time()},
+        ensure_ascii=False,
+    ))
     if SCHED_CONFIG.exists():
         return json.loads(SCHED_CONFIG.read_text())
     return {"enabled": False, "times": ["09:00", "15:00", "21:00"]}
@@ -1025,7 +1046,9 @@ async def auto_shorts_job():
 
 
 def _rebuild_scheduler():
-    scheduler.remove_all_jobs()
+    for job in scheduler.get_jobs():
+        if job.id.startswith("auto_"):
+            job.remove()
     cfg = load_sched_config()
     if not cfg.get("enabled"):
         return
@@ -1043,10 +1066,113 @@ def _rebuild_scheduler():
             pass
 
 
+async def auto_long_video_job():
+    save_lv_sched_log("running", "Konu seçiliyor…")
+    try:
+        api_key = get_deepseek_key()
+        if not api_key:
+            save_lv_sched_log("error", "DeepSeek API key sunucuda kayıtlı değil")
+            return
+        if not TOKEN_FILE.exists():
+            save_lv_sched_log("error", "YouTube hesabı bağlı değil")
+            return
+
+        cfg = load_lv_sched_config()
+        categories = cfg.get("categories", "teknoloji, bilim, tarih, uzay")
+        duration_min = cfg.get("duration_min", 5)
+        lang = cfg.get("lang", "tr")
+        voice = cfg.get("voice", "F1")
+        lang_name = LANG_MAP.get(lang, "Turkish")
+
+        # 1. DeepSeek'e konu seçtir
+        from openai import OpenAI
+        ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        topic_resp = ds.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": f"""Pick ONE specific, interesting and educational documentary topic in {lang_name}.
+Categories to choose from: {categories}
+Return ONLY valid JSON: {{"topic": "specific topic in {lang_name}"}}
+Make it specific and fascinating — NOT generic. Examples:
+- "Kuantum Dolanıklığı Nasıl Çalışır ve Neden Önemlidir?"
+- "James Webb Uzay Teleskobu İlk Bir Yılda Neler Keşfetti?"
+- "GPT-4 ve Büyük Dil Modelleri Nasıl Eğitilir?"
+- "İklim Değişikliğinin Okyanuslar Üzerindeki Gizli Etkileri"
+Pick something different and interesting each time."""}],
+            temperature=0.95,
+        )
+        raw = topic_resp.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].replace("json", "", 1)
+        topic = json.loads(raw.strip()).get("topic", categories.split(",")[0].strip())
+
+        save_lv_sched_log("running", f"Video üretiliyor: {topic}")
+
+        # 2. Uzun video üret + YouTube'a yükle
+        timeout = httpx.Timeout(connect=30, read=1800, write=60, pool=30)
+        async with httpx.AsyncClient(timeout=timeout) as hc:
+            r = await hc.post(
+                "http://localhost:8001/api/generate-long-video",
+                data={"topic": topic, "api_key": api_key, "lang": lang,
+                      "voice": voice, "speed": "1.0", "duration_min": str(duration_min)},
+            )
+            if r.status_code != 200:
+                save_lv_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
+                return
+            d = r.json()
+
+            filename  = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
+
+            r2 = await hc.post(
+                "http://localhost:8001/api/yt/upload",
+                data={
+                    "filename": filename,
+                    "title": d.get("title", topic),
+                    "description": d.get("description", ""),
+                    "tags": d.get("suggested_tags", f"#belgesel #eğitim #{lang}"),
+                    "privacy": "public",
+                    "category_id": "28",
+                    "age_restricted": "false",
+                    "thumbnail_filename": thumbnail,
+                },
+                timeout=300,
+            )
+            if r2.status_code != 200:
+                save_lv_sched_log("error", f"YouTube yüklenemedi: {r2.text[:300]}")
+                return
+
+            save_lv_sched_log("success", d.get("title", topic), r2.json().get("url", ""))
+
+    except Exception as e:
+        save_lv_sched_log("error", str(e))
+
+
+def _rebuild_lv_scheduler():
+    for job in scheduler.get_jobs():
+        if job.id.startswith("lv_"):
+            job.remove()
+    cfg = load_lv_sched_config()
+    if not cfg.get("enabled"):
+        return
+    t = cfg.get("time", "10:00")
+    try:
+        hour, minute = t.strip().split(":")
+        scheduler.add_job(
+            auto_long_video_job,
+            CronTrigger(hour=int(hour), minute=int(minute)),
+            id="lv_daily",
+            replace_existing=True,
+            max_instances=1,
+        )
+    except Exception:
+        pass
+
+
 @app.on_event("startup")
 async def startup_event():
     scheduler.start()
     _rebuild_scheduler()
+    _rebuild_lv_scheduler()
 
 
 @app.on_event("shutdown")
@@ -1084,6 +1210,47 @@ async def save_scheduler_config(
 @app.post("/api/scheduler/run-now")
 async def run_scheduler_now():
     asyncio.create_task(auto_shorts_job())
+    return {"ok": True}
+
+
+@app.get("/api/lv-scheduler/config")
+async def get_lv_scheduler_config():
+    cfg = load_lv_sched_config()
+    log = {}
+    if LV_SCHED_LOG.exists():
+        log = json.loads(LV_SCHED_LOG.read_text())
+    jobs = [j for j in scheduler.get_jobs() if j.id.startswith("lv_")]
+    next_run = None
+    if jobs and jobs[0].next_run_time:
+        next_run = jobs[0].next_run_time.strftime("%d.%m.%Y %H:%M")
+    return {**cfg, "log": log, "next_run": next_run}
+
+
+@app.post("/api/lv-scheduler/config")
+async def save_lv_scheduler_config(
+    enabled: str = Form("false"),
+    time: str = Form("10:00"),
+    categories: str = Form("teknoloji, bilim, tarih, uzay, doğa, yapay zeka"),
+    duration_min: str = Form("5"),
+    lang: str = Form("tr"),
+    voice: str = Form("F1"),
+):
+    cfg = {
+        "enabled": enabled == "true",
+        "time": time.strip(),
+        "categories": categories,
+        "duration_min": int(duration_min),
+        "lang": lang,
+        "voice": voice,
+    }
+    LV_SCHED_CONFIG.write_text(json.dumps(cfg))
+    _rebuild_lv_scheduler()
+    return cfg
+
+
+@app.post("/api/lv-scheduler/run-now")
+async def run_lv_now():
+    asyncio.create_task(auto_long_video_job())
     return {"ok": True}
 
 
