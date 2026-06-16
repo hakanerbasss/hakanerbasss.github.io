@@ -1039,6 +1039,8 @@ function switchTab(name) {
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'tnlv') updateTNLVApiKeyStatus();
+  if (name === 'longvideo') updateLVApiKeyStatus();
 }
 
 async function generateLongVideo() {
@@ -1756,13 +1758,14 @@ async function loadTNLVSchedulerStatus() {
 }
 
 async function saveTNLVScheduler() {
+  const enabled = document.getElementById('tnlv-sched-enabled').checked;
   const fd = new FormData();
-  fd.append('enabled', document.getElementById('tnlv-sched-enabled').checked ? 'true' : 'false');
+  fd.append('enabled', enabled ? 'true' : 'false');
   fd.append('times', document.getElementById('tnlv-sched-times').value);
   fd.append('lang', document.getElementById('tnlv-sched-lang').value);
   fd.append('voice', document.getElementById('tnlv-sched-voice').value);
   await fetch('/api/tnlv-scheduler/config', { method: 'POST', body: fd });
-  loadTNLVSchedulerStatus();
+  await loadTNLVSchedulerStatus();
 }
 
 async function runTNLVNow() {
