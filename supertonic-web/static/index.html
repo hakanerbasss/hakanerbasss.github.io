@@ -686,12 +686,55 @@
       <input type="password" id="cfg-pexels-key" placeholder="Pexels API Key..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
       <button onclick="savePexelsConfig()">Kaydet</button>
     </div>
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">DeepSeek API (Otomasyon için)</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">Otomatik video üretimi için sunucuda saklanır</p>
+    <div id="ds-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ DeepSeek key sunucuda kayıtlı</div>
+      <button onclick="resetDSConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
+    </div>
+    <div id="ds-input-state">
+      <input type="password" id="cfg-ds-key" placeholder="sk-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+      <button onclick="saveDSConfig()">Kaydet</button>
+    </div>
+
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">⚡ Otomatik Yayın</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">Belirlenen saatlerde trend haberden Short üretip YouTube'a yükler</p>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+        <input type="checkbox" id="sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveScheduler()">
+        Otomatik yayını etkinleştir
+      </label>
+    </div>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+      <input type="text" id="sched-times" value="09:00,15:00,21:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;" onchange="saveScheduler()">
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button onclick="saveScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+      <button onclick="runNow()" id="btn-run-now" style="background:#1a3a1a;font-size:12px;padding:8px 16px;">
+        <div class="spinner" id="spin-run-now"></div>
+        Şimdi Çalıştır
+      </button>
+    </div>
+
+    <div id="sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+      <div id="sched-next" style="color:#888;"></div>
+      <div id="sched-last-status"></div>
+      <div id="sched-last-msg" style="color:#888;word-break:break-all;"></div>
+      <div id="sched-last-url"></div>
+    </div>
+
     <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
 
 <div style="position:fixed;top:16px;right:16px;">
-  <button onclick="document.getElementById('yt-modal').style.display='flex';history.pushState({modal:'yt'},'','');checkYTStatus()" style="background:#222;font-size:12px;padding:8px 14px;">⚙ YouTube Ayarları</button>
+  <button onclick="openSettings()" style="background:#222;font-size:12px;padding:8px 14px;">⚙ Ayarlar</button>
 </div>
 
 <script>
@@ -979,6 +1022,22 @@ async function checkYTStatus() {
   } catch(e) {}
 }
 
+async function openSettings() {
+  document.getElementById('yt-modal').style.display = 'flex';
+  history.pushState({modal:'yt'}, '', '');
+  checkYTStatus();
+  // DeepSeek sunucu key durumu
+  try {
+    const r = await fetch('/api/deepseek/config');
+    const d = await r.json();
+    if (d.configured) {
+      document.getElementById('ds-saved-state').style.display = 'block';
+      document.getElementById('ds-input-state').style.display = 'none';
+    }
+  } catch(e) {}
+  loadSchedulerStatus();
+}
+
 function closeYTModal() {
   document.getElementById('yt-modal').style.display = 'none';
 }
@@ -1241,6 +1300,91 @@ function clearApiKey() {
   s.textContent = 'Temizlendi.'; s.style.color = '#f87171';
   updateLVApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
+}
+
+// ── DeepSeek sunucu config ────────────────────────────────────────────────────
+async function saveDSConfig() {
+  const key = document.getElementById('cfg-ds-key').value.trim();
+  if (!key) return showError('err-cfg', 'API key girin.');
+  const fd = new FormData(); fd.append('api_key', key);
+  const r = await fetch('/api/deepseek/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('ds-saved-state').style.display = 'block';
+    document.getElementById('ds-input-state').style.display = 'none';
+    document.getElementById('cfg-ds-key').value = '';
+    showError('err-cfg', '');
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+function resetDSConfig() {
+  document.getElementById('ds-saved-state').style.display = 'none';
+  document.getElementById('ds-input-state').style.display = 'block';
+}
+
+// ── Otomasyon / Scheduler ─────────────────────────────────────────────────────
+async function loadSchedulerStatus() {
+  try {
+    const r = await fetch('/api/scheduler/config');
+    const d = await r.json();
+
+    document.getElementById('sched-enabled').checked = d.enabled || false;
+    if (d.times) document.getElementById('sched-times').value = d.times.join(',');
+
+    const statusEl = document.getElementById('sched-status');
+    statusEl.style.display = 'block';
+
+    document.getElementById('sched-next').textContent =
+      d.next_run ? `Sıradaki yayın: ${d.next_run}` : (d.enabled ? 'Sıradaki yayın hesaplanıyor…' : 'Otomasyon kapalı');
+
+    const log = d.log || {};
+    if (log.status) {
+      const statusColors = { success: '#4ade80', error: '#f87171', running: '#facc15' };
+      const statusLabels = { success: '✓ Başarılı', error: '✗ Hata', running: '⟳ Çalışıyor…' };
+      document.getElementById('sched-last-status').innerHTML =
+        `<span style="color:${statusColors[log.status] || '#888'}">${statusLabels[log.status] || log.status}</span>` +
+        (log.ts ? ` · ${new Date(log.ts * 1000).toLocaleString('tr-TR')}` : '');
+      document.getElementById('sched-last-msg').textContent = log.message || '';
+      document.getElementById('sched-last-url').innerHTML = log.url
+        ? `<a href="${log.url}" target="_blank" style="color:#a78bfa;">${log.url}</a>` : '';
+    }
+  } catch(e) {}
+}
+
+async function saveScheduler() {
+  const enabled = document.getElementById('sched-enabled').checked;
+  const times = document.getElementById('sched-times').value.trim();
+  const fd = new FormData();
+  fd.append('enabled', enabled ? 'true' : 'false');
+  fd.append('times', times);
+  const r = await fetch('/api/scheduler/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    await loadSchedulerStatus();
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+async function runNow() {
+  setLoading('btn-run-now', 'spin-run-now', true);
+  try {
+    await fetch('/api/scheduler/run-now', { method: 'POST' });
+    showError('err-cfg', '');
+    // Poll log for ~2 min
+    let tries = 0;
+    const poll = setInterval(async () => {
+      await loadSchedulerStatus();
+      const log = document.getElementById('sched-last-status').textContent;
+      if (log.includes('✓') || log.includes('✗') || ++tries > 40) {
+        clearInterval(poll);
+        setLoading('btn-run-now', 'spin-run-now', false);
+      }
+    }, 3000);
+  } catch(e) {
+    setLoading('btn-run-now', 'spin-run-now', false);
+    showError('err-cfg', e.message);
+  }
 }
 
 loadMeta();

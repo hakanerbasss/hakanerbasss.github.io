@@ -3,6 +3,7 @@ import uuid
 import asyncio
 import subprocess
 import json
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
@@ -10,6 +11,10 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import traceback
 import aiofiles
+import httpx
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from supertonic import TTS
 from deep_translator import GoogleTranslator
@@ -707,6 +712,9 @@ Rules:
 CONFIG_FILE = Path("yt_config.json")
 TOKEN_FILE = Path("yt_token.json")
 PEXELS_CONFIG = Path("pexels_config.json")
+DS_CONFIG = Path("deepseek_config.json")
+SCHED_CONFIG = Path("scheduler_config.json")
+SCHED_LOG = Path("scheduler_log.json")
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
 
@@ -926,6 +934,157 @@ async def get_video(filename: str):
     if not path.exists():
         raise HTTPException(404, "Dosya bulunamadı")
     return FileResponse(str(path), media_type="video/mp4")
+
+
+# ── DeepSeek server-side config ──────────────────────────────────────────────
+
+def get_deepseek_key():
+    if DS_CONFIG.exists():
+        return json.loads(DS_CONFIG.read_text()).get("api_key", "")
+    return ""
+
+
+@app.post("/api/deepseek/config")
+async def save_deepseek_config(api_key: str = Form(...)):
+    DS_CONFIG.write_text(json.dumps({"api_key": api_key}))
+    return {"ok": True}
+
+
+@app.get("/api/deepseek/config")
+async def get_deepseek_config():
+    return {"configured": bool(get_deepseek_key())}
+
+
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+
+scheduler = AsyncIOScheduler(timezone="Europe/Istanbul")
+
+
+def load_sched_config():
+    if SCHED_CONFIG.exists():
+        return json.loads(SCHED_CONFIG.read_text())
+    return {"enabled": False, "times": ["09:00", "15:00", "21:00"]}
+
+
+def save_sched_log(status: str, message: str, url: str = ""):
+    SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "url": url, "ts": time.time()},
+        ensure_ascii=False,
+    ))
+
+
+async def auto_shorts_job():
+    save_sched_log("running", "Video üretiliyor…")
+    try:
+        api_key = get_deepseek_key()
+        if not api_key:
+            save_sched_log("error", "DeepSeek API key sunucuda kayıtlı değil")
+            return
+        if not TOKEN_FILE.exists():
+            save_sched_log("error", "YouTube hesabı bağlı değil")
+            return
+
+        async with httpx.AsyncClient(timeout=900) as client:
+            # 1. Video üret (trend haberden)
+            r = await client.post(
+                "http://localhost:8001/api/generate-shorts",
+                data={"topic": "", "api_key": api_key, "lang": "tr", "voice": "F1", "speed": "1.0"},
+            )
+            if r.status_code != 200:
+                save_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
+                return
+            d = r.json()
+
+            filename = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
+
+            # 2. YouTube'a yükle
+            r2 = await client.post(
+                "http://localhost:8001/api/yt/upload",
+                data={
+                    "filename": filename,
+                    "title": d.get("title", "Gündem Shorts"),
+                    "description": d.get("suggested_description", ""),
+                    "tags": d.get("suggested_tags", "#Shorts #gündem #viral"),
+                    "privacy": "public",
+                    "category_id": "25",
+                    "age_restricted": "false",
+                    "thumbnail_filename": thumbnail,
+                },
+                timeout=300,
+            )
+            if r2.status_code != 200:
+                save_sched_log("error", f"YouTube yüklenemedi: {r2.text[:300]}")
+                return
+
+            result = r2.json()
+            save_sched_log("success", d.get("title", ""), result.get("url", ""))
+
+    except Exception as e:
+        save_sched_log("error", f"{e}")
+
+
+def _rebuild_scheduler():
+    scheduler.remove_all_jobs()
+    cfg = load_sched_config()
+    if not cfg.get("enabled"):
+        return
+    for t in cfg.get("times", []):
+        try:
+            hour, minute = t.strip().split(":")
+            scheduler.add_job(
+                auto_shorts_job,
+                CronTrigger(hour=int(hour), minute=int(minute)),
+                id=f"auto_{t.replace(':', '')}",
+                replace_existing=True,
+                max_instances=1,
+            )
+        except Exception:
+            pass
+
+
+@app.on_event("startup")
+async def startup_event():
+    scheduler.start()
+    _rebuild_scheduler()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    scheduler.shutdown(wait=False)
+
+
+@app.get("/api/scheduler/config")
+async def get_scheduler_config():
+    cfg = load_sched_config()
+    log = {}
+    if SCHED_LOG.exists():
+        log = json.loads(SCHED_LOG.read_text())
+    jobs = scheduler.get_jobs()
+    next_run = None
+    if jobs:
+        nxt = [j.next_run_time for j in jobs if j.next_run_time]
+        if nxt:
+            next_run = min(nxt).strftime("%d.%m.%Y %H:%M")
+    return {**cfg, "log": log, "next_run": next_run}
+
+
+@app.post("/api/scheduler/config")
+async def save_scheduler_config(
+    enabled: str = Form("false"),
+    times: str = Form("09:00,15:00,21:00"),
+):
+    time_list = [t.strip() for t in times.split(",") if t.strip()]
+    cfg = {"enabled": enabled == "true", "times": time_list}
+    SCHED_CONFIG.write_text(json.dumps(cfg))
+    _rebuild_scheduler()
+    return cfg
+
+
+@app.post("/api/scheduler/run-now")
+async def run_scheduler_now():
+    asyncio.create_task(auto_shorts_job())
+    return {"ok": True}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
