@@ -713,7 +713,32 @@
 
     <div class="field" style="margin-bottom:12px;">
       <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-      <input type="text" id="sched-times" value="09:00,15:00,21:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;" onchange="saveScheduler()">
+      <input type="text" id="sched-times" value="09:00,15:00,21:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div class="field">
+        <label>Seslendirme Dili</label>
+        <select id="sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          <option value="tr" selected>Türkçe</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="ar">العربية</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ses</label>
+        <select id="sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          <option value="F1" selected>F1 (Kadın)</option>
+          <option value="F2">F2 (Kadın)</option>
+          <option value="F3">F3 (Kadın)</option>
+          <option value="M1">M1 (Erkek)</option>
+          <option value="M2">M2 (Erkek)</option>
+          <option value="M3">M3 (Erkek)</option>
+        </select>
+      </div>
     </div>
 
     <div style="display:flex;gap:8px;margin-bottom:14px;">
@@ -747,7 +772,7 @@
       <textarea id="lv-sched-categories" style="min-height:64px;font-size:13px;">teknoloji, bilim, tarih, uzay, doğa, yapay zeka</textarea>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <div class="field">
         <label>Yayın saati</label>
         <input type="text" id="lv-sched-time" value="10:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
@@ -766,6 +791,20 @@
         <select id="lv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
           <option value="tr" selected>Türkçe</option>
           <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ses</label>
+        <select id="lv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          <option value="F1" selected>F1 (Kadın)</option>
+          <option value="F2">F2 (Kadın)</option>
+          <option value="F3">F3 (Kadın)</option>
+          <option value="M1">M1 (Erkek)</option>
+          <option value="M2">M2 (Erkek)</option>
+          <option value="M3">M3 (Erkek)</option>
         </select>
       </div>
     </div>
@@ -1368,7 +1407,8 @@ async function loadLVSchedulerStatus() {
     if (d.categories) document.getElementById('lv-sched-categories').value = d.categories;
     if (d.time) document.getElementById('lv-sched-time').value = d.time;
     if (d.duration_min) document.getElementById('lv-sched-duration').value = d.duration_min;
-    if (d.lang) document.getElementById('lv-sched-lang').value = d.lang;
+    if (d.lang)  document.getElementById('lv-sched-lang').value  = d.lang;
+    if (d.voice) document.getElementById('lv-sched-voice').value = d.voice;
 
     const statusEl = document.getElementById('lv-sched-status');
     statusEl.style.display = 'block';
@@ -1395,8 +1435,8 @@ async function saveLVScheduler() {
   fd.append('time',         document.getElementById('lv-sched-time').value.trim());
   fd.append('categories',   document.getElementById('lv-sched-categories').value.trim());
   fd.append('duration_min', document.getElementById('lv-sched-duration').value);
-  fd.append('lang',         document.getElementById('lv-sched-lang').value);
-  fd.append('voice',        'F1');
+  fd.append('lang',  document.getElementById('lv-sched-lang').value);
+  fd.append('voice', document.getElementById('lv-sched-voice').value);
   const r = await fetch('/api/lv-scheduler/config', { method: 'POST', body: fd });
   if (r.ok) { await loadLVSchedulerStatus(); showError('err-cfg', ''); }
   else showError('err-cfg', 'Uzun video ayarı kaydedilemedi.');
@@ -1450,7 +1490,9 @@ async function loadSchedulerStatus() {
     const d = await r.json();
 
     document.getElementById('sched-enabled').checked = d.enabled || false;
-    if (d.times) document.getElementById('sched-times').value = d.times.join(',');
+    if (d.times)  document.getElementById('sched-times').value  = d.times.join(',');
+    if (d.lang)   document.getElementById('sched-lang').value   = d.lang;
+    if (d.voice)  document.getElementById('sched-voice').value  = d.voice;
 
     const statusEl = document.getElementById('sched-status');
     statusEl.style.display = 'block';
@@ -1473,17 +1515,14 @@ async function loadSchedulerStatus() {
 }
 
 async function saveScheduler() {
-  const enabled = document.getElementById('sched-enabled').checked;
-  const times = document.getElementById('sched-times').value.trim();
   const fd = new FormData();
-  fd.append('enabled', enabled ? 'true' : 'false');
-  fd.append('times', times);
+  fd.append('enabled', document.getElementById('sched-enabled').checked ? 'true' : 'false');
+  fd.append('times',   document.getElementById('sched-times').value.trim());
+  fd.append('lang',    document.getElementById('sched-lang').value);
+  fd.append('voice',   document.getElementById('sched-voice').value);
   const r = await fetch('/api/scheduler/config', { method: 'POST', body: fd });
-  if (r.ok) {
-    await loadSchedulerStatus();
-  } else {
-    showError('err-cfg', 'Kaydedilemedi.');
-  }
+  if (r.ok) { await loadSchedulerStatus(); showError('err-cfg', ''); }
+  else showError('err-cfg', 'Kaydedilemedi.');
 }
 
 async function runNow() {

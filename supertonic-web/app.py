@@ -1005,11 +1005,15 @@ async def auto_shorts_job():
             save_sched_log("error", "YouTube hesabı bağlı değil")
             return
 
+        shorts_cfg = load_sched_config()
+        s_lang  = shorts_cfg.get("lang", "tr")
+        s_voice = shorts_cfg.get("voice", "F1")
+
         async with httpx.AsyncClient(timeout=900) as client:
             # 1. Video üret (trend haberden)
             r = await client.post(
                 "http://localhost:8001/api/generate-shorts",
-                data={"topic": "", "api_key": api_key, "lang": "tr", "voice": "F1", "speed": "1.0"},
+                data={"topic": "", "api_key": api_key, "lang": s_lang, "voice": s_voice, "speed": "1.0"},
             )
             if r.status_code != 200:
                 save_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
@@ -1199,9 +1203,11 @@ async def get_scheduler_config():
 async def save_scheduler_config(
     enabled: str = Form("false"),
     times: str = Form("09:00,15:00,21:00"),
+    lang: str = Form("tr"),
+    voice: str = Form("F1"),
 ):
     time_list = [t.strip() for t in times.split(",") if t.strip()]
-    cfg = {"enabled": enabled == "true", "times": time_list}
+    cfg = {"enabled": enabled == "true", "times": time_list, "lang": lang, "voice": voice}
     SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_scheduler()
     return cfg
