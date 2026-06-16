@@ -224,6 +224,8 @@
       bottom: 0 !important;
       left: 0 !important;
       right: 0 !important;
+      max-height: 92vh !important;
+      overflow-y: auto !important;
     }
     #yt-modal { align-items: flex-end !important; }
 
@@ -653,7 +655,7 @@
 
 <!-- YouTube Ayarları Modal -->
 <div id="yt-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;">
-  <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;position:relative;">
+  <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;position:relative;max-height:88vh;overflow-y:auto;">
     <button onclick="closeYTModal()" style="position:absolute;top:12px;right:12px;background:#333;border-radius:6px;padding:4px 10px;font-size:16px;line-height:1;">✕</button>
     <h3 style="color:#fff;margin-bottom:4px;font-size:16px;">YouTube OAuth Ayarları</h3>
     <p style="color:#666;font-size:12px;margin-bottom:20px;">Google Cloud Console → API & Services → Credentials → OAuth 2.0 Client</p>
