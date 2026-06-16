@@ -88,7 +88,7 @@
         font-size="300" font-weight="900"
         text-anchor="middle" x="1280" y="790"
         letter-spacing="-6">
-    <tspan fill="url(#aiGrad)" filter="url(#glow)">ai</tspan><tspan fill="#f1f5f9">News</tspan>
+    <tspan fill="url(#aiGrad)" filter="url(#glow)">ai</tspan><tspan fill="#f1f5f9">Trends</tspan>
   </text>
 
   <!-- ── Alt yazı ── -->
@@ -105,5 +105,5 @@
   <!-- Küçük © etiket -->
   <text x="2100" y="590"
         font-family="monospace" font-size="20"
-        fill="#7c3aed" opacity="0.35" letter-spacing="2">© aiNews</text>
+        fill="#7c3aed" opacity="0.35" letter-spacing="2">© aiTrends</text>
 </svg>
