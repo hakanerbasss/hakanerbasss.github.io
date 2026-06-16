@@ -440,9 +440,7 @@ def _collect_data():
 def _build_prompt(data):
     cfg = data['cfg']
     lines = [
-        "Sen bir kripto portföy yöneticisisin. Aşağıdaki tüm veriyi görüyorsun.",
-        "Araçların: sell_partial, sell_all, buy_more, set_agent_enabled, set_position_mult.",
-        "Kendi kararını ver.",
+        "Kripto portföy yöneticisisin. Veriyi gör, kararını ver.",
         "",
         "=== PORTFÖY ÖZET ===",
         f"Serbest USDT: ${data['balance']}",
