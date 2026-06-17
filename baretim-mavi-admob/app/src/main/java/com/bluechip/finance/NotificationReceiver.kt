@@ -75,7 +75,7 @@ class NotificationReceiver : BroadcastReceiver() {
 
             // Avans
             if (settings.advanceEnabled && profile.advanceDay > 0) {
-                val diff = profile.advanceDay - today
+                val diff = (profile.advanceDay - today).let { if (it < 0) it + 30 else it }
                 if (diff == settings.advanceDaysBefore)
                     send("Avans Yaklasiyor!", "${settings.advanceDaysBefore} gun sonra avansiniz yatiyor.", CHANNEL_SALARY)
                 else if (diff == 0)
@@ -84,7 +84,7 @@ class NotificationReceiver : BroadcastReceiver() {
 
             // Emekli maaşı
             if (settings.retirementEnabled && profile.isRetired && profile.retirementDay > 0) {
-                val diff = profile.retirementDay - today
+                val diff = (profile.retirementDay - today).let { if (it < 0) it + 30 else it }
                 if (diff == settings.retirementDaysBefore)
                     send("Emekli Maasi Yaklasiyor!", "${settings.retirementDaysBefore} gun sonra emekli maasiniz yatiyor.", CHANNEL_SALARY)
                 else if (diff == 0)
