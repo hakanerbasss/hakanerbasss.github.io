@@ -269,7 +269,7 @@ Rules:
 - 5 to 7 scenes
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
-- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol"""
+- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")"""
 
     response = client.chat.completions.create(
         model="deepseek-chat",
@@ -424,7 +424,7 @@ Rules:
     # Videoya özel hashtag'ler (DeepSeek'ten) + genel engagement tag'leri
     raw_tags = data.get("hashtags", [])
     if raw_tags:
-        video_tags = ", ".join(f"#{t.lstrip('#')}" for t in raw_tags[:12] if t.strip())
+        video_tags = ", ".join(f"#{t.lstrip('#').replace(' ', '')}" for t in raw_tags[:12] if t.strip())
     else:
         # Fallback: trend hashtag'leri + başlık kelimelerinden üret
         title_tags = [f"#{w.lower()}" for w in generated_title.split()[:3] if len(w) > 3]
@@ -567,7 +567,7 @@ Rules:
 - Exactly {scene_count} scenes
 - Each scene: 2-3 sentences packed with facts, context and detail — NOT simple or vague
 - Cover the topic thoroughly: introduction, key facts, interesting details, historical context, conclusion
-- hashtags: 8-12 relevant tags mixing {lang_name} and English terms, no # symbol
+- hashtags: 8-12 relevant tags mixing {lang_name} and English terms, no # symbol, NO spaces within a tag (e.g. "yapayZeka" or "yapayZeka", never "yapay zeka")
 - keyword: English, specific and visual"""
 
     response = client.chat.completions.create(
@@ -707,7 +707,7 @@ Rules:
 
     # Hashtag'leri oluştur
     raw_tags = data.get("hashtags", [])
-    suggested_tags = ", ".join(f"#{t.lstrip('#')}" for t in raw_tags[:12] if t)
+    suggested_tags = ", ".join(f"#{t.lstrip('#').replace(' ', '')}" for t in raw_tags[:12] if t)
     if not suggested_tags:
         suggested_tags = f"#{topic.split()[0]}, #belgesel, #eğitim, #keşfet, #teknoloji"
 
@@ -783,7 +783,7 @@ Return ONLY valid JSON, no markdown:
 Rules:
 - One segment per trending topic ({len(topics_list)} segments total, {len(topics_list)*2} scenes)
 - Each segment: exactly 2 scenes, informative and engaging
-- hashtags: 10-15 tags mixing {lang_name} and English, always include news-related tags, no # symbol
+- hashtags: 10-15 tags mixing {lang_name} and English, always include news-related tags, no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika")
 - keyword: English, 2-3 words, visual and specific"""
 
     response = client.chat.completions.create(
@@ -922,7 +922,7 @@ Rules:
     tnlv_title = data.get("title", f"Günün Trend Haberleri - {today}")
 
     raw_tags = data.get("hashtags", [])
-    suggested_tags = ", ".join(f"#{t.lstrip('#')}" for t in raw_tags[:15] if t)
+    suggested_tags = ", ".join(f"#{t.lstrip('#').replace(' ', '')}" for t in raw_tags[:15] if t)
     if not suggested_tags:
         suggested_tags = "#gündem, #haberler, #trendler, #güncel, #viral"
 
