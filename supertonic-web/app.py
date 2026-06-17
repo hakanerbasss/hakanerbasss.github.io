@@ -1223,7 +1223,7 @@ def save_lv_sched_log(status: str, message: str, url: str = ""):
 def load_sched_config():
     if SCHED_CONFIG.exists():
         return json.loads(SCHED_CONFIG.read_text())
-    return {"enabled": False, "times": ["09:00", "15:00", "21:00"]}
+    return {"enabled": False, "times": ["07:00", "10:00", "13:00", "17:00", "21:00"]}
 
 
 def save_sched_log(status: str, message: str, url: str = ""):
@@ -1537,7 +1537,7 @@ async def get_scheduler_config():
 @app.post("/api/scheduler/config")
 async def save_scheduler_config(
     enabled: str = Form("false"),
-    times: str = Form("09:00,15:00,21:00"),
+    times: str = Form("07:00,10:00,13:00,17:00,21:00"),
     lang: str = Form("tr"),
     voice: str = Form("F1"),
 ):
