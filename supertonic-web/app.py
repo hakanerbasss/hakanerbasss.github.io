@@ -1114,8 +1114,7 @@ async def upload_youtube(
         f"#{t}" if not t.startswith("#") else t
         for t in tag_list
     )
-    ai_notice = "⚠️ Bu video yapay zeka (AI) yardımıyla üretilmiştir."
-    full_description = f"{description}\n\n{hashtag_str}\n\n{ai_notice}".strip() if description else f"{hashtag_str}\n\n{ai_notice}"
+    full_description = f"{description}\n\n{hashtag_str}".strip() if description else hashtag_str
 
     yt_title = title
 
