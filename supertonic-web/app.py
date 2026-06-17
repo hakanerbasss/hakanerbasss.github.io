@@ -220,6 +220,7 @@ async def generate_shorts(
     lang: str = Form("tr"),
     voice: str = Form("M1"),
     speed: float = Form(1.0),
+    exclude_topics: str = Form(""),
 ):
     import json
     import httpx
@@ -234,10 +235,13 @@ async def generate_shorts(
 
     # Trend verileri al
     trend_data = get_trends(region_code="TR", lang=lang)
-    trend_topics = ", ".join(trend_data["topics"][:5])
+    trend_topics = ", ".join(trend_data["topics"][:12])
     trend_tags = ", ".join(trend_data["hashtags"][:8])
 
     lang_name = LANG_MAP.get(lang, "Turkish")
+    exclude_instruction = ""
+    if exclude_topics.strip():
+        exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
     topic_instruction = (
         f"Topic: {topic}\n"
         f"Use these TODAY'S real trending news to make the content timely and relevant:\n{trend_topics}"
@@ -247,7 +251,7 @@ async def generate_shorts(
     prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
 {topic_instruction}
-Suggested hashtags: {trend_tags}
+{exclude_instruction}Suggested hashtags: {trend_tags}
 
 Return ONLY valid JSON, no markdown, no explanation:
 {{
@@ -1220,6 +1224,28 @@ def save_lv_sched_log(status: str, message: str, url: str = ""):
     ))
 
 
+SHORTS_DAILY_TOPICS = Path("shorts_daily_topics.json")
+
+
+def get_shorts_used_topics() -> list[str]:
+    from datetime import date
+    today = str(date.today())
+    if SHORTS_DAILY_TOPICS.exists():
+        data = json.loads(SHORTS_DAILY_TOPICS.read_text())
+        if data.get("date") == today:
+            return data.get("topics", [])
+    return []
+
+
+def add_shorts_used_topic(title: str):
+    from datetime import date
+    today = str(date.today())
+    topics = get_shorts_used_topics()
+    if title not in topics:
+        topics.append(title)
+    SHORTS_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
+
+
 def load_sched_config():
     if SCHED_CONFIG.exists():
         return json.loads(SCHED_CONFIG.read_text())
@@ -1248,16 +1274,21 @@ async def auto_shorts_job():
         s_lang  = shorts_cfg.get("lang", "tr")
         s_voice = shorts_cfg.get("voice", "F1")
 
+        used_topics = get_shorts_used_topics()
+        exclude_str = " | ".join(used_topics) if used_topics else ""
+
         async with httpx.AsyncClient(timeout=900) as client:
             # 1. Video üret (trend haberden)
             r = await client.post(
                 "http://localhost:8001/api/generate-shorts",
-                data={"topic": "", "api_key": api_key, "lang": s_lang, "voice": s_voice, "speed": "1.0"},
+                data={"topic": "", "api_key": api_key, "lang": s_lang, "voice": s_voice,
+                      "speed": "1.0", "exclude_topics": exclude_str},
             )
             if r.status_code != 200:
                 save_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
                 return
             d = r.json()
+            add_shorts_used_topic(d.get("title", ""))
 
             filename = d["video"].split("/").pop()
             thumbnail = (d.get("thumbnail") or "").split("/").pop()
