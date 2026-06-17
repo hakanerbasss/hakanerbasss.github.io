@@ -980,6 +980,74 @@
       <div id="tnlv-sched-last-url"></div>
     </div>
 
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">🎬 2. Kanal — Belgesel (EN)</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce belgesel kanalı — ayrı YouTube hesabı, her gün 1 video</p>
+
+    <div id="yt-en-not-linked" style="background:#1a1010;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="color:#f87171;font-size:13px;margin-bottom:8px;">✗ EN kanal bağlı değil</div>
+      <p style="color:#888;font-size:12px;margin-bottom:8px;">Bağlamadan önce YouTube'da 2. kanalınıza geçin, sonra tıklayın:</p>
+      <button onclick="window.location='/auth/youtube/en'" style="background:#c00;font-size:12px;padding:8px 16px;">EN Kanal Bağla</button>
+    </div>
+    <div id="yt-en-linked" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ EN kanal bağlı</div>
+      <button onclick="window.location='/auth/youtube/en'" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Yeniden Bağla</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+        <input type="checkbox" id="lv-en-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveLVENScheduler()">
+        Otomatik EN belgesel videoyu etkinleştir
+      </label>
+    </div>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Kategoriler (virgülle ayır, İngilizce)</label>
+      <textarea id="lv-en-sched-categories" style="min-height:64px;font-size:13px;">history, science, space, technology, nature, ancient civilizations, physics</textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="field">
+        <label>Yayın saati (İstanbul)</label>
+        <input type="text" id="lv-en-sched-time" value="14:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+      </div>
+      <div class="field">
+        <label>Video süresi</label>
+        <select id="lv-en-sched-duration" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          <option value="3">~3 dakika</option>
+          <option value="5" selected>~5 dakika</option>
+          <option value="8">~8 dakika</option>
+          <option value="10">~10 dakika</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ses</label>
+        <select id="lv-en-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          <option value="M1" selected>M1 (Erkek)</option>
+          <option value="M2">M2 (Erkek)</option>
+          <option value="M3">M3 (Erkek)</option>
+          <option value="F1">F1 (Kadın)</option>
+          <option value="F2">F2 (Kadın)</option>
+          <option value="F3">F3 (Kadın)</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button onclick="saveLVENScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+      <button onclick="runLVENNow()" id="btn-lv-en-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+        <div class="spinner" id="spin-lv-en-run-now"></div>
+        Şimdi Çalıştır
+      </button>
+    </div>
+
+    <div id="lv-en-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+      <div id="lv-en-sched-next" style="color:#888;"></div>
+      <div id="lv-en-sched-last-status"></div>
+      <div id="lv-en-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+      <div id="lv-en-sched-last-url"></div>
+    </div>
+
     <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
@@ -1294,6 +1362,8 @@ async function openSettings() {
   loadLVSchedulerStatus();
   loadTNLVSchedulerStatus();
   updateTNLVApiKeyStatus();
+  checkYTENStatus();
+  loadLVENSchedulerStatus();
 }
 
 function closeYTModal() {
@@ -1781,6 +1851,68 @@ async function runTNLVNow() {
       document.getElementById('spin-tnlv-run-now').style.display = 'none';
       document.getElementById('btn-tnlv-run-now').disabled = false;
       loadTNLVSchedulerStatus();
+    }
+  }, 5000);
+}
+
+async function checkYTENStatus() {
+  try {
+    const r = await fetch('/api/yt/en/config');
+    const d = await r.json();
+    document.getElementById('yt-en-linked').style.display = d.authorized ? 'block' : 'none';
+    document.getElementById('yt-en-not-linked').style.display = d.authorized ? 'none' : 'block';
+  } catch(e) {}
+}
+
+async function loadLVENSchedulerStatus() {
+  try {
+    const r = await fetch('/api/lv-en-scheduler/config');
+    const d = await r.json();
+    document.getElementById('lv-en-sched-enabled').checked = d.enabled;
+    document.getElementById('lv-en-sched-time').value = d.time || '14:00';
+    document.getElementById('lv-en-sched-categories').value = d.categories || 'history, science, space, technology, nature';
+    const durEl = document.getElementById('lv-en-sched-duration');
+    if (d.duration_min) durEl.value = String(d.duration_min);
+    if (d.voice) document.getElementById('lv-en-sched-voice').value = d.voice;
+
+    const st = document.getElementById('lv-en-sched-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('lv-en-sched-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#facc15';
+      const label = log.status === 'success' ? 'Başarılı' : log.status === 'error' ? 'Hata' : 'Çalışıyor';
+      document.getElementById('lv-en-sched-last-status').innerHTML = log.status ? `<span style="color:${color}">${label}</span>` : '';
+      document.getElementById('lv-en-sched-last-msg').textContent = log.message || '';
+      document.getElementById('lv-en-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
+    }
+  } catch(e) {}
+}
+
+async function saveLVENScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('lv-en-sched-enabled').checked ? 'true' : 'false');
+  fd.append('time', document.getElementById('lv-en-sched-time').value);
+  fd.append('categories', document.getElementById('lv-en-sched-categories').value);
+  fd.append('duration_min', document.getElementById('lv-en-sched-duration').value);
+  fd.append('voice', document.getElementById('lv-en-sched-voice').value);
+  await fetch('/api/lv-en-scheduler/config', { method: 'POST', body: fd });
+  await loadLVENSchedulerStatus();
+}
+
+async function runLVENNow() {
+  document.getElementById('spin-lv-en-run-now').style.display = 'inline-block';
+  document.getElementById('btn-lv-en-run-now').disabled = true;
+  await fetch('/api/lv-en-scheduler/run-now', { method: 'POST' });
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/lv-en-scheduler/config');
+    const d = await r.json();
+    const log = d.log || {};
+    if (log.status && log.status !== 'running') {
+      clearInterval(poll);
+      document.getElementById('spin-lv-en-run-now').style.display = 'none';
+      document.getElementById('btn-lv-en-run-now').disabled = false;
+      loadLVENSchedulerStatus();
     }
   }, 5000);
 }

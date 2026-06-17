@@ -956,6 +956,7 @@ Rules:
 
 CONFIG_FILE = Path("yt_config.json")
 TOKEN_FILE = Path("yt_token.json")
+TOKEN_FILE_EN = Path("yt_token_en.json")
 PEXELS_CONFIG = Path("pexels_config.json")
 DS_CONFIG = Path("deepseek_config.json")
 SCHED_CONFIG = Path("scheduler_config.json")
@@ -1075,6 +1076,44 @@ async def youtube_callback(request: Request, code: str):
     return RedirectResponse("/?yt=ok")
 
 
+@app.get("/auth/youtube/en")
+async def youtube_auth_en(request: Request):
+    import secrets, hashlib, base64
+    cfg = load_yt_config()
+    if not cfg:
+        raise HTTPException(400, "Önce client_id ve client_secret girin")
+    redirect_uri = str(request.base_url) + "auth/youtube/en/callback"
+    flow = _build_flow(cfg, redirect_uri)
+    code_verifier = secrets.token_urlsafe(64)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).rstrip(b"=").decode()
+    VERIFIER_FILE.write_text(code_verifier)
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        prompt="consent",
+        code_challenge=code_challenge,
+        code_challenge_method="S256",
+    )
+    return RedirectResponse(auth_url)
+
+
+@app.get("/auth/youtube/en/callback")
+async def youtube_callback_en(request: Request, code: str):
+    cfg = load_yt_config()
+    redirect_uri = str(request.base_url) + "auth/youtube/en/callback"
+    flow = _build_flow(cfg, redirect_uri)
+    code_verifier = VERIFIER_FILE.read_text() if VERIFIER_FILE.exists() else None
+    flow.fetch_token(code=code, code_verifier=code_verifier)
+    TOKEN_FILE_EN.write_text(flow.credentials.to_json())
+    return RedirectResponse("/?yt_en=ok")
+
+
+@app.get("/api/yt/en/config")
+async def get_yt_en_config():
+    return {"authorized": TOKEN_FILE_EN.exists()}
+
+
 @app.post("/api/yt/upload")
 async def upload_youtube(
     filename: str = Form(...),
@@ -1085,12 +1124,14 @@ async def upload_youtube(
     category_id: str = Form("25"),
     age_restricted: str = Form("false"),
     thumbnail_filename: str = Form(""),
+    channel: str = Form("tr"),
 ):
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    if not TOKEN_FILE.exists():
+    token_file = TOKEN_FILE_EN if channel == "en" else TOKEN_FILE
+    if not token_file.exists():
         raise HTTPException(401, "YouTube hesabı bağlı değil")
 
     video_path = OUTPUT_DIR / filename
@@ -1098,10 +1139,10 @@ async def upload_youtube(
         raise HTTPException(404, "Video bulunamadı")
 
     from google.auth.transport.requests import Request as GRequest
-    creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)
     if creds.expired and creds.refresh_token:
         creds.refresh(GRequest())
-        TOKEN_FILE.write_text(creds.to_json())
+        token_file.write_text(creds.to_json())
     youtube = build("youtube", "v3", credentials=creds)
 
     # Tag listesi — virgül veya boşluk ayırıcı kabul et
@@ -1427,7 +1468,7 @@ Pick something different and interesting each time."""}],
 
 def _rebuild_lv_scheduler():
     for job in scheduler.get_jobs():
-        if job.id.startswith("lv_"):
+        if job.id.startswith("lv_") and not job.id.startswith("lv_en_"):
             job.remove()
     cfg = load_lv_sched_config()
     if not cfg.get("enabled"):
@@ -1439,6 +1480,127 @@ def _rebuild_lv_scheduler():
             auto_long_video_job,
             CronTrigger(hour=int(hour), minute=int(minute)),
             id="lv_daily",
+            replace_existing=True,
+            max_instances=1,
+        )
+    except Exception:
+        pass
+
+
+LV_EN_SCHED_CONFIG = Path("lv_en_scheduler_config.json")
+LV_EN_SCHED_LOG    = Path("lv_en_scheduler_log.json")
+
+
+def load_lv_en_sched_config():
+    if LV_EN_SCHED_CONFIG.exists():
+        return json.loads(LV_EN_SCHED_CONFIG.read_text())
+    return {
+        "enabled": False,
+        "time": "14:00",
+        "categories": "history, science, space, technology, nature, ancient civilizations, physics",
+        "duration_min": 5,
+        "voice": "M1",
+    }
+
+
+def save_lv_en_sched_log(status: str, message: str, url: str = ""):
+    LV_EN_SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "url": url, "ts": time.time()},
+        ensure_ascii=False,
+    ))
+
+
+async def auto_lv_en_job():
+    save_lv_en_sched_log("running", "Topic selecting…")
+    try:
+        api_key = get_deepseek_key()
+        if not api_key:
+            save_lv_en_sched_log("error", "DeepSeek API key not configured on server")
+            return
+        if not TOKEN_FILE_EN.exists():
+            save_lv_en_sched_log("error", "EN YouTube channel not connected")
+            return
+
+        cfg = load_lv_en_sched_config()
+        categories = cfg.get("categories", "history, science, space, technology")
+        duration_min = cfg.get("duration_min", 5)
+        voice = cfg.get("voice", "M1")
+
+        from openai import OpenAI
+        ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        topic_resp = ds.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": f"""Pick ONE specific, fascinating and educational documentary topic in English.
+Categories to choose from: {categories}
+Return ONLY valid JSON: {{"topic": "specific topic in English"}}
+Make it specific and fascinating — NOT generic. Examples:
+- "How the Roman Colosseum Was Built and What Happened Inside"
+- "The Science Behind Black Holes: What Happens If You Fall In?"
+- "The Real Story of the Library of Alexandria and Its Destruction"
+- "How Quantum Entanglement Could Change Communication Forever"
+Pick something different and interesting each time."""}],
+            temperature=0.95,
+        )
+        topic = _parse_llm_json(topic_resp.choices[0].message.content).get(
+            "topic", categories.split(",")[0].strip()
+        )
+
+        save_lv_en_sched_log("running", f"Generating: {topic}")
+
+        timeout = httpx.Timeout(connect=30, read=1800, write=60, pool=30)
+        async with httpx.AsyncClient(timeout=timeout) as hc:
+            r = await hc.post(
+                "http://localhost:8001/api/generate-long-video",
+                data={"topic": topic, "api_key": api_key, "lang": "en",
+                      "voice": voice, "speed": "1.0", "duration_min": str(duration_min)},
+            )
+            if r.status_code != 200:
+                save_lv_en_sched_log("error", f"Video failed: {r.text[:300]}")
+                return
+            d = r.json()
+
+            filename  = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
+
+            r2 = await hc.post(
+                "http://localhost:8001/api/yt/upload",
+                data={
+                    "filename": filename,
+                    "title": d.get("title", topic),
+                    "description": d.get("description", ""),
+                    "tags": d.get("suggested_tags", "#documentary, #education, #science, #history"),
+                    "privacy": "public",
+                    "category_id": "27",
+                    "age_restricted": "false",
+                    "thumbnail_filename": thumbnail,
+                    "channel": "en",
+                },
+                timeout=300,
+            )
+            if r2.status_code != 200:
+                save_lv_en_sched_log("error", f"Upload failed: {r2.text[:300]}")
+                return
+
+            save_lv_en_sched_log("success", d.get("title", topic), r2.json().get("url", ""))
+
+    except Exception as e:
+        save_lv_en_sched_log("error", str(e))
+
+
+def _rebuild_lv_en_scheduler():
+    for job in scheduler.get_jobs():
+        if job.id.startswith("lv_en_"):
+            job.remove()
+    cfg = load_lv_en_sched_config()
+    if not cfg.get("enabled"):
+        return
+    t = cfg.get("time", "14:00")
+    try:
+        hour, minute = t.strip().split(":")
+        scheduler.add_job(
+            auto_lv_en_job,
+            CronTrigger(hour=int(hour), minute=int(minute)),
+            id="lv_en_daily",
             replace_existing=True,
             max_instances=1,
         )
@@ -1547,6 +1709,7 @@ async def startup_event():
     scheduler.start()
     _rebuild_scheduler()
     _rebuild_lv_scheduler()
+    _rebuild_lv_en_scheduler()
     _rebuild_tnlv_scheduler()
 
 
@@ -1596,7 +1759,7 @@ async def get_lv_scheduler_config():
     log = {}
     if LV_SCHED_LOG.exists():
         log = json.loads(LV_SCHED_LOG.read_text())
-    jobs = [j for j in scheduler.get_jobs() if j.id.startswith("lv_")]
+    jobs = [j for j in scheduler.get_jobs() if j.id.startswith("lv_") and not j.id.startswith("lv_en_")]
     next_run = None
     if jobs and jobs[0].next_run_time:
         next_run = jobs[0].next_run_time.strftime("%d.%m.%Y %H:%M")
@@ -1628,6 +1791,45 @@ async def save_lv_scheduler_config(
 @app.post("/api/lv-scheduler/run-now")
 async def run_lv_now():
     asyncio.create_task(auto_long_video_job())
+    return {"ok": True}
+
+
+@app.get("/api/lv-en-scheduler/config")
+async def get_lv_en_scheduler_config():
+    cfg = load_lv_en_sched_config()
+    log = {}
+    if LV_EN_SCHED_LOG.exists():
+        log = json.loads(LV_EN_SCHED_LOG.read_text())
+    jobs = [j for j in scheduler.get_jobs() if j.id.startswith("lv_en_")]
+    next_run = None
+    if jobs and jobs[0].next_run_time:
+        next_run = jobs[0].next_run_time.strftime("%d.%m.%Y %H:%M")
+    return {**cfg, "log": log, "next_run": next_run}
+
+
+@app.post("/api/lv-en-scheduler/config")
+async def save_lv_en_scheduler_config(
+    enabled: str = Form("false"),
+    time: str = Form("14:00"),
+    categories: str = Form("history, science, space, technology, nature"),
+    duration_min: str = Form("5"),
+    voice: str = Form("M1"),
+):
+    cfg = {
+        "enabled": enabled == "true",
+        "time": time.strip(),
+        "categories": categories,
+        "duration_min": int(duration_min),
+        "voice": voice,
+    }
+    LV_EN_SCHED_CONFIG.write_text(json.dumps(cfg))
+    _rebuild_lv_en_scheduler()
+    return cfg
+
+
+@app.post("/api/lv-en-scheduler/run-now")
+async def run_lv_en_now():
+    asyncio.create_task(auto_lv_en_job())
     return {"ok": True}
 
 
