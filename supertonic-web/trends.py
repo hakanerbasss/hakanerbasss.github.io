@@ -33,7 +33,6 @@ def fetch_google_news(lang="tr", region="TR", max_items=20):
         for item in root.findall(".//item"):
             title = item.findtext("title", "")
             if title and " - " in title:
-                # "Haber başlığı - Kaynak Adı" formatından sadece başlığı al
                 title = title.rsplit(" - ", 1)[0].strip()
             if title:
                 titles.append(title)
@@ -44,7 +43,8 @@ def fetch_google_news(lang="tr", region="TR", max_items=20):
         return []
 
 
-def fetch_youtube_trending(youtube_client, region_code="TR", max_results=10):
+def fetch_youtube_trending(youtube_client, region_code="TR", max_results=25):
+    """YouTube trending videolarından frekans bazlı popüler hashtag'leri çeker."""
     try:
         resp = youtube_client.videos().list(
             part="snippet",
@@ -52,11 +52,32 @@ def fetch_youtube_trending(youtube_client, region_code="TR", max_results=10):
             regionCode=region_code,
             maxResults=max_results,
         ).execute()
-        titles = [item["snippet"]["title"] for item in resp.get("items", [])]
-        tags = []
+
+        titles = []
+        tag_count = {}
+
         for item in resp.get("items", []):
-            tags.extend(item["snippet"].get("tags", [])[:2])
-        return titles, list(set(tags))[:15]
+            snippet = item["snippet"]
+            titles.append(snippet["title"])
+            for tag in snippet.get("tags", []):
+                tag = tag.strip()
+                # Çok kısa veya çok uzun tag'leri atla
+                if not tag or len(tag) < 2 or len(tag) > 40:
+                    continue
+                key = tag.lower()
+                tag_count[key] = tag_count.get(key, 0) + 1
+
+        # Frekansa göre sırala — birden fazla videoda geçen tag'ler en popüler
+        sorted_tags = sorted(tag_count.items(), key=lambda x: x[1], reverse=True)
+
+        # Hashtag formatına çevir: boşlukları kaldır, # ekle
+        top_hashtags = []
+        for tag, _ in sorted_tags[:25]:
+            ht = "#" + tag.replace(" ", "").replace("-", "")
+            if ht not in top_hashtags:
+                top_hashtags.append(ht)
+
+        return titles, top_hashtags[:20]
     except Exception:
         return [], []
 
@@ -70,24 +91,24 @@ def get_trends(youtube_client=None, region_code="TR", lang="tr"):
     news_topics = fetch_google_news(lang=lang, region=region_code)
 
     # YouTube trending (varsa)
-    yt_topics, yt_tags = [], []
+    yt_topics, yt_hashtags = [], []
     if youtube_client:
-        yt_topics, yt_tags = fetch_youtube_trending(youtube_client, region_code)
+        yt_topics, yt_hashtags = fetch_youtube_trending(youtube_client, region_code)
 
     topics = news_topics + yt_topics
 
-    # Fallback
     if not topics:
         topics = ["gündem haberleri", "teknoloji gelişmeleri", "ekonomi"]
 
-    trend_hashtags = list(set(
-        ["#Shorts", "#keşfet", "#viral", "#trending", "#gündem"]
-        + [f"#{t.split()[0].lower()}" for t in yt_tags[:5] if t]
-    ))[:15]
+    # YouTube trending hashtag'leri + genel hashtag'ler
+    base = ["#Shorts", "#keşfet", "#viral", "#trending", "#gündem"]
+    # YouTube trending tag'leri öne al — daha değerli
+    trend_hashtags = list(dict.fromkeys(yt_hashtags + base))[:20]
 
     result = {
         "topics": topics[:20],
-        "hashtags": trend_hashtags,
+        "hashtags": trend_hashtags,          # prompt'a giden liste
+        "yt_trending_tags": yt_hashtags,     # sadece YouTube kaynaklılar
         "region": region_code,
         "lang": lang,
     }

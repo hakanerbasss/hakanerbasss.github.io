@@ -236,7 +236,8 @@ async def generate_shorts(
     # Trend verileri al
     trend_data = get_trends(region_code="TR", lang=lang)
     trend_topics = ", ".join(trend_data["topics"][:12])
-    trend_tags = ", ".join(trend_data["hashtags"][:8])
+    yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
+    trend_tags = ", ".join(trend_data["hashtags"][:10])
 
     lang_name = LANG_MAP.get(lang, "Turkish")
     exclude_instruction = ""
@@ -248,10 +249,11 @@ async def generate_shorts(
         if topic.strip() else
         f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}"
     )
+    yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
     prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
 {topic_instruction}
-{exclude_instruction}Suggested hashtags: {trend_tags}
+{exclude_instruction}Suggested hashtags: {trend_tags}{yt_tag_instruction}
 
 Return ONLY valid JSON, no markdown, no explanation:
 {{
@@ -754,6 +756,7 @@ async def generate_trend_long_video(
     trend_data = get_trends(region_code=region, lang=lang)
     topics_list = trend_data["topics"][:6]
     topics_str = "\n".join(f"- {t}" for t in topics_list)
+    yt_tags_lv = ", ".join(trend_data.get("yt_trending_tags", [])[:12])
     today = datetime.now().strftime("%d.%m.%Y")
 
     prompt = f"""Create a news roundup YouTube video covering today's trending topics in {lang_name}.
@@ -761,6 +764,8 @@ Date: {today}
 
 Trending topics:
 {topics_str}
+
+YouTube TR trending hashtags RIGHT NOW (use relevant ones in your hashtags list): {yt_tags_lv}
 
 Create a news digest with one segment per topic. Each segment has 2 scenes.
 
