@@ -132,8 +132,8 @@ fun AiAssistantScreen() {
         displayMessages.add(Pair(userText, true))
         isLoading = true
         scope.launch {
-            val result = DeepSeekClient.sendMessage(context, history.toList(), userText)
             history.add(ChatMessage("user", userText))
+            val result = DeepSeekClient.sendMessage(context, history.toList(), userText)
             result.onSuccess { reply ->
                 history.add(ChatMessage("assistant", reply))
                 displayMessages.add(Pair(reply, false))

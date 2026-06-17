@@ -20,17 +20,19 @@ object SpecialDayManager {
     fun getAll(context: Context): List<SpecialDay> {
         val json = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY, "[]") ?: "[]"
-        val arr = JSONArray(json)
-        return (0 until arr.length()).map { i ->
-            val o = arr.getJSONObject(i)
-            SpecialDay(
-                id       = o.optString("id", UUID.randomUUID().toString()),
-                title    = o.optString("title", ""),
-                subtitle = o.optString("subtitle", ""),
-                day      = o.optInt("day", 1),
-                month    = o.optInt("month", 1)
-            )
-        }
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                SpecialDay(
+                    id       = o.optString("id", UUID.randomUUID().toString()),
+                    title    = o.optString("title", ""),
+                    subtitle = o.optString("subtitle", ""),
+                    day      = o.optInt("day", 1),
+                    month    = o.optInt("month", 1)
+                )
+            }
+        } catch (_: Exception) { return emptyList() }
     }
 
     fun save(context: Context, day: SpecialDay) {

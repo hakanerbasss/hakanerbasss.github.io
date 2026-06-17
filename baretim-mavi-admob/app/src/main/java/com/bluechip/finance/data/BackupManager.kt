@@ -14,7 +14,10 @@ object BackupManager {
         "savings_prefs",
         "special_days",
         "notif_settings",
-        "deepseek_prefs"
+        "deepseek_prefs",
+        "ad_free_prefs",
+        "calc_history",
+        "custom_cryptos"
     )
 
     fun export(context: Context, out: OutputStream) {
@@ -42,6 +45,33 @@ object BackupManager {
         out.write(root.toString(2).toByteArray())
         out.flush()
         markBackupDone(context)
+    }
+
+    /** export() ile aynı ama markBackupDone() çağırmaz — sadece okuma amaçlı. */
+    fun exportForRead(context: Context, out: OutputStream) {
+        val root  = JSONObject()
+        root.put("version", 1)
+        root.put("timestamp", System.currentTimeMillis())
+        val prefs = JSONObject()
+        PREF_NAMES.forEach { name ->
+            val sp  = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+            val obj = JSONObject()
+            sp.all.forEach { (k, v) ->
+                val entry = JSONObject()
+                when (v) {
+                    is Boolean -> { entry.put("t", "b"); entry.put("v", v.toString()) }
+                    is Int     -> { entry.put("t", "i"); entry.put("v", v.toString()) }
+                    is Long    -> { entry.put("t", "l"); entry.put("v", v.toString()) }
+                    is Float   -> { entry.put("t", "f"); entry.put("v", v.toString()) }
+                    else       -> { entry.put("t", "s"); entry.put("v", v?.toString() ?: "") }
+                }
+                obj.put(k, entry)
+            }
+            prefs.put(name, obj)
+        }
+        root.put("prefs", prefs)
+        out.write(root.toString(2).toByteArray())
+        out.flush()
     }
 
     fun markBackupDone(context: Context) {

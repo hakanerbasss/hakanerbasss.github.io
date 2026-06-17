@@ -229,7 +229,7 @@ object DeepSeekClient {
             appendLine("Asagida uygulamadaki tum kaydedilmis veri JSON formatinda. Yukarida ozetlenmeyenler buradadir.")
             try {
                 val bos = ByteArrayOutputStream()
-                BackupManager.export(context, bos)
+                BackupManager.exportForRead(context, bos)
                 val root  = JSONObject(bos.toString("UTF-8"))
                 val prefs = root.optJSONObject("prefs") ?: JSONObject()
                 prefs.keys().forEach { prefName ->
@@ -359,7 +359,7 @@ object DeepSeekClient {
                 JSONObject().apply {
                     put("label",    param("string", "Ad: Yemek Yardimi, Yol Yardimi, Kira Geliri, Freelance vb."))
                     put("amount",   param("number", "Aylik sabit tutar TL"))
-                    put("category", param("string", "Kategori", listOf("KIRA","FAIZ","DIJITAL","FREELANCE","DIGER")))
+                    put("category", param("string", "Kategori", listOf("KIRA","FAIZ","DIJITAL","FREELANCE","YOL","YEMEK","IKRAMIYE","DIGER")))
                 }, listOf("label","amount")))
 
             put(tool("delete_side_income",
@@ -596,12 +596,13 @@ object DeepSeekClient {
                 body = JSONObject().apply {
                     put("model", MODEL); put("messages", messages)
                     put("max_tokens", 1024); put("temperature", 0.7)
+                    put("tools", toolDefinitions()); put("tool_choice", "auto")
                 }
                 response = callApi(apiKey, body)
                 choice   = response.getJSONArray("choices").getJSONObject(0)
             }
 
-            choice.getJSONObject("message").getString("content")
+            choice.getJSONObject("message").optString("content", "")
         }
     }
 }

@@ -64,8 +64,8 @@ fun BudgetScreen() {
         // KIRA category → rentText
         payments.filter { it.category == PaymentCategory.KIRA }
             .sumOf { it.amount }.let { if (it > 0) { rentText = it.toLong().toString(); filled.add("kira") } }
-        // FATURA + ABONELIK + SIGORTA + DIGER → billsText
-        payments.filter { it.category == PaymentCategory.FATURA || it.category == PaymentCategory.ABONELIK || it.category == PaymentCategory.SIGORTA || it.category == PaymentCategory.DIGER }
+        // FATURA + ABONELIK + SIGORTA + KREDI + DIGER → billsText
+        payments.filter { it.category == PaymentCategory.FATURA || it.category == PaymentCategory.ABONELIK || it.category == PaymentCategory.SIGORTA || it.category == PaymentCategory.KREDI || it.category == PaymentCategory.DIGER }
             .sumOf { it.amount }.let { if (it > 0) { billsText = it.toLong().toString(); filled.add("fatura") } }
         autoFilledFields = filled
     }

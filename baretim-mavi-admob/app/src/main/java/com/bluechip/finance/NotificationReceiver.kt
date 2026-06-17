@@ -66,7 +66,7 @@ class NotificationReceiver : BroadcastReceiver() {
 
             // Maaş
             if (settings.salaryEnabled && profile.salaryDay > 0) {
-                val diff = profile.salaryDay - today
+                val diff = (profile.salaryDay - today).let { if (it < 0) it + 30 else it }
                 if (diff == settings.salaryDaysBefore)
                     send("Maas Yaklasiyor!", "${settings.salaryDaysBefore} gun sonra maasiniz yatiyor.", CHANNEL_SALARY)
                 else if (diff == 0)
@@ -129,10 +129,10 @@ class NotificationReceiver : BroadcastReceiver() {
 
             // Yedekleme hatirlatici
             if (settings.backupReminderEnabled) {
-                val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
                 val prefs = context.getSharedPreferences("notif_settings", Context.MODE_PRIVATE)
                 val lastBackup = prefs.getString(NotificationSettingsManager.KEY_LAST_BACKUP_DATE, "")
-                if (lastBackup != today) {
+                if (lastBackup != todayStr) {
                     send("Yedekleme Hatirlatici", "Bugun yedekleme yapmadiniz. Verileriniz kaybolmasin!", CHANNEL_BACKUP)
                 }
             }
