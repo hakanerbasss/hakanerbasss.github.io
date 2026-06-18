@@ -1014,9 +1014,22 @@ def _generate_dalle_image(keyword: str, orientation: str, openai_key: str) -> by
     return None
 
 
+def _save_as_jpeg(data: bytes, img_path: Path) -> bool:
+    """Herhangi bir görsel formatını (SVG hariç) JPEG olarak kaydeder."""
+    from PIL import Image
+    import io
+    try:
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+        img.save(str(img_path), "JPEG", quality=92)
+        return True
+    except Exception:
+        return False
+
+
 def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path: Path) -> bool:
     """
     Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels.
+    Tüm görseller PIL ile JPEG'e dönüştürülür (SVG/GIF/WebP sorunlarını önler).
     Başarılıysa img_path'e yazar ve True döner.
     """
     width = 1080 if orientation == "portrait" else 1920
@@ -1025,13 +1038,11 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
     openai_key = get_openai_key()
     if openai_key:
         data = _generate_dalle_image(keyword, orientation, openai_key)
-        if data:
-            img_path.write_bytes(data)
+        if data and _save_as_jpeg(data, img_path):
             return True
 
     data = _fetch_wikimedia_image(keyword, width=width)
-    if data:
-        img_path.write_bytes(data)
+    if data and _save_as_jpeg(data, img_path):
         return True
 
     if pexels_key:
@@ -1045,8 +1056,9 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
             photos = resp.json().get("photos", [])
             if photos:
                 img_url = photos[0]["src"].get(size_key) or photos[0]["src"]["large"]
-                img_path.write_bytes(httpx.get(img_url, timeout=15).content)
-                return True
+                data = httpx.get(img_url, timeout=15).content
+                if _save_as_jpeg(data, img_path):
+                    return True
         except Exception:
             pass
 
