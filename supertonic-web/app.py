@@ -1078,23 +1078,12 @@ async def youtube_callback(request: Request, code: str):
 
 @app.get("/auth/youtube/en")
 async def youtube_auth_en(request: Request):
-    import secrets, hashlib, base64
     cfg = load_yt_config()
     if not cfg:
         raise HTTPException(400, "Önce client_id ve client_secret girin")
     redirect_uri = str(request.base_url) + "auth/youtube/en/callback"
     flow = _build_flow(cfg, redirect_uri)
-    code_verifier = secrets.token_urlsafe(64)
-    code_challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(code_verifier.encode()).digest()
-    ).rstrip(b"=").decode()
-    VERIFIER_FILE.write_text(code_verifier)
-    auth_url, _ = flow.authorization_url(
-        access_type="offline",
-        prompt="consent",
-        code_challenge=code_challenge,
-        code_challenge_method="S256",
-    )
+    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
     return RedirectResponse(auth_url)
 
 
@@ -1103,8 +1092,7 @@ async def youtube_callback_en(request: Request, code: str):
     cfg = load_yt_config()
     redirect_uri = str(request.base_url) + "auth/youtube/en/callback"
     flow = _build_flow(cfg, redirect_uri)
-    code_verifier = VERIFIER_FILE.read_text() if VERIFIER_FILE.exists() else None
-    flow.fetch_token(code=code, code_verifier=code_verifier)
+    flow.fetch_token(code=code)
     TOKEN_FILE_EN.write_text(flow.credentials.to_json())
     return RedirectResponse("/?yt_en=ok")
 
