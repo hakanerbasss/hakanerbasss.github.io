@@ -307,27 +307,10 @@ Rules:
         audio_files.append(audio_path)
         durations.append(dur_val)
 
-        # Pexels'ten fotoğraf çek
+        # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
         png_path = scene_dir / f"scene_{i}.jpg"
         keyword = scene.get("keyword", topic)
-        photo_saved = False
-
-        if pexels_key:
-            try:
-                resp = httpx.get(
-                    "https://api.pexels.com/v1/search",
-                    params={"query": keyword, "orientation": "portrait", "per_page": 1},
-                    headers={"Authorization": pexels_key},
-                    timeout=10,
-                )
-                photos = resp.json().get("photos", [])
-                if photos:
-                    img_url = photos[0]["src"].get("portrait") or photos[0]["src"]["large"]
-                    img_data = httpx.get(img_url, timeout=15).content
-                    png_path.write_bytes(img_data)
-                    photo_saved = True
-            except Exception:
-                pass
+        photo_saved = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
 
         # Fallback: siyah arka plan
         if not photo_saved:
@@ -613,24 +596,9 @@ Rules:
         audio_files.append(audio_path)
         durations.append(dur_val)
 
-        # Pexels fotoğraf (yatay)
+        # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
         img_path = scene_dir / f"scene_{i}.jpg"
-        photo_saved = False
-        if pexels_key:
-            try:
-                resp = httpx.get(
-                    "https://api.pexels.com/v1/search",
-                    params={"query": scene.get("keyword", topic), "orientation": "landscape", "per_page": 1},
-                    headers={"Authorization": pexels_key},
-                    timeout=10,
-                )
-                photos = resp.json().get("photos", [])
-                if photos:
-                    img_url = photos[0]["src"].get("large2x") or photos[0]["src"]["large"]
-                    img_path.write_bytes(httpx.get(img_url, timeout=15).content)
-                    photo_saved = True
-            except Exception:
-                pass
+        photo_saved = fetch_scene_visual(scene.get("keyword", topic), "landscape", pexels_key, img_path)
 
         if not photo_saved:
             subprocess.run([
@@ -838,22 +806,8 @@ Rules:
         durations.append(dur_val)
 
         img_path = scene_dir / f"scene_{i}.jpg"
-        photo_saved = False
-        if pexels_key:
-            try:
-                resp = httpx.get(
-                    "https://api.pexels.com/v1/search",
-                    params={"query": scene.get("keyword", "breaking news"), "orientation": "landscape", "per_page": 1},
-                    headers={"Authorization": pexels_key},
-                    timeout=10,
-                )
-                photos = resp.json().get("photos", [])
-                if photos:
-                    img_url = photos[0]["src"].get("large2x") or photos[0]["src"]["large"]
-                    img_path.write_bytes(httpx.get(img_url, timeout=15).content)
-                    photo_saved = True
-            except Exception:
-                pass
+        kw = scene.get("keyword", "breaking news")
+        photo_saved = fetch_scene_visual(kw, "landscape", pexels_key, img_path)
 
         if not photo_saved:
             subprocess.run([
@@ -959,6 +913,7 @@ TOKEN_FILE = Path("yt_token.json")
 TOKEN_FILE_EN = Path("yt_token_en.json")
 PEXELS_CONFIG = Path("pexels_config.json")
 DS_CONFIG = Path("deepseek_config.json")
+OPENAI_CONFIG = Path("openai_config.json")
 SCHED_CONFIG = Path("scheduler_config.json")
 SCHED_LOG = Path("scheduler_log.json")
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
@@ -970,6 +925,106 @@ def get_pexels_key():
     return ""
 
 
+def get_openai_key():
+    if OPENAI_CONFIG.exists():
+        return json.loads(OPENAI_CONFIG.read_text()).get("api_key", "")
+    return ""
+
+
+def _fetch_wikimedia_image(keyword: str, width: int = 1920) -> bytes | None:
+    """Wikimedia Commons'dan CC lisanslı görsel çeker."""
+    try:
+        r = httpx.get(
+            "https://commons.wikimedia.org/w/api.php",
+            params={
+                "action": "query",
+                "generator": "search",
+                "gsrsearch": keyword,
+                "gsrnamespace": "6",
+                "gsrlimit": "5",
+                "prop": "imageinfo",
+                "iiprop": "url|mime",
+                "iiurlwidth": str(width),
+                "format": "json",
+            },
+            timeout=10,
+            headers={"User-Agent": "SupertonicBot/1.0"},
+        )
+        pages = r.json().get("query", {}).get("pages", {})
+        for page in pages.values():
+            info = (page.get("imageinfo") or [{}])[0]
+            mime = info.get("mime", "")
+            if not mime.startswith("image/"):
+                continue
+            url = info.get("thumburl") or info.get("url", "")
+            if url:
+                return httpx.get(url, timeout=15).content
+    except Exception:
+        pass
+    return None
+
+
+def _generate_dalle_image(keyword: str, orientation: str, openai_key: str) -> bytes | None:
+    """DALL-E 3 ile sahne görseli üretir."""
+    try:
+        from openai import OpenAI as _OAI
+        client = _OAI(api_key=openai_key)
+        size = "1024x1792" if orientation == "portrait" else "1792x1024"
+        resp = client.images.generate(
+            model="dall-e-3",
+            prompt=(
+                f"Professional high-quality documentary-style photo of {keyword}, "
+                "realistic, cinematic lighting, no text, no watermarks, no logos"
+            ),
+            size=size,
+            quality="standard",
+            n=1,
+        )
+        img_url = resp.data[0].url
+        return httpx.get(img_url, timeout=30).content
+    except Exception:
+        return None
+
+
+def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path: Path) -> bool:
+    """
+    Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels.
+    Başarılıysa img_path'e yazar ve True döner.
+    """
+    width = 1080 if orientation == "portrait" else 1920
+    size_key = "portrait" if orientation == "portrait" else "large2x"
+
+    openai_key = get_openai_key()
+    if openai_key:
+        data = _generate_dalle_image(keyword, orientation, openai_key)
+        if data:
+            img_path.write_bytes(data)
+            return True
+
+    data = _fetch_wikimedia_image(keyword, width=width)
+    if data:
+        img_path.write_bytes(data)
+        return True
+
+    if pexels_key:
+        try:
+            resp = httpx.get(
+                "https://api.pexels.com/v1/search",
+                params={"query": keyword, "orientation": orientation, "per_page": 3},
+                headers={"Authorization": pexels_key},
+                timeout=10,
+            )
+            photos = resp.json().get("photos", [])
+            if photos:
+                img_url = photos[0]["src"].get(size_key) or photos[0]["src"]["large"]
+                img_path.write_bytes(httpx.get(img_url, timeout=15).content)
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
 @app.post("/api/pexels/config")
 async def save_pexels_config(api_key: str = Form(...)):
     PEXELS_CONFIG.write_text(json.dumps({"api_key": api_key}))
@@ -979,6 +1034,17 @@ async def save_pexels_config(api_key: str = Form(...)):
 @app.get("/api/pexels/config")
 async def get_pexels_config():
     return {"configured": bool(get_pexels_key())}
+
+
+@app.get("/api/openai/config")
+async def get_openai_config():
+    key = get_openai_key()
+    return {"configured": bool(key), "key_preview": (key[:8] + "...") if key else ""}
+
+@app.post("/api/openai/config")
+async def set_openai_config(api_key: str = Form(...)):
+    OPENAI_CONFIG.write_text(json.dumps({"api_key": api_key}, ensure_ascii=False))
+    return {"ok": True}
 
 
 def load_yt_config():

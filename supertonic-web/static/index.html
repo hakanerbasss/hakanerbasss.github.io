@@ -790,6 +790,15 @@
       <button onclick="savePexelsConfig()">Kaydet</button>
     </div>
     <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">🎨 OpenAI DALL-E (Opsiyonel)</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">DALL-E 3 API key — varsa görseller DALL-E ile üretilir, yoksa Wikimedia → Pexels kullanılır</p>
+    <div id="openai-key-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
+    <div class="field">
+      <label>OpenAI API Key</label>
+      <input type="password" id="openai-api-key" placeholder="sk-..." style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+    </div>
+    <button onclick="saveOpenAIKey()" style="font-size:12px;padding:8px 16px;margin-bottom:4px;">Kaydet</button>
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
     <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">DeepSeek API (Otomasyon için)</h3>
     <p style="color:#666;font-size:12px;margin-bottom:12px;">Otomatik video üretimi için sunucuda saklanır</p>
     <div id="ds-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
@@ -1364,6 +1373,7 @@ async function openSettings() {
   updateTNLVApiKeyStatus();
   checkYTENStatus();
   loadLVENSchedulerStatus();
+  checkOpenAIStatus();
 }
 
 function closeYTModal() {
@@ -1936,6 +1946,28 @@ async function saveDSConfig() {
 function resetDSConfig() {
   document.getElementById('ds-saved-state').style.display = 'none';
   document.getElementById('ds-input-state').style.display = 'block';
+}
+
+// ── OpenAI DALL-E config ──────────────────────────────────────────────────────
+async function checkOpenAIStatus() {
+  try {
+    const r = await fetch('/api/openai/config');
+    const d = await r.json();
+    const el = document.getElementById('openai-key-status');
+    if (el) el.innerHTML = d.configured
+      ? `<span style="color:#4ade80">✓ DALL-E aktif (${d.key_preview})</span>`
+      : '<span style="color:#888">✗ API key girilmedi — Wikimedia + Pexels kullanılacak</span>';
+  } catch(e) {}
+}
+
+async function saveOpenAIKey() {
+  const key = document.getElementById('openai-api-key').value.trim();
+  if (!key) return;
+  const fd = new FormData();
+  fd.append('api_key', key);
+  await fetch('/api/openai/config', { method: 'POST', body: fd });
+  document.getElementById('openai-api-key').value = '';
+  await checkOpenAIStatus();
 }
 
 // ── Otomasyon / Scheduler ─────────────────────────────────────────────────────
