@@ -1340,7 +1340,7 @@ async def auto_shorts_job():
                     "age_restricted": "false",
                     "thumbnail_filename": thumbnail,
                 },
-                timeout=300,
+                timeout=600,
             )
             if r2.status_code != 200:
                 save_sched_log("error", f"YouTube yüklenemedi: {r2.text[:300]}")
@@ -1442,7 +1442,7 @@ Pick something different and interesting each time."""}],
                     "age_restricted": "false",
                     "thumbnail_filename": thumbnail,
                 },
-                timeout=300,
+                timeout=600,
             )
             if r2.status_code != 200:
                 save_lv_sched_log("error", f"YouTube yüklenemedi: {r2.text[:300]}")
@@ -1563,7 +1563,7 @@ Pick something different and interesting each time."""}],
                     "thumbnail_filename": thumbnail,
                     "channel": "en",
                 },
-                timeout=300,
+                timeout=600,
             )
             if r2.status_code != 200:
                 save_lv_en_sched_log("error", f"Upload failed: {r2.text[:300]}")
@@ -1659,7 +1659,7 @@ async def auto_tnlv_job():
                     "age_restricted": "false",
                     "thumbnail_filename": thumbnail,
                 },
-                timeout=300,
+                timeout=600,
             )
             if r2.status_code != 200:
                 save_tnlv_sched_log("error", f"YouTube yüklenemedi: {r2.text[:300]}")
