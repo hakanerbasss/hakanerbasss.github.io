@@ -983,25 +983,31 @@ def _fetch_wikimedia_image(keyword: str, width: int = 1920) -> bytes | None:
 
 
 def _generate_dalle_image(keyword: str, orientation: str, openai_key: str) -> bytes | None:
-    """DALL-E 3 ile sahne görseli üretir."""
+    """gpt-image-1-mini ile sahne görseli üretir."""
+    import base64
     try:
         from openai import OpenAI as _OAI
         client = _OAI(api_key=openai_key)
-        size = "1024x1792" if orientation == "portrait" else "1792x1024"
+        size = "1024x1536" if orientation == "portrait" else "1536x1024"
         resp = client.images.generate(
-            model="dall-e-3",
+            model="gpt-image-1-mini",
             prompt=(
                 f"Professional high-quality documentary-style photo of {keyword}, "
                 "realistic, cinematic lighting, no text, no watermarks, no logos"
             ),
             size=size,
-            quality="standard",
             n=1,
         )
-        img_url = resp.data[0].url
-        return httpx.get(img_url, timeout=30).content
+        b64 = resp.data[0].b64_json
+        if b64:
+            return base64.b64decode(b64)
+        # Fallback: url varsa indir
+        url = getattr(resp.data[0], "url", None)
+        if url:
+            return httpx.get(url, timeout=30).content
     except Exception:
-        return None
+        pass
+    return None
 
 
 def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path: Path) -> bool:
