@@ -269,6 +269,8 @@ Return ONLY valid JSON, no markdown, no explanation:
 
 Rules:
 - 5 to 7 scenes
+- FIRST scene text MUST start with a hook: a shocking statement OR a question that creates curiosity (e.g. "Biliyor muydunuz?", "Şok gelişme!", "Peki ya şimdi?"). This is critical for retention.
+- LAST scene text MUST end with a call to action: "Abone olmayı ve beğenmeyi unutma!" (in {lang_name})
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
 - hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")"""
@@ -550,6 +552,8 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - Exactly {scene_count} scenes
+- FIRST scene text MUST start with a hook: a shocking statement or question (e.g. "Biliyor muydunuz?", "Şok gelişme!"). Critical for viewer retention.
+- LAST scene text MUST end with: "Abone olmayı ve beğenmeyi unutma!" (in {lang_name})
 - Each scene: 2-3 sentences packed with facts, context and detail — NOT simple or vague
 - Cover the topic thoroughly: introduction, key facts, interesting details, historical context, conclusion
 - hashtags: 8-12 relevant tags mixing {lang_name} and English terms, no # symbol, NO spaces within a tag (e.g. "yapayZeka" or "yapayZeka", never "yapay zeka")
@@ -755,6 +759,8 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - One segment per trending topic ({len(topics_list)} segments total, {len(topics_list)*2} scenes)
+- VERY FIRST scene of the entire video MUST start with a hook (shocking statement or question). Critical for retention.
+- VERY LAST scene MUST end with: "Abone olmayı ve beğenmeyi unutma!" (in {lang_name})
 - Each segment: exactly 2 scenes, informative and engaging
 - hashtags: 10-15 tags mixing {lang_name} and English, always include news-related tags, no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika")
 - keyword: English, 2-3 words, visual and specific"""
