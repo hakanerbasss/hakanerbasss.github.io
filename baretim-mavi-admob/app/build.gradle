@@ -38,12 +38,6 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.4'
     }
-
-    packaging {
-        jniLibs {
-            pageSize = 0x4000
-        }
-    }
 }
 
 dependencies {
