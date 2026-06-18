@@ -1253,16 +1253,6 @@ async def get_yt_analytics(days: int = 28):
             maxResults=10,
         ).execute()
 
-        # Saat bazlı (hangi saatte çok izleniyor)
-        hourly = analytics.reports().query(
-            ids="channel==MINE",
-            startDate=str(start_date),
-            endDate=str(end_date),
-            metrics="views",
-            dimensions="hour",
-            sort="hour",
-        ).execute()
-
         # Video başlıklarını çek
         yt = build("youtube", "v3", credentials=creds)
         video_ids = []
@@ -1302,10 +1292,6 @@ async def get_yt_analytics(days: int = 28):
                     "watch_min": int(row[2]),
                 }
                 for row in top_videos.get("rows", [])
-            ],
-            "hourly": [
-                {"hour": int(row[0]), "views": int(row[1])}
-                for row in hourly.get("rows", [])
             ],
         }
     except Exception as e:

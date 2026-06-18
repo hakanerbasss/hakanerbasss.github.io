@@ -792,14 +792,6 @@
       <div id="an-daily-labels" style="display:flex;gap:3px;margin-top:4px;overflow-x:auto;"></div>
     </div>
 
-    <!-- Saat bazlı chart -->
-    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:20px;">
-      <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:4px;">En Çok İzlenen Saatler</div>
-      <div style="color:#666;font-size:11px;margin-bottom:12px;">Hangi saatte yayın yapmalısın?</div>
-      <div id="an-hourly-chart" style="display:flex;align-items:flex-end;gap:2px;height:60px;"></div>
-      <div id="an-hourly-labels" style="display:flex;gap:2px;margin-top:4px;"></div>
-    </div>
-
     <!-- Top videolar -->
     <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;">
       <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:12px;">En İyi Videolar</div>
@@ -2125,17 +2117,6 @@ async function loadAnalytics() {
       d.daily.map(x => x.views),
       d.daily.map(x => x.date.slice(5)), // MM-DD
       '#7c3aed', 80
-    );
-
-    // Saatlik chart
-    const hourlyFull = Array.from({length: 24}, (_, h) => {
-      const found = d.hourly.find(x => x.hour === h);
-      return found ? found.views : 0;
-    });
-    renderBarChart('an-hourly-chart', 'an-hourly-labels',
-      hourlyFull,
-      Array.from({length: 24}, (_, h) => h.toString().padStart(2,'0')),
-      '#4ade80', 60
     );
 
     // Top videolar
