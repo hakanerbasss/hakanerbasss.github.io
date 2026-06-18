@@ -421,7 +421,7 @@ Rules:
     thumb_path = None
     try:
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-        create_thumbnail(png_files[0].read_bytes(), generated_title, thumb_out, size=(1080, 1920))
+        create_thumbnail(png_files[0].read_bytes(), generated_title, thumb_out, size=(1080, 1920), lang=lang)
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
@@ -443,22 +443,29 @@ THUMB_DIR = Path("thumbnails")
 THUMB_DIR.mkdir(exist_ok=True)
 
 
-def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720)):
+def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720), lang="tr"):
     from PIL import Image, ImageDraw, ImageFont
     import io
     import textwrap
 
     img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
     img = img.resize(size, Image.LANCZOS)
+    W, H = size
+    is_portrait = H > W
 
-    # Gradient overlay (altta koyu)
-    overlay = Image.new("RGBA", size, (0, 0, 0, 0))
-    draw_ov = ImageDraw.Draw(overlay)
-    for y in range(size[1]):
-        alpha = int(200 * (y / size[1]) ** 1.5)
-        draw_ov.line([(0, y), (size[0], y)], fill=(0, 0, 0, alpha))
+    # 1. Genel koyu overlay
+    overlay = Image.new("RGBA", size, (0, 0, 0, 150))
     img = img.convert("RGBA")
-    img = Image.alpha_composite(img, overlay).convert("RGB")
+    img = Image.alpha_composite(img, overlay)
+
+    # 2. Alt yarı ek gradient (metin okunabilirliği için)
+    grad = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw_g = ImageDraw.Draw(grad)
+    half = H // 2
+    for y in range(half, H):
+        alpha = int(210 * ((y - half) / half) ** 1.1)
+        draw_g.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
+    img = Image.alpha_composite(img, grad).convert("RGB")
 
     draw = ImageDraw.Draw(img)
 
@@ -471,39 +478,44 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
     ]
     font_path = next((f for f in font_candidates if Path(f).exists()), None)
 
-    title_font_size = 72 if size[0] == 1280 else 60
-    small_font_size = 36
+    title_size = 88 if is_portrait else 78
+    badge_size = 50 if is_portrait else 42
 
     if font_path:
         try:
-            title_font = ImageFont.truetype(font_path, title_font_size)
-            small_font = ImageFont.truetype(font_path, small_font_size)
+            title_font = ImageFont.truetype(font_path, title_size)
+            badge_font = ImageFont.truetype(font_path, badge_size)
         except Exception:
-            title_font = ImageFont.load_default()
-            small_font = title_font
+            title_font = badge_font = ImageFont.load_default()
     else:
-        title_font = ImageFont.load_default()
-        small_font = title_font
+        title_font = badge_font = ImageFont.load_default()
 
-    # Başlığı sar
-    max_chars = 30 if size[0] == 1280 else 22
-    lines = textwrap.wrap(title, width=max_chars)[:3]
+    # Alt kırmızı bant — "SON DAKİKA" / "BREAKING NEWS"
+    band_h = 100 if is_portrait else 82
+    band_y = H - band_h
+    draw.rectangle([0, band_y, W, H], fill=(210, 10, 10))
+    badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
+    bb = draw.textbbox((0, 0), badge_text, font=badge_font)
+    bw, bh = bb[2] - bb[0], bb[3] - bb[1]
+    draw.text(((W - bw) // 2, band_y + (band_h - bh) // 2), badge_text, font=badge_font, fill="white")
 
-    # Başlık konumu (alttan yukarı)
-    y = size[1] - 80
-    for line in reversed(lines):
-        bbox = draw.textbbox((0, 0), line, font=title_font)
-        w = bbox[2] - bbox[0]
-        h = bbox[3] - bbox[1]
-        x = (size[0] - w) // 2
-        y -= h + 12
-        # Gölge
-        draw.text((x + 3, y + 3), line, font=title_font, fill=(0, 0, 0, 180))
-        draw.text((x, y), line, font=title_font, fill="white")
+    # Başlık metni — sarı, büyük, kalın gölgeli
+    max_chars = 18 if is_portrait else 26
+    lines = textwrap.wrap(title, width=max_chars)[:(4 if is_portrait else 3)]
+    lh = title_size + 16
+    total_h = len(lines) * lh
+    text_start_y = band_y - total_h - 28
 
-    # Üst köşe etiket
-    draw.rounded_rectangle([16, 16, 180, 56], radius=8, fill="#7c3aed")
-    draw.text((24, 22), "YENİ VİDEO", font=small_font, fill="white")
+    for i, line in enumerate(lines):
+        bb = draw.textbbox((0, 0), line, font=title_font)
+        tw = bb[2] - bb[0]
+        x = (W - tw) // 2
+        y = text_start_y + i * lh
+        # Kalın siyah gölge (8 yön)
+        for dx, dy in [(-3,-3),(3,-3),(-3,3),(3,3),(0,4),(0,-4),(4,0),(-4,0)]:
+            draw.text((x + dx, y + dy), line, font=title_font, fill=(0, 0, 0))
+        # Sarı ana metin
+        draw.text((x, y), line, font=title_font, fill="#FFE000")
 
     img.save(str(out_path), "JPEG", quality=95)
     return out_path
@@ -691,7 +703,7 @@ Rules:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
             thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-            create_thumbnail(first_img.read_bytes(), lv_title, thumb_out, size=(1280, 720))
+            create_thumbnail(first_img.read_bytes(), lv_title, thumb_out, size=(1280, 720), lang=lang)
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
@@ -896,7 +908,7 @@ Rules:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
             thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-            create_thumbnail(first_img.read_bytes(), tnlv_title, thumb_out, size=(1280, 720))
+            create_thumbnail(first_img.read_bytes(), tnlv_title, thumb_out, size=(1280, 720), lang=lang)
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
