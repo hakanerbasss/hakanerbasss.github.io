@@ -934,7 +934,11 @@ DS_CONFIG = Path("deepseek_config.json")
 OPENAI_CONFIG = Path("openai_config.json")
 SCHED_CONFIG = Path("scheduler_config.json")
 SCHED_LOG = Path("scheduler_log.json")
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+    "https://www.googleapis.com/auth/youtube.readonly",
+]
 
 
 def get_pexels_key():
@@ -1190,6 +1194,110 @@ async def youtube_callback_en(request: Request, code: str):
 @app.get("/api/yt/en/config")
 async def get_yt_en_config():
     return {"authorized": TOKEN_FILE_EN.exists()}
+
+
+@app.get("/api/yt/analytics")
+async def get_yt_analytics(days: int = 28):
+    """YouTube Analytics API'dan kanal istatistiklerini çeker."""
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    import datetime
+
+    if not TOKEN_FILE.exists():
+        raise HTTPException(401, "YouTube hesabı bağlı değil")
+
+    creds_data = json.loads(TOKEN_FILE.read_text())
+    creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
+
+    if creds.expired and creds.refresh_token:
+        import google.auth.transport.requests
+        creds.refresh(google.auth.transport.requests.Request())
+        TOKEN_FILE.write_text(creds.to_json())
+
+    end_date = datetime.date.today()
+    start_date = end_date - datetime.timedelta(days=days - 1)
+
+    try:
+        analytics = build("youtubeAnalytics", "v2", credentials=creds)
+
+        # Günlük istatistikler
+        daily = analytics.reports().query(
+            ids="channel==MINE",
+            startDate=str(start_date),
+            endDate=str(end_date),
+            metrics="views,estimatedMinutesWatched,subscribersGained",
+            dimensions="day",
+            sort="day",
+        ).execute()
+
+        # Video bazlı performans (top 10)
+        top_videos = analytics.reports().query(
+            ids="channel==MINE",
+            startDate=str(start_date),
+            endDate=str(end_date),
+            metrics="views,estimatedMinutesWatched",
+            dimensions="video",
+            sort="-views",
+            maxResults=10,
+        ).execute()
+
+        # Saat bazlı (hangi saatte çok izleniyor)
+        hourly = analytics.reports().query(
+            ids="channel==MINE",
+            startDate=str(start_date),
+            endDate=str(end_date),
+            metrics="views",
+            dimensions="hour",
+            sort="hour",
+        ).execute()
+
+        # Video başlıklarını çek
+        yt = build("youtube", "v3", credentials=creds)
+        video_ids = []
+        for row in top_videos.get("rows", []):
+            video_ids.append(row[0])
+
+        video_titles = {}
+        if video_ids:
+            vresp = yt.videos().list(
+                part="snippet",
+                id=",".join(video_ids[:10]),
+            ).execute()
+            for item in vresp.get("items", []):
+                video_titles[item["id"]] = item["snippet"]["title"]
+
+        # Toplam özet
+        total_views = sum(row[1] for row in daily.get("rows", []))
+        total_watch_min = sum(row[2] for row in daily.get("rows", []))
+        total_subs = sum(row[3] for row in daily.get("rows", []))
+
+        return {
+            "summary": {
+                "views": int(total_views),
+                "watch_hours": round(total_watch_min / 60, 1),
+                "subs_gained": int(total_subs),
+                "period_days": days,
+            },
+            "daily": [
+                {"date": row[0], "views": int(row[1]), "watch_min": int(row[2]), "subs": int(row[3])}
+                for row in daily.get("rows", [])
+            ],
+            "top_videos": [
+                {
+                    "id": row[0],
+                    "title": video_titles.get(row[0], row[0]),
+                    "views": int(row[1]),
+                    "watch_min": int(row[2]),
+                }
+                for row in top_videos.get("rows", [])
+            ],
+            "hourly": [
+                {"hour": int(row[0]), "views": int(row[1])}
+                for row in hourly.get("rows", [])
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.post("/api/yt/upload")

@@ -251,6 +251,7 @@
   <div class="tab" onclick="switchTab('shorts')">Shorts Üret</div>
   <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
   <div class="tab" onclick="switchTab('tnlv')">Trend Haber LV</div>
+  <div class="tab" onclick="switchTab('analytics')">📊 Analitik</div>
 </div>
 
 <!-- TEXT TO SPEECH -->
@@ -754,6 +755,63 @@
   </div>
 </div>
 
+<div class="panel" id="tab-analytics">
+  <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+    <h2 style="color:#fff;font-size:18px;margin:0;">📊 YouTube Analitik</h2>
+    <select id="analytics-period" onchange="loadAnalytics()" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:8px;outline:none;">
+      <option value="7">Son 7 gün</option>
+      <option value="28" selected>Son 28 gün</option>
+      <option value="90">Son 90 gün</option>
+    </select>
+    <button onclick="loadAnalytics()" style="font-size:12px;padding:8px 14px;">Yenile</button>
+  </div>
+
+  <div id="analytics-error" style="display:none;color:#f87171;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:16px;"></div>
+
+  <!-- Özet kartlar -->
+  <div id="analytics-summary" style="display:none;">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:bold;color:#7c3aed;" id="an-views">-</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">Görüntüleme</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:bold;color:#4ade80;" id="an-hours">-</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">İzlenme Saati</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:bold;color:#facc15;" id="an-subs">-</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">Yeni Abone</div>
+      </div>
+    </div>
+
+    <!-- Günlük görüntüleme chart (CSS bar) -->
+    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:20px;">
+      <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:12px;">Günlük Görüntüleme</div>
+      <div id="an-daily-chart" style="display:flex;align-items:flex-end;gap:3px;height:80px;overflow-x:auto;"></div>
+      <div id="an-daily-labels" style="display:flex;gap:3px;margin-top:4px;overflow-x:auto;"></div>
+    </div>
+
+    <!-- Saat bazlı chart -->
+    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:20px;">
+      <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:4px;">En Çok İzlenen Saatler</div>
+      <div style="color:#666;font-size:11px;margin-bottom:12px;">Hangi saatte yayın yapmalısın?</div>
+      <div id="an-hourly-chart" style="display:flex;align-items:flex-end;gap:2px;height:60px;"></div>
+      <div id="an-hourly-labels" style="display:flex;gap:2px;margin-top:4px;"></div>
+    </div>
+
+    <!-- Top videolar -->
+    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;">
+      <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:12px;">En İyi Videolar</div>
+      <div id="an-top-videos"></div>
+    </div>
+  </div>
+
+  <div id="analytics-loading" style="display:none;color:#888;font-size:14px;text-align:center;padding:40px;">
+    Yükleniyor...
+  </div>
+</div>
+
 <!-- YouTube Ayarları Modal -->
 <div id="yt-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;">
   <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;position:relative;max-height:88vh;overflow-y:auto;">
@@ -1110,7 +1168,7 @@ async function loadMeta() {
 }
 
 function switchTab(name) {
-  const names = ['text','video','translate','shorts','longvideo','tnlv'];
+  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics'];
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', names[i] === name);
   });
@@ -1118,6 +1176,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'tnlv') updateTNLVApiKeyStatus();
   if (name === 'longvideo') updateLVApiKeyStatus();
+  if (name === 'analytics') loadAnalytics();
 }
 
 async function generateLongVideo() {
@@ -2037,6 +2096,96 @@ loadMeta();
 if (new URLSearchParams(window.location.search).get('yt') === 'ok') {
   switchTab('shorts');
   checkYTStatus();
+}
+
+// ── YouTube Analytics ─────────────────────────────────────────────────────────
+let analyticsLoaded = false;
+
+async function loadAnalytics() {
+  const period = document.getElementById('analytics-period')?.value || '28';
+  document.getElementById('analytics-loading').style.display = 'block';
+  document.getElementById('analytics-summary').style.display = 'none';
+  document.getElementById('analytics-error').style.display = 'none';
+
+  try {
+    const r = await fetch(`/api/yt/analytics?days=${period}`);
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || 'Veri alınamadı');
+    }
+    const d = await r.json();
+
+    // Özet
+    document.getElementById('an-views').textContent = formatNum(d.summary.views);
+    document.getElementById('an-hours').textContent = d.summary.watch_hours + 's';
+    document.getElementById('an-subs').textContent = (d.summary.subs_gained >= 0 ? '+' : '') + d.summary.subs_gained;
+
+    // Günlük chart
+    renderBarChart('an-daily-chart', 'an-daily-labels',
+      d.daily.map(x => x.views),
+      d.daily.map(x => x.date.slice(5)), // MM-DD
+      '#7c3aed', 80
+    );
+
+    // Saatlik chart
+    const hourlyFull = Array.from({length: 24}, (_, h) => {
+      const found = d.hourly.find(x => x.hour === h);
+      return found ? found.views : 0;
+    });
+    renderBarChart('an-hourly-chart', 'an-hourly-labels',
+      hourlyFull,
+      Array.from({length: 24}, (_, h) => h.toString().padStart(2,'0')),
+      '#4ade80', 60
+    );
+
+    // Top videolar
+    const tv = document.getElementById('an-top-videos');
+    tv.innerHTML = d.top_videos.map((v, i) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1a1a1a;">
+        <div style="color:#555;font-size:12px;width:18px;">${i+1}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="color:#e0e0e0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
+          <div style="color:#888;font-size:11px;margin-top:2px;">${formatNum(v.views)} görüntüleme · ${Math.round(v.watch_min/60*10)/10}s izlenme</div>
+        </div>
+        <a href="https://youtu.be/${v.id}" target="_blank" style="color:#7c3aed;font-size:11px;white-space:nowrap;">↗</a>
+      </div>
+    `).join('');
+
+    document.getElementById('analytics-loading').style.display = 'none';
+    document.getElementById('analytics-summary').style.display = 'block';
+    analyticsLoaded = true;
+  } catch(e) {
+    document.getElementById('analytics-loading').style.display = 'none';
+    const errEl = document.getElementById('analytics-error');
+    errEl.style.display = 'block';
+    errEl.textContent = '⚠ ' + e.message + (e.message.includes('bağlı değil') ? ' — YouTube hesabını bağlayın.' : ' — YouTube hesabını yeniden bağlamanız gerekebilir (yeni izinler eklendi).');
+  }
+}
+
+function renderBarChart(chartId, labelId, values, labels, color, height) {
+  const max = Math.max(...values, 1);
+  const chart = document.getElementById(chartId);
+  const labelEl = document.getElementById(labelId);
+  if (!chart) return;
+
+  chart.innerHTML = values.map((v, i) => {
+    const h = Math.max(2, Math.round((v / max) * height));
+    return `<div title="${labels[i]}: ${formatNum(v)}" style="flex:1;min-width:6px;height:${h}px;background:${color};border-radius:2px 2px 0 0;opacity:0.85;cursor:default;"></div>`;
+  }).join('');
+
+  if (labelEl) {
+    // Sadece her 3-5 etiketi göster (sıkışmasın)
+    const step = values.length > 20 ? 3 : (values.length > 10 ? 2 : 1);
+    labelEl.innerHTML = labels.map((l, i) => {
+      return `<div style="flex:1;min-width:6px;font-size:9px;color:#555;text-align:center;">${i % step === 0 ? l : ''}</div>`;
+    }).join('');
+  }
+}
+
+function formatNum(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'B';
+  return String(n);
 }
 </script>
 </body>
