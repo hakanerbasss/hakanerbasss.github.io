@@ -870,7 +870,12 @@
         Story olarak paylaş
       </label>
     </div>
-    <button onclick="saveInstagramConfig()" style="font-size:12px;padding:8px 16px;margin-bottom:4px;">Kaydet</button>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button onclick="saveInstagramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+      <button onclick="testInstagram()" style="font-size:12px;padding:8px 16px;background:#1a3a1a;">Bağlantıyı Test Et</button>
+    </div>
+    <div id="ig-test-result" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
+    <div id="ig-last-log" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
     <hr style="border-color:#2a2a2a;margin:20px 0;">
     <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">DeepSeek API (Otomasyon için)</h3>
     <p style="color:#666;font-size:12px;margin-bottom:12px;">Otomatik video üretimi için sunucuda saklanır</p>
@@ -1449,6 +1454,7 @@ async function openSettings() {
   loadLVENSchedulerStatus();
   checkOpenAIStatus();
   checkInstagramStatus();
+  loadInstagramLog();
 }
 
 function closeYTModal() {
@@ -2074,6 +2080,32 @@ async function saveInstagramConfig() {
   await fetch('/api/instagram/config', { method: 'POST', body: fd });
   document.getElementById('ig-access-token').value = '';
   await checkInstagramStatus();
+}
+
+async function testInstagram() {
+  const el = document.getElementById('ig-test-result');
+  el.textContent = 'Test ediliyor...';
+  try {
+    const r = await fetch('/api/instagram/test', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      el.innerHTML = `<span style="color:#4ade80">✓ Bağlantı başarılı — @${d.username} (${d.account_type})</span>`;
+    } else {
+      el.innerHTML = `<span style="color:#f87171">✗ Hata: ${d.error}</span>`;
+    }
+  } catch(e) { el.textContent = 'Test başarısız: ' + e; }
+}
+
+async function loadInstagramLog() {
+  try {
+    const r = await fetch('/api/instagram/log');
+    const d = await r.json();
+    const el = document.getElementById('ig-last-log');
+    if (el && d.msg) {
+      const ts = d.ts ? new Date(d.ts * 1000).toLocaleString('tr-TR') : '';
+      el.textContent = `Son: ${d.msg}${ts ? ' · ' + ts : ''}`;
+    }
+  } catch(e) {}
 }
 
 // ── Otomasyon / Scheduler ─────────────────────────────────────────────────────

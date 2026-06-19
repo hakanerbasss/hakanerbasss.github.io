@@ -955,6 +955,7 @@ PEXELS_CONFIG = Path("pexels_config.json")
 DS_CONFIG = Path("deepseek_config.json")
 OPENAI_CONFIG = Path("openai_config.json")
 IG_CONFIG = Path("ig_config.json")
+IG_LOG = Path("ig_log.json")
 SCHED_CONFIG = Path("scheduler_config.json")
 SCHED_LOG = Path("scheduler_log.json")
 SCOPES = [
@@ -982,85 +983,61 @@ def get_ig_config() -> dict:
     return {}
 
 
-def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> str | None:
-    """Instagram Reels yükle. Başarılıysa media_id döner, hata varsa None."""
+def post_reel_to_instagram(video_url: str, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
+    """Instagram Reels yükle (public video_url ile). (media_id, error) döner."""
+    graph = "https://graph.facebook.com/v21.0"
     try:
-        video_bytes = video_path.read_bytes()
-        video_size = len(video_bytes)
-        graph = "https://graph.facebook.com/v21.0"
-
-        # 1. Resumable upload session başlat
+        # 1. Media container oluştur
         r1 = httpx.post(
             f"{graph}/{ig_user_id}/media",
             params={
                 "media_type": "REELS",
-                "upload_type": "resumable",
+                "video_url": video_url,
                 "caption": caption,
                 "share_to_feed": "true",
                 "access_token": access_token,
             },
-            timeout=30,
+            timeout=60,
         )
         if r1.status_code != 200:
-            return None
-        j1 = r1.json()
-        video_upload_id = j1.get("video_upload_id") or j1.get("id")
-        upload_url = j1.get("uri")
-        if not video_upload_id or not upload_url:
-            return None
+            return None, f"media create failed: {r1.status_code} {r1.text[:200]}"
+        media_id = r1.json().get("id")
+        if not media_id:
+            return None, f"no id in response: {r1.text[:200]}"
 
-        # 2. Video bytes'ı yükle
-        r2 = httpx.post(
-            upload_url,
-            headers={
-                "Authorization": f"OAuth {access_token}",
-                "offset": "0",
-                "file_size": str(video_size),
-                "Content-Type": "video/mp4",
-            },
-            content=video_bytes,
-            timeout=120,
-        )
-        if r2.status_code not in (200, 201):
-            return None
-
-        # 3. İşlenme tamamlanana kadar bekle (maks 90 sn)
-        media_id = None
-        for _ in range(18):
-            time.sleep(5)
-            r3 = httpx.get(
-                f"{graph}/{video_upload_id}",
-                params={"fields": "status_code,id", "access_token": access_token},
+        # 2. İşlenme tamamlanana kadar bekle (maks 5 dakika)
+        for _ in range(30):
+            time.sleep(10)
+            r2 = httpx.get(
+                f"{graph}/{media_id}",
+                params={"fields": "status_code,status", "access_token": access_token},
                 timeout=15,
             )
-            if r3.status_code == 200:
-                st = r3.json()
-                if st.get("status_code") == "FINISHED":
-                    media_id = st.get("id") or video_upload_id
+            if r2.status_code == 200:
+                st = r2.json()
+                code = st.get("status_code", "")
+                if code == "FINISHED":
                     break
-                if st.get("status_code") == "ERROR":
-                    return None
+                if code == "ERROR":
+                    return None, f"processing error: {st}"
 
-        if not media_id:
-            media_id = video_upload_id
-
-        # 4. Yayınla
-        r4 = httpx.post(
+        # 3. Yayınla
+        r3 = httpx.post(
             f"{graph}/{ig_user_id}/media_publish",
             params={"creation_id": media_id, "access_token": access_token},
             timeout=30,
         )
-        if r4.status_code == 200:
-            return r4.json().get("id")
-        return None
-    except Exception:
-        return None
+        if r3.status_code == 200:
+            return r3.json().get("id"), ""
+        return None, f"publish failed: {r3.status_code} {r3.text[:200]}"
+    except Exception as e:
+        return None, str(e)
 
 
-def post_story_to_instagram(image_url: str, ig_user_id: str, access_token: str) -> bool:
+def post_story_to_instagram(image_url: str, ig_user_id: str, access_token: str) -> tuple[bool, str]:
     """Instagram Story olarak resim yayınla (public URL gerekir)."""
+    graph = "https://graph.facebook.com/v21.0"
     try:
-        graph = "https://graph.facebook.com/v21.0"
         r1 = httpx.post(
             f"{graph}/{ig_user_id}/media",
             params={
@@ -1072,18 +1049,20 @@ def post_story_to_instagram(image_url: str, ig_user_id: str, access_token: str) 
             timeout=30,
         )
         if r1.status_code != 200:
-            return False
+            return False, f"media create failed: {r1.status_code} {r1.text[:200]}"
         media_id = r1.json().get("id")
         if not media_id:
-            return False
+            return False, f"no id: {r1.text[:200]}"
         r2 = httpx.post(
             f"{graph}/{ig_user_id}/media_publish",
             params={"creation_id": media_id, "access_token": access_token},
             timeout=30,
         )
-        return r2.status_code == 200
-    except Exception:
-        return False
+        if r2.status_code == 200:
+            return True, ""
+        return False, f"publish failed: {r2.status_code} {r2.text[:200]}"
+    except Exception as e:
+        return False, str(e)
 
 
 def _fetch_wikimedia_image(keyword: str, width: int = 1920) -> bytes | None:
@@ -1249,6 +1228,36 @@ async def set_instagram_config(
     }
     IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
     return {"ok": True}
+
+
+@app.get("/api/instagram/log")
+async def get_instagram_log():
+    if IG_LOG.exists():
+        return json.loads(IG_LOG.read_text())
+    return {"ts": None, "msg": "Henüz Instagram gönderisi yapılmadı"}
+
+
+@app.post("/api/instagram/test")
+async def test_instagram():
+    """Kayıtlı token ile Instagram bağlantısını test eder."""
+    cfg = get_ig_config()
+    if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+        return {"ok": False, "error": "Instagram yapılandırması eksik"}
+    ig_user_id = cfg["ig_user_id"]
+    access_token = cfg["access_token"]
+    graph = "https://graph.facebook.com/v21.0"
+    try:
+        r = httpx.get(
+            f"{graph}/{ig_user_id}",
+            params={"fields": "id,username,account_type", "access_token": access_token},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            d = r.json()
+            return {"ok": True, "username": d.get("username"), "account_type": d.get("account_type"), "id": d.get("id")}
+        return {"ok": False, "error": f"{r.status_code}: {r.text[:300]}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def load_yt_config():
@@ -1714,16 +1723,23 @@ async def auto_shorts_job():
             if ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
                 ig_user_id = ig_cfg["ig_user_id"]
                 ig_token = ig_cfg["access_token"]
-                video_file = OUTPUT_DIR / filename
+                base_url = "http://hakanerbas.duckdns.org:8001"
                 caption = f"{d.get('title', '')}\n\n{d.get('suggested_tags', '#Shorts #gündem')}"
 
-                if ig_cfg.get("post_reels", True) and video_file.exists():
-                    post_reel_to_instagram(video_file, caption, ig_user_id, ig_token)
+                if ig_cfg.get("post_reels", True):
+                    video_url = f"{base_url}/api/video/{filename}"
+                    reel_id, reel_err = post_reel_to_instagram(video_url, caption, ig_user_id, ig_token)
+                    if reel_err:
+                        ig_log = f"Reels hatası: {reel_err}"
+                    else:
+                        ig_log = f"Reels yüklendi: {reel_id}"
+                    IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
 
                 if ig_cfg.get("post_story", True) and thumbnail:
-                    base_url = "http://hakanerbas.duckdns.org:8001"
                     story_img_url = f"{base_url}/api/thumbnail/{thumbnail}"
-                    post_story_to_instagram(story_img_url, ig_user_id, ig_token)
+                    ok, story_err = post_story_to_instagram(story_img_url, ig_user_id, ig_token)
+                    story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
+                    IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": story_log}))
 
     except Exception as e:
         save_sched_log("error", f"{e}")
