@@ -1249,12 +1249,12 @@ async def test_instagram():
     try:
         r = httpx.get(
             f"{graph}/{ig_user_id}",
-            params={"fields": "id,username,account_type", "access_token": access_token},
+            params={"fields": "id,username,name,biography", "access_token": access_token},
             timeout=15,
         )
         if r.status_code == 200:
             d = r.json()
-            return {"ok": True, "username": d.get("username"), "account_type": d.get("account_type"), "id": d.get("id")}
+            return {"ok": True, "username": d.get("username") or d.get("name"), "id": d.get("id")}
         return {"ok": False, "error": f"{r.status_code}: {r.text[:300]}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
