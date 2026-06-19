@@ -175,6 +175,8 @@ def _exec_set_trail_stop(symbol, distance_pct, reason):
 
 def _exec_buy_more(symbol, usdt, reason):
     try:
+        if load_config().get('bot_paused'):
+            return f'{symbol}: bot duraklatıldı, ekleme iptal'
         client    = get_client()
         positions = load_positions()
         if symbol not in positions or positions[symbol].get('qty', 0) <= 0:
