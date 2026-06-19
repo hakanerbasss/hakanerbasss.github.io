@@ -444,32 +444,30 @@ THUMB_DIR.mkdir(exist_ok=True)
 
 
 def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720), lang="tr"):
-    from PIL import Image, ImageDraw, ImageFont
-    import io
-    import textwrap
+    """
+    Haber kanalı stili thumbnail: PIL ile arka planı karartır,
+    FFmpeg drawtext ile sarı başlık + kırmızı SON DAKİKA bandı ekler.
+    """
+    from PIL import Image
+    import io, textwrap, uuid as _uuid, tempfile
 
-    img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
-    img = img.resize(size, Image.LANCZOS)
     W, H = size
     is_portrait = H > W
 
-    # 1. Genel koyu overlay
-    overlay = Image.new("RGBA", size, (0, 0, 0, 150))
+    # 1. PIL: yeniden boyutlandır + karart
+    img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+    img = img.resize(size, Image.LANCZOS)
+
+    overlay = Image.new("RGBA", size, (0, 0, 0, 145))
     img = img.convert("RGBA")
-    img = Image.alpha_composite(img, overlay)
+    img = Image.alpha_composite(img, overlay).convert("RGB")
 
-    # 2. Alt yarı ek gradient (metin okunabilirliği için)
-    grad = Image.new("RGBA", size, (0, 0, 0, 0))
-    draw_g = ImageDraw.Draw(grad)
-    half = H // 2
-    for y in range(half, H):
-        alpha = int(210 * ((y - half) / half) ** 1.1)
-        draw_g.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
-    img = Image.alpha_composite(img, grad).convert("RGB")
+    uid = _uuid.uuid4().hex[:8]
+    tmp_dir = Path(tempfile.gettempdir())
+    tmp_bg = tmp_dir / f"thumb_bg_{uid}.jpg"
+    img.save(str(tmp_bg), "JPEG", quality=92)
 
-    draw = ImageDraw.Draw(img)
-
-    # Font bul
+    # 2. FFmpeg: metin overlay
     font_candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -478,46 +476,70 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
     ]
     font_path = next((f for f in font_candidates if Path(f).exists()), None)
 
-    title_size = 88 if is_portrait else 78
-    badge_size = 50 if is_portrait else 42
-
-    if font_path:
-        try:
-            title_font = ImageFont.truetype(font_path, title_size)
-            badge_font = ImageFont.truetype(font_path, badge_size)
-        except Exception:
-            title_font = badge_font = ImageFont.load_default()
-    else:
-        title_font = badge_font = ImageFont.load_default()
-
-    # Alt kırmızı bant — "SON DAKİKA" / "BREAKING NEWS"
-    band_h = 100 if is_portrait else 82
-    band_y = H - band_h
-    draw.rectangle([0, band_y, W, H], fill=(210, 10, 10))
-    badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
-    bb = draw.textbbox((0, 0), badge_text, font=badge_font)
-    bw, bh = bb[2] - bb[0], bb[3] - bb[1]
-    draw.text(((W - bw) // 2, band_y + (band_h - bh) // 2), badge_text, font=badge_font, fill="white")
-
-    # Başlık metni — sarı, büyük, kalın gölgeli
+    title_fs  = 78 if is_portrait else 68
+    badge_fs  = 46 if is_portrait else 38
+    band_h    = 100 if is_portrait else 82
+    line_h    = title_fs + 18
     max_chars = 18 if is_portrait else 26
+
     lines = textwrap.wrap(title, width=max_chars)[:(4 if is_portrait else 3)]
-    lh = title_size + 16
-    total_h = len(lines) * lh
-    text_start_y = band_y - total_h - 28
+    badge_text = "SON DAKIKA" if lang == "tr" else "BREAKING NEWS"
 
+    # Satırları ayrı dosyalara yaz (Türkçe karakter desteği)
+    line_files = []
     for i, line in enumerate(lines):
-        bb = draw.textbbox((0, 0), line, font=title_font)
-        tw = bb[2] - bb[0]
-        x = (W - tw) // 2
-        y = text_start_y + i * lh
-        # Kalın siyah gölge (8 yön)
-        for dx, dy in [(-3,-3),(3,-3),(-3,3),(3,3),(0,4),(0,-4),(4,0),(-4,0)]:
-            draw.text((x + dx, y + dy), line, font=title_font, fill=(0, 0, 0))
-        # Sarı ana metin
-        draw.text((x, y), line, font=title_font, fill="#FFE000")
+        lf = tmp_dir / f"thumb_line_{uid}_{i}.txt"
+        lf.write_text(line, encoding="utf-8")
+        line_files.append(lf)
 
-    img.save(str(out_path), "JPEG", quality=95)
+    vf_parts = []
+
+    # Kırmızı alt bant
+    vf_parts.append(
+        f"drawbox=x=0:y=ih-{band_h}:w=iw:h={band_h}:color=0xD20A0A@1:t=fill"
+    )
+
+    # Badge metni (ASCII — Türkçe karakter yok)
+    badge_cmd = (
+        f"drawtext=text='{badge_text}'"
+        f":fontsize={badge_fs}:fontcolor=white"
+        f":x=(w-tw)/2:y=h-{band_h//2}-th/2"
+    )
+    if font_path:
+        badge_cmd += f":fontfile='{font_path}'"
+    vf_parts.append(badge_cmd)
+
+    # Başlık satırları (alttan yukarı)
+    for i, lf in enumerate(line_files):
+        y_expr = f"ih-{band_h}-{(len(line_files) - i) * line_h}-10"
+        line_cmd = (
+            f"drawtext=textfile='{lf}'"
+            f":fontsize={title_fs}:fontcolor=#FFE000"
+            f":x=(w-tw)/2:y={y_expr}"
+            f":shadowx=4:shadowy=4:shadowcolor=black@0.9"
+        )
+        if font_path:
+            line_cmd += f":fontfile='{font_path}'"
+        vf_parts.append(line_cmd)
+
+    vf = ",".join(vf_parts)
+
+    result = subprocess.run([
+        "ffmpeg", "-y", "-i", str(tmp_bg),
+        "-vf", vf,
+        "-frames:v", "1", "-q:v", "2",
+        str(out_path),
+    ], capture_output=True)
+
+    # Temizlik
+    tmp_bg.unlink(missing_ok=True)
+    for lf in line_files:
+        lf.unlink(missing_ok=True)
+
+    # FFmpeg başarısızsa düz resmi kaydet
+    if not out_path.exists():
+        img.save(str(out_path), "JPEG", quality=92)
+
     return out_path
 
 
