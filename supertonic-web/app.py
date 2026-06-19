@@ -62,20 +62,26 @@ def _parse_llm_json(text: str) -> dict:
     """DeepSeek/LLM yanıtından JSON objesini güvenilir şekilde çıkar."""
     import re
     t = text.strip()
-    # Markdown kod bloğunu soy
     if "```json" in t:
         t = t.split("```json", 1)[1].split("```", 1)[0]
     elif "```" in t:
         t = t.split("```", 1)[1].split("```", 1)[0]
     t = t.strip()
-    # En dıştaki { ... } arasını al
     start = t.find("{")
     end   = t.rfind("}") + 1
     if start >= 0 and end > start:
         t = t[start:end]
-    # Trailing comma temizle: ,] ve ,}
+    # Trailing comma temizle
     t = re.sub(r",\s*([}\]])", r"\1", t)
-    return json.loads(t)
+    # String içindeki ham satır sonu karakterlerini temizle
+    t = re.sub(r'(?<!\\)\n', ' ', t)
+    t = re.sub(r'(?<!\\)\r', '', t)
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        # Son çare: sadece geçerli JSON karakterlerini bırak
+        t2 = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', t)
+        return json.loads(t2)
 
 
 def get_tts():
@@ -276,13 +282,20 @@ Rules:
 - Total narration under 55 seconds
 - hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")"""
 
-    response = client.chat.completions.create(
-        model="deepseek-chat",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-    )
+    data = None
+    for attempt in range(3):
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+        )
+        try:
+            data = _parse_llm_json(response.choices[0].message.content)
+            break
+        except Exception:
+            if attempt == 2:
+                raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
 
-    data = _parse_llm_json(response.choices[0].message.content)
     scenes = data["scenes"]
 
     uid = uuid.uuid4().hex
