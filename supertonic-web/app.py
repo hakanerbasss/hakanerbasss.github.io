@@ -2123,7 +2123,7 @@ EN_SHORTS_DAILY_TOPICS  = Path("en_shorts_daily_topics.json")
 def load_en_shorts_sched_config():
     if EN_SHORTS_SCHED_CONFIG.exists():
         return json.loads(EN_SHORTS_SCHED_CONFIG.read_text())
-    return {"enabled": False, "times": ["08:00", "14:00", "20:00"], "voice": "M1"}
+    return {"enabled": False, "times": ["08:00", "14:00", "20:00"], "voice": "M1", "ig_enabled": False}
 
 
 def save_en_shorts_sched_log(status: str, message: str, url: str = ""):
@@ -2213,14 +2213,15 @@ async def auto_en_shorts_job():
             result = r2.json()
             save_en_shorts_sched_log("success", d.get("title", ""), result.get("url", ""))
 
-            ig_cfg = get_ig_config()
-            if ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
-                asyncio.create_task(_post_to_instagram_bg(
-                    filename=filename,
-                    title=d.get("title", ""),
-                    suggested_tags=d.get("suggested_tags", "#Shorts #news"),
-                    ig_cfg=ig_cfg,
-                ))
+            if cfg.get("ig_enabled", False):
+                ig_cfg = get_ig_config()
+                if ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
+                    asyncio.create_task(_post_to_instagram_bg(
+                        filename=filename,
+                        title=d.get("title", ""),
+                        suggested_tags=d.get("suggested_tags", "#Shorts #news"),
+                        ig_cfg=ig_cfg,
+                    ))
 
     except Exception as e:
         save_en_shorts_sched_log("error", str(e))
@@ -2493,9 +2494,10 @@ async def save_en_shorts_scheduler_config(
     enabled: str = Form("false"),
     times: str = Form("08:00,14:00,20:00"),
     voice: str = Form("M1"),
+    ig_enabled: str = Form("false"),
 ):
     time_list = [t.strip() for t in times.split(",") if t.strip()]
-    cfg = {"enabled": enabled == "true", "times": time_list, "voice": voice}
+    cfg = {"enabled": enabled == "true", "times": time_list, "voice": voice, "ig_enabled": ig_enabled == "true"}
     EN_SHORTS_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_en_shorts_scheduler()
     return cfg

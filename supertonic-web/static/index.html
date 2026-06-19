@@ -1163,6 +1163,13 @@
       </select>
     </div>
 
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+        <input type="checkbox" id="en-shorts-ig-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
+        Instagram'a da paylaş
+      </label>
+    </div>
+
     <div style="display:flex;gap:8px;margin-bottom:14px;">
       <button onclick="saveENShortsScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
       <button onclick="runENShortsNow()" id="btn-en-shorts-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
@@ -2060,6 +2067,7 @@ async function loadENShortsSchedulerStatus() {
     document.getElementById('en-shorts-sched-enabled').checked = d.enabled;
     document.getElementById('en-shorts-sched-times').value = (d.times || ['08:00','14:00','20:00']).join(',');
     if (d.voice) document.getElementById('en-shorts-sched-voice').value = d.voice;
+    document.getElementById('en-shorts-ig-enabled').checked = !!d.ig_enabled;
 
     const st = document.getElementById('en-shorts-sched-status');
     if (d.next_run || d.log?.ts) {
@@ -2081,6 +2089,7 @@ async function saveENShortsScheduler() {
   fd.append('enabled', document.getElementById('en-shorts-sched-enabled').checked ? 'true' : 'false');
   fd.append('times', document.getElementById('en-shorts-sched-times').value);
   fd.append('voice', document.getElementById('en-shorts-sched-voice').value);
+  fd.append('ig_enabled', document.getElementById('en-shorts-ig-enabled').checked ? 'true' : 'false');
   await fetch('/api/en-shorts-scheduler/config', { method: 'POST', body: fd });
   await loadENShortsSchedulerStatus();
 }
