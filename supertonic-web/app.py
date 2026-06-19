@@ -1054,19 +1054,19 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
         return None, str(e)
 
 
-async def post_story_to_instagram(image_path: Path, ig_user_id: str, access_token: str) -> tuple[bool, str]:
-    """Instagram Story olarak resim yayınla (bytes upload)."""
+async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_token: str) -> tuple[bool, str]:
+    """Instagram Story olarak video yayınla (resumable upload)."""
     graph = "https://graph.facebook.com/v21.0"
     try:
-        img_bytes = image_path.read_bytes()
-        img_size = len(img_bytes)
+        video_bytes = video_path.read_bytes()
+        video_size = len(video_bytes)
 
         async with httpx.AsyncClient(timeout=60) as client:
-            # 1. Resumable session
+            # 1. Resumable session (VIDEO story)
             r1 = await client.post(
                 f"{graph}/{ig_user_id}/media",
                 params={
-                    "media_type": "IMAGE",
+                    "media_type": "VIDEO",
                     "upload_type": "resumable",
                     "is_stories": "true",
                     "access_token": access_token,
@@ -1078,33 +1078,47 @@ async def post_story_to_instagram(image_path: Path, ig_user_id: str, access_toke
             media_id = j1.get("id")
             upload_uri = j1.get("uri")
             if not media_id or not upload_uri:
-                # IMAGE story might not support resumable — try direct image_url fallback
-                return False, f"no uri for image story: {r1.text[:300]}"
+                return False, f"no uri: {r1.text[:300]}"
 
-            # 2. Bytes yükle
+            # 2. Video bytes yükle
             r2 = await client.post(
                 upload_uri,
                 headers={
                     "Authorization": f"OAuth {access_token}",
                     "offset": "0",
-                    "file_size": str(img_size),
-                    "Content-Type": "image/jpeg",
+                    "file_size": str(video_size),
+                    "Content-Type": "video/mp4",
                 },
-                content=img_bytes,
-                timeout=60,
+                content=video_bytes,
+                timeout=180,
             )
             if r2.status_code not in (200, 201):
                 return False, f"upload failed: {r2.status_code} {r2.text[:200]}"
 
-            # 3. Yayınla
-            r3 = await client.post(
+            # 3. İşlenme bekle
+            for _ in range(18):
+                await asyncio.sleep(10)
+                r3 = await client.get(
+                    f"{graph}/{media_id}",
+                    params={"fields": "status_code", "access_token": access_token},
+                    timeout=15,
+                )
+                if r3.status_code == 200:
+                    code = r3.json().get("status_code", "")
+                    if code == "FINISHED":
+                        break
+                    if code == "ERROR":
+                        return False, f"processing error"
+
+            # 4. Yayınla
+            r4 = await client.post(
                 f"{graph}/{ig_user_id}/media_publish",
                 params={"creation_id": media_id, "access_token": access_token},
                 timeout=30,
             )
-            if r3.status_code == 200:
+            if r4.status_code == 200:
                 return True, ""
-            return False, f"publish failed: {r3.status_code} {r3.text[:200]}"
+            return False, f"publish failed: {r4.status_code} {r4.text[:200]}"
     except Exception as e:
         return False, str(e)
 
@@ -1775,11 +1789,11 @@ async def auto_shorts_job():
                     ig_log = f"Reels hatası: {reel_err}" if reel_err else f"Reels yüklendi: {reel_id}"
                     IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
 
-                if ig_cfg.get("post_story", True) and thumbnail:
-                    thumb_file = OUTPUT_DIR / thumbnail
-                    ok, story_err = await post_story_to_instagram(thumb_file, ig_user_id, ig_token)
+                if ig_cfg.get("post_story", True):
+                    video_file2 = OUTPUT_DIR / filename
+                    ok, story_err = await post_story_to_instagram(video_file2, ig_user_id, ig_token)
                     story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
-                    IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": story_log}))
+                    IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log + " | " + story_log}))
 
     except Exception as e:
         save_sched_log("error", f"{e}")
