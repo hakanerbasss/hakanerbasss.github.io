@@ -684,6 +684,7 @@ def stop_ceo_agent():
     global _running
     _running = False
     cfg = load_config()
+    cfg['ceo_agent_enabled'] = False
     for ag in _CEO_AGENTS:
         cfg[f'{ag}_enabled'] = True
     cfg['accumulation_enabled'] = True

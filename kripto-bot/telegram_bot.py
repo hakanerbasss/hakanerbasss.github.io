@@ -96,7 +96,13 @@ def handle_command(cmd, chat_id):
     elif cmd == '/durdur':
         cfg['bot_paused'] = True
         save_config(cfg)
-        send_reply(chat_id, '⏸ Bot duraklatıldı — sinyaller işlenmeyecek')
+        try:
+            from manager_agent import stop_ceo_agent, ceo_agent_status
+            if ceo_agent_status()['running']:
+                stop_ceo_agent()
+        except Exception:
+            pass
+        send_reply(chat_id, '⏸ Bot duraklatıldı — sinyaller işlenmeyecek, CEO durduruldu')
 
     elif cmd == '/baslat':
         cfg['bot_paused'] = False
