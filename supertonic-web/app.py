@@ -1716,6 +1716,26 @@ def save_lv_sched_log(status: str, message: str, url: str = ""):
 
 
 SHORTS_DAILY_TOPICS = Path("shorts_daily_topics.json")
+LV_EN_TOPICS = Path("lv_en_topics.json")
+
+
+def get_lv_en_used_topics() -> list[str]:
+    from datetime import date
+    today = str(date.today())
+    if LV_EN_TOPICS.exists():
+        data = json.loads(LV_EN_TOPICS.read_text())
+        if data.get("date") == today:
+            return data.get("topics", [])
+    return []
+
+
+def add_lv_en_used_topic(title: str):
+    from datetime import date
+    today = str(date.today())
+    topics = get_lv_en_used_topics()
+    if title not in topics:
+        topics.append(title)
+    LV_EN_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
 
 
 def get_shorts_used_topics() -> list[str]:
@@ -2004,17 +2024,21 @@ async def auto_lv_en_job():
 
         from openai import OpenAI
         ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        used_topics = get_lv_en_used_topics()
+        exclude_block = (
+            f"\nDo NOT pick any of these already-covered topics:\n" + "\n".join(f"- {t}" for t in used_topics) + "\n"
+        ) if used_topics else ""
         topic_resp = ds.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": f"""Pick ONE specific, fascinating and educational documentary topic in English.
 Categories to choose from: {categories}
-Return ONLY valid JSON: {{"topic": "specific topic in English"}}
+{exclude_block}Return ONLY valid JSON: {{"topic": "specific topic in English"}}
 Make it specific and fascinating — NOT generic. Examples:
 - "How the Roman Colosseum Was Built and What Happened Inside"
 - "The Science Behind Black Holes: What Happens If You Fall In?"
 - "The Real Story of the Library of Alexandria and Its Destruction"
 - "How Quantum Entanglement Could Change Communication Forever"
-Pick something different and interesting each time."""}],
+Pick something DIFFERENT and interesting each time."""}],
             temperature=0.95,
         )
         topic = _parse_llm_json(topic_resp.choices[0].message.content).get(
@@ -2057,7 +2081,9 @@ Pick something different and interesting each time."""}],
                 save_lv_en_sched_log("error", f"Upload failed: {r2.text[:300]}")
                 return
 
-            save_lv_en_sched_log("success", d.get("title", topic), r2.json().get("url", ""))
+            title = d.get("title", topic)
+            add_lv_en_used_topic(title)
+            save_lv_en_sched_log("success", title, r2.json().get("url", ""))
 
     except Exception as e:
         save_lv_en_sched_log("error", str(e))
