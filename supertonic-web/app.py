@@ -221,6 +221,7 @@ async def generate_shorts(
     voice: str = Form("M1"),
     speed: float = Form(1.0),
     exclude_topics: str = Form(""),
+    region: str = Form("TR"),
 ):
     import json
     import httpx
@@ -234,7 +235,7 @@ async def generate_shorts(
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
     # Trend verileri al
-    trend_data = get_trends(region_code="TR", lang=lang)
+    trend_data = get_trends(region_code=region.upper(), lang=lang)
     trend_topics = ", ".join(trend_data["topics"][:12])
     yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
     trend_tags = ", ".join(trend_data["hashtags"][:10])
@@ -2101,6 +2102,138 @@ def _rebuild_lv_en_scheduler():
         pass
 
 
+EN_SHORTS_SCHED_CONFIG  = Path("en_shorts_scheduler_config.json")
+EN_SHORTS_SCHED_LOG     = Path("en_shorts_scheduler_log.json")
+EN_SHORTS_DAILY_TOPICS  = Path("en_shorts_daily_topics.json")
+
+
+def load_en_shorts_sched_config():
+    if EN_SHORTS_SCHED_CONFIG.exists():
+        return json.loads(EN_SHORTS_SCHED_CONFIG.read_text())
+    return {"enabled": False, "times": ["08:00", "14:00", "20:00"], "voice": "M1"}
+
+
+def save_en_shorts_sched_log(status: str, message: str, url: str = ""):
+    EN_SHORTS_SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "url": url, "ts": time.time()},
+        ensure_ascii=False,
+    ))
+
+
+def get_en_shorts_used_topics() -> list[str]:
+    from datetime import date
+    today = str(date.today())
+    if EN_SHORTS_DAILY_TOPICS.exists():
+        data = json.loads(EN_SHORTS_DAILY_TOPICS.read_text())
+        if data.get("date") == today:
+            return data.get("topics", [])
+    return []
+
+
+def add_en_shorts_used_topic(title: str):
+    from datetime import date
+    today = str(date.today())
+    topics = get_en_shorts_used_topics()
+    if title not in topics:
+        topics.append(title)
+    EN_SHORTS_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
+
+
+async def auto_en_shorts_job():
+    save_en_shorts_sched_log("running", "Generating EN short…")
+    try:
+        api_key = get_deepseek_key()
+        if not api_key:
+            save_en_shorts_sched_log("error", "DeepSeek API key not configured on server")
+            return
+        if not TOKEN_FILE_EN.exists():
+            save_en_shorts_sched_log("error", "EN YouTube channel not connected")
+            return
+
+        cfg = load_en_shorts_sched_config()
+        s_voice = cfg.get("voice", "M1")
+
+        used_topics = get_en_shorts_used_topics()
+        exclude_str = " | ".join(used_topics) if used_topics else ""
+
+        async with httpx.AsyncClient(timeout=900) as client:
+            r = await client.post(
+                "http://localhost:8001/api/generate-shorts",
+                data={
+                    "topic": "",
+                    "api_key": api_key,
+                    "lang": "en",
+                    "voice": s_voice,
+                    "speed": "1.0",
+                    "exclude_topics": exclude_str,
+                    "region": "US",
+                },
+            )
+            if r.status_code != 200:
+                save_en_shorts_sched_log("error", f"Video failed: {r.text[:300]}")
+                return
+            d = r.json()
+            add_en_shorts_used_topic(d.get("title", ""))
+
+            filename = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
+
+            r2 = await client.post(
+                "http://localhost:8001/api/yt/upload",
+                data={
+                    "filename": filename,
+                    "title": d.get("title", "Breaking News Short"),
+                    "description": d.get("suggested_description", ""),
+                    "tags": d.get("suggested_tags", "#Shorts #news #viral #trending"),
+                    "privacy": "public",
+                    "category_id": "25",
+                    "age_restricted": "false",
+                    "thumbnail_filename": thumbnail,
+                    "channel": "en",
+                },
+                timeout=600,
+            )
+            if r2.status_code != 200:
+                save_en_shorts_sched_log("error", f"Upload failed: {r2.text[:300]}")
+                return
+
+            result = r2.json()
+            save_en_shorts_sched_log("success", d.get("title", ""), result.get("url", ""))
+
+            ig_cfg = get_ig_config()
+            if ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
+                asyncio.create_task(_post_to_instagram_bg(
+                    filename=filename,
+                    title=d.get("title", ""),
+                    suggested_tags=d.get("suggested_tags", "#Shorts #news"),
+                    ig_cfg=ig_cfg,
+                ))
+
+    except Exception as e:
+        save_en_shorts_sched_log("error", str(e))
+
+
+def _rebuild_en_shorts_scheduler():
+    for job in scheduler.get_jobs():
+        if job.id.startswith("en_shorts_"):
+            job.remove()
+    cfg = load_en_shorts_sched_config()
+    if not cfg.get("enabled"):
+        return
+    for t in cfg.get("times", []):
+        try:
+            hour, minute = t.strip().split(":")
+            scheduler.add_job(
+                auto_en_shorts_job,
+                CronTrigger(hour=int(hour), minute=int(minute)),
+                id=f"en_shorts_{t.replace(':', '')}",
+                replace_existing=True,
+                max_instances=1,
+            )
+        except Exception:
+            pass
+
+
 TNLV_SCHED_CONFIG = Path("tnlv_scheduler_config.json")
 TNLV_SCHED_LOG    = Path("tnlv_scheduler_log.json")
 
@@ -2203,6 +2336,7 @@ async def startup_event():
     _rebuild_scheduler()
     _rebuild_lv_scheduler()
     _rebuild_lv_en_scheduler()
+    _rebuild_en_shorts_scheduler()
     _rebuild_tnlv_scheduler()
 
 
@@ -2323,6 +2457,40 @@ async def save_lv_en_scheduler_config(
 @app.post("/api/lv-en-scheduler/run-now")
 async def run_lv_en_now():
     asyncio.create_task(auto_lv_en_job())
+    return {"ok": True}
+
+
+@app.get("/api/en-shorts-scheduler/config")
+async def get_en_shorts_scheduler_config():
+    cfg = load_en_shorts_sched_config()
+    log = {}
+    if EN_SHORTS_SCHED_LOG.exists():
+        log = json.loads(EN_SHORTS_SCHED_LOG.read_text())
+    jobs = [j for j in scheduler.get_jobs() if j.id.startswith("en_shorts_")]
+    next_run = None
+    if jobs:
+        nxt = [j.next_run_time for j in jobs if j.next_run_time]
+        if nxt:
+            next_run = min(nxt).strftime("%d.%m.%Y %H:%M")
+    return {**cfg, "log": log, "next_run": next_run}
+
+
+@app.post("/api/en-shorts-scheduler/config")
+async def save_en_shorts_scheduler_config(
+    enabled: str = Form("false"),
+    times: str = Form("08:00,14:00,20:00"),
+    voice: str = Form("M1"),
+):
+    time_list = [t.strip() for t in times.split(",") if t.strip()]
+    cfg = {"enabled": enabled == "true", "times": time_list, "voice": voice}
+    EN_SHORTS_SCHED_CONFIG.write_text(json.dumps(cfg))
+    _rebuild_en_shorts_scheduler()
+    return cfg
+
+
+@app.post("/api/en-shorts-scheduler/run-now")
+async def run_en_shorts_now():
+    asyncio.create_task(auto_en_shorts_job())
     return {"ok": True}
 
 

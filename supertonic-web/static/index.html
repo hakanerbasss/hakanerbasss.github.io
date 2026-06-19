@@ -1135,6 +1135,49 @@
       <div id="lv-en-sched-last-url"></div>
     </div>
 
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">⚡ EN Otomatik Short</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce kanalına otomatik trend haberden Short üretip yükler (ABD trendleri)</p>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+        <input type="checkbox" id="en-shorts-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
+        EN otomatik shortu etkinleştir
+      </label>
+    </div>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+      <input type="text" id="en-shorts-sched-times" value="08:00,14:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+
+    <div class="field" style="margin-bottom:14px;">
+      <label>Ses</label>
+      <select id="en-shorts-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        <option value="M1" selected>M1 (Erkek)</option>
+        <option value="M2">M2 (Erkek)</option>
+        <option value="M3">M3 (Erkek)</option>
+        <option value="F1">F1 (Kadın)</option>
+        <option value="F2">F2 (Kadın)</option>
+        <option value="F3">F3 (Kadın)</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button onclick="saveENShortsScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+      <button onclick="runENShortsNow()" id="btn-en-shorts-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+        <div class="spinner" id="spin-en-shorts-run-now"></div>
+        Şimdi Çalıştır
+      </button>
+    </div>
+
+    <div id="en-shorts-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+      <div id="en-shorts-sched-next" style="color:#888;"></div>
+      <div id="en-shorts-sched-last-status"></div>
+      <div id="en-shorts-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+      <div id="en-shorts-sched-last-url"></div>
+    </div>
+
     <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
@@ -1452,6 +1495,7 @@ async function openSettings() {
   updateTNLVApiKeyStatus();
   checkYTENStatus();
   loadLVENSchedulerStatus();
+  loadENShortsSchedulerStatus();
   checkOpenAIStatus();
   checkInstagramStatus();
   loadInstagramLog();
@@ -2004,6 +2048,56 @@ async function runLVENNow() {
       document.getElementById('spin-lv-en-run-now').style.display = 'none';
       document.getElementById('btn-lv-en-run-now').disabled = false;
       loadLVENSchedulerStatus();
+    }
+  }, 5000);
+}
+
+// ── EN Shorts Scheduler ───────────────────────────────────────────────────────
+async function loadENShortsSchedulerStatus() {
+  try {
+    const r = await fetch('/api/en-shorts-scheduler/config');
+    const d = await r.json();
+    document.getElementById('en-shorts-sched-enabled').checked = d.enabled;
+    document.getElementById('en-shorts-sched-times').value = (d.times || ['08:00','14:00','20:00']).join(',');
+    if (d.voice) document.getElementById('en-shorts-sched-voice').value = d.voice;
+
+    const st = document.getElementById('en-shorts-sched-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('en-shorts-sched-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const statusEl = document.getElementById('en-shorts-sched-last-status');
+      statusEl.textContent = log.status ? `Durum: ${log.status}` : '';
+      statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
+      document.getElementById('en-shorts-sched-last-msg').textContent = log.message || '';
+      const urlEl = document.getElementById('en-shorts-sched-last-url');
+      urlEl.innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
+    }
+  } catch(e) {}
+}
+
+async function saveENShortsScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('en-shorts-sched-enabled').checked ? 'true' : 'false');
+  fd.append('times', document.getElementById('en-shorts-sched-times').value);
+  fd.append('voice', document.getElementById('en-shorts-sched-voice').value);
+  await fetch('/api/en-shorts-scheduler/config', { method: 'POST', body: fd });
+  await loadENShortsSchedulerStatus();
+}
+
+async function runENShortsNow() {
+  document.getElementById('spin-en-shorts-run-now').style.display = 'inline-block';
+  document.getElementById('btn-en-shorts-run-now').disabled = true;
+  await fetch('/api/en-shorts-scheduler/run-now', { method: 'POST' });
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/en-shorts-scheduler/config');
+    const d = await r.json();
+    const log = d.log || {};
+    if (log.status && log.status !== 'running') {
+      clearInterval(poll);
+      document.getElementById('spin-en-shorts-run-now').style.display = 'none';
+      document.getElementById('btn-en-shorts-run-now').disabled = false;
+      loadENShortsSchedulerStatus();
     }
   }, 5000);
 }
