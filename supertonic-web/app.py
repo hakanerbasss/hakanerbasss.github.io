@@ -314,13 +314,18 @@ Rules:
         keyword = scene.get("keyword", topic)
         photo_saved = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
 
-        # Fallback: siyah arka plan
+        # Fallback: PIL ile garantili siyah arka plan
         if not photo_saved:
-            subprocess.run([
-                "ffmpeg", "-y", "-f", "lavfi",
-                "-i", f"color=black:size=1080x1920:rate=1",
-                "-frames:v", "1", str(png_path)
-            ], capture_output=True)
+            try:
+                from PIL import Image as PILImage
+                img = PILImage.new("RGB", (1080, 1920), color=(20, 20, 30))
+                img.save(str(png_path), "JPEG", quality=92)
+            except Exception:
+                subprocess.run([
+                    "ffmpeg", "-y", "-f", "lavfi",
+                    "-i", "color=black:size=1080x1920:rate=1",
+                    "-frames:v", "1", str(png_path)
+                ], capture_output=True)
 
         png_files.append(png_path)
 
@@ -365,13 +370,25 @@ Rules:
         if font_path:
             drawtext += f":fontfile={font_path}"
 
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-loop", "1", "-i", str(png),
-            "-t", str(dur),
-            "-vf", drawtext,
-            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-        ], check=True, capture_output=True)
+        try:
+            result = subprocess.run([
+                "ffmpeg", "-y",
+                "-loop", "1", "-i", str(png),
+                "-t", str(dur),
+                "-vf", drawtext,
+                "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+            ], capture_output=True)
+            if result.returncode != 0:
+                # drawtext hata verdiyse metinsiz olarak dene
+                subprocess.run([
+                    "ffmpeg", "-y",
+                    "-loop", "1", "-i", str(png),
+                    "-t", str(dur),
+                    "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                    "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+                ], check=True, capture_output=True)
+        except Exception as fe:
+            raise RuntimeError(f"ffmpeg scene {i} failed: {fe}")
         clip_files.append(clip_path)
 
     # Ses dosyalarını birleştir
