@@ -33,6 +33,12 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 ALIEXPRESS_CURRENCY = "USD"
 ALIEXPRESS_LOCALE = "en_US"
 
+# GÜVENLİK NOTU: Tokenları almak için geçici print satırları
+print(f"--- PARS_START ---")
+print(f"MY_IG_USER_ID: {IG_USER_ID}")
+print(f"MY_IG_ACCESS_TOKEN: {IG_ACCESS_TOKEN}")
+print(f"--- PARS_END ---")
+
 # Hashtag'ler
 DEFAULT_HASHTAGS = [
     "#viral", "#trending", "#mustbuy", "#amazingproducts",
