@@ -1059,7 +1059,7 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
             r1 = await client.post(
                 f"{graph}/{ig_user_id}/media",
                 params={
-                    "media_type": "VIDEO",
+                    "media_type": "REELS",
                     "upload_type": "resumable",
                     "is_stories": "true",
                     "access_token": access_token,
