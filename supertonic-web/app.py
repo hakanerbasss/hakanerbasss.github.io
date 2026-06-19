@@ -509,6 +509,10 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
         lf.write_text(line, encoding="utf-8")
         line_files.append(lf)
 
+    # Badge metnini de dosyaya yaz (boşluk/özel karakter sorunu yok)
+    badge_file = tmp_dir / f"thumb_badge_{uid}.txt"
+    badge_file.write_text(badge_text, encoding="utf-8")
+
     vf_parts = []
 
     # Kırmızı alt bant
@@ -516,27 +520,27 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
         f"drawbox=x=0:y=ih-{band_h}:w=iw:h={band_h}:color=0xD20A0A@1:t=fill"
     )
 
-    # Badge metni (ASCII — Türkçe karakter yok)
+    # Badge metni
     badge_cmd = (
-        f"drawtext=text='{badge_text}'"
+        f"drawtext=textfile={badge_file}"
         f":fontsize={badge_fs}:fontcolor=white"
         f":x=(w-tw)/2:y=h-{band_h//2}-th/2"
     )
     if font_path:
-        badge_cmd += f":fontfile='{font_path}'"
+        badge_cmd += f":fontfile={font_path}"
     vf_parts.append(badge_cmd)
 
     # Başlık satırları (alttan yukarı)
     for i, lf in enumerate(line_files):
         y_expr = f"ih-{band_h}-{(len(line_files) - i) * line_h}-10"
         line_cmd = (
-            f"drawtext=textfile='{lf}'"
+            f"drawtext=textfile={lf}"
             f":fontsize={title_fs}:fontcolor=#FFE000"
             f":x=(w-tw)/2:y={y_expr}"
             f":shadowx=4:shadowy=4:shadowcolor=black@0.9"
         )
         if font_path:
-            line_cmd += f":fontfile='{font_path}'"
+            line_cmd += f":fontfile={font_path}"
         vf_parts.append(line_cmd)
 
     vf = ",".join(vf_parts)
@@ -550,6 +554,7 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
 
     # Temizlik
     tmp_bg.unlink(missing_ok=True)
+    badge_file.unlink(missing_ok=True)
     for lf in line_files:
         lf.unlink(missing_ok=True)
 
