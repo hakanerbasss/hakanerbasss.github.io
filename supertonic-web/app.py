@@ -1776,27 +1776,39 @@ async def auto_shorts_job():
             result = r2.json()
             save_sched_log("success", d.get("title", ""), result.get("url", ""))
 
-            # 3. Instagram'a gönder (opsiyonel)
+            # 3. Instagram'a gönder — arka planda, job'u bloke etmez
             ig_cfg = get_ig_config()
             if ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
-                ig_user_id = ig_cfg["ig_user_id"]
-                ig_token = ig_cfg["access_token"]
-                caption = f"{d.get('title', '')}\n\n{d.get('suggested_tags', '#Shorts #gündem')}"
-
-                if ig_cfg.get("post_reels", True):
-                    video_file = OUTPUT_DIR / filename
-                    reel_id, reel_err = await post_reel_to_instagram(video_file, caption, ig_user_id, ig_token)
-                    ig_log = f"Reels hatası: {reel_err}" if reel_err else f"Reels yüklendi: {reel_id}"
-                    IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
-
-                if ig_cfg.get("post_story", True):
-                    video_file2 = OUTPUT_DIR / filename
-                    ok, story_err = await post_story_to_instagram(video_file2, ig_user_id, ig_token)
-                    story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
-                    IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log + " | " + story_log}))
+                asyncio.create_task(_post_to_instagram_bg(
+                    filename=filename,
+                    title=d.get("title", ""),
+                    suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
+                    ig_cfg=ig_cfg,
+                ))
 
     except Exception as e:
         save_sched_log("error", f"{e}")
+
+
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict):
+    """Instagram gönderisi arka planda çalışır — scheduler'ı bloke etmez."""
+    ig_user_id = ig_cfg["ig_user_id"]
+    ig_token = ig_cfg["access_token"]
+    caption = f"{title}\n\n{suggested_tags}"
+    ig_log = ""
+
+    if ig_cfg.get("post_reels", True):
+        video_file = OUTPUT_DIR / filename
+        reel_id, reel_err = await post_reel_to_instagram(video_file, caption, ig_user_id, ig_token)
+        ig_log = f"Reels hatası: {reel_err}" if reel_err else f"Reels yüklendi: {reel_id}"
+        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
+
+    if ig_cfg.get("post_story", True):
+        video_file2 = OUTPUT_DIR / filename
+        ok, story_err = await post_story_to_instagram(video_file2, ig_user_id, ig_token)
+        story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
+        combined = f"{ig_log} | {story_log}" if ig_log else story_log
+        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": combined}))
 
 
 def _rebuild_scheduler():
