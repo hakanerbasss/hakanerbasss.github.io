@@ -9,61 +9,64 @@ object BackupManager {
 
     private val PREF_NAMES = listOf(
         "user_profile",
-        "overtime_track_prefs",
+        "overtime_prefs",
         "payment_prefs",
         "savings_prefs",
-        "special_days",
-        "notif_settings"
+        "notif_settings",
+        "ad_free_prefs",
+        "history_prefs",
+        "overtime_track_prefs",
+        "special_day_prefs"
     )
 
     fun export(context: Context, out: OutputStream) {
-        val root  = JSONObject()
-        root.put("version", 1)
-        root.put("timestamp", System.currentTimeMillis())
-        val prefs = JSONObject()
-        PREF_NAMES.forEach { name ->
-            val sp  = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        val root = JSONObject()
+        for (name in PREF_NAMES) {
+            val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
             val obj = JSONObject()
-            sp.all.forEach { (k, v) ->
-                val entry = JSONObject()
+            for ((k, v) in prefs.all) {
                 when (v) {
-                    is Boolean -> { entry.put("t", "b"); entry.put("v", v.toString()) }
-                    is Int     -> { entry.put("t", "i"); entry.put("v", v.toString()) }
-                    is Long    -> { entry.put("t", "l"); entry.put("v", v.toString()) }
-                    is Float   -> { entry.put("t", "f"); entry.put("v", v.toString()) }
-                    else       -> { entry.put("t", "s"); entry.put("v", v?.toString() ?: "") }
+                    is String  -> obj.put(k, v)
+                    is Int     -> obj.put(k, v)
+                    is Long    -> obj.put(k, v)
+                    is Float   -> obj.put(k, v)
+                    is Boolean -> obj.put(k, v)
+                    is Set<*>  -> obj.put(k, org.json.JSONArray(v.toList()))
                 }
-                obj.put(k, entry)
             }
-            prefs.put(name, obj)
+            root.put(name, obj)
         }
-        root.put("prefs", prefs)
-        out.write(root.toString(2).toByteArray())
-        out.flush()
+        out.write(root.toString(2).toByteArray(Charsets.UTF_8))
     }
 
-    fun import(context: Context, input: InputStream): Boolean {
+    fun import(context: Context, inp: InputStream): Boolean {
         return try {
-            val root  = JSONObject(input.bufferedReader().readText())
-            val prefs = root.getJSONObject("prefs")
-            PREF_NAMES.forEach { name ->
-                if (!prefs.has(name)) return@forEach
-                val obj    = prefs.getJSONObject(name)
+            val text = inp.bufferedReader().readText()
+            val root = JSONObject(text)
+            for (name in PREF_NAMES) {
+                if (!root.has(name)) continue
+                val obj = root.getJSONObject(name)
                 val editor = context.getSharedPreferences(name, Context.MODE_PRIVATE).edit()
-                obj.keys().forEach { key ->
-                    val entry = obj.getJSONObject(key)
-                    val v     = entry.getString("v")
-                    when (entry.getString("t")) {
-                        "b"  -> editor.putBoolean(key, v.toBoolean())
-                        "i"  -> editor.putInt(key, v.toIntOrNull() ?: 0)
-                        "l"  -> editor.putLong(key, v.toLongOrNull() ?: 0L)
-                        "f"  -> editor.putFloat(key, v.toFloatOrNull() ?: 0f)
-                        else -> editor.putString(key, v)
+                editor.clear()
+                for (k in obj.keys()) {
+                    when (val v = obj.get(k)) {
+                        is String  -> editor.putString(k, v)
+                        is Int     -> editor.putInt(k, v)
+                        is Long    -> editor.putLong(k, v)
+                        is Double  -> editor.putFloat(k, v.toFloat())
+                        is Boolean -> editor.putBoolean(k, v)
+                        is org.json.JSONArray -> {
+                            val set = mutableSetOf<String>()
+                            for (i in 0 until v.length()) set.add(v.getString(i))
+                            editor.putStringSet(k, set)
+                        }
                     }
                 }
                 editor.apply()
             }
             true
-        } catch (_: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 }

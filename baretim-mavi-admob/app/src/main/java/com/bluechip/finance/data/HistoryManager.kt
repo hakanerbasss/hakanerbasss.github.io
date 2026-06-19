@@ -5,63 +5,45 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class HistoryEntry(
-    val screenId: String,
-    val timestamp: Long,
-    val label: String,         // "Ocak — 40.000₺ brüt"
-    val resultSummary: String, // "Net: 32.450₺"
-    val salary: String         // Ana giris alani (geri yukleme icin)
+    val type: String,
+    val label: String,
+    val amount: Double,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 object HistoryManager {
+    private const val PREFS = "history_prefs"
+    private const val KEY = "entries"
+    private const val MAX = 100
 
-    private const val PREFS = "calc_history"
-    private const val MAX   = 5
-
-    fun save(context: Context, entry: HistoryEntry) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val key   = "history_${entry.screenId}"
-        val arr   = load(context, entry.screenId).toMutableList()
-
-        // Ayni maaş/label varsa guncelle, yoksa basa ekle
-        arr.removeAll { it.label == entry.label }
-        arr.add(0, entry)
-        if (arr.size > MAX) arr.subList(MAX, arr.size).clear()
-
-        val json = JSONArray()
-        arr.forEach { e ->
-            json.put(JSONObject().apply {
-                put("screenId",      e.screenId)
-                put("timestamp",     e.timestamp)
-                put("label",         e.label)
-                put("resultSummary", e.resultSummary)
-                put("salary",        e.salary)
+    fun add(context: Context, entry: HistoryEntry) {
+        val list = getAll(context).toMutableList()
+        list.add(0, entry)
+        if (list.size > MAX) list.removeAt(list.size - 1)
+        val arr = JSONArray()
+        list.forEach { e ->
+            arr.put(JSONObject().apply {
+                put("type", e.type)
+                put("label", e.label)
+                put("amount", e.amount)
+                put("ts", e.timestamp)
             })
         }
-        prefs.edit().putString(key, json.toString()).apply()
-    }
-
-    fun load(context: Context, screenId: String): List<HistoryEntry> {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val raw   = prefs.getString("history_$screenId", null) ?: return emptyList()
-        return try {
-            val arr  = JSONArray(raw)
-            val list = mutableListOf<HistoryEntry>()
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                list.add(HistoryEntry(
-                    screenId      = o.getString("screenId"),
-                    timestamp     = o.getLong("timestamp"),
-                    label         = o.getString("label"),
-                    resultSummary = o.getString("resultSummary"),
-                    salary        = o.getString("salary")
-                ))
-            }
-            list
-        } catch (_: Exception) { emptyList() }
-    }
-
-    fun clear(context: Context, screenId: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().remove("history_$screenId").apply()
+            .edit().putString(KEY, arr.toString()).apply()
+    }
+
+    fun getAll(context: Context): List<HistoryEntry> {
+        val json = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY, "[]") ?: "[]"
+        val arr = JSONArray(json)
+        return (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i)
+            HistoryEntry(o.getString("type"), o.getString("label"), o.getDouble("amount"), o.getLong("ts"))
+        }
+    }
+
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
     }
 }

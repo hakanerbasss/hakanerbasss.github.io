@@ -1,90 +1,74 @@
 package com.bluechip.finance.data
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONArray
-import java.util.*
-import java.util.concurrent.TimeUnit
 
-data class PublicHoliday(
-    val name: String,
-    val localName: String,
-    val day: Int,
-    val month: Int,
-    val year: Int
-)
+data class Holiday(val month: Int, val day: Int, val name: String)
 
 object HolidayManager {
-    private const val PREFS     = "holidays_cache"
-    private const val KEY_DATA  = "holidays_json"
-    private const val KEY_YEAR  = "cache_year"
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
 
-    suspend fun getHolidays(context: Context): List<PublicHoliday> = withContext(Dispatchers.IO) {
-        val year = Calendar.getInstance().get(Calendar.YEAR)
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val cachedYear = prefs.getInt(KEY_YEAR, 0)
+    // Türkiye resmi tatil listesi (sabit)
+    private val fixedHolidays = listOf(
+        Holiday(1,  1,  "Yılbaşı"),
+        Holiday(4,  23, "Ulusal Egemenlik ve Çocuk Bayramı"),
+        Holiday(5,  1,  "Emek ve Dayanışma Günü"),
+        Holiday(5,  19, "Atatürk'ü Anma, Gençlik ve Spor Bayramı"),
+        Holiday(7,  15, "Demokrasi ve Milli Birlik Günü"),
+        Holiday(8,  30, "Zafer Bayramı"),
+        Holiday(10, 29, "Cumhuriyet Bayramı")
+    )
 
-        // Cache geçerliyse kullan
-        if (cachedYear == year) {
-            val json = prefs.getString(KEY_DATA, null)
-            if (json != null) return@withContext parseHolidays(json)
+    // Ramazan / Kurban Bayramı tarihleri (2025-2030, yaklaşık)
+    private val islamicHolidays = mapOf(
+        2025 to listOf(
+            Holiday(3, 30, "Ramazan Bayramı 1. Gün"),
+            Holiday(3, 31, "Ramazan Bayramı 2. Gün"),
+            Holiday(4,  1, "Ramazan Bayramı 3. Gün"),
+            Holiday(6,  6, "Kurban Bayramı 1. Gün"),
+            Holiday(6,  7, "Kurban Bayramı 2. Gün"),
+            Holiday(6,  8, "Kurban Bayramı 3. Gün"),
+            Holiday(6,  9, "Kurban Bayramı 4. Gün")
+        ),
+        2026 to listOf(
+            Holiday(3, 20, "Ramazan Bayramı 1. Gün"),
+            Holiday(3, 21, "Ramazan Bayramı 2. Gün"),
+            Holiday(3, 22, "Ramazan Bayramı 3. Gün"),
+            Holiday(5, 27, "Kurban Bayramı 1. Gün"),
+            Holiday(5, 28, "Kurban Bayramı 2. Gün"),
+            Holiday(5, 29, "Kurban Bayramı 3. Gün"),
+            Holiday(5, 30, "Kurban Bayramı 4. Gün")
+        ),
+        2027 to listOf(
+            Holiday(3,  9, "Ramazan Bayramı 1. Gün"),
+            Holiday(3, 10, "Ramazan Bayramı 2. Gün"),
+            Holiday(3, 11, "Ramazan Bayramı 3. Gün"),
+            Holiday(5, 17, "Kurban Bayramı 1. Gün"),
+            Holiday(5, 18, "Kurban Bayramı 2. Gün"),
+            Holiday(5, 19, "Kurban Bayramı 3. Gün"),
+            Holiday(5, 20, "Kurban Bayramı 4. Gün")
+        )
+    )
+
+    fun getHolidays(year: Int): List<Holiday> {
+        val list = fixedHolidays.toMutableList()
+        islamicHolidays[year]?.let { list.addAll(it) }
+        return list.sortedWith(compareBy({ it.month }, { it.day }))
+    }
+
+    fun isHoliday(year: Int, month: Int, day: Int): Boolean {
+        return getHolidays(year).any { it.month == month && it.day == day }
+    }
+
+    /** Belirtilen tarihten itibaren kaç iş günü var (tatil+hafta sonu hariç). */
+    fun workDaysUntil(year: Int, month: Int, fromDay: Int, toDay: Int): Int {
+        var count = 0
+        val cal = java.util.Calendar.getInstance()
+        for (d in fromDay..toDay) {
+            cal.set(year, month - 1, d)
+            val dow = cal.get(java.util.Calendar.DAY_OF_WEEK)
+            if (dow == java.util.Calendar.SATURDAY || dow == java.util.Calendar.SUNDAY) continue
+            if (isHoliday(year, month, d)) continue
+            count++
         }
-
-        // Nager.Date API'den çek
-        try {
-            val req = Request.Builder()
-                .url("https://date.nager.at/api/v3/PublicHolidays/$year/TR")
-                .build()
-            val resp = client.newCall(req).execute()
-            if (resp.isSuccessful) {
-                val body = resp.body?.string() ?: return@withContext emptyList()
-                prefs.edit()
-                    .putString(KEY_DATA, body)
-                    .putInt(KEY_YEAR, year)
-                    .apply()
-                return@withContext parseHolidays(body)
-            }
-        } catch (_: Exception) {}
-
-        // Cache yoksa boş
-        val oldJson = prefs.getString(KEY_DATA, null)
-        if (oldJson != null) parseHolidays(oldJson) else emptyList()
-    }
-
-    private fun parseHolidays(json: String): List<PublicHoliday> {
-        return try {
-            val arr = JSONArray(json)
-            (0 until arr.length()).mapNotNull { i ->
-                val o = arr.getJSONObject(i)
-                val date = o.optString("date", "") // "2025-01-01"
-                val parts = date.split("-")
-                if (parts.size != 3) return@mapNotNull null
-                PublicHoliday(
-                    name      = o.optString("name", ""),
-                    localName = o.optString("localName", o.optString("name", "")),
-                    day       = parts[2].toIntOrNull() ?: return@mapNotNull null,
-                    month     = parts[1].toIntOrNull() ?: return@mapNotNull null,
-                    year      = parts[0].toIntOrNull() ?: return@mapNotNull null
-                )
-            }
-        } catch (_: Exception) { emptyList() }
-    }
-
-    fun daysUntil(day: Int, month: Int): Int {
-        return SpecialDayManager.daysUntil(day, month)
-    }
-
-    fun getUpcoming(holidays: List<PublicHoliday>, withinDays: Int = 30): List<Pair<PublicHoliday, Int>> {
-        return holidays
-            .map { it to daysUntil(it.day, it.month) }
-            .filter { it.second <= withinDays }
-            .sortedBy { it.second }
+        return count
     }
 }

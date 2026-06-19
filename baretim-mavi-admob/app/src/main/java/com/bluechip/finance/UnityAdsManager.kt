@@ -44,13 +44,12 @@ object UnityAdsManager {
                 override fun onInitializationFailed(
                     error: UnityAds.UnityAdsInitializationError, message: String) {
                     Log.e(TAG, "Unity Ads baslanamadi: $message")
-                    android.widget.Toast.makeText(context, "Unity init FAIL: $message", android.widget.Toast.LENGTH_LONG).show()
                     initialized = false
                 }
             })
     }
 
-    // ── BANNER ──────────────────────────────────────────────────
+    // ── BANNER ────────────────────────────────────────────────────────
     fun showBanner(activity: Activity, container: FrameLayout) {
         destroyBanner()
         val banner = BannerView(activity, BANNER_ID, UnityBannerSize(320, 50))
@@ -81,7 +80,7 @@ object UnityAdsManager {
         bannerView = null
     }
 
-    // ── INTERSTITIAL ─────────────────────────────────────────────
+    // ── INTERSTITIAL ───────────────────────────────────────────────────
     fun loadInterstitial() {
         interstitialReady = false
         UnityAds.load(INTERSTITIAL_ID, object : IUnityAdsLoadListener {
@@ -121,7 +120,7 @@ object UnityAdsManager {
         }
     }
 
-    // ── REWARDED ─────────────────────────────────────────────────
+    // ── REWARDED ──────────────────────────────────────────────────────
     fun loadRewarded() {
         rewardedReady = false
         UnityAds.load(REWARDED_ID, object : IUnityAdsLoadListener {
@@ -132,13 +131,11 @@ object UnityAdsManager {
             override fun onUnityAdsFailedToLoad(placementId: String,
                 error: UnityAds.UnityAdsLoadError, message: String) {
                 Log.e(TAG, "Rewarded FAIL: $error | $message")
-                android.widget.Toast.makeText(appContext, "LOAD FAIL: $error | $message", android.widget.Toast.LENGTH_LONG).show()
             }
         })
     }
 
     fun showRewarded(activity: Activity, onRewarded: () -> Unit, onNotReady: () -> Unit) {
-        android.widget.Toast.makeText(activity, "isInit:${UnityAds.isInitialized} rewardedReady:$rewardedReady", android.widget.Toast.LENGTH_LONG).show()
         if (rewardedReady) {
             rewardedReady = false
             UnityAds.show(activity, REWARDED_ID, UnityAdsShowOptions(),
