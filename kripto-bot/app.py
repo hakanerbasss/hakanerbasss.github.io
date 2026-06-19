@@ -353,6 +353,7 @@ def settings():
     cfg['telegram_chat_id']     = request.form.get('telegram_chat_id', '')
     cfg['max_positions']        = int(request.form.get('max_positions', 6))
     cfg['sl_cooldown_hours']    = float(request.form.get('sl_cooldown_hours', 3))
+    cfg['max_loss_per_trade_usd'] = float(request.form.get('max_loss_per_trade_usd', 0))
     if request.form.get('deepseek_api_key', '').strip():
         cfg['deepseek_api_key'] = request.form.get('deepseek_api_key', '').strip()
     if request.form.get('funding_futures_key', '').strip():
