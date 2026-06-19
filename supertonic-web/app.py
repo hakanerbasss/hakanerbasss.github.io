@@ -1583,6 +1583,21 @@ async def upload_youtube(
     if not video_path.exists():
         raise HTTPException(404, "Video bulunamadı")
 
+    # Sosyal medya footer — tüm videolara eklenir
+    if channel == "en":
+        social_footer = (
+            "\n\n📺 Subscribe for daily documentaries!\n"
+            "📸 Instagram: https://www.instagram.com/hakanerbasss/\n"
+            "\n#documentary #education #history #science #shorts"
+        )
+    else:
+        social_footer = (
+            "\n\n📺 Abone olmayı unutma!\n"
+            "📸 Instagram: https://www.instagram.com/hakanerbasss/\n"
+            "\n#gündem #haber #shorts #keşfet #viral"
+        )
+    description = (description or "").strip() + social_footer
+
     from google.auth.transport.requests import Request as GRequest
     creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)
     if creds.expired and creds.refresh_token:
