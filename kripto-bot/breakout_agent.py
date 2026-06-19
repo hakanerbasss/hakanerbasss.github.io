@@ -391,6 +391,13 @@ class BreakoutAgent:
         ceo_mult = cfg.get('ceo_position_mult', 1.0)
         usdt     = position_size_by_score(equity, result['score'], mult=ceo_mult)
 
+        # İşlem başına maksimum zarar limiti — hard stop %5 üzerinden tersine hesap
+        max_loss = float(cfg.get('max_loss_per_trade_usd', 0))
+        if max_loss > 0:
+            max_pos = round(max_loss / (HARD_STOP_PCT / 100), 2)
+            min_pos = float(cfg.get('min_position_usd', 10.0))
+            usdt = max(min_pos, min(usdt, max_pos))
+
         res = execute_buy(client, symbol, usdt, source='BREAKOUT', period='1h', agent='BREAKOUT')
         if not res.get('ok'):
             print(f'[Breakout] Alım başarısız: {symbol} — {res.get("error")}')
@@ -403,6 +410,7 @@ class BreakoutAgent:
                         peak_price=pos_now.get('avg_price', result['price']),
                         trail_active=False)
 
+        max_loss_str = f'🛡 Max zarar: ${max_loss:.0f}\n' if max_loss > 0 else ''
         send_telegram(
             f'🚀 <b>BREAKOUT ALIM</b>\n'
             f'💎 {symbol}\n'
@@ -410,6 +418,7 @@ class BreakoutAgent:
             f'📊 Hacim spike: {result["vol_spike"]}x\n'
             f'🎯 Skor: {result["score"]}/10\n'
             f'💵 Tutar: ${usdt}\n'
+            f'{max_loss_str}'
             f'🔒 Trail: +3-10%→-3% | +10-25%→-5% | +25-40%→-6% | +40%+→-10%\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler\n'
             f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
