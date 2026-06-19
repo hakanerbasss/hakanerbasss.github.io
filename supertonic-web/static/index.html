@@ -2089,7 +2089,7 @@ async function testInstagram() {
     const r = await fetch('/api/instagram/test', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      el.innerHTML = `<span style="color:#4ade80">✓ Bağlantı başarılı — @${d.username} (${d.account_type})</span>`;
+      el.innerHTML = `<span style="color:#4ade80">✓ Bağlantı başarılı — @${d.username}</span>`;
     } else {
       el.innerHTML = `<span style="color:#f87171">✗ Hata: ${d.error}</span>`;
     }
