@@ -276,7 +276,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
 Rules:
 - 5 to 7 scenes
-- FIRST scene text MUST start with a hook: a shocking statement OR a question that creates curiosity (e.g. "Biliyor muydunuz?", "Şok gelişme!", "Peki ya şimdi?"). This is critical for retention.
+- FIRST scene text MUST start with a strong hook. Use VARIETY — never repeat the same hook phrase across videos. Examples: "Biliyor muydunuz?", "Peki ne oldu?", "İşte o an!", "Herkes bunu merak ediyor:", "Rakamlar şaşırtıyor:", "Tarihin en...", "Kimse beklemiyordu:". Do NOT use "Şok gelişme" repeatedly.
 - LAST scene text MUST end with a call to action: "Abone olmayı ve beğenmeyi unutma!" (in {lang_name})
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
@@ -915,7 +915,7 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - Exactly {scene_count} scenes
-- FIRST scene text MUST start with a hook: a shocking statement or question (e.g. "Biliyor muydunuz?", "Şok gelişme!"). Critical for viewer retention.
+- FIRST scene text MUST start with a strong, varied hook. Do NOT use "Şok gelişme" every time. Rotate between: "Biliyor muydunuz?", "Peki ne oldu?", "İşte o an!", "Herkes bunu merak ediyor:", "Rakamlar şaşırtıyor:", "Tarihin en...", "Kimse beklemiyordu:", or similar creative openers matching the topic.
 - LAST scene text MUST end with: "Abone olmayı ve beğenmeyi unutma!" (in {lang_name})
 - Each scene: 2-3 sentences packed with facts, context and detail — NOT simple or vague
 - Cover the topic thoroughly: introduction, key facts, interesting details, historical context, conclusion
@@ -1123,7 +1123,7 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - One segment per trending topic ({len(topics_list)} segments total, {len(topics_list)*2} scenes)
-- VERY FIRST scene of the entire video MUST start with a hook (shocking statement or question). Critical for retention.
+- VERY FIRST scene of the entire video MUST start with a strong, creative hook that fits the topic. Do NOT use the same phrase every time (avoid repeating "Şok gelişme"). Use varied openers: "Biliyor muydunuz?", "Peki ne oldu?", "İşte o an!", "Herkes bunu merak ediyor:", "Rakamlar şaşırtıyor:", etc. Critical for retention.
 - VERY LAST scene MUST end with: "Abone olmayı ve beğenmeyi unutma!" (in {lang_name})
 - Each segment: exactly 2 scenes, informative and engaging
 - hashtags: 10-15 tags mixing {lang_name} and English, always include news-related tags, no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika")
