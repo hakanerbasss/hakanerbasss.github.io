@@ -459,9 +459,6 @@ Rules:
     except Exception:
         pass
 
-    # Thumbnail'i videonun ilk 2 saniyesi olarak ekle
-    if thumb_out and thumb_out.exists():
-        output_file = prepend_thumbnail_intro(thumb_out, output_file, duration=2, size=(1080, 1920))
 
     return {
         "video": f"/api/video/{output_file.name}",
@@ -1063,9 +1060,6 @@ Rules:
     except Exception:
         pass
 
-    if thumb_out and thumb_out.exists():
-        output_file = prepend_thumbnail_intro(thumb_out, output_file, duration=3, size=(1280, 720))
-
     return {
         "video": f"/api/video/{output_file.name}",
         "thumbnail": thumb_path,
@@ -1271,9 +1265,6 @@ Rules:
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
-
-    if thumb_out and thumb_out.exists():
-        output_file = prepend_thumbnail_intro(thumb_out, output_file, duration=3, size=(1280, 720))
 
     return {
         "video": f"/api/video/{output_file.name}",
