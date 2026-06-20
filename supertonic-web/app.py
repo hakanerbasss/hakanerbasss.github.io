@@ -668,14 +668,6 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
 
     img.save(str(out_path), "JPEG", quality=92)
     return out_path
-        # gölge
-        draw.text((lx + 3, y + 3), line, font=title_font, fill=(0, 0, 0))
-        # sarı başlık
-        draw.text((lx, y), line, font=title_font, fill=(255, 224, 0))
-        y += line_h
-
-    img.save(str(out_path), "JPEG", quality=92)
-    return out_path
 
 
 def prepend_thumbnail_intro(thumb_path: Path, video_path: Path, duration: int = 2, size: tuple = (1080, 1920)) -> Path:
