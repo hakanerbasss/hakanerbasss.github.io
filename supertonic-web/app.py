@@ -266,15 +266,6 @@ Return ONLY valid JSON, no markdown, no explanation:
 {{
   "title": "catchy YouTube title for this video (max 80 chars, in {lang_name})",
   "hashtags": ["Shorts", "topic", "specific", "tags", "no", "hash", "symbol"],
-  "thumbnail": {{
-    "template": "breaking OR tech OR economy OR shock",
-    "ust_bant": "SON DAKİKA",
-    "sayi": "striking number from news OR impactful 1-2 word (e.g. 57, 3, ŞOK, ALARM)",
-    "ana_baslik": "key noun 1-2 words MAX uppercase (e.g. YARALI, ÖLDÜ, ARTIŞ)",
-    "alt_baslik": "action phrase max 22 chars (e.g. İKİ TREN ÇARPIŞTI)",
-    "detay": "location or subject max 20 chars (e.g. İNGİLTERE'DE)",
-    "ek_bilgi": "short extra detail max 25 chars"
-  }},
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
@@ -290,10 +281,7 @@ Rules:
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
 - hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")
-- thumbnail.template: "breaking" for accidents/disasters/crime, "tech" for technology/AI/science, "economy" for crypto/stocks/finance, "shock" for viral/bizarre/unexpected news
-- thumbnail.sayi: extract the most shocking number from the news (deaths, injured, percentage, year, amount). If no number exists use a 1-2 word hook like "ŞOK" or "ALARM"
-- thumbnail.ust_bant: "SON DAKİKA" for {lang_name} Turkish, "BREAKING NEWS" for English
-- All thumbnail text fields MUST be in {lang_name} and UPPERCASE"""
+"""
 
     data = None
     for attempt in range(3):
@@ -461,17 +449,12 @@ Rules:
         title_tags = [f"#{w.lower()}" for w in generated_title.split()[:3] if len(w) > 3]
         video_tags = ", ".join(["#Shorts"] + title_tags + trend_data["hashtags"][1:6])
 
-    # Thumbnail — yeni SVG tabanlı breaking-news tasarımı
+    # Thumbnail — ilk sahnenin fotoğrafından PIL ile üret
     thumb_path = None
     thumb_out = None
     try:
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-        thumb_vars = data.get("thumbnail", {})
-        if not thumb_vars:
-            thumb_vars = {"ust_bant": "SON DAKİKA" if lang == "tr" else "BREAKING NEWS",
-                          "sayi": "ŞOK", "ana_baslik": generated_title.upper()[:15],
-                          "alt_baslik": "", "detay": "", "ek_bilgi": ""}
-        create_shorts_thumbnail(thumb_vars, thumb_out, size=(1080, 1920), lang=lang)
+        create_thumbnail(png_files[0].read_bytes(), generated_title, thumb_out, size=(1080, 1920), lang=lang)
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
