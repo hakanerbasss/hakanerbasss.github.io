@@ -340,7 +340,7 @@ Rules:
                     "ffmpeg", "-y", "-f", "lavfi",
                     "-i", "color=black:size=1080x1920:rate=1",
                     "-frames:v", "1", str(png_path)
-                ], capture_output=True)
+                ], capture_output=True, timeout=90)
 
         png_files.append(png_path)
 
@@ -400,7 +400,7 @@ Rules:
                 "-t", str(dur),
                 "-vf", drawtext,
                 "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-            ], capture_output=True)
+            ], capture_output=True, timeout=90)
             if result.returncode != 0:
                 # drawtext hata verdiyse metinsiz olarak dene
                 subprocess.run([
@@ -409,7 +409,7 @@ Rules:
                     "-t", str(dur),
                     "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
                     "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-                ], check=True, capture_output=True)
+                ], check=True, capture_output=True, timeout=90)
         except Exception as fe:
             raise RuntimeError(f"ffmpeg scene {i} failed: {fe}")
         clip_files.append(clip_path)
@@ -422,7 +422,7 @@ Rules:
             f.write(f"file '{af.absolute()}'\n")
     subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list_file), "-c", "copy", str(combined_audio)],
-        check=True, capture_output=True
+        check=True, capture_output=True, timeout=120
     )
 
     # Video kliplerini birleştir
@@ -435,7 +435,7 @@ Rules:
     subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file),
         "-c", "copy", str(slideshow)
-    ], check=True, capture_output=True)
+    ], check=True, capture_output=True, timeout=120)
 
     # Ses ekle
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
@@ -443,7 +443,7 @@ Rules:
         "ffmpeg", "-y", "-i", str(slideshow), "-i", str(combined_audio),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
-    ], check=True, capture_output=True)
+    ], check=True, capture_output=True, timeout=120)
 
     full_script = " ".join(s["text"] for s in scenes)
     generated_title = data.get("title", topic or scenes[0]["text"][:60])
@@ -820,14 +820,14 @@ def prepend_thumbnail_intro(thumb_path: Path, video_path: Path, duration: int = 
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-ar", "44100",
             str(intro_clip),
-        ], check=True, capture_output=True)
+        ], check=True, capture_output=True, timeout=120)
         with open(intro_list, "w") as f:
             f.write(f"file '{intro_clip.absolute()}'\n")
             f.write(f"file '{video_path.absolute()}'\n")
         subprocess.run([
             "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(intro_list),
             "-c", "copy", str(final_path),
-        ], check=True, capture_output=True)
+        ], check=True, capture_output=True, timeout=120)
         video_path.unlink(missing_ok=True)
         return final_path
     except Exception:
@@ -1106,7 +1106,7 @@ Rules:
                 "ffmpeg", "-y", "-f", "lavfi",
                 "-i", "color=black:size=1920x1080:rate=1",
                 "-frames:v", "1", str(img_path)
-            ], capture_output=True)
+            ], capture_output=True, timeout=90)
 
         # Clip oluştur (yatay 1920x1080)
         clip_path = scene_dir / f"clip_{i}.mp4"
@@ -1139,7 +1139,7 @@ Rules:
             "-t", str(dur_val),
             "-vf", drawtext,
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-        ], check=True, capture_output=True)
+        ], check=True, capture_output=True, timeout=120)
         clip_files.append(clip_path)
 
     # Sesleri birleştir
@@ -1170,7 +1170,7 @@ Rules:
         "ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
-    ], check=True, capture_output=True)
+    ], check=True, capture_output=True, timeout=120)
 
     full_script = " ".join(s["text"] for s in scenes)
     total_dur = round(sum(durations), 1)
@@ -1318,7 +1318,7 @@ Rules:
                 "ffmpeg", "-y", "-f", "lavfi",
                 "-i", "color=black:size=1920x1080:rate=1",
                 "-frames:v", "1", str(img_path)
-            ], capture_output=True)
+            ], capture_output=True, timeout=90)
 
         clip_path = scene_dir / f"clip_{i}.mp4"
         words = scene["text"].split()
@@ -1350,7 +1350,7 @@ Rules:
             "-t", str(dur_val),
             "-vf", drawtext,
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-        ], check=True, capture_output=True)
+        ], check=True, capture_output=True, timeout=120)
         clip_files.append(clip_path)
 
     audio_list = scene_dir / "audio_list.txt"
@@ -1378,7 +1378,7 @@ Rules:
         "ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
-    ], check=True, capture_output=True)
+    ], check=True, capture_output=True, timeout=120)
 
     full_script = " ".join(s["text"] for s in scenes)
     total_dur = round(sum(durations), 1)
@@ -1421,6 +1421,7 @@ DS_CONFIG = Path("deepseek_config.json")
 OPENAI_CONFIG = Path("openai_config.json")
 IG_CONFIG = Path("ig_config.json")
 IG_LOG = Path("ig_log.json")
+IG_RECENT_FILE = Path("ig_recent_posts.json")  # duplicate prevention
 SCHED_CONFIG = Path("scheduler_config.json")
 SCHED_LOG = Path("scheduler_log.json")
 SCOPES = [
@@ -1446,6 +1447,34 @@ def get_ig_config() -> dict:
     if IG_CONFIG.exists():
         return json.loads(IG_CONFIG.read_text())
     return {}
+
+
+_IG_DEDUP_HOURS = 4  # aynı başlık bu süreden önce atıldıysa tekrar atma
+
+
+def _ig_recently_posted(title: str) -> bool:
+    """Son 4 saat içinde aynı başlık Instagram'a atıldıysa True döner."""
+    if not IG_RECENT_FILE.exists():
+        return False
+    try:
+        records = json.loads(IG_RECENT_FILE.read_text())
+        cutoff = time.time() - _IG_DEDUP_HOURS * 3600
+        title_lower = title.strip().lower()[:80]
+        return any(r.get("ts", 0) > cutoff and r.get("title", "").lower()[:80] == title_lower for r in records)
+    except Exception:
+        return False
+
+
+def _ig_mark_posted(title: str) -> None:
+    """Başlığı IG son-gönderi listesine ekle, 12 saatten eski kayıtları temizle."""
+    try:
+        records = json.loads(IG_RECENT_FILE.read_text()) if IG_RECENT_FILE.exists() else []
+        cutoff = time.time() - 12 * 3600
+        records = [r for r in records if r.get("ts", 0) > cutoff]
+        records.append({"ts": time.time(), "title": title.strip()[:120]})
+        IG_RECENT_FILE.write_text(json.dumps(records))
+    except Exception:
+        pass
 
 
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
@@ -2378,6 +2407,12 @@ async def auto_shorts_job():
 
 async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict):
     """Instagram gönderisi arka planda çalışır — scheduler'ı bloke etmez."""
+    # Aynı başlık son 4 saatte atıldıysa tekrar atma
+    if _ig_recently_posted(title):
+        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP] Zaten atıldı, atlanıyor: {title[:60]}"}))
+        return
+    _ig_mark_posted(title)
+
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
     caption = f"{title}\n\n{suggested_tags}"
