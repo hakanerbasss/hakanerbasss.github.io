@@ -312,6 +312,35 @@ function getAdminWaConn() {
   return customers.find(c => c.wa_status === 'connected' && c.wa_number === contactPhone);
 }
 
+// Kota dolduğunda admin + müşteriye bildirim gönder (günde 1 kez)
+async function notifyLimitExceeded(customer) {
+  try {
+    if (!db.isFirstLimitExceed(customer.id)) return;
+    const adminConn = getAdminWaConn();
+    if (!adminConn) return;
+    const contactPhone = db.getSetting('contact_phone')?.replace(/\D/g, '');
+    const baseUrl = db.getSetting('base_url') || 'https://wa.wizaicorp.com';
+    const isDemo = customer.plan === 'demo';
+    const planLabel = isDemo ? `Demo (${customer.daily_limit} mesaj)` : `${customer.plan} (${customer.daily_limit}/gün)`;
+
+    // Admin bildirimi
+    if (contactPhone) {
+      const adminMsg = `⚠️ *Kota Aşıldı*\n\nMüşteri: ${customer.name}\nPlan: ${planLabel}\nToken: ${customer.token.slice(0, 8)}...\n\nPlan yükseltmek için:\n${baseUrl}`;
+      await wa.sendMessage(adminConn.id, contactPhone, adminMsg).catch(() => {});
+    }
+
+    // Müşteri bildirimi (telefonu kayıtlıysa)
+    if (customer.phone) {
+      const customerMsg = isDemo
+        ? `⚠️ Demo süreniz doldu!\n\n${customer.daily_limit} mesaj hakkınızı kullandınız.\nDevam etmek için plan yükseltin:\n${baseUrl}/musteri?token=${customer.token}`
+        : `⚠️ Günlük kotanız doldu!\n\nGünlük ${customer.daily_limit} mesaj hakkınızı kullandınız.\nYarın otomatik sıfırlanır veya planınızı yükseltin:\n${baseUrl}/musteri?token=${customer.token}`;
+      await wa.sendMessage(adminConn.id, customer.phone, customerMsg).catch(() => {});
+    }
+  } catch(e) {
+    console.error('Limit bildirim hatası:', e.message);
+  }
+}
+
 // Tek müşteriye mesaj gönder
 app.post('/api/admin/customers/:id/message', adminAuth, async (req, res) => {
   const { message } = req.body;
@@ -427,6 +456,7 @@ app.post('/api/send', customerAuth, rateLimit, async (req, res) => {
 
   if (!allowed) {
     db.logMessage(req.customer.id, to, 'text', 'limit_exceeded');
+    notifyLimitExceeded(req.customer).catch(() => {});
     return res.status(429).json({
       error: db.getSetting('contact_message') || 'Günlük mesaj limitinize ulaştınız',
       contact: {
@@ -452,7 +482,10 @@ app.post('/api/send/image', customerAuth, rateLimit, async (req, res) => {
   if (!to || !url) return res.status(400).json({ error: 'to ve url gerekli' });
 
   const allowed = db.checkAndIncrementUsage(req.customer.id, req.customer.daily_limit);
-  if (!allowed) return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  if (!allowed) {
+    notifyLimitExceeded(req.customer).catch(() => {});
+    return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  }
 
   try {
     await wa.sendMessage(req.customer.id, to, { image: { url }, caption: caption || '' });
@@ -469,7 +502,10 @@ app.post('/api/send/document', customerAuth, rateLimit, async (req, res) => {
   if (!to || !url) return res.status(400).json({ error: 'to ve url gerekli' });
 
   const allowed = db.checkAndIncrementUsage(req.customer.id, req.customer.daily_limit);
-  if (!allowed) return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  if (!allowed) {
+    notifyLimitExceeded(req.customer).catch(() => {});
+    return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  }
 
   try {
     await wa.sendMessage(req.customer.id, to, {
@@ -514,6 +550,7 @@ app.post('/api/send/bulk', customerAuth, async (req, res) => {
   for (const msg of messages.slice(0, 50)) { // Max 50
     const allowed = db.checkAndIncrementUsage(req.customer.id, req.customer.daily_limit);
     if (!allowed) {
+      notifyLimitExceeded(req.customer).catch(() => {});
       results.push({ to: msg.to, ok: false, error: 'Limit aşıldı' });
       break;
     }
