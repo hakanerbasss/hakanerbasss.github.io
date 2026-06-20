@@ -140,8 +140,10 @@ input:focus{border-color:var(--accent);}
     <!-- API Token -->
     <div class="card">
       <div class="card-title">API Token</div>
-      <div class="token-box" id="d-token" onclick="copyToken()">—</div>
-      <div style="font-size:11px;color:var(--accent2);margin-top:6px">👆 Kopyalamak için tıkla</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="token-box" id="d-token" style="flex:1;cursor:default;user-select:all">—</div>
+        <button onclick="copyToken()" id="copy-btn" style="flex-shrink:0;padding:8px 14px;border-radius:8px;border:1px solid var(--accent2);background:rgba(0,212,255,.1);color:var(--accent2);cursor:pointer;font-size:13px;font-weight:600">📋 Kopyala</button>
+      </div>
       <button onclick="renewToken()" style="width:100%;margin-top:10px;padding:9px;border-radius:8px;border:1px solid var(--yellow);background:rgba(255,215,0,.08);color:var(--yellow);cursor:pointer;font-size:12px">
         🔄 Token Yenile
       </button>
@@ -387,10 +389,17 @@ function renderDashboard(d, token) {
 
 function copyToken() {
   copyToClipboard(currentToken).then(() => {
-    const el = document.getElementById('d-token');
-    const orig = el.textContent;
-    el.textContent = '✅ Kopyalandı!';
-    setTimeout(() => el.textContent = orig, 2000);
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ Kopyalandı!';
+    btn.style.borderColor = '#25D366';
+    btn.style.color = '#25D366';
+    btn.style.background = 'rgba(37,211,102,.1)';
+    setTimeout(() => {
+      btn.textContent = '📋 Kopyala';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+      btn.style.background = '';
+    }, 2000);
   });
 }
 
