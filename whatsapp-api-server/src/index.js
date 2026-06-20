@@ -68,11 +68,11 @@ function rateLimit(req, res, next) {
   if (req.customer) {
     const id = req.customer.id;
     if (!tokenRateMap[id]) tokenRateMap[id] = [];
-    tokenRateMap[id] = tokenRateMap[id].filter(t => now - t < 1000);
-    if (tokenRateMap[id].length >= 2) {
+    tokenRateMap[id] = tokenRateMap[id].filter(t => now - t < 3000);
+    if (tokenRateMap[id].length >= 1) {
       return res.status(429).json({
-        error: 'Çok hızlı istek. Saniyede maksimum 2 mesaj gönderebilirsiniz.',
-        retry_after: 1
+        error: 'Çok hızlı istek. Her 3 saniyede maksimum 1 mesaj gönderebilirsiniz.',
+        retry_after: 3
       });
     }
     tokenRateMap[id].push(now);
@@ -349,7 +349,7 @@ app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
     } catch(e) {
       results.push({ id: c.id, name: c.name, ok: false, error: e.message });
     }
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 2000));
   }
   res.json({ ok: true, total: customers.length, results });
 });
@@ -521,7 +521,7 @@ app.post('/api/send/bulk', customerAuth, async (req, res) => {
       await wa.sendMessage(req.customer.id, msg.to, msg.message);
       db.logMessage(req.customer.id, msg.to, 'text', 'sent');
       results.push({ to: msg.to, ok: true });
-      await new Promise(r => setTimeout(r, 1500)); // Spam koruması
+      await new Promise(r => setTimeout(r, 3000)); // Spam koruması
     } catch(e) {
       results.push({ to: msg.to, ok: false, error: e.message });
     }
