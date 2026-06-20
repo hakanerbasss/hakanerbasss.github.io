@@ -2490,7 +2490,7 @@ function renderBarChart(chartId, labelId, values, labels, color, height) {
 
 function formatNum(n) {
   if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n/1000).toFixed(1) + 'B';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
   return String(n);
 }
 </script>

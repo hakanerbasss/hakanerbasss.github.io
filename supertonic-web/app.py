@@ -2022,8 +2022,11 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
             "NO_LINK_EMBEDDED": "Yerleşik Player", "NO_LINK_OTHER": "Diğer",
             "NOTIFICATION": "Bildirim", "PLAYLIST": "Oynatma Listesi",
             "PROMOTED": "Tanıtılan Video", "RELATED_VIDEO": "Önerilen Video",
-            "SEARCH": "YouTube Arama", "SHORTS": "Shorts Feed",
-            "SUBSCRIBER": "Aboneler", "YT_CHANNEL": "YT Kanal Sayfası",
+            "SEARCH": "YouTube Arama", "YT_SEARCH": "YouTube Arama",
+            "SHORTS": "Shorts Feed", "SUBSCRIBER": "Aboneler",
+            "YT_CHANNEL": "YT Kanal Sayfası", "YT_OTHER_PAGE": "Diğer YT Sayfası",
+            "SOUND_PAGE": "Ses/Müzik Sayfası", "HASHTAG": "Hashtag Sayfası",
+            "CAMPAIGN_CARD": "Kampanya", "VIDEO_REMIXES": "Video Remix",
         }
 
         return {
