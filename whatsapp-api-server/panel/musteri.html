@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — WhatsApp API</title>
+<style>
+:root{--bg:#0a0e14;--surface:#0f1419;--card:#111820;--border:#1e2733;--accent:#25D366;--accent2:#00d4ff;--red:#ff4444;--yellow:#ffd700;--text:#e8f4f8;--muted:#4a6070;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 60px;}
+.hdr{text-align:center;padding:28px 0 20px;}
+.hdr-logo{font-size:36px;margin-bottom:8px;}
+.hdr-name{font-size:22px;font-weight:800;}
+.hdr-plan{display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-top:6px;}
+.plan-demo{background:rgba(255,215,0,.15);color:var(--yellow);border:1px solid rgba(255,215,0,.3);}
+.plan-basic{background:rgba(0,212,255,.1);color:var(--accent2);border:1px solid rgba(0,212,255,.3);}
+.plan-pro{background:rgba(37,211,102,.15);color:var(--accent);border:1px solid rgba(37,211,102,.3);}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px;}
+.card-title{font-size:11px;color:var(--accent2);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.stat-num{font-size:26px;font-weight:800;}
+.stat-label{font-size:11px;color:var(--muted);margin-top:3px;}
+.prog-wrap{margin:10px 0;}
+.prog-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.prog-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:4px;transition:width .4s;}
+.wa-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;}
+.wa-connected{background:rgba(37,211,102,.15);color:var(--accent);border:1px solid rgba(37,211,102,.3);}
+.wa-disconnected{background:rgba(74,96,112,.2);color:var(--muted);border:1px solid var(--border);}
+.token-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:monospace;font-size:12px;word-break:break-all;cursor:pointer;transition:border-color .2s;}
+.token-box:hover{border-color:var(--accent2);}
+.alert-box{border-radius:12px;padding:16px;margin-bottom:12px;text-align:center;}
+.alert-limit{background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.3);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 20px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:700;transition:all .2s;text-decoration:none;}
+.btn-green{background:var(--accent);color:#000;width:100%;}
+.btn-green:hover{background:#20c05a;}
+.btn-wa{background:rgba(37,211,102,.15);color:var(--accent);border:1px solid rgba(37,211,102,.3);width:100%;}
+/* Accordion */
+.accordion{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;}
+.accordion-header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;cursor:pointer;user-select:none;}
+.accordion-header:hover{background:rgba(255,255,255,.02);}
+.accordion-title{font-size:11px;color:var(--accent2);letter-spacing:2px;text-transform:uppercase;font-weight:700;}
+.accordion-arrow{font-size:12px;color:var(--muted);transition:transform .3s;}
+.accordion-body{padding:0 18px;max-height:0;overflow:hidden;transition:max-height .4s ease, padding .3s ease;}
+.accordion-body.open{max-height:2000px;padding:0 18px 18px;}
+/* Login */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;width:100%;max-width:380px;text-align:center;}
+input{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;outline:none;margin-bottom:12px;}
+input:focus{border-color:var(--accent);}
+.logout-btn{width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:13px;}
+.logout-btn:hover{border-color:var(--red);color:var(--red);}
+</style>
+</head>
+<body>
+
+<!-- Token Giriş -->
+<div id="login-wrap" class="login-wrap" style="display:none">
+  <div class="login-box">
+    <div style="font-size:48px;margin-bottom:12px">🔑</div>
+    <h2 style="margin-bottom:6px">API Token Girin</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Kayıt olurken aldığınız token</p>
+    <input type="text" id="login-token" placeholder="Token..." onkeydown="if(event.key==='Enter')loginWithToken()">
+    <button onclick="loginWithToken()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#000;font-size:15px;font-weight:700;cursor:pointer">Giriş</button>
+    <div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+    <div style="margin-top:16px;font-size:12px;color:var(--muted)">
+      Hesabın yok mu? <a href="/kayit" style="color:var(--accent2)">Demo başlat →</a>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" style="display:none">
+  <div class="wrap">
+
+    <!-- Header -->
+    <div class="hdr">
+      <div class="hdr-logo">📱</div>
+      <div class="hdr-name" id="d-name">—</div>
+      <div><span class="hdr-plan" id="d-plan-badge">—</span></div>
+    </div>
+
+    <!-- Limit uyarısı -->
+    <div id="alert-limit" class="alert-box alert-limit" style="display:none">
+      <div style="font-size:32px;margin-bottom:8px">⛔</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:6px" id="alert-msg">Mesaj limitiniz doldu</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Devam etmek için aşağıdaki iletişim bilgilerini kullanın</div>
+      <div id="alert-contact"></div>
+    </div>
+
+    <!-- İstatistikler -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num" id="d-limit">—</div>
+        <div class="stat-label">Toplam Limit</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="d-used" style="color:var(--accent2)">—</div>
+        <div class="stat-label">Kullanılan</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="d-remaining" style="color:var(--accent)">—</div>
+        <div class="stat-label">Kalan</div>
+      </div>
+    </div>
+
+    <!-- Kullanım -->
+    <div class="card">
+      <div class="card-title">Kullanım</div>
+      <div class="prog-wrap">
+        <div class="prog-label">
+          <span id="prog-text">0 / 0 mesaj</span>
+          <span id="prog-pct">0%</span>
+        </div>
+        <div class="prog-bar">
+          <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px" id="d-plan-note"></div>
+    </div>
+
+    <!-- WhatsApp Bağlantısı -->
+    <div class="card">
+      <div class="card-title">WhatsApp Bağlantısı</div>
+      <div style="margin-bottom:12px">
+        <span class="wa-badge" id="wa-badge">⚪ Bağlı Değil</span>
+        <span style="font-size:12px;color:var(--muted);margin-left:8px" id="wa-number"></span>
+      </div>
+      <div id="wa-connect-area">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn btn-wa" style="flex:1" onclick="startConnect('pairing')">🔢 Telefon Kodu ile Bağlan</button>
+          <button class="btn btn-wa" style="flex:1" onclick="startConnect('qr')">📷 QR ile Bağlan</button>
+        </div>
+        <div id="wa-connect-box" style="text-align:center;padding:10px"></div>
+      </div>
+    </div>
+
+    <!-- API Token -->
+    <div class="card">
+      <div class="card-title">API Token</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="token-box" id="d-token" style="flex:1;cursor:default;user-select:all">—</div>
+        <button onclick="copyToken()" id="copy-btn" style="flex-shrink:0;padding:8px 14px;border-radius:8px;border:1px solid var(--accent2);background:rgba(0,212,255,.1);color:var(--accent2);cursor:pointer;font-size:13px;font-weight:600">📋 Kopyala</button>
+      </div>
+      <button onclick="renewToken()" style="width:100%;margin-top:10px;padding:9px;border-radius:8px;border:1px solid var(--yellow);background:rgba(255,215,0,.08);color:var(--yellow);cursor:pointer;font-size:12px">
+        🔄 Token Yenile
+      </button>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5">
+        ⚠️ Token yenilenirse <strong>eski token geçersiz</strong> olur. Tüm entegrasyonlarınızı güncellemeniz gerekir.
+      </div>
+    </div>
+
+    <!-- Plan Yönetimi — JS ile doldurulacak -->
+    <div id="plan-card-container"></div>
+
+    <!-- Toplu Mesaj -->
+    <a id="toplu-link" href="/toplu" style="display:block;width:100%;margin-bottom:12px;padding:12px;border-radius:10px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent2);cursor:pointer;font-size:14px;font-weight:700;text-align:center;text-decoration:none">📤 Toplu Mesaj Gönder</a>
+
+    <!-- Test Mesajı — Accordion -->
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleAccordion('acc-test')">
+        <span class="accordion-title">Test Mesajı Gönder</span>
+        <span class="accordion-arrow" id="arrow-acc-test">▼</span>
+      </div>
+      <div class="accordion-body" id="acc-test">
+        <div style="margin-bottom:8px">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Telefon</label>
+          <input type="tel" id="test-phone" placeholder="+905551234567 veya 905551234567" style="margin-bottom:8px">
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Mesaj</label>
+          <textarea id="test-msg" rows="2" placeholder="Merhaba!" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;outline:none;resize:vertical"></textarea>
+        </div>
+        <button class="btn btn-green" onclick="sendTest()">📤 Gönder</button>
+        <div id="test-result" style="margin-top:8px;font-size:13px"></div>
+      </div>
+    </div>
+
+    <!-- Hızlı Kullanım — Accordion -->
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleAccordion('acc-usage')">
+        <span class="accordion-title">Hızlı Kullanım</span>
+        <span class="accordion-arrow" id="arrow-acc-usage">▼</span>
+      </div>
+      <div class="accordion-body" id="acc-usage">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:11px;line-height:1.8" id="d-example"></div>
+      </div>
+    </div>
+
+    <!-- API Dökümanı — Accordion -->
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleAccordion('acc-api')">
+        <span class="accordion-title">📖 API Dökümanı</span>
+        <span class="accordion-arrow" id="arrow-acc-api">▼</span>
+      </div>
+      <div class="accordion-body" id="acc-api">
+        <div id="d-api-docs"></div>
+      </div>
+    </div>
+
+    <!-- Hesap — Accordion -->
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleAccordion('acc-account')">
+        <span class="accordion-title">⚙️ Hesap</span>
+        <span class="accordion-arrow" id="arrow-acc-account">▼</span>
+      </div>
+      <div class="accordion-body" id="acc-account">
+        <button onclick="deleteAccount()" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--red);background:rgba(255,68,68,.1);color:var(--red);cursor:pointer;font-size:13px">
+          🗑 Hesabı Sil
+        </button>
+        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px">Hesabınız kalıcı olarak silinir, geri alınamaz</div>
+      </div>
+    </div>
+
+    <!-- Çıkış — En altta -->
+    <button onclick="logout()" class="logout-btn">🚪 Çıkış Yap</button>
+
+  </div>
+</div>
+
+<script>
+function copyToClipboard(text){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));}else{fallbackCopy(text);}}
+function fallbackCopy(text){var el=document.createElement("textarea");el.value=text;el.style.position="fixed";el.style.opacity="0";document.body.appendChild(el);el.focus();el.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(el);}
+
+function toggleAccordion(id) {
+  const body = document.getElementById(id);
+  const arrow = document.getElementById('arrow-' + id);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+let currentToken = '';
+
+window.addEventListener('DOMContentLoaded', () => {
+  const urlToken = new URLSearchParams(window.location.search).get('token');
+  const savedToken = localStorage.getItem('wa_customer_token');
+  const token = urlToken || savedToken;
+  if (token) { loadDashboard(token); }
+  else { document.getElementById('login-wrap').style.display = 'flex'; }
+});
+
+async function loginWithToken() {
+  const token = document.getElementById('login-token').value.trim();
+  if (!token) return;
+  await loadDashboard(token);
+}
+
+async function loadDashboard(token) {
+  if (!token) return;
+  try {
+    const r = await fetch('/api/musteri/dashboard', { headers: { 'x-api-token': token } });
+    const data = await r.json();
+    if (data.error) {
+      document.getElementById('login-wrap').style.display = 'flex';
+      document.getElementById('login-err').textContent = '❌ ' + data.error;
+      return;
+    }
+    currentToken = token;
+    localStorage.setItem('wa_customer_token', token);
+    document.getElementById('login-wrap').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('toplu-link').href = '/toplu?token=' + token;
+    renderDashboard(data, token);
+  } catch(e) {
+    document.getElementById('login-wrap').style.display = 'flex';
+    document.getElementById('login-err').textContent = '❌ Bağlantı hatası: ' + e.message;
+  }
+}
+
+function renderDashboard(d, token) {
+  document.getElementById('d-name').textContent = d.name;
+  const planBadge = document.getElementById('d-plan-badge');
+  planBadge.textContent = d.plan === 'demo' ? '🎁 Demo' : d.plan === 'pro' ? '⭐ Pro' : '✅ Basic';
+  planBadge.className = 'hdr-plan plan-' + d.plan;
+
+  document.getElementById('d-limit').textContent = d.daily_limit;
+  document.getElementById('d-used').textContent = d.plan === 'demo' ? d.total_usage : d.today_usage;
+  document.getElementById('d-remaining').textContent = d.remaining;
+
+  const usedVal = d.plan === 'demo' ? d.total_usage : d.today_usage;
+  const pct = d.daily_limit > 0 ? Math.min(100, Math.round(usedVal / d.daily_limit * 100)) : 0;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-fill').style.background = pct > 80 ? '#ff4444' : pct > 50 ? '#ffd700' : '#25D366';
+  document.getElementById('prog-text').textContent = `${usedVal} / ${d.daily_limit} mesaj`;
+  document.getElementById('prog-pct').textContent = pct + '%';
+  document.getElementById('d-plan-note').textContent = d.plan === 'demo' ? 'Demo plan: toplam mesaj limiti' : 'Günlük mesaj limiti (gece yarısı sıfırlanır)';
+
+  if (d.expires_at) {
+    const exp = new Date(d.expires_at);
+    const now = new Date();
+    const daysLeft = Math.ceil((exp - now) / (1000*60*60*24));
+    const expStr = exp.toLocaleDateString('tr-TR');
+    const color = daysLeft <= 0 ? 'var(--red)' : daysLeft <= 7 ? 'var(--yellow)' : 'var(--muted)';
+    const text = daysLeft <= 0 ? `⛔ Süre doldu (${expStr})` : `📅 ${expStr} · ${daysLeft} gün kaldı`;
+    document.getElementById('d-plan-note').insertAdjacentHTML('afterend', `<div style="font-size:12px;color:${color};margin-top:4px">${text}</div>`);
+  }
+
+  const waBadge = document.getElementById('wa-badge');
+  if (d.wa_status === 'connected') {
+    waBadge.className = 'wa-badge wa-connected';
+    waBadge.textContent = '🟢 Bağlı';
+    document.getElementById('wa-number').textContent = d.wa_number || '';
+  } else {
+    waBadge.className = 'wa-badge wa-disconnected';
+    waBadge.textContent = '⚪ Bağlı Değil';
+  }
+
+  document.getElementById('d-token').textContent = token;
+
+  const host = window.location.origin;
+  document.getElementById('d-example').innerHTML =
+    `POST ${host}/api/send<br>Header: x-api-token: ${token.substring(0,16)}...<br>Body: { "to": "905551234567", "message": "Merhaba!" }`;
+
+  const apiDoc = document.getElementById('d-api-docs');
+  if (apiDoc) {
+    const sheets = `// Apps Script > Araçlar > Komut Dosyası Düzenleyicisi\nvar API_URL = '${host}/api/send';\nvar API_TOKEN = '${token}';\n\nfunction sendWhatsApp(phone, message) {\n  var options = {\n    method: 'post',\n    contentType: 'application/json',\n    headers: { 'x-api-token': API_TOKEN },\n    payload: JSON.stringify({ to: phone, message: message }),\n    muteHttpExceptions: true\n  };\n  try {\n    var r = UrlFetchApp.fetch(API_URL, options);\n    var res = JSON.parse(r.getContentText());\n    return res.ok ? 'Gönderildi' : 'Hata: ' + res.error;\n  } catch(e) { return 'Bağlantı hatası: ' + e.message; }\n}`;
+
+    apiDoc.innerHTML = `
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Base URL</div>
+        <div style="font-family:monospace;font-size:12px;background:var(--surface);padding:8px;border-radius:6px;cursor:pointer;border:1px solid var(--border)"
+             onclick="copyToClipboard('${host}/api');this.style.borderColor='var(--accent)'">${host}/api 📋</div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Token</div>
+        <div style="font-family:monospace;font-size:12px;background:var(--surface);padding:8px;border-radius:6px;cursor:pointer;border:1px solid var(--border);word-break:break-all"
+             onclick="copyToClipboard('${token}');this.style.borderColor='var(--accent)'">${token} 📋</div>
+      </div>
+      <div style="font-family:monospace;font-size:11px;background:var(--surface);padding:10px;border-radius:6px;border:1px solid var(--border);line-height:2;margin-bottom:10px">
+        POST /api/send → Mesaj gönder<br>
+        POST /api/send/image → Resim gönder<br>
+        POST /api/send/bulk → Toplu mesaj<br>
+        POST /api/check → Numara kontrolü<br>
+        GET  /api/status → Durum
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Google Sheets Örneği</div>
+      <div style="font-family:monospace;font-size:11px;background:var(--surface);padding:10px;border-radius:6px;border:1px solid var(--border);line-height:1.8;cursor:pointer;white-space:pre-wrap"
+           onclick="copyToClipboard(this.dataset.code);this.style.borderColor='var(--accent)'"
+           data-code="${sheets.replace(/"/g,'&quot;')}">${sheets} 📋</div>`;
+  }
+
+  // Plan kartı
+  if (d.packages?.length) {
+    const waPhone = d.contact.phone ? d.contact.phone.replace(/\D/g,'') : '';
+    let pkgHtml = d.packages.filter(p => p.id !== 'demo').map(p => {
+      const isCurrent = p.id === d.plan;
+      return `
+      <div style="background:var(--surface);border:2px solid ${isCurrent ? 'var(--accent)' : 'var(--border)'};border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color .2s;position:relative"
+           onclick="selectPlan('${p.id}','${p.name}','${p.price}',this)" id="pkg-${p.id}">
+        ${isCurrent ? '<div style="position:absolute;top:8px;right:8px;font-size:10px;background:var(--accent);color:#000;padding:2px 6px;border-radius:10px">Mevcut Plan</div>' : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700">${p.name}</div>
+            <div style="font-size:12px;color:var(--muted)">${p.desc||''} · ${p.limit >= 9999 ? 'Sınırsız' : p.limit+'/gün'}</div>
+          </div>
+          <div style="font-weight:800;color:var(--accent)">${p.price}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('plan-card-container').innerHTML = `
+      <div class="card" id="upgrade-card">
+        <div class="card-title">📋 Plan Yönetimi</div>
+        ${pkgHtml}
+        <div id="selected-plan" style="font-size:12px;color:var(--muted);margin:8px 0">Plan seçip mesaj gönderin...</div>
+        <button class="btn btn-green" id="upgrade-btn" onclick="sendUpgradeRequest('${waPhone}','${d.name}',currentToken)" disabled style="width:100%;opacity:.5;margin-bottom:8px">
+          💬 WhatsApp ile Plan Değişikliği Talep Et
+        </button>
+        <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px">
+          Plan değişikliği, uzatma veya iptal için mesaj atın
+        </div>
+        ${d.contact.email ? `<a href="mailto:${d.contact.email}?subject=Plan Talebi - ${d.name}&body=Merhaba, planım hakkında talep iletmek istiyorum.%0APlan: ${d.plan}%0AToken: ${currentToken}" class="btn" style="display:block;text-align:center;margin-bottom:8px;text-decoration:none;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent2)">📧 E-posta Gönder</a>` : ''}
+      </div>`;
+  }
+
+  // Limit uyarısı
+  if (d.is_limit_done || d.is_expired) {
+    document.getElementById('alert-limit').style.display = 'block';
+    document.getElementById('alert-msg').textContent = d.contact.message;
+    let contactHtml = '';
+    if (d.contact.phone) contactHtml += `<a href="https://wa.me/${d.contact.phone.replace(/\D/g,'')}" style="display:inline-block;margin:4px;padding:8px 16px;background:rgba(37,211,102,.2);color:#25D366;border-radius:8px;text-decoration:none;font-size:13px">💬 WhatsApp</a>`;
+    if (d.contact.email) contactHtml += `<a href="mailto:${d.contact.email}" style="display:inline-block;margin:4px;padding:8px 16px;background:rgba(0,212,255,.1);color:#00d4ff;border-radius:8px;text-decoration:none;font-size:13px">📧 E-posta</a>`;
+    document.getElementById('alert-contact').innerHTML = contactHtml;
+  }
+}
+
+function copyToken() {
+  copyToClipboard(currentToken).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ Kopyalandı!';
+    btn.style.borderColor = '#25D366';
+    btn.style.color = '#25D366';
+    btn.style.background = 'rgba(37,211,102,.1)';
+    setTimeout(() => {
+      btn.textContent = '📋 Kopyala';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+      btn.style.background = '';
+    }, 2000);
+  });
+}
+
+let selectedPlanName = '';
+let selectedPlanId = '';
+
+function selectPlan(id, name, price, el) {
+  document.querySelectorAll('[id^="pkg-"]').forEach(e => e.style.borderColor = 'var(--border)');
+  el.style.borderColor = 'var(--accent)';
+  selectedPlanId = id;
+  selectedPlanName = name;
+  document.getElementById('selected-plan').innerHTML = `<span style="color:var(--accent)">✅ Seçildi: ${name} — ${price}</span>`;
+  const btn = document.getElementById('upgrade-btn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+function sendUpgradeRequest(waPhone, name, token) {
+  if (!selectedPlanId) return;
+  const msg = `Merhaba! ${name} - Plan talebi\n\nTalep edilen: ${selectedPlanName}\nToken: ${token}\n\nLütfen işlemi onaylayın.`;
+  if (waPhone) { window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank'); }
+  else { alert('WhatsApp numarası tanımlanmamış. E-posta ile iletişime geçin.'); }
+}
+
+async function renewToken() {
+  if (!confirm('⚠️ DİKKAT: Eski tokenınız geçersiz olacak!\n\nDevam etmek istiyor musunuz?')) return;
+  const r = await fetch('/api/musteri/renew-token', { method: 'POST', headers: { 'x-api-token': currentToken } });
+  const data = await r.json();
+  if (data.ok) {
+    currentToken = data.token;
+    localStorage.setItem('wa_customer_token', data.token);
+    document.getElementById('d-token').textContent = data.token;
+    const url = new URL(window.location);
+    url.searchParams.set('token', data.token);
+    window.history.replaceState({}, '', url);
+    alert('✅ Token yenilendi! Yeni tokenınızı kopyalayın ve entegrasyonlarınızı güncelleyin.');
+  } else { alert('Hata: ' + data.error); }
+}
+
+async function deleteAccount() {
+  if (!confirm('Hesabınız kalıcı olarak silinecek. Emin misiniz?')) return;
+  if (!confirm('Son kez onaylayın — bu işlem geri alınamaz!')) return;
+  const r = await fetch('/api/musteri/delete', { method: 'DELETE', headers: { 'x-api-token': currentToken } });
+  const data = await r.json();
+  if (data.ok) {
+    localStorage.removeItem('wa_customer_token');
+    alert('Hesabınız silindi.');
+    window.location.href = '/kayit';
+  } else { alert('Hata: ' + data.error); }
+}
+
+async function sendTest() {
+  const phone = document.getElementById('test-phone').value.trim();
+  const message = document.getElementById('test-msg').value.trim();
+  const el = document.getElementById('test-result');
+  if (!phone || !message) { el.innerHTML = '<span style="color:var(--red)">Telefon ve mesaj gerekli</span>'; return; }
+  el.innerHTML = '<span style="color:var(--muted)">Gönderiliyor...</span>';
+  const r = await fetch('/api/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
+    body: JSON.stringify({ to: phone, message })
+  });
+  const data = await r.json();
+  el.innerHTML = data.ok ? '<span style="color:var(--accent)">✅ Gönderildi!</span>' : `<span style="color:var(--red)">❌ ${data.error}</span>`;
+}
+
+async function startConnect(method) {
+  const box = document.getElementById('wa-connect-box');
+  box.innerHTML = '<div style="color:var(--muted);font-size:13px">Hazırlanıyor...</div>';
+  let phone = '';
+  if (method === 'pairing') {
+    phone = prompt('WhatsApp telefon numaranız (örn: 905551234567):');
+    if (!phone) return;
+    phone = phone.replace(/\D/g, '');
+  }
+  await fetch('/api/connect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
+    body: JSON.stringify({ method, phone })
+  });
+  const evtSource = new EventSource('/api/connect/events?token=' + currentToken);
+  evtSource.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'qr') {
+      box.innerHTML = `<img src="${data.qr_base64}" style="max-width:200px;border-radius:10px;border:2px solid var(--accent)"><div style="font-size:11px;color:var(--muted);margin-top:6px">WhatsApp → Bağlı Cihazlar → QR Okut</div>`;
+    } else if (data.type === 'pairing') {
+      if (data.code) {
+        box.innerHTML = `<div style="font-size:32px;font-weight:800;letter-spacing:6px;color:var(--accent);padding:10px;cursor:pointer" onclick="copyToClipboard('${data.code}');this.style.color='var(--accent2)'">${data.code}</div><div style="font-size:11px;color:var(--muted)">👆 Kopyala → WhatsApp → Bağlı Cihazlar → Telefon ile Bağla</div>`;
+      } else if (data.error) {
+        box.innerHTML = `<div style="color:var(--red);font-size:13px">❌ ${data.error}</div>`;
+      }
+    } else if (data.type === 'status' && data.status === 'connected') {
+      evtSource.close();
+      box.innerHTML = '';
+      document.getElementById('wa-badge').className = 'wa-badge wa-connected';
+      document.getElementById('wa-badge').textContent = '🟢 Bağlı';
+      document.getElementById('wa-number').textContent = data.phone || '';
+    }
+  };
+}
+
+function logout() {
+  localStorage.removeItem('wa_customer_token');
+  window.location.href = '/musteri';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toplu Mesaj — WhatsApp API</title>
+<style>
+:root{--bg:#0a0e14;--surface:#0f1419;--card:#111820;--border:#1e2733;--accent:#25D366;--accent2:#00d4ff;--red:#ff4444;--yellow:#ffd700;--text:#e8f4f8;--muted:#4a6070;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;}
+.wrap{max-width:600px;margin:0 auto;padding:16px 16px 80px;}
+.header{display:flex;align-items:center;gap:10px;padding:14px 0 20px;}
+.header h1{font-size:20px;font-weight:800;}
+.back-btn{text-decoration:none;color:var(--muted);font-size:20px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;}
+.card-title{font-size:11px;color:var(--accent2);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
+input,select,textarea{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;outline:none;transition:border-color .2s;-webkit-appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+.field{margin-bottom:10px;}
+.btn{padding:9px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-ghost{background:var(--surface);color:var(--muted);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);}
+.btn-danger{background:rgba(255,68,68,.15);color:var(--red);border:1px solid rgba(255,68,68,.3);}
+.btn-full{width:100%;justify-content:center;padding:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+/* Rehber */
+.contact-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;}
+.contact-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+.contact-info{flex:1;min-width:0;}
+.contact-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.contact-phone{font-size:11px;color:var(--muted);font-family:monospace;}
+.contact-del{color:var(--red);background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;}
+/* Mesaj tipi */
+.type-btns{display:flex;gap:6px;margin-bottom:12px;}
+.type-btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:13px;text-align:center;transition:all .2s;}
+.type-btn.active{background:rgba(37,211,102,.15);color:var(--accent);border-color:var(--accent);}
+/* Upload */
+.upload-area{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s;}
+.upload-area:hover{border-color:var(--accent);}
+.upload-area.has-file{border-color:var(--accent);background:rgba(37,211,102,.05);}
+/* Progress */
+.progress-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(30,39,51,.5);font-size:12px;}
+.progress-item:last-child{border-bottom:none;}
+/* Token giriş */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;width:100%;max-width:380px;text-align:center;}
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:12px;background:var(--surface);border-radius:8px;padding:4px;}
+.tab{flex:1;padding:7px;border-radius:6px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;transition:all .2s;}
+.tab.active{background:var(--card);color:var(--text);font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- Token Giriş -->
+<div id="login-wrap" class="login-wrap" style="display:none">
+  <div class="login-box">
+    <div style="font-size:48px;margin-bottom:12px">📤</div>
+    <h2 style="margin-bottom:6px">Toplu Mesaj</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">API Token ile giriş yapın</p>
+    <input type="text" id="login-token" placeholder="Token...">
+    <button onclick="loginWithToken()" style="width:100%;margin-top:8px;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#000;font-size:15px;font-weight:700;cursor:pointer">Giriş</button>
+    <div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- Ana Uygulama -->
+<div id="app" style="display:none">
+  <div class="wrap">
+    <div class="header">
+      <a href="/musteri" id="back-link" class="back-btn">←</a>
+      <h1>📤 Toplu Mesaj</h1>
+      <div style="margin-left:auto;font-size:12px;color:var(--muted)" id="header-info"></div>
+    </div>
+
+    <!-- Mesaj Bölümü -->
+    <div class="card">
+      <div class="card-title">Mesaj</div>
+      <div class="type-btns">
+        <div class="type-btn active" onclick="setType('text',this)">📝 Metin</div>
+        <div class="type-btn" onclick="setType('image',this)">🖼 Resim</div>
+        <div class="type-btn" onclick="setType('video',this)">🎬 Video</div>
+        <div class="type-btn" onclick="setType('document',this)">📄 Dosya</div>
+      </div>
+
+      <!-- Metin -->
+      <div id="type-text">
+        <div class="field">
+          <label>Mesaj *</label>
+          <textarea id="msg-text" rows="4" placeholder="Mesajınızı yazın...&#10;&#10;{isim} yazarsanız kişi adı ile değiştirilir"></textarea>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">💡 {isim} → kişinin adı ile değiştirilir</div>
+      </div>
+
+      <!-- Resim -->
+      <div id="type-image" style="display:none">
+        <div class="field">
+          <label>Resim Seç</label>
+          <div class="upload-area" id="img-upload-area" onclick="document.getElementById('img-file').click()">
+            <div style="font-size:32px;margin-bottom:8px">🖼</div>
+            <div style="font-size:13px;color:var(--muted)">Galeriden seç veya tıkla</div>
+            <input type="file" id="img-file" accept="image/*" style="display:none" onchange="onFileSelect('img')">
+          </div>
+          <div id="img-preview" style="margin-top:8px"></div>
+        </div>
+        <div class="field">
+          <label>Açıklama (opsiyonel)</label>
+          <input type="text" id="img-caption" placeholder="Resim açıklaması...">
+        </div>
+      </div>
+
+      <!-- Video -->
+      <div id="type-video" style="display:none">
+        <div class="field">
+          <label>Video Seç</label>
+          <div class="upload-area" id="vid-upload-area" onclick="document.getElementById('vid-file').click()">
+            <div style="font-size:32px;margin-bottom:8px">🎬</div>
+            <div style="font-size:13px;color:var(--muted)">Video seç (max 20MB)</div>
+            <input type="file" id="vid-file" accept="video/*" style="display:none" onchange="onFileSelect('vid')">
+          </div>
+          <div id="vid-preview" style="margin-top:8px"></div>
+        </div>
+        <div class="field">
+          <label>Açıklama (opsiyonel)</label>
+          <input type="text" id="vid-caption" placeholder="Video açıklaması...">
+        </div>
+      </div>
+
+      <!-- Dosya -->
+      <div id="type-document" style="display:none">
+        <div class="field">
+          <label>Dosya Seç</label>
+          <div class="upload-area" id="doc-upload-area" onclick="document.getElementById('doc-file').click()">
+            <div style="font-size:32px;margin-bottom:8px">📄</div>
+            <div style="font-size:13px;color:var(--muted)">Dosya seç (PDF, Excel, Word...)</div>
+            <input type="file" id="doc-file" style="display:none" onchange="onFileSelect('doc')">
+          </div>
+          <div id="doc-preview" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rehber -->
+    <div class="card">
+      <div class="card-title">Rehber</div>
+      <div class="tabs">
+        <button class="tab active" onclick="showTab('contacts',this)">👥 Kişiler</button>
+        <button class="tab" onclick="showTab('add',this)">➕ Ekle</button>
+        <button class="tab" onclick="showTab('import',this)">📥 İmport</button>
+      </div>
+
+      <!-- Kişiler Listesi -->
+      <div id="tab-contacts">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;color:var(--muted)" id="contact-count">0 kişi</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="selectAll()">Tümünü Seç</button>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="selectNone()">Seçimi Kaldır</button>
+          </div>
+        </div>
+        <div id="contact-list" style="max-height:300px;overflow-y:auto">
+          <div style="text-align:center;color:var(--muted);padding:20px;font-size:13px">Rehber boş. Kişi ekleyin.</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn btn-ghost" style="flex:1;font-size:11px" onclick="exportContacts()">💾 Rehberi İndir</button>
+          <button class="btn btn-danger" style="font-size:11px" onclick="clearContacts()">🗑 Temizle</button>
+        </div>
+      </div>
+
+      <!-- Kişi Ekle -->
+      <div id="tab-add" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">📥 Google rehberinizi indirmek için: <a href="https://contacts.google.com" target="_blank" style="color:var(--accent)">contacts.google.com</a> → Dışa Aktar → CSV</div>
+          <div class="field"><label>Ad Soyad *</label><input type="text" id="add-name" placeholder="Ahmet Yılmaz"></div>
+        <div class="field"><label>Telefon * (905551234567)</label><input type="tel" id="add-phone" placeholder="905551234567"></div>
+        <button class="btn btn-primary btn-full" onclick="addContact()">➕ Ekle</button>
+        <div id="add-result" style="margin-top:8px;font-size:12px"></div>
+      </div>
+
+      <!-- Import -->
+      <div id="tab-import" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7">
+          <strong style="color:var(--text)">CSV formatı:</strong><br>
+          isim,telefon<br>
+          Ahmet Yılmaz,905551234567<br>
+          Mehmet Kaya,905559876543
+        </div>
+        <div class="field">
+          <label>CSV veya JSON dosya seç</label>
+          <input type="file" id="import-file" accept=".csv,.json,text/csv,text/plain,*/*" onchange="importContacts(this)">
+        </div>
+        <div id="import-result" style="margin-top:8px;font-size:12px"></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <label style="margin-bottom:6px;display:block">Veya JSON yapıştır</label>
+          <textarea id="import-json" rows="4" placeholder='[{"isim":"Ahmet","telefon":"905551234567"}]'></textarea>
+          <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="importFromText()">İçe Aktar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gönderim Ayarları -->
+    <div class="card">
+      <div class="card-title">Gönderim Ayarları</div>
+      <div class="field">
+        <label>Mesajlar arası bekleme (ms)</label>
+        <select id="send-delay">
+          
+          <option value="1000" selected>1 saniye (Önerilen)</option>
+          <option value="2000">2 saniye (Güvenli)</option>
+          <option value="3000">3 saniye (Çok güvenli)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Gönder Butonu -->
+    <button class="btn btn-primary btn-full" id="send-btn" onclick="startSending()" style="font-size:15px;padding:14px">
+      📤 Toplu Gönder
+    </button>
+
+    <!-- İlerleme -->
+    <div id="progress-card" class="card" style="display:none;margin-top:12px">
+      <div class="card-title">Gönderim Durumu</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px">
+        <span id="prog-text">0 / 0</span>
+        <span id="prog-pct">0%</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:12px">
+        <div id="prog-bar" style="height:100%;background:var(--accent);border-radius:4px;width:0%;transition:width .3s"></div>
+      </div>
+      <div id="prog-log" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function copyToClipboard(text){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));}else{fallbackCopy(text);}}function fallbackCopy(text){var el=document.createElement("textarea");el.value=text;el.style.position="fixed";el.style.opacity="0";document.body.appendChild(el);el.focus();el.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(el);}
+let currentToken = '';
+let contacts = [];
+let msgType = 'text';
+let selectedFile = null;
+
+// ── BAŞLANGIÇ ────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const urlToken = new URLSearchParams(window.location.search).get('token');
+  const savedToken = localStorage.getItem('wa_customer_token');
+  const token = urlToken || savedToken;
+  if (token) {
+    currentToken = token;
+    document.getElementById('back-link').href = '/musteri?token=' + token;
+    document.getElementById('app').style.display = 'block';
+    loadContacts();
+    checkWaStatus();
+  } else {
+    document.getElementById('login-wrap').style.display = 'flex';
+  }
+});
+
+async function loginWithToken() {
+  const token = document.getElementById('login-token').value.trim();
+  if (!token) return;
+  const r = await fetch('/api/status', { headers: { 'x-api-token': token } });
+  const data = await r.json();
+  if (data.error) { document.getElementById('login-err').textContent = '❌ Geçersiz token'; return; }
+  currentToken = token;
+  localStorage.setItem('wa_customer_token', token);
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('back-link').href = '/musteri?token=' + token;
+  loadContacts();
+  checkWaStatus();
+}
+
+async function checkWaStatus() {
+  const r = await fetch('/api/status', { headers: { 'x-api-token': currentToken } });
+  const data = await r.json();
+  const el = document.getElementById('header-info');
+  if (data.wa_status === 'connected') {
+    el.innerHTML = `<span style="color:var(--accent)">🟢 ${data.wa_number||'Bağlı'}</span>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--red)">⚪ Bağlı Değil</span>`;
+  }
+}
+
+// ── MESAJ TİPİ ───────────────────────────────────────────────────
+function setType(type, el) {
+  msgType = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  ['text','image','video','document'].forEach(t => {
+    document.getElementById('type-' + t).style.display = t === type ? 'block' : 'none';
+  });
+  selectedFile = null;
+}
+
+function onFileSelect(prefix) {
+  const input = document.getElementById(prefix + '-file');
+  const file = input.files[0];
+  if (!file) return;
+  selectedFile = file;
+  const area = document.getElementById(prefix + '-upload-area');
+  const preview = document.getElementById(prefix + '-preview');
+  area.classList.add('has-file');
+
+  if (file.type.startsWith('image/')) {
+    const url = URL.createObjectURL(file);
+    preview.innerHTML = `<img src="${url}" style="max-width:100%;border-radius:8px;max-height:150px">`;
+  } else {
+    preview.innerHTML = `<div style="font-size:12px;color:var(--accent)">✅ ${file.name} (${(file.size/1024).toFixed(0)}KB)</div>`;
+  }
+}
+
+// ── REHBER ───────────────────────────────────────────────────────
+function loadContacts() {
+  try { contacts = JSON.parse(localStorage.getItem('wa_contacts') || '[]'); }
+  catch(e) { contacts = []; }
+  renderContacts();
+}
+
+function saveContacts() {
+  localStorage.setItem('wa_contacts', JSON.stringify(contacts));
+}
+
+function renderContacts() {
+  const el = document.getElementById('contact-list');
+  const countEl = document.getElementById('contact-count');
+  const selected = contacts.filter(c => c.selected).length;
+  countEl.textContent = `${contacts.length} kişi · ${selected} seçili`;
+
+  if (!contacts.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px">Rehber boş. Kişi ekleyin.</div>';
+    return;
+  }
+
+  el.innerHTML = contacts.map((c, i) => `
+    <div class="contact-item">
+      <input type="checkbox" class="contact-check" ${c.selected ? 'checked' : ''} onchange="toggleContact(${i},this.checked)">
+      <div class="contact-info">
+        <div class="contact-name">${c.name}</div>
+        <div class="contact-phone">${c.phone}</div>
+      </div>
+      <button class="contact-del" onclick="deleteContact(${i})">×</button>
+    </div>`).join('');
+}
+
+function toggleContact(i, checked) {
+  contacts[i].selected = checked;
+  saveContacts();
+  renderContacts();
+}
+
+function selectAll() { contacts.forEach(c => c.selected = true); saveContacts(); renderContacts(); }
+function selectNone() { contacts.forEach(c => c.selected = false); saveContacts(); renderContacts(); }
+
+function deleteContact(i) {
+  contacts.splice(i, 1);
+  saveContacts();
+  renderContacts();
+}
+
+function clearContacts() {
+  if (!confirm('Tüm rehber silinsin mi?')) return;
+  contacts = [];
+  saveContacts();
+  renderContacts();
+}
+
+function addContact() {
+  const name = document.getElementById('add-name').value.trim();
+  const phone = document.getElementById('add-phone').value.trim().replace(/\D/g,'');
+  const el = document.getElementById('add-result');
+
+  if (!name || !phone) { el.innerHTML = '<span style="color:var(--red)">Ad ve telefon gerekli</span>'; return; }
+  if (contacts.find(c => c.phone === phone)) { el.innerHTML = '<span style="color:var(--red)">Bu numara zaten ekli</span>'; return; }
+
+  contacts.push({ name, phone, selected: true });
+  saveContacts();
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-phone').value = '';
+  el.innerHTML = '<span style="color:var(--accent)">✅ Eklendi!</span>';
+  setTimeout(() => el.innerHTML = '', 2000);
+  renderContacts();
+}
+
+function importContacts(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result;
+    let added = 0;
+    if (file.name.endsWith('.json')) {
+      try {
+        const data = JSON.parse(text);
+        data.forEach(row => {
+          const name = row.isim || row.name || row.ad || '';
+          const phone = (row.telefon || row.phone || row.tel || '').toString().replace(/\D/g,'');
+          if (name && phone && !contacts.find(c => c.phone === phone)) {
+            contacts.push({ name, phone, selected: true });
+            added++;
+          }
+        });
+      } catch(e) {}
+    } else {
+      // CSV - Google ve standart format destegi
+      const lines = text.split('\n');
+      const header = lines[0].toLowerCase();
+      const isGoogle = header.includes('first name') || header.includes('phone 1');
+      
+      // Sutun indexlerini bul
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase());
+      const firstIdx = headers.indexOf('first name');
+      const lastIdx = headers.indexOf('last name');
+      const nameIdx = headers.indexOf('isim') !== -1 ? headers.indexOf('isim') : headers.indexOf('name');
+      const phoneIdx = (() => {
+        for (let i = 0; i < headers.length; i++) {
+          if (headers[i].includes('phone 1 - value') || headers[i] === 'telefon' || headers[i] === 'phone' || headers[i] === 'tel') return i;
+        }
+        return -1;
+      })();
+
+      lines.slice(1).forEach(line => {
+        if (!line.trim()) return;
+        // Virgülle bölme - tırnak içindeki virgülleri koru
+        const parts = [];
+        let current = '';
+        let inQuote = false;
+        for (const ch of line) {
+          if (ch === '"') inQuote = !inQuote;
+          else if (ch === ',' && !inQuote) { parts.push(current); current = ''; }
+          else current += ch;
+        }
+        parts.push(current);
+
+        let name = '';
+        let phone = '';
+
+        if (isGoogle && firstIdx !== -1) {
+          const first = (parts[firstIdx] || '').trim().replace(/"/g,'');
+          const last = lastIdx !== -1 ? (parts[lastIdx] || '').trim().replace(/"/g,'') : '';
+          name = (first + ' ' + last).trim();
+        } else if (nameIdx !== -1) {
+          name = (parts[nameIdx] || '').trim().replace(/"/g,'');
+        } else {
+          name = (parts[0] || '').trim().replace(/"/g,'');
+        }
+
+        if (phoneIdx !== -1) {
+          phone = (parts[phoneIdx] || '').trim().replace(/"/g,'');
+        } else {
+          phone = (parts[1] || '').trim();
+        }
+
+        // Telefon formatla: +90 542 280 22 19 -> 905422802219
+        phone = phone.replace(/[^0-9]/g,'');
+        if (phone.startsWith('90') && phone.length >= 11) {
+          // zaten dogru
+        } else if (phone.startsWith('0') && phone.length === 11) {
+          phone = '9' + phone;
+        } else if (phone.length === 10) {
+          phone = '90' + phone;
+        }
+
+        if (name && phone && phone.length >= 10 && !contacts.find(c => c.phone === phone)) {
+          contacts.push({ name, phone, selected: true });
+          added++;
+        }
+      });
+    }
+    saveContacts();
+    renderContacts();
+    document.getElementById('import-result').innerHTML = `<span style="color:var(--accent)">✅ ${added} kişi eklendi</span>`;
+  };
+  reader.readAsText(file);
+}
+
+function importFromText() {
+  const text = document.getElementById('import-json').value.trim();
+  if (!text) return;
+  try {
+    const data = JSON.parse(text);
+    let added = 0;
+    data.forEach(row => {
+      const name = row.isim || row.name || row.ad || '';
+      const phone = (row.telefon || row.phone || row.tel || '').toString().replace(/\D/g,'');
+      if (name && phone && !contacts.find(c => c.phone === phone)) {
+        contacts.push({ name, phone, selected: true });
+        added++;
+      }
+    });
+    saveContacts();
+    renderContacts();
+    document.getElementById('import-result').innerHTML = `<span style="color:var(--accent)">✅ ${added} kişi eklendi</span>`;
+  } catch(e) {
+    document.getElementById('import-result').innerHTML = '<span style="color:var(--red)">❌ Geçersiz JSON</span>';
+  }
+}
+
+function exportContacts() {
+  const json = JSON.stringify(contacts.map(c => ({ isim: c.name, telefon: c.phone })), null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'rehber.json'; a.click();
+}
+
+// ── TAB ──────────────────────────────────────────────────────────
+function showTab(tab, el) {
+  ['contacts','add','import'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── GÖNDER ───────────────────────────────────────────────────────
+async function startSending() {
+  const selected = contacts.filter(c => c.selected);
+  if (!selected.length) { alert('En az bir kişi seçin'); return; }
+
+  const delay = parseInt(document.getElementById('send-delay').value);
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Gönderiliyor...';
+
+  const progCard = document.getElementById('progress-card');
+  progCard.style.display = 'block';
+  progCard.scrollIntoView({ behavior: 'smooth' });
+
+  let success = 0, fail = 0;
+  const log = document.getElementById('prog-log');
+  log.innerHTML = '';
+
+  for (let i = 0; i < selected.length; i++) {
+    const contact = selected[i];
+    const pct = Math.round((i / selected.length) * 100);
+    document.getElementById('prog-text').textContent = `${i} / ${selected.length}`;
+    document.getElementById('prog-pct').textContent = pct + '%';
+    document.getElementById('prog-bar').style.width = pct + '%';
+
+    try {
+      if (msgType === 'text') {
+        const text = document.getElementById('msg-text').value.replace('{isim}', contact.name);
+        if (!text) throw new Error('Mesaj boş');
+        const r = await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
+          body: JSON.stringify({ to: contact.phone, message: text })
+        });
+        const data = await r.json();
+        if (!data.ok) throw new Error(data.error);
+      } else {
+        if (!selectedFile) throw new Error('Dosya seçilmedi');
+        const fd = new FormData();
+        fd.append('file', selectedFile);
+        fd.append('to', contact.phone);
+        const caption = document.getElementById(msgType === 'image' ? 'img-caption' : 'vid-caption')?.value || '';
+        if (caption) fd.append('caption', caption);
+        const r = await fetch('/api/send/media', {
+          method: 'POST',
+          headers: { 'x-api-token': currentToken },
+          body: fd
+        });
+        const data = await r.json();
+        if (!data.ok) throw new Error(data.error);
+      }
+
+      success++;
+      log.innerHTML += `<div class="progress-item"><span style="color:var(--accent)">✅</span><span>${contact.name}</span><span style="color:var(--muted);margin-left:auto">${contact.phone}</span></div>`;
+    } catch(e) {
+      fail++;
+      log.innerHTML += `<div class="progress-item"><span style="color:var(--red)">❌</span><span>${contact.name}</span><span style="color:var(--red);margin-left:auto;font-size:11px">${e.message}</span></div>`;
+    }
+
+    log.scrollTop = log.scrollHeight;
+    if (i < selected.length - 1) await new Promise(r => setTimeout(r, delay));
+  }
+
+  // Tamamlandı
+  document.getElementById('prog-text').textContent = `${selected.length} / ${selected.length}`;
+  document.getElementById('prog-pct').textContent = '100%';
+  document.getElementById('prog-bar').style.width = '100%';
+  document.getElementById('prog-bar').style.background = fail > 0 ? 'var(--yellow)' : 'var(--accent)';
+
+  log.innerHTML += `<div style="padding:10px;text-align:center;font-weight:700;color:var(--accent);margin-top:8px">
+    ✅ ${success} başarılı ${fail > 0 ? `· ❌ ${fail} başarısız` : ''}
+  </div>`;
+
+  btn.disabled = false;
+  btn.textContent = '📤 Toplu Gönder';
+}
+</script>
+</body>
+</html>

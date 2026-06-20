@@ -1,0 +1,46 @@
+name: WhatsApp API Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'whatsapp-api-server/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sunucuya deploy et
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/hakanerbasss.github.io
+            git fetch origin main
+            git reset --hard origin/main
+
+            DEST=~/whatsapp-api
+
+            # Kaynak dosyaları güncelle
+            cp -r whatsapp-api-server/src   $DEST/
+            cp -r whatsapp-api-server/panel $DEST/
+            cp    whatsapp-api-server/package.json      $DEST/
+            cp    whatsapp-api-server/reset-password.js $DEST/
+
+            # package.json değiştiyse npm install yenile
+            cd $DEST
+            npm install --no-audit --no-fund --silent 2>/dev/null || true
+
+            # Baileys patch (npm install sonrası tekrar lazım)
+            BAILEYS_VALIDATE="$DEST/node_modules/baileys/lib/Utils/validate-connection.js"
+            BAILEYS_SOCKET="$DEST/node_modules/baileys/lib/Socket/socket.js"
+            [ -f "$BAILEYS_VALIDATE" ] && sed -i 's/passive: true,/passive: false,/g' "$BAILEYS_VALIDATE" 2>/dev/null || true
+            [ -f "$BAILEYS_VALIDATE" ] && sed -i '/lidDbMigrated: false/d' "$BAILEYS_VALIDATE" 2>/dev/null || true
+            [ -f "$BAILEYS_SOCKET"   ] && sed -i 's/await noise\.finishInit();/noise.finishInit();/g' "$BAILEYS_SOCKET" 2>/dev/null || true
+
+            # pm2 ile yeniden başlat
+            pm2 restart whatsapp-api || pm2 start $DEST/src/index.js --name whatsapp-api --log $DEST/logs/server.log
+            pm2 status whatsapp-api
