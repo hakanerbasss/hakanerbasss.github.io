@@ -245,6 +245,21 @@ app.get('/api/admin/customers/:id/events', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// PUBLIC API (auth yok)
+// ═══════════════════════════════════════════════════════════════
+
+// Paketleri herkese açık döndür — waport.wizaicorp.com buradan okur
+app.get('/api/public/packages', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const packages = JSON.parse(db.getSetting('packages') || JSON.stringify([
+    { id: 'basic',     name: 'Basic',     limit: 100,  price: '150₺/ay', desc: 'Küçük işletmeler için' },
+    { id: 'pro',       name: 'Pro',       limit: 500,  price: '300₺/ay', desc: 'Büyüyen işletmeler için' },
+    { id: 'unlimited', name: 'Unlimited', limit: 9999, price: '500₺/ay', desc: 'Sınırsız kullanım' },
+  ]));
+  res.json(packages);
+});
+
+// ═══════════════════════════════════════════════════════════════
 // AYARLAR API
 // ═══════════════════════════════════════════════════════════════
 
