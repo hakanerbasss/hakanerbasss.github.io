@@ -450,12 +450,17 @@ Rules:
 
     # Thumbnail (ilk sahnenin fotoğrafından)
     thumb_path = None
+    thumb_out = None
     try:
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
         create_thumbnail(png_files[0].read_bytes(), generated_title, thumb_out, size=(1080, 1920), lang=lang)
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
+
+    # Thumbnail'i videonun ilk 2 saniyesi olarak ekle
+    if thumb_out and thumb_out.exists():
+        output_file = prepend_thumbnail_intro(thumb_out, output_file, duration=2, size=(1080, 1920))
 
     return {
         "video": f"/api/video/{output_file.name}",
@@ -548,6 +553,40 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
 
     img.save(str(out_path), "JPEG", quality=92)
     return out_path
+
+
+def prepend_thumbnail_intro(thumb_path: Path, video_path: Path, duration: int = 2, size: tuple = (1080, 1920)) -> Path:
+    """Thumbnail görüntüsünü intro klibe çevirip videonun başına ekler."""
+    import shutil, tempfile
+    W, H = size
+    tmp = Path(tempfile.mkdtemp())
+    intro_clip = tmp / "intro.mp4"
+    intro_list = tmp / "list.txt"
+    final_path = video_path.with_name(video_path.stem + "_wi.mp4")
+    try:
+        subprocess.run([
+            "ffmpeg", "-y",
+            "-loop", "1", "-i", str(thumb_path),
+            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+            "-t", str(duration),
+            "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}",
+            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-ar", "44100",
+            str(intro_clip),
+        ], check=True, capture_output=True)
+        with open(intro_list, "w") as f:
+            f.write(f"file '{intro_clip.absolute()}'\n")
+            f.write(f"file '{video_path.absolute()}'\n")
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(intro_list),
+            "-c", "copy", str(final_path),
+        ], check=True, capture_output=True)
+        video_path.unlink(missing_ok=True)
+        return final_path
+    except Exception:
+        return video_path
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 @app.post("/api/generate-long-video")
@@ -728,6 +767,7 @@ Rules:
 
     # Thumbnail
     thumb_path = None
+    thumb_out = None
     try:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
@@ -736,6 +776,9 @@ Rules:
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
+
+    if thumb_out and thumb_out.exists():
+        output_file = prepend_thumbnail_intro(thumb_out, output_file, duration=3, size=(1280, 720))
 
     return {
         "video": f"/api/video/{output_file.name}",
@@ -933,6 +976,7 @@ Rules:
         suggested_tags = "#gündem, #haberler, #trendler, #güncel, #viral"
 
     thumb_path = None
+    thumb_out = None
     try:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
@@ -941,6 +985,9 @@ Rules:
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
+
+    if thumb_out and thumb_out.exists():
+        output_file = prepend_thumbnail_intro(thumb_out, output_file, duration=3, size=(1280, 720))
 
     return {
         "video": f"/api/video/{output_file.name}",
