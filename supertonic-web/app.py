@@ -267,6 +267,7 @@ Return ONLY valid JSON, no markdown, no explanation:
   "title": "catchy YouTube title for this video (max 80 chars, in {lang_name})",
   "hashtags": ["Shorts", "topic", "specific", "tags", "no", "hash", "symbol"],
   "thumbnail": {{
+    "template": "breaking OR tech OR economy OR shock",
     "ust_bant": "SON DAKİKA",
     "sayi": "striking number from news OR impactful 1-2 word (e.g. 57, 3, ŞOK, ALARM)",
     "ana_baslik": "key noun 1-2 words MAX uppercase (e.g. YARALI, ÖLDÜ, ARTIŞ)",
@@ -289,6 +290,7 @@ Rules:
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
 - hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")
+- thumbnail.template: "breaking" for accidents/disasters/crime, "tech" for technology/AI/science, "economy" for crypto/stocks/finance, "shock" for viral/bizarre/unexpected news
 - thumbnail.sayi: extract the most shocking number from the news (deaths, injured, percentage, year, amount). If no number exists use a 1-2 word hook like "ŞOK" or "ALARM"
 - thumbnail.ust_bant: "SON DAKİKA" for {lang_name} Turkish, "BREAKING NEWS" for English
 - All thumbnail text fields MUST be in {lang_name} and UPPERCASE"""
@@ -720,8 +722,56 @@ def prepend_thumbnail_intro(thumb_path: Path, video_path: Path, duration: int = 
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+_THUMB_TEMPLATES = {
+    "breaking": {
+        "band_grad": ((184, 0, 0), (255, 30, 30)),
+        "sayi_color": (255, 212, 0),
+        "ana_color": (255, 255, 255),
+        "accent_fill": (255, 212, 0),
+        "accent_text": (0, 0, 0),
+        "detay_color": (255, 255, 255),
+        "alarm_border": (255, 0, 0),
+        "alarm_label": {"tr": "ACİL GELİŞME", "en": "BREAKING UPDATE"},
+        "alarm_label_color": (255, 64, 64),
+    },
+    "tech": {
+        "band_grad": ((0, 50, 160), (0, 180, 255)),
+        "sayi_color": (0, 220, 255),
+        "ana_color": (255, 255, 255),
+        "accent_fill": (0, 150, 255),
+        "accent_text": (255, 255, 255),
+        "detay_color": (0, 220, 255),
+        "alarm_border": (0, 180, 255),
+        "alarm_label": {"tr": "YENİ GELİŞME", "en": "TECH UPDATE"},
+        "alarm_label_color": (0, 200, 255),
+    },
+    "economy": {
+        "band_grad": ((0, 90, 20), (0, 210, 80)),
+        "sayi_color": (0, 255, 120),
+        "ana_color": (255, 255, 255),
+        "accent_fill": (0, 200, 80),
+        "accent_text": (0, 0, 0),
+        "detay_color": (0, 255, 120),
+        "alarm_border": (0, 200, 80),
+        "alarm_label": {"tr": "PİYASA HABERİ", "en": "MARKET NEWS"},
+        "alarm_label_color": (0, 230, 100),
+    },
+    "shock": {
+        "band_grad": ((110, 0, 180), (220, 0, 255)),
+        "sayi_color": (255, 100, 0),
+        "ana_color": (255, 255, 255),
+        "accent_fill": (180, 0, 220),
+        "accent_text": (255, 255, 255),
+        "detay_color": (255, 120, 0),
+        "alarm_border": (200, 0, 240),
+        "alarm_label": {"tr": "İNANILMAZ!", "en": "UNBELIEVABLE!"},
+        "alarm_label_color": (255, 80, 255),
+    },
+}
+
+
 def create_shorts_thumbnail(thumb_vars: dict, out_path: Path, size=(1080, 1920), lang="tr"):
-    """ChatGPT SVG breaking-news tasarımını PIL ile render eder. Arka plan fotoğraf gerektirmez."""
+    """ChatGPT SVG breaking-news tasarımını PIL ile render eder. 4 renk şablonu döner."""
     from PIL import Image, ImageDraw, ImageFont
     import textwrap
 
@@ -763,6 +813,12 @@ def create_shorts_thumbnail(thumb_vars: dict, out_path: Path, size=(1080, 1920),
         except (AttributeError, TypeError):
             draw.rectangle([(x1, y1), (x2, y2)], fill=fill, outline=outline, width=width)
 
+    # Şablon seç
+    tpl_key = thumb_vars.get("template", "breaking")
+    if tpl_key not in _THUMB_TEMPLATES:
+        tpl_key = "breaking"
+    tpl = _THUMB_TEMPLATES[tpl_key]
+
     # SVG 1080x1920 — aynı boyut, scale=1
     def s(v): return int(v * H / 1920)
 
@@ -770,65 +826,56 @@ def create_shorts_thumbnail(thumb_vars: dict, out_path: Path, size=(1080, 1920),
     draw.rectangle([(0, s(128)), (W, s(153))], fill=(17, 17, 17))
     draw.rectangle([(0, s(1755)), (W, s(1780))], fill=(17, 17, 17))
 
-    # ── Üst kırmızı bant ──
+    # ── Üst gradient bant ──
+    c1, c2 = tpl["band_grad"]
     bx1, by1, bx2, by2 = s(80), s(80), s(80) + s(920), s(80) + s(130)
     for xi in range(bx1, bx2):
         t = (xi - bx1) / max(bx2 - bx1, 1)
-        r = int(184 + 71 * t)
-        g = int(30 * t)
-        draw.line([(xi, by1), (xi, by2)], fill=(r, g, 0))
-    rrect(bx1, by1, bx2, by2, s(20), None)  # rounded mask overlay (no-op if no rounded_rectangle)
-    try:
-        draw.rounded_rectangle([(bx1, by1), (bx2, by2)], radius=s(20), fill=None, outline=(0, 0, 0), width=0)
-    except Exception:
-        pass
+        col = tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
+        draw.line([(xi, by1), (xi, by2)], fill=col)
     ust = thumb_vars.get("ust_bant", "SON DAKİKA" if lang == "tr" else "BREAKING NEWS")
     center_text(ust, load_font(s(82)), (by1 + by2) // 2, (255, 255, 255))
 
     # ── Büyük sayı / kelime ──
     sayi = str(thumb_vars.get("sayi", ""))
     if sayi:
-        num_sz = s(420)
-        num_font = load_font(num_sz)
-        center_text(sayi, num_font, s(520), (255, 212, 0), shadow_fill=(40, 30, 0))
+        center_text(sayi, load_font(s(420)), s(520), tpl["sayi_color"], shadow_fill=(20, 20, 20))
 
-    # ── Ana başlık (beyaz) ──
+    # ── Ana başlık ──
     ana = thumb_vars.get("ana_baslik", "")
     if ana:
-        center_text(ana, load_font(s(130)), s(860), (255, 255, 255))
+        center_text(ana, load_font(s(130)), s(860), tpl["ana_color"])
 
-    # ── Sarı rounded rect + siyah yazı ──
+    # ── Accent rounded rect + yazı ──
     yr1, yr2 = s(1030), s(1150)
     xr1, xr2 = s(120), s(960)
-    rrect(xr1, yr1, xr2, yr2, s(14), (255, 212, 0))
+    rrect(xr1, yr1, xr2, yr2, s(14), tpl["accent_fill"])
     alt = thumb_vars.get("alt_baslik", "")
     if alt:
         alt_font = load_font(s(72))
         bb = draw.textbbox((0, 0), alt, font=alt_font)
-        # uzunsa küçült
         alt_sz = s(72)
         while bb[2] - bb[0] > (xr2 - xr1) - s(40) and alt_sz > s(36):
             alt_sz -= 4
             alt_font = load_font(alt_sz)
             bb = draw.textbbox((0, 0), alt, font=alt_font)
-        center_text(alt, alt_font, (yr1 + yr2) // 2, (0, 0, 0))
+        center_text(alt, alt_font, (yr1 + yr2) // 2, tpl["accent_text"])
 
-    # ── Detay metni (beyaz) ──
+    # ── Detay metni ──
     detay = thumb_vars.get("detay", "")
     if detay:
-        center_text(detay, load_font(s(95)), s(1285), (255, 255, 255))
+        center_text(detay, load_font(s(95)), s(1285), tpl["detay_color"])
 
     # ── Alarm kutusu ──
     ab_x1, ab_x2 = s(90), s(990)
     ab_y1, ab_y2 = s(1450), s(1660)
-    rrect(ab_x1, ab_y1, ab_x2, ab_y2, s(22), (17, 17, 17), outline=(255, 0, 0), width=s(8))
+    rrect(ab_x1, ab_y1, ab_x2, ab_y2, s(22), (17, 17, 17), outline=tpl["alarm_border"], width=s(8))
 
-    acil = "ACİL GELİŞME" if lang == "tr" else "BREAKING UPDATE"
-    center_text(acil, load_font(s(55)), s(1510), (255, 64, 64))
+    acil = tpl["alarm_label"].get(lang, tpl["alarm_label"].get("tr", "ACİL GELİŞME"))
+    center_text(acil, load_font(s(55)), s(1510), tpl["alarm_label_color"])
 
     ek = thumb_vars.get("ek_bilgi", "")
     if ek:
-        ek_font = load_font(s(72))
         ek_lines = textwrap.wrap(ek, width=20)[:2]
         ek_y = s(1570)
         for ln in ek_lines:
