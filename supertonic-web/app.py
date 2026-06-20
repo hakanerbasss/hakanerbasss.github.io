@@ -1924,89 +1924,152 @@ async def get_yt_en_config():
 
 
 @app.get("/api/yt/analytics")
-async def get_yt_analytics(days: int = 28):
-    """YouTube Analytics API'dan kanal istatistiklerini çeker."""
+async def get_yt_analytics(days: int = 28, channel: str = "tr"):
+    """YouTube Analytics API — genişletilmiş kanal raporu."""
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     import datetime
 
-    if not TOKEN_FILE.exists():
+    tok = TOKEN_FILE_EN if channel == "en" else TOKEN_FILE
+    if not tok.exists():
         raise HTTPException(401, "YouTube hesabı bağlı değil")
 
-    creds_data = json.loads(TOKEN_FILE.read_text())
+    creds_data = json.loads(tok.read_text())
     creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
-
     if creds.expired and creds.refresh_token:
         import google.auth.transport.requests
         creds.refresh(google.auth.transport.requests.Request())
-        TOKEN_FILE.write_text(creds.to_json())
+        tok.write_text(creds.to_json())
 
-    end_date = datetime.date.today()
+    end_date   = datetime.date.today()
     start_date = end_date - datetime.timedelta(days=days - 1)
+    sd, ed     = str(start_date), str(end_date)
+
+    def safe_query(**kw):
+        try:
+            return analytics.reports().query(**kw).execute()
+        except Exception:
+            return {}
 
     try:
         analytics = build("youtubeAnalytics", "v2", credentials=creds)
+        yt        = build("youtube", "v3", credentials=creds)
 
-        # Günlük istatistikler
-        daily = analytics.reports().query(
-            ids="channel==MINE",
-            startDate=str(start_date),
-            endDate=str(end_date),
-            metrics="views,estimatedMinutesWatched,subscribersGained",
-            dimensions="day",
-            sort="day",
-        ).execute()
+        # ── Günlük: views, watch, subs kazanılan/kaybedilen, likes, comments, shares
+        daily = safe_query(
+            ids="channel==MINE", startDate=sd, endDate=ed,
+            metrics="views,estimatedMinutesWatched,subscribersGained,subscribersLost,likes,comments,shares",
+            dimensions="day", sort="day",
+        )
 
-        # Video bazlı performans (top 10)
-        top_videos = analytics.reports().query(
-            ids="channel==MINE",
-            startDate=str(start_date),
-            endDate=str(end_date),
-            metrics="views,estimatedMinutesWatched",
-            dimensions="video",
-            sort="-views",
-            maxResults=10,
-        ).execute()
+        # ── Top 15 video: views, watch, avg view duration, avg view %, likes
+        top_videos = safe_query(
+            ids="channel==MINE", startDate=sd, endDate=ed,
+            metrics="views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes",
+            dimensions="video", sort="-views", maxResults=15,
+        )
 
-        # Video başlıklarını çek
-        yt = build("youtube", "v3", credentials=creds)
-        video_ids = []
-        for row in top_videos.get("rows", []):
-            video_ids.append(row[0])
+        # ── Trafik kaynağı
+        traffic = safe_query(
+            ids="channel==MINE", startDate=sd, endDate=ed,
+            metrics="views", dimensions="insightTrafficSourceType", sort="-views",
+        )
 
+        # ── Cihaz türü
+        devices = safe_query(
+            ids="channel==MINE", startDate=sd, endDate=ed,
+            metrics="views", dimensions="deviceType", sort="-views",
+        )
+
+        # ── Top 10 ülke
+        countries = safe_query(
+            ids="channel==MINE", startDate=sd, endDate=ed,
+            metrics="views,estimatedMinutesWatched", dimensions="country", sort="-views", maxResults=10,
+        )
+
+        # ── Kanal abone sayısı
+        ch_resp = yt.channels().list(part="statistics", mine=True).execute()
+        ch_stats = {}
+        if ch_resp.get("items"):
+            s = ch_resp["items"][0]["statistics"]
+            ch_stats = {
+                "subscriber_count": int(s.get("subscriberCount", 0)),
+                "total_views": int(s.get("viewCount", 0)),
+                "video_count": int(s.get("videoCount", 0)),
+            }
+
+        # ── Video başlıkları
+        video_ids = [row[0] for row in top_videos.get("rows", [])]
         video_titles = {}
         if video_ids:
-            vresp = yt.videos().list(
-                part="snippet",
-                id=",".join(video_ids[:10]),
-            ).execute()
-            for item in vresp.get("items", []):
+            vr = yt.videos().list(part="snippet", id=",".join(video_ids)).execute()
+            for item in vr.get("items", []):
                 video_titles[item["id"]] = item["snippet"]["title"]
 
-        # Toplam özet
-        total_views = sum(row[1] for row in daily.get("rows", []))
-        total_watch_min = sum(row[2] for row in daily.get("rows", []))
-        total_subs = sum(row[3] for row in daily.get("rows", []))
+        # ── Özet toplamlar
+        rows_d = daily.get("rows", [])
+        total_views     = sum(r[1] for r in rows_d)
+        total_watch_min = sum(r[2] for r in rows_d)
+        total_subs_g    = sum(r[3] for r in rows_d)
+        total_subs_l    = sum(r[4] for r in rows_d)
+        total_likes     = sum(r[5] for r in rows_d)
+        total_comments  = sum(r[6] for r in rows_d)
+        total_shares    = sum(r[7] for r in rows_d)
+
+        traffic_map = {
+            "ADVERTISING": "Reklam", "ANNOTATION": "Açıklama", "BROWSE": "Gözat / Ana Sayfa",
+            "CHANNEL": "Kanal Sayfası", "END_SCREEN": "Bitiş Ekranı", "EXT_URL": "Harici URL",
+            "NO_LINK_EMBEDDED": "Yerleşik Player", "NO_LINK_OTHER": "Diğer",
+            "NOTIFICATION": "Bildirim", "PLAYLIST": "Oynatma Listesi",
+            "PROMOTED": "Tanıtılan Video", "RELATED_VIDEO": "Önerilen Video",
+            "SEARCH": "YouTube Arama", "SHORTS": "Shorts Feed",
+            "SUBSCRIBER": "Aboneler", "YT_CHANNEL": "YT Kanal Sayfası",
+        }
 
         return {
+            "channel": ch_stats,
             "summary": {
                 "views": int(total_views),
                 "watch_hours": round(total_watch_min / 60, 1),
-                "subs_gained": int(total_subs),
+                "subs_gained": int(total_subs_g),
+                "subs_lost": int(total_subs_l),
+                "subs_net": int(total_subs_g - total_subs_l),
+                "likes": int(total_likes),
+                "comments": int(total_comments),
+                "shares": int(total_shares),
                 "period_days": days,
             },
             "daily": [
-                {"date": row[0], "views": int(row[1]), "watch_min": int(row[2]), "subs": int(row[3])}
-                for row in daily.get("rows", [])
+                {
+                    "date": r[0], "views": int(r[1]), "watch_min": int(r[2]),
+                    "subs_gained": int(r[3]), "subs_lost": int(r[4]),
+                    "likes": int(r[5]), "comments": int(r[6]), "shares": int(r[7]),
+                }
+                for r in rows_d
             ],
             "top_videos": [
                 {
-                    "id": row[0],
-                    "title": video_titles.get(row[0], row[0]),
-                    "views": int(row[1]),
-                    "watch_min": int(row[2]),
+                    "id": r[0],
+                    "title": video_titles.get(r[0], r[0]),
+                    "views": int(r[1]),
+                    "watch_min": int(r[2]),
+                    "avg_view_sec": int(r[3]),
+                    "avg_view_pct": round(float(r[4]), 1),
+                    "likes": int(r[5]),
                 }
-                for row in top_videos.get("rows", [])
+                for r in top_videos.get("rows", [])
+            ],
+            "traffic": [
+                {"source": traffic_map.get(r[0], r[0]), "views": int(r[1])}
+                for r in traffic.get("rows", [])
+            ],
+            "devices": [
+                {"device": r[0].replace("_", " ").title(), "views": int(r[1])}
+                for r in devices.get("rows", [])
+            ],
+            "countries": [
+                {"country": r[0], "views": int(r[1]), "watch_min": int(r[2])}
+                for r in countries.get("rows", [])
             ],
         }
     except Exception as e:
