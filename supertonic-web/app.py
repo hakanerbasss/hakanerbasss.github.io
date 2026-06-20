@@ -344,6 +344,14 @@ Rules:
 
         png_files.append(png_path)
 
+    # İlk sahneye haber bandı overlay ekle (thumbnail yerine geçer, video hemen başlar)
+    first_title = data.get("title", topic or scenes[0]["text"][:60])
+    if png_files:
+        try:
+            overlay_first_scene_banner(png_files[0], first_title, lang=lang)
+        except Exception:
+            pass
+
     # Mevcut font bul
     font_candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -449,16 +457,15 @@ Rules:
         title_tags = [f"#{w.lower()}" for w in generated_title.split()[:3] if len(w) > 3]
         video_tags = ", ".join(["#Shorts"] + title_tags + trend_data["hashtags"][1:6])
 
-    # Thumbnail — ilk sahnenin fotoğrafından PIL ile üret
+    # Thumbnail — overlay'li ilk sahneyi kopyala (ayrıca create_thumbnail gerekmez)
     thumb_path = None
-    thumb_out = None
     try:
+        import shutil
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-        create_thumbnail(png_files[0].read_bytes(), generated_title, thumb_out, size=(1080, 1920), lang=lang)
+        shutil.copy2(str(png_files[0]), str(thumb_out))
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
-
 
     return {
         "video": f"/api/video/{output_file.name}",
@@ -666,6 +673,143 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
 
     img.save(str(out_path), "JPEG", quality=92)
     return out_path
+
+
+def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -> None:
+    """İlk sahne fotoğrafının ortasına ChatGPT-stili haber bandı çizer (in-place)."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    W, H = 1080, 1920
+    img = Image.open(photo_path).convert("RGB")
+    img = img.resize((W, H), Image.LANCZOS)
+
+    # Hafif koyu overlay — fotoğraf net görünür
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 115))
+    img = Image.alpha_composite(img.convert("RGBA"), ov).convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    fp = next((f for f in font_candidates if Path(f).exists()), None)
+
+    def lf(sz):
+        if fp:
+            try:
+                return ImageFont.truetype(fp, sz)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+
+    def tw(text, font):
+        try:
+            return draw.textlength(text, font=font)
+        except AttributeError:
+            return font.getlength(text)
+
+    YELLOW = (255, 208,   0)
+    RED    = (213,   0,   0)
+    BLACK  = ( 17,  17,  17)
+    WHITE  = (255, 255, 255)
+
+    cat_text   = "GÜNDEM"     if lang == "tr" else "BREAKING"
+    badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
+
+    # SVG (360x640, y=52..502) → 1080x1920, SC=2.5x, dikey ortalı
+    SC = 2.5
+    design_h = int((502 - 52) * SC)          # ~1125px
+    y0 = (H - design_h) // 2                  # ~397 (üstte/altta eşit boşluk)
+
+    def sy(svg_y):  return y0 + int((svg_y - 52) * SC)
+    def sh(v):      return int(v * SC)
+
+    PAD = int(W * 0.05)
+
+    cat_fs   = sh(18)   # 45
+    big_fs   = sh(64)   # 160
+    mid_fs   = sh(30)   # 75
+    badge_fs = sh(28)   # 70
+
+    # Başlığı 3 parçaya böl (SVG mantığı)
+    words = title.upper().split()
+    if len(words) <= 2:
+        part_a, part_b, part_c = " ".join(words), "", ""
+    elif len(words) <= 4:
+        m = len(words) // 2
+        part_a = " ".join(words[:m])
+        part_b = " ".join(words[m:])
+        part_c = ""
+    else:
+        part_a = " ".join(words[:2])
+        part_b = " ".join(words[2:-2])
+        part_c = " ".join(words[-2:])
+
+    def fit_font(text, start_size, max_w):
+        """Metni sığdıracak en büyük font boyutunu döner."""
+        sz = start_size
+        while sz > 36:
+            f = lf(sz)
+            if tw(text, f) <= max_w:
+                return f, sz
+            sz -= 8
+        return lf(sz), sz
+
+    # ① Kategori bandı — SVG y=52, h=44
+    y1, h1 = sy(52), sh(44)
+    draw.rectangle([(0, y1), (W, y1+h1)], fill=YELLOW)
+    draw.rectangle([(0, y1), (W, y1+3)], fill=BLACK)
+    draw.rectangle([(0, y1+h1-3), (W, y1+h1)], fill=BLACK)
+    cat_font  = lf(cat_fs)
+    arr_font  = lf(cat_fs + 6)
+    draw.text((PAD, y1 + (h1 - cat_fs) // 2), "»»", font=arr_font, fill=BLACK)
+    cw = tw(cat_text, cat_font)
+    draw.text(((W - cw) // 2, y1 + (h1 - cat_fs) // 2), cat_text, font=cat_font, fill=BLACK)
+    draw.text((W - PAD - tw("««", arr_font), y1 + (h1 - cat_fs) // 2), "««", font=arr_font, fill=BLACK)
+
+    # ② Büyük sarı bant 1 — SVG y=125, h=80 → part_a
+    if part_a:
+        y2, h2 = sy(125), sh(80)
+        draw.rectangle([(PAD // 2, y2), (W - PAD // 2, y2 + h2)], fill=YELLOW)
+        draw.rectangle([(PAD // 2, y2), (W - PAD // 2, y2 + 3)], fill=BLACK)
+        draw.rectangle([(PAD // 2, y2 + h2 - 3), (W - PAD // 2, y2 + h2)], fill=BLACK)
+        a_font, a_sz = fit_font(part_a, big_fs, W - PAD * 3)
+        aw = tw(part_a, a_font)
+        draw.text(((W - aw) // 2, y2 + (h2 - a_sz) // 2), part_a, font=a_font, fill=BLACK)
+
+    # ③ Orta sarı yazı — SVG y=218 (koyu arka plan, sarı yazı) → part_b
+    if part_b:
+        y3 = sy(210)
+        b_font, b_sz = fit_font(part_b, mid_fs, W - PAD * 2)
+        bw = tw(part_b, b_font)
+        draw.text(((W - bw) // 2, y3), part_b, font=b_font, fill=YELLOW)
+        line_y = y3 + b_sz + sh(5)
+        draw.rectangle([(W // 4, line_y), (3 * W // 4, line_y + 3)], fill=YELLOW)
+
+    # ④ İkinci büyük sarı bant — SVG y=288, h=72 → part_c
+    if part_c:
+        y4, h4 = sy(288), sh(72)
+        draw.rectangle([(PAD // 2, y4), (W - PAD // 2, y4 + h4)], fill=YELLOW)
+        draw.rectangle([(PAD // 2, y4), (W - PAD // 2, y4 + 3)], fill=BLACK)
+        draw.rectangle([(PAD // 2, y4 + h4 - 3), (W - PAD // 2, y4 + h4)], fill=BLACK)
+        c_font, c_sz = fit_font(part_c, big_fs, W - PAD * 3)
+        cw2 = tw(part_c, c_font)
+        draw.text(((W - cw2) // 2, y4 + (h4 - c_sz) // 2), part_c, font=c_font, fill=BLACK)
+
+    # ⑤ SON DAKİKA kırmızı bant — SVG y=440, h=62
+    y6, h6 = sy(440), sh(62)
+    draw.rectangle([(0, y6), (W, y6 + h6)], fill=RED)
+    draw.rectangle([(0, y6), (W, y6 + 5)], fill=(255, 23, 68))
+    draw.rectangle([(0, y6), (8, y6 + h6)], fill=(255, 23, 68))
+    draw.rectangle([(W - 8, y6), (W, y6 + h6)], fill=(255, 23, 68))
+    draw.rectangle([(0, y6 + h6 - 5), (W, y6 + h6)], fill=(100, 0, 0))
+    badge_font = lf(badge_fs)
+    bw2 = tw(badge_text, badge_font)
+    draw.text(((W - bw2) // 2, y6 + (h6 - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
+
+    img.save(str(photo_path), "JPEG", quality=92)
 
 
 def prepend_thumbnail_intro(thumb_path: Path, video_path: Path, duration: int = 2, size: tuple = (1080, 1920)) -> Path:
