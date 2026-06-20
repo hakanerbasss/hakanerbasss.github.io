@@ -141,6 +141,15 @@ function getBlacklist() { return all('SELECT * FROM blacklist ORDER BY created_a
 function removeBlacklist(id) { run('DELETE FROM blacklist WHERE id=?',[id]); }
 function searchBlacklist(q) { return all("SELECT * FROM blacklist WHERE phone LIKE ? OR name LIKE ? ORDER BY created_at DESC",[`%${q}%`,`%${q}%`]); }
 
+// Bugün ilk kez limit aşıldıysa true döner (tekrar bildirim gönderme)
+function isFirstLimitExceed(customerId) {
+  const today = new Date().toISOString().split('T')[0];
+  const key = `limit_notif_${customerId}_${today}`;
+  if (getSetting(key)) return false;
+  setSetting(key, '1');
+  return true;
+}
+
 function getTodayUsage(customerId) {
   const today = new Date().toISOString().split('T')[0];
   return get('SELECT count FROM daily_usage WHERE customer_id=? AND date=?',[customerId,today])?.count || 0;
@@ -150,4 +159,4 @@ function getTotalUsage(customerId) {
   return get('SELECT COALESCE(SUM(count),0) as c FROM daily_usage WHERE customer_id=?',[customerId])?.c || 0;
 }
 
-module.exports = { initDb, saveDb, createAdmin, getAdmin, adminExists, createCustomer, getCustomers, getCustomerByToken, getCustomerById, getCustomerByPhone, updateCustomer, deleteCustomer, toggleCustomer, upsertConnection, getConnection, checkAndIncrementUsage, logMessage, getSetting, setSetting, getStats, getTodayUsage, getTotalUsage, addBlacklist, isBlacklisted, getBlacklist, removeBlacklist, searchBlacklist };
+module.exports = { initDb, saveDb, createAdmin, getAdmin, adminExists, createCustomer, getCustomers, getCustomerByToken, getCustomerById, getCustomerByPhone, updateCustomer, deleteCustomer, toggleCustomer, upsertConnection, getConnection, checkAndIncrementUsage, logMessage, getSetting, setSetting, getStats, getTodayUsage, getTotalUsage, addBlacklist, isBlacklisted, getBlacklist, removeBlacklist, searchBlacklist, isFirstLimitExceed };
