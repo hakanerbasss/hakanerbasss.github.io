@@ -1545,19 +1545,25 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
             if not media_id or not upload_uri:
                 return False, f"no uri: {r1.text[:300]}"
 
-            # 2. Video bytes yükle
-            r2 = await client.post(
-                upload_uri,
-                headers={
-                    "Authorization": f"OAuth {access_token}",
-                    "offset": "0",
-                    "file_size": str(video_size),
-                    "Content-Type": "video/mp4",
-                },
-                content=video_bytes,
-                timeout=180,
-            )
-            if r2.status_code not in (200, 201):
+            # 2. Video bytes yükle — 3 deneme
+            r2 = None
+            for attempt in range(3):
+                r2 = await client.post(
+                    upload_uri,
+                    headers={
+                        "Authorization": f"OAuth {access_token}",
+                        "offset": "0",
+                        "file_size": str(video_size),
+                        "Content-Type": "video/mp4",
+                    },
+                    content=video_bytes,
+                    timeout=180,
+                )
+                if r2.status_code in (200, 201):
+                    break
+                if attempt < 2:
+                    await asyncio.sleep(8)
+            if r2 is None or r2.status_code not in (200, 201):
                 return False, f"upload failed: {r2.status_code} {r2.text[:200]}"
 
             # 3. İşlenme bekle
@@ -2291,7 +2297,8 @@ async def auto_shorts_job():
 
             # 3. Instagram'a gönder — arka planda, job'u bloke etmez
             ig_cfg = get_ig_config()
-            if ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
+            ig_any = ig_cfg.get("post_reels", True) or ig_cfg.get("post_story", True)
+            if ig_any and ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
                 asyncio.create_task(_post_to_instagram_bg(
                     filename=filename,
                     title=d.get("title", ""),
@@ -2669,11 +2676,12 @@ async def auto_en_shorts_job():
                 return
 
             result = r2.json()
-            save_en_shorts_sched_log("success", d.get("title", ""), result.get("url", ""))
-
-            if cfg.get("ig_enabled", False):
+            ig_enabled = bool(cfg.get("ig_enabled", False))
+            save_en_shorts_sched_log("success", d.get("title", "") + f" [IG={'AÇIK' if ig_enabled else 'KAPALI'}]", result.get("url", ""))
+            if ig_enabled:
                 ig_cfg = get_ig_config()
-                if ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
+                ig_any = ig_cfg.get("post_reels", True) or ig_cfg.get("post_story", True)
+                if ig_any and ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
                     asyncio.create_task(_post_to_instagram_bg(
                         filename=filename,
                         title=d.get("title", ""),
