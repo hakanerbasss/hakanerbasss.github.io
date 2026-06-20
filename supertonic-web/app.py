@@ -480,20 +480,20 @@ THUMB_DIR.mkdir(exist_ok=True)
 
 
 def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720), lang="tr"):
-    """Saf PIL ile thumbnail: sarı başlık + kırmızı SON DAKİKA bandı."""
+    """Haber kanalı stili thumbnail: koyu fotoğraf + sarı bantlar + SON DAKİKA."""
     from PIL import Image, ImageDraw, ImageFont
     import io, textwrap
 
     W, H = size
     is_portrait = H > W
 
+    # Arka plan fotoğrafı
     img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
     img = img.resize(size, Image.LANCZOS)
 
-    # Karartma
-    overlay = Image.new("RGBA", size, (0, 0, 0, 145))
+    # Koyu overlay
+    overlay = Image.new("RGBA", size, (0, 0, 0, 160))
     img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
-
     draw = ImageDraw.Draw(img)
 
     font_candidates = [
@@ -504,12 +504,6 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
     ]
     font_path = next((f for f in font_candidates if Path(f).exists()), None)
 
-    title_fs  = 78 if is_portrait else 68
-    badge_fs  = 46 if is_portrait else 38
-    band_h    = 105 if is_portrait else 88
-    line_h    = title_fs + 16
-    max_chars = 18 if is_portrait else 26
-
     def load_font(size):
         if font_path:
             try:
@@ -518,33 +512,162 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
                 pass
         return ImageFont.load_default()
 
-    title_font = load_font(title_fs)
-    badge_font = load_font(badge_fs)
-
-    # Kırmızı alt bant
-    draw.rectangle([(0, H - band_h), (W, H)], fill=(210, 10, 10))
-
-    # Badge metni ortala
-    badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
-    try:
-        bw = draw.textlength(badge_text, font=badge_font)
-    except AttributeError:
-        bw = badge_font.getlength(badge_text)
-    bx = (W - bw) / 2
-    by = H - band_h + (band_h - badge_fs) // 2
-    draw.text((bx, by), badge_text, font=badge_font, fill=(255, 255, 255))
-
-    # Başlık satırları (alttan yukarı, sarı + gölge)
-    lines = textwrap.wrap(title, width=max_chars)[:(4 if is_portrait else 3)]
-    total_text_h = len(lines) * line_h
-    y = H - band_h - total_text_h - 18
-
-    for line in lines:
+    def text_w(draw, text, font):
         try:
-            lw = draw.textlength(line, font=title_font)
+            return draw.textlength(text, font=font)
         except AttributeError:
-            lw = title_font.getlength(line)
-        lx = (W - lw) / 2
+            return font.getlength(text)
+
+    YELLOW = (255, 208, 0)
+    RED    = (213, 0, 0)
+    BLACK  = (17, 17, 17)
+    WHITE  = (255, 255, 255)
+
+    badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
+
+    if is_portrait:
+        # ── Portrait (Shorts 1080×1920) ──
+        # Başlığı 3 parçaya böl: ilk kısa kelime(ler) / orta / son kısa kelime(ler)
+        words = title.upper().split()
+        if len(words) <= 2:
+            part_a, part_b, part_c = title.upper(), "", ""
+        elif len(words) <= 4:
+            mid = len(words) // 2
+            part_a = " ".join(words[:mid])
+            part_b = " ".join(words[mid:])
+            part_c = ""
+        else:
+            part_a = " ".join(words[:2])
+            part_b = " ".join(words[2:-2])
+            part_c = " ".join(words[-2:])
+
+        cat_text = "GÜNDEM" if lang == "tr" else "BREAKING"
+        cat_fs   = int(H * 0.028)
+        big_fs   = int(H * 0.072)
+        mid_fs   = int(H * 0.042)
+        sml_fs   = int(H * 0.032)
+        badge_fs = int(H * 0.038)
+        pad      = int(W * 0.05)
+
+        cat_font   = load_font(cat_fs)
+        big_font   = load_font(big_fs)
+        mid_font   = load_font(mid_fs)
+        sml_font   = load_font(sml_fs)
+        badge_font = load_font(badge_fs)
+
+        y = int(H * 0.09)
+
+        # ① Kategori bandı
+        band1_h = cat_fs + int(H * 0.025)
+        draw.rectangle([(0, y), (W, y + band1_h)], fill=YELLOW)
+        draw.rectangle([(0, y), (W, y + 3)], fill=BLACK)
+        draw.rectangle([(0, y + band1_h - 3), (W, y + band1_h)], fill=BLACK)
+        # ok dekorasyonları
+        draw.text((pad, y + (band1_h - cat_fs) // 2), "»»", font=cat_font, fill=BLACK)
+        cw = text_w(draw, cat_text, cat_font)
+        draw.text(((W - cw) / 2, y + (band1_h - cat_fs) // 2), cat_text, font=cat_font, fill=BLACK)
+        draw.text((W - pad - text_w(draw, "««", cat_font), y + (band1_h - cat_fs) // 2), "««", font=cat_font, fill=BLACK)
+        y += band1_h + int(H * 0.018)
+
+        # ② Büyük sarı bant — part_a
+        if part_a:
+            lines_a = textwrap.wrap(part_a, width=10)[:2]
+            band2_h = len(lines_a) * (big_fs + 10) + int(H * 0.022)
+            draw.rectangle([(pad // 2, y), (W - pad // 2, y + band2_h)], fill=YELLOW)
+            draw.rectangle([(pad // 2, y), (W - pad // 2, y + 3)], fill=BLACK)
+            draw.rectangle([(pad // 2, y + band2_h - 3), (W - pad // 2, y + band2_h)], fill=BLACK)
+            ty = y + int(H * 0.011)
+            for ln in lines_a:
+                lw = text_w(draw, ln, big_font)
+                draw.text(((W - lw) / 2, ty), ln, font=big_font, fill=BLACK)
+                ty += big_fs + 10
+            y += band2_h + int(H * 0.022)
+
+        # ③ Orta satır — sarı yazı koyu zeminde
+        if part_b:
+            lines_b = textwrap.wrap(part_b, width=16)[:3]
+            for ln in lines_b:
+                lw = text_w(draw, ln, mid_font)
+                draw.text(((W - lw) / 2, y), ln, font=mid_font, fill=YELLOW)
+                y += mid_fs + int(H * 0.012)
+            # ince ayraç çizgisi
+            draw.rectangle([(W // 4, y), (3 * W // 4, y + 3)], fill=YELLOW)
+            y += int(H * 0.022)
+
+        # ④ İkinci büyük sarı bant — part_c
+        if part_c:
+            lines_c = textwrap.wrap(part_c, width=10)[:2]
+            band4_h = len(lines_c) * (big_fs + 10) + int(H * 0.022)
+            draw.rectangle([(pad // 2, y), (W - pad // 2, y + band4_h)], fill=YELLOW)
+            draw.rectangle([(pad // 2, y), (W - pad // 2, y + 3)], fill=BLACK)
+            draw.rectangle([(pad // 2, y + band4_h - 3), (W - pad // 2, y + band4_h)], fill=BLACK)
+            ty = y + int(H * 0.011)
+            for ln in lines_c:
+                lw = text_w(draw, ln, big_font)
+                draw.text(((W - lw) / 2, ty), ln, font=big_font, fill=BLACK)
+                ty += big_fs + 10
+            y += band4_h + int(H * 0.018)
+
+        # ⑤ SON DAKİKA kırmızı bant — alt
+        badge_h = badge_fs + int(H * 0.028)
+        by = H - badge_h - int(H * 0.04)
+        draw.rectangle([(0, by), (W, by + badge_h)], fill=RED)
+        draw.rectangle([(0, by), (W, by + 5)], fill=(255, 23, 68))
+        draw.rectangle([(0, by), (8, by + badge_h)], fill=(255, 23, 68))
+        draw.rectangle([(W - 8, by), (W, by + badge_h)], fill=(255, 23, 68))
+        bw = text_w(draw, badge_text, badge_font)
+        draw.text(((W - bw) / 2, by + (badge_h - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
+
+    else:
+        # ── Landscape (uzun video 1280×720) ──
+        words = title.upper().split()
+        part_a = " ".join(words[:3]) if len(words) > 3 else title.upper()
+        part_b = " ".join(words[3:]) if len(words) > 3 else ""
+
+        big_fs   = int(H * 0.10)
+        mid_fs   = int(H * 0.06)
+        badge_fs = int(H * 0.055)
+        pad      = int(W * 0.04)
+        band_h   = int(H * 0.18)
+
+        big_font   = load_font(big_fs)
+        mid_font   = load_font(mid_fs)
+        badge_font = load_font(badge_fs)
+
+        y = int(H * 0.12)
+
+        # Büyük sarı bant
+        draw.rectangle([(0, y), (W, y + band_h)], fill=YELLOW)
+        draw.rectangle([(0, y), (W, y + 4)], fill=BLACK)
+        draw.rectangle([(0, y + band_h - 4), (W, y + band_h)], fill=BLACK)
+        lines_a = textwrap.wrap(part_a, width=20)[:2]
+        ty = y + (band_h - len(lines_a) * (big_fs + 6)) // 2
+        for ln in lines_a:
+            lw = text_w(draw, ln, big_font)
+            draw.text(((W - lw) / 2, ty), ln, font=big_font, fill=BLACK)
+            ty += big_fs + 6
+        y += band_h + int(H * 0.04)
+
+        # Orta sarı yazı
+        if part_b:
+            lines_b = textwrap.wrap(part_b, width=28)[:2]
+            for ln in lines_b:
+                lw = text_w(draw, ln, mid_font)
+                draw.text(((W - lw) / 2, y), ln, font=mid_font, fill=YELLOW)
+                y += mid_fs + int(H * 0.015)
+
+        # SON DAKİKA
+        badge_band = badge_fs + int(H * 0.04)
+        by = H - badge_band - int(H * 0.03)
+        draw.rectangle([(0, by), (W, by + badge_band)], fill=RED)
+        draw.rectangle([(0, by), (W, by + 4)], fill=(255, 23, 68))
+        draw.rectangle([(0, by), (8, by + badge_band)], fill=(255, 23, 68))
+        draw.rectangle([(W - 8, by), (W, by + badge_band)], fill=(255, 23, 68))
+        bw = text_w(draw, badge_text, badge_font)
+        draw.text(((W - bw) / 2, by + (badge_band - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
+
+    img.save(str(out_path), "JPEG", quality=92)
+    return out_path
         # gölge
         draw.text((lx + 3, y + 3), line, font=title_font, fill=(0, 0, 0))
         # sarı başlık
