@@ -266,6 +266,14 @@ Return ONLY valid JSON, no markdown, no explanation:
 {{
   "title": "catchy YouTube title for this video (max 80 chars, in {lang_name})",
   "hashtags": ["Shorts", "topic", "specific", "tags", "no", "hash", "symbol"],
+  "thumbnail": {{
+    "ust_bant": "SON DAKİKA",
+    "sayi": "striking number from news OR impactful 1-2 word (e.g. 57, 3, ŞOK, ALARM)",
+    "ana_baslik": "key noun 1-2 words MAX uppercase (e.g. YARALI, ÖLDÜ, ARTIŞ)",
+    "alt_baslik": "action phrase max 22 chars (e.g. İKİ TREN ÇARPIŞTI)",
+    "detay": "location or subject max 20 chars (e.g. İNGİLTERE'DE)",
+    "ek_bilgi": "short extra detail max 25 chars"
+  }},
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
@@ -280,7 +288,10 @@ Rules:
 - LAST scene text MUST end with a call to action: "Abone olmayı ve beğenmeyi unutma!" (in {lang_name})
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
-- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")"""
+- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")
+- thumbnail.sayi: extract the most shocking number from the news (deaths, injured, percentage, year, amount). If no number exists use a 1-2 word hook like "ŞOK" or "ALARM"
+- thumbnail.ust_bant: "SON DAKİKA" for {lang_name} Turkish, "BREAKING NEWS" for English
+- All thumbnail text fields MUST be in {lang_name} and UPPERCASE"""
 
     data = None
     for attempt in range(3):
@@ -448,12 +459,17 @@ Rules:
         title_tags = [f"#{w.lower()}" for w in generated_title.split()[:3] if len(w) > 3]
         video_tags = ", ".join(["#Shorts"] + title_tags + trend_data["hashtags"][1:6])
 
-    # Thumbnail (ilk sahnenin fotoğrafından)
+    # Thumbnail — yeni SVG tabanlı breaking-news tasarımı
     thumb_path = None
     thumb_out = None
     try:
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-        create_thumbnail(png_files[0].read_bytes(), generated_title, thumb_out, size=(1080, 1920), lang=lang)
+        thumb_vars = data.get("thumbnail", {})
+        if not thumb_vars:
+            thumb_vars = {"ust_bant": "SON DAKİKA" if lang == "tr" else "BREAKING NEWS",
+                          "sayi": "ŞOK", "ana_baslik": generated_title.upper()[:15],
+                          "alt_baslik": "", "detay": "", "ek_bilgi": ""}
+        create_shorts_thumbnail(thumb_vars, thumb_out, size=(1080, 1920), lang=lang)
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
@@ -702,6 +718,131 @@ def prepend_thumbnail_intro(thumb_path: Path, video_path: Path, duration: int = 
         return video_path
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def create_shorts_thumbnail(thumb_vars: dict, out_path: Path, size=(1080, 1920), lang="tr"):
+    """ChatGPT SVG breaking-news tasarımını PIL ile render eder. Arka plan fotoğraf gerektirmez."""
+    from PIL import Image, ImageDraw, ImageFont
+    import textwrap
+
+    W, H = size
+    img = Image.new("RGB", (W, H), (0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((f for f in font_candidates if Path(f).exists()), None)
+
+    def load_font(sz):
+        if font_path:
+            try:
+                return ImageFont.truetype(font_path, sz)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+
+    def center_text(text, font, cy, fill, shadow_fill=None):
+        bb = draw.textbbox((0, 0), text, font=font)
+        tw, th = bb[2] - bb[0], bb[3] - bb[1]
+        x = (W - tw) // 2
+        y = cy - th // 2
+        if shadow_fill:
+            draw.text((x + 5, y + 8), text, font=font, fill=shadow_fill)
+        draw.text((x, y), text, font=font, fill=fill)
+
+    def rrect(x1, y1, x2, y2, r, fill, outline=None, width=0):
+        try:
+            if outline:
+                draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=r, fill=fill, outline=outline, width=width)
+            else:
+                draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=r, fill=fill)
+        except (AttributeError, TypeError):
+            draw.rectangle([(x1, y1), (x2, y2)], fill=fill, outline=outline, width=width)
+
+    # SVG 1080x1920 — aynı boyut, scale=1
+    def s(v): return int(v * H / 1920)
+
+    # ── Dekoratif ince şeritler ──
+    draw.rectangle([(0, s(128)), (W, s(153))], fill=(17, 17, 17))
+    draw.rectangle([(0, s(1755)), (W, s(1780))], fill=(17, 17, 17))
+
+    # ── Üst kırmızı bant ──
+    bx1, by1, bx2, by2 = s(80), s(80), s(80) + s(920), s(80) + s(130)
+    for xi in range(bx1, bx2):
+        t = (xi - bx1) / max(bx2 - bx1, 1)
+        r = int(184 + 71 * t)
+        g = int(30 * t)
+        draw.line([(xi, by1), (xi, by2)], fill=(r, g, 0))
+    rrect(bx1, by1, bx2, by2, s(20), None)  # rounded mask overlay (no-op if no rounded_rectangle)
+    try:
+        draw.rounded_rectangle([(bx1, by1), (bx2, by2)], radius=s(20), fill=None, outline=(0, 0, 0), width=0)
+    except Exception:
+        pass
+    ust = thumb_vars.get("ust_bant", "SON DAKİKA" if lang == "tr" else "BREAKING NEWS")
+    center_text(ust, load_font(s(82)), (by1 + by2) // 2, (255, 255, 255))
+
+    # ── Büyük sayı / kelime ──
+    sayi = str(thumb_vars.get("sayi", ""))
+    if sayi:
+        num_sz = s(420)
+        num_font = load_font(num_sz)
+        center_text(sayi, num_font, s(520), (255, 212, 0), shadow_fill=(40, 30, 0))
+
+    # ── Ana başlık (beyaz) ──
+    ana = thumb_vars.get("ana_baslik", "")
+    if ana:
+        center_text(ana, load_font(s(130)), s(860), (255, 255, 255))
+
+    # ── Sarı rounded rect + siyah yazı ──
+    yr1, yr2 = s(1030), s(1150)
+    xr1, xr2 = s(120), s(960)
+    rrect(xr1, yr1, xr2, yr2, s(14), (255, 212, 0))
+    alt = thumb_vars.get("alt_baslik", "")
+    if alt:
+        alt_font = load_font(s(72))
+        bb = draw.textbbox((0, 0), alt, font=alt_font)
+        # uzunsa küçült
+        alt_sz = s(72)
+        while bb[2] - bb[0] > (xr2 - xr1) - s(40) and alt_sz > s(36):
+            alt_sz -= 4
+            alt_font = load_font(alt_sz)
+            bb = draw.textbbox((0, 0), alt, font=alt_font)
+        center_text(alt, alt_font, (yr1 + yr2) // 2, (0, 0, 0))
+
+    # ── Detay metni (beyaz) ──
+    detay = thumb_vars.get("detay", "")
+    if detay:
+        center_text(detay, load_font(s(95)), s(1285), (255, 255, 255))
+
+    # ── Alarm kutusu ──
+    ab_x1, ab_x2 = s(90), s(990)
+    ab_y1, ab_y2 = s(1450), s(1660)
+    rrect(ab_x1, ab_y1, ab_x2, ab_y2, s(22), (17, 17, 17), outline=(255, 0, 0), width=s(8))
+
+    acil = "ACİL GELİŞME" if lang == "tr" else "BREAKING UPDATE"
+    center_text(acil, load_font(s(55)), s(1510), (255, 64, 64))
+
+    ek = thumb_vars.get("ek_bilgi", "")
+    if ek:
+        ek_font = load_font(s(72))
+        ek_lines = textwrap.wrap(ek, width=20)[:2]
+        ek_y = s(1570)
+        for ln in ek_lines:
+            lf = load_font(s(60) if len(ek_lines) > 1 else s(72))
+            bb = draw.textbbox((0, 0), ln, font=lf)
+            draw.text(((W - (bb[2]-bb[0])) // 2, ek_y), ln, font=lf, fill=(255, 255, 255))
+            ek_y += s(72)
+
+    # ── Brand bar ──
+    draw.rectangle([(0, s(1810)), (W, H)], fill=(5, 5, 5))
+    center_text("BELMOLYSOFT NEWS", load_font(s(46)), s(1855), (119, 119, 119))
+
+    img.save(str(out_path), "JPEG", quality=92)
+    return out_path
 
 
 @app.post("/api/generate-long-video")
