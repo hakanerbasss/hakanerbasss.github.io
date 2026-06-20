@@ -79,12 +79,21 @@ ok "Baileys patch tamamlandı"
 if [ ! -f "$DEST/.env" ]; then
   SECRET=$(cat /proc/sys/kernel/random/uuid | tr -d '-')$(date +%s)
   cat > "$DEST/.env" <<EOF
-PORT=3000
+PORT=80
 JWT_SECRET=${SECRET}
 EOF
-  ok ".env oluşturuldu (PORT=3000)"
+  ok ".env oluşturuldu (PORT=80 — domain için)"
 else
   ok ".env zaten var, dokunulmadı"
+fi
+
+# Port 80 kontrol
+if ss -tlnp 2>/dev/null | grep -q ':80 ' || netstat -tlnp 2>/dev/null | grep -q ':80 '; then
+  echo -e "\n${Y} UYR ${X} Port 80 başka bir servis tarafından kullanılıyor!"
+  ss -tlnp 2>/dev/null | grep ':80 ' || netstat -tlnp 2>/dev/null | grep ':80 '
+  echo -e "${Y} UYR ${X} nginx/apache varsa durdurun: systemctl stop nginx apache2"
+  echo -e "${Y} UYR ${X} Devam etmek için Enter'a basın (veya Ctrl+C ile iptal)..."
+  read -r
 fi
 
 # pm2 ile başlat
@@ -103,7 +112,7 @@ SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 
 echo -e "\n${G}╔══════════════════════════════════════════╗"
 echo    "║  Kurulum tamamlandı!                    ║"
-echo -e "║  Panel: http://${SERVER_IP}:3000           ║"
+echo -e "║  Panel: http://${SERVER_IP} (port 80)      ║"
 echo    "║  pm2 logs whatsapp-api   → loglar       ║"
 echo    "║  pm2 restart whatsapp-api → yeniden     ║"
 echo -e "╚══════════════════════════════════════════╝${X}"
