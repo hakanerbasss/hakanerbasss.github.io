@@ -1556,11 +1556,11 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
         video_size = len(video_bytes)
 
         async with httpx.AsyncClient(timeout=60) as client:
-            # 1. Resumable session (VIDEO story)
+            # 1. Resumable session (VIDEO story — REELS değil, grid'e düşmez)
             r1 = await client.post(
                 f"{graph}/{ig_user_id}/media",
                 params={
-                    "media_type": "REELS",
+                    "media_type": "VIDEO",
                     "upload_type": "resumable",
                     "is_stories": "true",
                     "access_token": access_token,
