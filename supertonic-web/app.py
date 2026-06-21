@@ -344,13 +344,7 @@ Rules:
 
         png_files.append(png_path)
 
-    # İlk sahneye haber bandı overlay ekle (thumbnail yerine geçer, video hemen başlar)
-    first_title = data.get("title", topic or scenes[0]["text"][:60])
-    if png_files:
-        try:
-            overlay_first_scene_banner(png_files[0], first_title, lang=lang)
-        except Exception:
-            pass
+
 
     # Mevcut font bul
     font_candidates = [
