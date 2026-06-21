@@ -426,7 +426,7 @@ Rules:
             f"crop=1080:1920,"
             f"drawtext=textfile={text_file.absolute()}"
             f":fontsize=42:fontcolor=white:bordercolor=black:borderw=2"
-            f":x=(w-text_w)/2:y=h-th-140:line_spacing=12"
+            f":x=(w-text_w)/2:y=h-th-420:line_spacing=12"
             f":box=1:boxcolor=black@0.55:boxborderw=18"
         )
         if font_path:
