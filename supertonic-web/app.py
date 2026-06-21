@@ -179,7 +179,7 @@ async def voice_video(
     subprocess.run(
         ["ffmpeg", "-y", "-i", str(video_path), "-vn", "-ar", "16000", "-ac", "1",
          "-f", "wav", str(audio_extracted)],
-        check=True, capture_output=True
+        check=True, capture_output=True, timeout=180
     )
 
     # transkript
@@ -209,7 +209,7 @@ async def voice_video(
         ["ffmpeg", "-y", "-i", str(video_path), "-i", str(tts_audio),
          "-map", "0:v:0", "-map", "1:a:0",
          "-c:v", "copy", "-shortest", str(output_video)],
-        check=True, capture_output=True
+        check=True, capture_output=True, timeout=180
     )
 
     return {
@@ -1186,8 +1186,9 @@ Rules:
             "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
             "-t", str(dur_val),
             "-vf", drawtext,
-            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-        ], check=True, capture_output=True, timeout=120)
+            "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+            "-pix_fmt", "yuv420p", str(clip_path)
+        ], check=True, capture_output=True, timeout=180)
         clip_files.append(clip_path)
 
     # Sesleri birleştir
@@ -1198,7 +1199,7 @@ Rules:
             f.write(f"file '{af.absolute()}'\n")
     subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list), "-c", "copy", str(combined_audio)],
-        check=True, capture_output=True
+        check=True, capture_output=True, timeout=180
     )
 
     # Klipleri birleştir
@@ -1209,7 +1210,7 @@ Rules:
             f.write(f"file '{cp.absolute()}'\n")
     subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list), "-c", "copy", str(merged)],
-        check=True, capture_output=True
+        check=True, capture_output=True, timeout=180
     )
 
     # Ses ekle
@@ -1397,8 +1398,9 @@ Rules:
             "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
             "-t", str(dur_val),
             "-vf", drawtext,
-            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-        ], check=True, capture_output=True, timeout=120)
+            "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+            "-pix_fmt", "yuv420p", str(clip_path)
+        ], check=True, capture_output=True, timeout=180)
         clip_files.append(clip_path)
 
     audio_list = scene_dir / "audio_list.txt"
@@ -1408,7 +1410,7 @@ Rules:
             f.write(f"file '{af.absolute()}'\n")
     subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list), "-c", "copy", str(combined_audio)],
-        check=True, capture_output=True
+        check=True, capture_output=True, timeout=180
     )
 
     clip_list = scene_dir / "clip_list.txt"
@@ -1418,7 +1420,7 @@ Rules:
             f.write(f"file '{cp.absolute()}'\n")
     subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list), "-c", "copy", str(merged)],
-        check=True, capture_output=True
+        check=True, capture_output=True, timeout=180
     )
 
     output_file = OUTPUT_DIR / f"{uid}_tnlv.mp4"
