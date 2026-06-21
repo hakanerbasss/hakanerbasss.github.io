@@ -250,12 +250,23 @@ async def generate_shorts(
     exclude_instruction = ""
     if exclude_topics.strip():
         exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
-    topic_instruction = (
-        f"Topic: {topic}\n"
-        f"Use these TODAY'S real trending news to make the content timely and relevant:\n{trend_topics}"
-        if topic.strip() else
-        f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}"
-    )
+    if topic.strip():
+        topic_instruction = (
+            f"Topic: {topic}\n"
+            f"Use these TODAY'S real trending news to make the content timely and relevant:\n{trend_topics}"
+        )
+    elif lang == "en":
+        topic_instruction = (
+            f"Choose ONE of these TODAY'S trending news topics for a US/English-speaking audience:\n{trend_topics}\n"
+            f"PRIORITY ORDER: 1) Trump or US President news  2) US politics / Congress / White House  "
+            f"3) Major US foreign policy (wars, sanctions, NATO)  4) Breaking global news that impacts the US  "
+            f"5) Any other trending topic.\n"
+            f"Always pick the HIGHEST priority category available in the list above."
+        )
+    else:
+        topic_instruction = (
+            f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}"
+        )
     yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
     prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
