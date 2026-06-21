@@ -1752,6 +1752,7 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
     Tüm görseller PIL ile JPEG'e dönüştürülür (SVG/GIF/WebP sorunlarını önler).
     Başarılıysa img_path'e yazar ve True döner.
     """
+    import sys
     width = 1080 if orientation == "portrait" else 1920
     size_key = "portrait" if orientation == "portrait" else "large2x"
 
@@ -1779,9 +1780,14 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
                 data = httpx.get(img_url, timeout=15).content
                 if _save_as_jpeg(data, img_path):
                     return True
-        except Exception:
-            pass
+            else:
+                print(f"[GÖRSEL] Pexels sonuç yok: '{keyword}' HTTP={resp.status_code}", file=sys.stderr)
+        except Exception as e:
+            print(f"[GÖRSEL] Pexels hata: '{keyword}' {e}", file=sys.stderr)
+    else:
+        print(f"[GÖRSEL] Pexels key yok, Wikimedia de bulunamadı: '{keyword}'", file=sys.stderr)
 
+    print(f"[GÖRSEL] Tüm kaynaklar başarısız — siyah kare kullanılıyor: '{keyword}'", file=sys.stderr)
     return False
 
 
