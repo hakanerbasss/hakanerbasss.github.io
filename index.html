@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hakan Erbas — Projeler</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #1c2230;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --accent2: #3fb950;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --tag-bg: #1f2937;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+      min-height: 100vh;
+      padding: 0 0 60px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 32px 24px 28px;
+      text-align: center;
+    }
+
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #a371f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 16px;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    .header-links {
+      margin-top: 14px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .header-links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 20px;
+      transition: background 0.2s;
+    }
+
+    .header-links a:hover { background: var(--surface2); }
+
+    /* ── MAIN ── */
+    main {
+      max-width: 960px;
+      margin: 40px auto 0;
+      padding: 0 20px;
+    }
+
+    .section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      margin-bottom: 16px;
+      padding-left: 2px;
+    }
+
+    /* ── GRID ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s, transform 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .card-icon {
+      font-size: 1.6rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .card-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .card-status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 6px;
+      vertical-align: middle;
+      position: relative;
+      top: -1px;
+    }
+
+    .status-live { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+    .status-dev  { background: #e3b341; box-shadow: 0 0 6px #e3b341; }
+    .status-demo { background: var(--muted); }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      background: var(--tag-bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .card-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .btn {
+      font-size: 0.8rem;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0d1117;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .btn-secondary:hover { color: var(--text); border-color: var(--accent); }
+
+    /* ── CATEGORY BADGE ── */
+    .cat-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .cat-ai    { background: #1a1f3a; color: #79c0ff; border: 1px solid #1f3a6e; }
+    .cat-api   { background: #1a2e1a; color: #56d364; border: 1px solid #1f4a1f; }
+    .cat-app   { background: #2a1f1a; color: #ffa657; border: 1px solid #5a2e1a; }
+    .cat-game  { background: #2a1a2e; color: #d2a8ff; border: 1px solid #4a1f5e; }
+    .cat-tool  { background: #1a2a2a; color: #39d5d5; border: 1px solid #1a4a4a; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: 40px;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 500px) {
+      header h1 { font-size: 1.4rem; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="avatar">👨‍💻</div>
+  <h1>Hakan Erbas</h1>
+  <p>Full-Stack Developer &amp; AI Enthusiast</p>
+  <div class="header-links">
+    <a href="https://github.com/hakanerbasss" target="_blank">GitHub</a>
+    <a href="mailto:belmolysoft@gmail.com">E-posta</a>
+  </div>
+</header>
+
+<main>
+
+  <p class="section-title">Canlı Projeler &amp; Araçlar</p>
+  <div class="grid">
+
+    <!-- WhatsApp API -->
+    <div class="card">
+      <span class="cat-badge cat-api">API</span>
+      <div class="card-top">
+        <div class="card-icon">💬</div>
+        <div>
+          <div class="card-name">
+            WhatsApp API
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">WhatsApp Business API entegrasyonu. Mesaj gönderme, webhook dinleme ve oturum yönetimi için RESTful API servisi.</p>
+      <div class="card-tags">
+        <span class="tag">Node.js</span>
+        <span class="tag">WhatsApp</span>
+        <span class="tag">REST API</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-primary" href="https://wa.wizaicorp.com/" target="_blank">Aç</a>
+        <a class="btn btn-secondary" href="whatsapp-api-server/KURULUM.md" target="_blank">Docs</a>
+      </div>
+    </div>
+
+    <!-- WaPort -->
+    <div class="card">
+      <span class="cat-badge cat-api">Portal</span>
+      <div class="card-top">
+        <div class="card-icon">🚪</div>
+        <div>
+          <div class="card-name">
+            WaPort
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">WhatsApp yönetim portalı. Oturumları ve mesajları tek panelden izleme, QR kod ile bağlantı kurma.</p>
+      <div class="card-tags">
+        <span class="tag">Dashboard</span>
+        <span class="tag">WhatsApp</span>
+        <span class="tag">Panel</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-primary" href="https://waport.wizaicorp.com/" target="_blank">Aç</a>
+      </div>
+    </div>
+
+    <!-- TChat -->
+    <div class="card">
+      <span class="cat-badge cat-app">Chat</span>
+      <div class="card-top">
+        <div class="card-icon">💭</div>
+        <div>
+          <div class="card-name">
+            TChat
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">Gerçek zamanlı sohbet uygulaması. Oda bazlı mesajlaşma, kullanıcı yönetimi ve anlık bildirimler.</p>
+      <div class="card-tags">
+        <span class="tag">Real-time</span>
+        <span class="tag">WebSocket</span>
+        <span class="tag">Python</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-primary" href="http://45.143.4.169:5000/" target="_blank">Aç</a>
+      </div>
+    </div>
+
+    <!-- Drone -->
+    <div class="card">
+      <span class="cat-badge cat-tool">IoT</span>
+      <div class="card-top">
+        <div class="card-icon">🚁</div>
+        <div>
+          <div class="card-name">
+            Drone Kontrol
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">Drone izleme ve kontrol paneli. Anlık telemetri, uçuş rotası takibi ve uzaktan kontrol arayüzü.</p>
+      <div class="card-tags">
+        <span class="tag">IoT</span>
+        <span class="tag">Telemetri</span>
+        <span class="tag">Python</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-primary" href="http://hakanerbas.duckdns.org:8001/" target="_blank">Aç</a>
+      </div>
+    </div>
+
+    <!-- Kripto Bot -->
+    <div class="card">
+      <span class="cat-badge cat-ai">AI Bot</span>
+      <div class="card-top">
+        <div class="card-icon">📈</div>
+        <div>
+          <div class="card-name">
+            Kripto Bot
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">Çok-ajanlı AI kripto trading botu. Teknik analiz, sinyal üretimi, risk yönetimi ve otomatik işlem açma. Telegram bildirimleri ile canlı takip.</p>
+      <div class="card-tags">
+        <span class="tag">Python</span>
+        <span class="tag">Multi-Agent AI</span>
+        <span class="tag">Binance</span>
+        <span class="tag">Telegram</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-secondary" href="kripto-bot/SISTEM.md" target="_blank">Docs</a>
+      </div>
+    </div>
+
+    <!-- YouTube CEO Analyzer -->
+    <div class="card">
+      <span class="cat-badge cat-ai">AI Analiz</span>
+      <div class="card-top">
+        <div class="card-icon">🎬</div>
+        <div>
+          <div class="card-name">
+            YouTube CEO Analyzer
+            <span class="card-status status-dev" title="Geliştirme aşamasında"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">YouTube kanal ve video analiz aracı. İçerik stratejisi, rakip analizi ve büyüme fırsatları için AI destekli raporlama.</p>
+      <div class="card-tags">
+        <span class="tag">YouTube API</span>
+        <span class="tag">AI</span>
+        <span class="tag">Analitik</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-secondary" href="https://github.com/hakanerbasss" target="_blank">GitHub</a>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="section-title">Diğer Projeler</p>
+  <div class="grid">
+
+    <!-- Instagram Bot -->
+    <div class="card">
+      <span class="cat-badge cat-ai">Bot</span>
+      <div class="card-top">
+        <div class="card-icon">📸</div>
+        <div>
+          <div class="card-name">
+            Instagram Bot
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">Otomatik Instagram içerik yayıncısı. Ürün bulma, görsel düzenleme, caption oluşturma ve zamanlanmış paylaşım.</p>
+      <div class="card-tags">
+        <span class="tag">Python</span>
+        <span class="tag">Instagram API</span>
+        <span class="tag">AI Caption</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-secondary" href="https://github.com/hakanerbasss" target="_blank">GitHub</a>
+      </div>
+    </div>
+
+    <!-- NoteChain -->
+    <div class="card">
+      <span class="cat-badge cat-app">App</span>
+      <div class="card-top">
+        <div class="card-icon">📝</div>
+        <div>
+          <div class="card-name">
+            NoteChain
+            <span class="card-status status-dev" title="Geliştirme aşamasında"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">Zincir tabanlı not alma uygulaması. Notları birbirine bağlayarak bilgi grafiği oluşturma.</p>
+      <div class="card-tags">
+        <span class="tag">Notes</span>
+        <span class="tag">Knowledge Graph</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-secondary" href="https://github.com/hakanerbasss" target="_blank">GitHub</a>
+      </div>
+    </div>
+
+    <!-- Tank Siege -->
+    <div class="card">
+      <span class="cat-badge cat-game">Oyun</span>
+      <div class="card-top">
+        <div class="card-icon">🎮</div>
+        <div>
+          <div class="card-name">
+            Tank Siege
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">Mobil tank savaş oyunu. Strateji ve aksiyon bir arada, çok oyunculu modlar.</p>
+      <div class="card-tags">
+        <span class="tag">Unity</span>
+        <span class="tag">Mobile</span>
+        <span class="tag">Game</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-primary" href="tank-siege/tank_siege.html" target="_blank">Oyna</a>
+      </div>
+    </div>
+
+    <!-- Buzdağ Klima -->
+    <div class="card">
+      <span class="cat-badge cat-tool">Web</span>
+      <div class="card-top">
+        <div class="card-icon">❄️</div>
+        <div>
+          <div class="card-name">
+            Buzdağ Klima
+            <span class="card-status status-live" title="Canlı"></span>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">Klima ve soğutma sistemleri teknisyen web sitesi. Hizmet listesi, iletişim formu ve müşteri bilgilendirme.</p>
+      <div class="card-tags">
+        <span class="tag">HTML/CSS</span>
+        <span class="tag">İşletme</span>
+      </div>
+      <div class="card-links">
+        <a class="btn btn-primary" href="buzdagklima/index.html" target="_blank">Aç</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Durum göstergesi açıklaması -->
+  <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:8px; padding:14px 16px; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-size:0.8rem; color:var(--muted);">
+    <span><span class="card-status status-live" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3fb950;box-shadow:0 0 6px #3fb950;vertical-align:middle;margin-right:5px;"></span>Canlı</span>
+    <span><span class="card-status status-dev" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e3b341;box-shadow:0 0 6px #e3b341;vertical-align:middle;margin-right:5px;"></span>Geliştirme aşamasında</span>
+    <span><span class="card-status status-demo" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b949e;vertical-align:middle;margin-right:5px;"></span>Demo</span>
+  </div>
+
+</main>
+
+<footer style="margin-top:48px;">
+  <p>Hakan Erbas · <a href="https://github.com/hakanerbasss" target="_blank">@hakanerbasss</a> · <a href="mailto:belmolysoft@gmail.com">belmolysoft@gmail.com</a></p>
+</footer>
+
+</body>
+</html>
