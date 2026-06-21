@@ -2388,7 +2388,14 @@ def save_sched_log(status: str, message: str, url: str = ""):
     ))
 
 
+_shorts_job_lock = False
+
 async def auto_shorts_job():
+    global _shorts_job_lock
+    if _shorts_job_lock:
+        save_sched_log("error", "Önceki job hâlâ çalışıyor, bu istek atlandı")
+        return
+    _shorts_job_lock = True
     save_sched_log("running", "Video üretiliyor…")
     try:
         api_key = get_deepseek_key()
@@ -2458,6 +2465,8 @@ async def auto_shorts_job():
 
     except Exception as e:
         save_sched_log("error", f"{e}")
+    finally:
+        _shorts_job_lock = False
 
 
 async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = ""):
