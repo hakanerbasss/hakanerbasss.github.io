@@ -325,14 +325,26 @@ Rules:
         audio_files.append(audio_path)
         durations.append(dur_val)
 
-        # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
+        # Son sahne: sabit belmolysoft end card — Pexels'e gitme
+        is_last_scene = (i == len(scenes) - 1)
         png_path = scene_dir / f"scene_{i}.jpg"
-        keyword = scene.get("keyword", topic)
-        photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
-        if not photo_saved and visual_err:
-            visual_warnings.add(visual_err)
 
-        # Fallback: PIL ile garantili siyah arka plan
+        if is_last_scene:
+            endcard = Path("static/endcard_tr.jpg")
+            if endcard.exists():
+                import shutil as _sh
+                _sh.copy2(str(endcard), str(png_path))
+                photo_saved, visual_err = True, ""
+            else:
+                photo_saved, visual_err = False, "endcard yok"
+        else:
+            # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
+            keyword = scene.get("keyword", topic)
+            photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+            if not photo_saved and visual_err:
+                visual_warnings.add(visual_err)
+
+        # Fallback: koyu arka plan
         if not photo_saved:
             try:
                 from PIL import Image as PILImage
@@ -355,8 +367,9 @@ Rules:
         except Exception:
             pass
 
-    # Son sahneye beğen/abone ol bandı ekle
-    if png_files:
+    # Son sahneye beğen/abone ol bandı ekle (endcard kullanılıyorsa atlıyoruz — zaten içinde var)
+    endcard_used = Path("static/endcard_tr.jpg").exists()
+    if png_files and not endcard_used:
         try:
             overlay_like_subscribe_banner(png_files[-1])
         except Exception:
@@ -375,6 +388,22 @@ Rules:
     clip_files = []
     for i, (png, dur, scene) in enumerate(zip(png_files, durations, scenes)):
         clip_path = scene_dir / f"clip_{i}.mp4"
+        is_last = (i == len(scenes) - 1)
+
+        # Son sahne (endcard): metin overlay ekleme — endcard zaten tasarımlı
+        if is_last and endcard_used:
+            try:
+                subprocess.run([
+                    "ffmpeg", "-y",
+                    "-loop", "1", "-i", str(png),
+                    "-t", str(dur),
+                    "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                    "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+                ], check=True, capture_output=True, timeout=90)
+            except Exception as fe:
+                raise RuntimeError(f"ffmpeg endcard scene failed: {fe}")
+            clip_files.append(clip_path)
+            continue
 
         # Metni dosyaya yaz — özel karakter sorununu çözer
         words = scene["text"].split()
