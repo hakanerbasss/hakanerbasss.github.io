@@ -1610,6 +1610,9 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
             if not media_id or not upload_uri:
                 return None, f"no id/uri: {r1.text[:300]}"
 
+            # Instagram container'ın hazır olması için bekle
+            await asyncio.sleep(3)
+
             # 2. Video bytes'ı yükle — 3 deneme
             r2 = None
             for attempt in range(3):
@@ -1685,6 +1688,9 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
             upload_uri = j1.get("uri")
             if not media_id or not upload_uri:
                 return False, f"no uri: {r1.text[:300]}"
+
+            # Instagram container'ın hazır olması için bekle
+            await asyncio.sleep(3)
 
             # 2. Video bytes yükle — 3 deneme
             r2 = None
