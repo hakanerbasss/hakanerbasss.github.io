@@ -439,13 +439,13 @@ Rules:
         "-c", "copy", str(slideshow)
     ], check=True, capture_output=True, timeout=120)
 
-    # Ses ekle — Instagram uyumlu encode (baseline profile, faststart, AAC 44100)
+    # Ses ekle — YouTube + Instagram uyumlu encode
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
     subprocess.run([
         "ffmpeg", "-y", "-i", str(slideshow), "-i", str(combined_audio),
         "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.1",
-        "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
+        "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         "-shortest", str(output_file)
