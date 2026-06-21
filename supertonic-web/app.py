@@ -439,13 +439,17 @@ Rules:
         "-c", "copy", str(slideshow)
     ], check=True, capture_output=True, timeout=120)
 
-    # Ses ekle
+    # Ses ekle — Instagram uyumlu encode (baseline profile, faststart, AAC 44100)
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
     subprocess.run([
         "ffmpeg", "-y", "-i", str(slideshow), "-i", str(combined_audio),
         "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
-    ], check=True, capture_output=True, timeout=120)
+        "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.1",
+        "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+        "-movflags", "+faststart",
+        "-shortest", str(output_file)
+    ], check=True, capture_output=True, timeout=180)
 
     full_script = " ".join(s["text"] for s in scenes)
     generated_title = data.get("title", topic or scenes[0]["text"][:60])
@@ -1558,19 +1562,25 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
             if not media_id or not upload_uri:
                 return None, f"no id/uri: {r1.text[:300]}"
 
-            # 2. Video bytes'ı yükle
-            r2 = await client.post(
-                upload_uri,
-                headers={
-                    "Authorization": f"OAuth {access_token}",
-                    "offset": "0",
-                    "file_size": str(video_size),
-                    "Content-Type": "video/mp4",
-                },
-                content=video_bytes,
-                timeout=180,
-            )
-            if r2.status_code not in (200, 201):
+            # 2. Video bytes'ı yükle — 3 deneme
+            r2 = None
+            for attempt in range(3):
+                r2 = await client.post(
+                    upload_uri,
+                    headers={
+                        "Authorization": f"OAuth {access_token}",
+                        "offset": "0",
+                        "file_size": str(video_size),
+                        "Content-Type": "video/mp4",
+                    },
+                    content=video_bytes,
+                    timeout=180,
+                )
+                if r2.status_code in (200, 201):
+                    break
+                if attempt < 2:
+                    await asyncio.sleep(8)
+            if r2 is None or r2.status_code not in (200, 201):
                 return None, f"upload failed: {r2.status_code} {r2.text[:200]}"
 
             # 3. İşlenme tamamlanana kadar bekle (maks 5 dakika)
