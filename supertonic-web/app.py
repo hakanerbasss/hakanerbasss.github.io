@@ -309,6 +309,7 @@ Rules:
     audio_files = []
     png_files = []
     durations = []
+    visual_warnings: set = set()
 
     for i, scene in enumerate(scenes):
         wav, dur = tts.synthesize(
@@ -327,7 +328,9 @@ Rules:
         # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
         png_path = scene_dir / f"scene_{i}.jpg"
         keyword = scene.get("keyword", topic)
-        photo_saved = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+        photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+        if not photo_saved and visual_err:
+            visual_warnings.add(visual_err)
 
         # Fallback: PIL ile garantili siyah arka plan
         if not photo_saved:
@@ -474,6 +477,7 @@ Rules:
         "scene_count": len(scenes),
         "suggested_tags": video_tags,
         "suggested_description": f"{full_script[:200]}...\n\n{video_tags.replace(', ', ' ')}",
+        "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
     }
 
 
@@ -1746,11 +1750,10 @@ def _save_as_jpeg(data: bytes, img_path: Path) -> bool:
         return False
 
 
-def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path: Path) -> bool:
+def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path: Path) -> tuple[bool, str]:
     """
     Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels.
-    Tüm görseller PIL ile JPEG'e dönüştürülür (SVG/GIF/WebP sorunlarını önler).
-    Başarılıysa img_path'e yazar ve True döner.
+    (başarı: True,"") | (başarısız: False, "hata nedeni")
     """
     import sys
     width = 1080 if orientation == "portrait" else 1920
@@ -1760,11 +1763,11 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
     if openai_key:
         data = _generate_dalle_image(keyword, orientation, openai_key)
         if data and _save_as_jpeg(data, img_path):
-            return True
+            return True, ""
 
     data = _fetch_wikimedia_image(keyword, width=width)
     if data and _save_as_jpeg(data, img_path):
-        return True
+        return True, ""
 
     if pexels_key:
         try:
@@ -1774,21 +1777,30 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
                 headers={"Authorization": pexels_key},
                 timeout=10,
             )
+            if resp.status_code == 401:
+                print(f"[GÖRSEL] Pexels key geçersiz (401): '{keyword}'", file=sys.stderr)
+                return False, "Pexels 401 key geçersiz"
+            if resp.status_code == 429:
+                print(f"[GÖRSEL] Pexels kota doldu (429): '{keyword}'", file=sys.stderr)
+                return False, "Pexels 429 kota doldu"
             photos = resp.json().get("photos", [])
             if photos:
                 img_url = photos[0]["src"].get(size_key) or photos[0]["src"]["large"]
                 data = httpx.get(img_url, timeout=15).content
                 if _save_as_jpeg(data, img_path):
-                    return True
+                    return True, ""
             else:
                 print(f"[GÖRSEL] Pexels sonuç yok: '{keyword}' HTTP={resp.status_code}", file=sys.stderr)
+                return False, f"Pexels sonuç yok ({resp.status_code})"
         except Exception as e:
             print(f"[GÖRSEL] Pexels hata: '{keyword}' {e}", file=sys.stderr)
+            return False, f"Pexels hata: {e}"
     else:
         print(f"[GÖRSEL] Pexels key yok, Wikimedia de bulunamadı: '{keyword}'", file=sys.stderr)
+        return False, "Pexels key yok"
 
-    print(f"[GÖRSEL] Tüm kaynaklar başarısız — siyah kare kullanılıyor: '{keyword}'", file=sys.stderr)
-    return False
+    print(f"[GÖRSEL] Tüm kaynaklar başarısız — siyah kare: '{keyword}'", file=sys.stderr)
+    return False, "tüm kaynaklar başarısız"
 
 
 @app.post("/api/pexels/config")
@@ -2457,7 +2469,9 @@ async def auto_shorts_job():
                 return
 
             result = r2.json()
-            save_sched_log("success", d.get("title", ""), result.get("url", ""))
+            vw = d.get("visual_warning", "")
+            log_title = d.get("title", "") + (f" ⚠️ Görsel: {vw}" if vw else "")
+            save_sched_log("success", log_title, result.get("url", ""))
 
             # 3. Instagram'a gönder — arka planda, job'u bloke etmez
             ig_cfg = get_ig_config()
