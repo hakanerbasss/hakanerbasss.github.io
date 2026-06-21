@@ -347,6 +347,14 @@ Rules:
 
         png_files.append(png_path)
 
+    # İlk sahneye haber overlay ekle
+    if png_files:
+        try:
+            first_title = data.get("title", topic or scenes[0]["text"][:60])
+            overlay_first_scene_banner(png_files[0], first_title, lang=lang)
+        except Exception:
+            pass
+
     # Son sahneye beğen/abone ol bandı ekle
     if png_files:
         try:
