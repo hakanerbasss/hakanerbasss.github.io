@@ -2440,7 +2440,7 @@ async def auto_shorts_job():
 
             # 3. Instagram'a gönder — arka planda, job'u bloke etmez
             ig_cfg = get_ig_config()
-            ig_any = ig_cfg.get("post_reels", True) or ig_cfg.get("post_story", True)
+            ig_any = ig_cfg.get("post_reels", True) or ig_cfg.get("post_story", False)
             if ig_any and ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
                 asyncio.create_task(_post_to_instagram_bg(
                     filename=filename,
@@ -2472,7 +2472,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         ig_log = f"Reels hatası: {reel_err}" if reel_err else f"Reels yüklendi: {reel_id}"
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
 
-    if ig_cfg.get("post_story", True):
+    if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
         ok, story_err = await post_story_to_instagram(video_file2, ig_user_id, ig_token)
         story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
@@ -2829,7 +2829,7 @@ async def auto_en_shorts_job():
             save_en_shorts_sched_log("success", d.get("title", "") + f" [IG={'AÇIK' if ig_enabled else 'KAPALI'}]", result.get("url", ""))
             if ig_enabled:
                 ig_cfg = get_ig_config()
-                ig_any = ig_cfg.get("post_reels", True) or ig_cfg.get("post_story", True)
+                ig_any = ig_cfg.get("post_reels", True) or ig_cfg.get("post_story", False)
                 if ig_any and ig_cfg.get("ig_user_id") and ig_cfg.get("access_token"):
                     asyncio.create_task(_post_to_instagram_bg(
                         filename=filename,
