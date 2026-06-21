@@ -344,7 +344,12 @@ Rules:
 
         png_files.append(png_path)
 
-
+    # Son sahneye beğen/abone ol bandı ekle
+    if png_files:
+        try:
+            overlay_like_subscribe_banner(png_files[-1])
+        except Exception:
+            pass
 
     # Mevcut font bul
     font_candidates = [
@@ -667,6 +672,55 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
 
     img.save(str(out_path), "JPEG", quality=92)
     return out_path
+
+
+def overlay_like_subscribe_banner(photo_path: Path) -> None:
+    """Son sahne fotoğrafına koyu şeffaf alt bant + 👍 Beğen  🔔 Abone Ol yazar."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    W, H = 1080, 1920
+    img = Image.open(photo_path).convert("RGBA")
+    img = img.resize((W, H), Image.LANCZOS)
+
+    BAND_H = 260
+    band = Image.new("RGBA", (W, BAND_H), (10, 10, 10, 210))
+    img.paste(band, (0, H - BAND_H), band)
+
+    draw = ImageDraw.Draw(img)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((f for f in font_candidates if Path(f).exists()), None)
+
+    try:
+        font_big  = ImageFont.truetype(font_path, 90) if font_path else ImageFont.load_default()
+        font_small = ImageFont.truetype(font_path, 46) if font_path else ImageFont.load_default()
+    except Exception:
+        font_big = font_small = ImageFont.load_default()
+
+    RED    = (255, 0, 0)
+    WHITE  = (255, 255, 255)
+    YELLOW = (255, 208, 0)
+
+    # Sol yarı — 👍 Beğen
+    lx = W // 4
+    draw.text((lx, H - BAND_H + 28), "👍", font=font_big,  anchor="mt", fill=WHITE)
+    draw.text((lx, H - BAND_H + 128), "Beğen",   font=font_small, anchor="mt", fill=YELLOW)
+
+    # Dikey ayraç
+    sep_x = W // 2
+    draw.line([(sep_x, H - BAND_H + 20), (sep_x, H - 20)], fill=(80, 80, 80), width=2)
+
+    # Sağ yarı — 🔔 Abone Ol
+    rx = W * 3 // 4
+    draw.text((rx, H - BAND_H + 28), "🔔", font=font_big,  anchor="mt", fill=WHITE)
+    draw.text((rx, H - BAND_H + 128), "Abone Ol", font=font_small, anchor="mt", fill=RED)
+
+    img.convert("RGB").save(str(photo_path), "JPEG", quality=92)
 
 
 def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -> None:
