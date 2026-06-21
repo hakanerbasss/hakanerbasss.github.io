@@ -3178,6 +3178,41 @@ async def run_tnlv_now():
     return {"ok": True}
 
 
+@app.post("/api/stop-all")
+async def stop_all_jobs():
+    """Tüm çalışan FFmpeg proseslerini öldür ve log'ları sıfırla."""
+    import signal
+    global _shorts_job_lock
+
+    # FFmpeg proseslerini öldür
+    killed = 0
+    try:
+        result = subprocess.run(["pgrep", "-x", "ffmpeg"], capture_output=True, text=True)
+        pids = result.stdout.strip().split()
+        for pid in pids:
+            try:
+                import os
+                os.kill(int(pid), signal.SIGKILL)
+                killed += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # Job lock'ları serbest bırak
+    _shorts_job_lock = False
+
+    # Tüm log dosyalarını "durduruldu" olarak sıfırla
+    stop_payload = json.dumps({"status": "error", "message": "Kullanıcı tarafından durduruldu", "url": "", "ts": time.time()})
+    for log_file in [SCHED_LOG, LV_SCHED_LOG, LV_EN_SCHED_LOG, EN_SHORTS_SCHED_LOG, TNLV_SCHED_LOG]:
+        try:
+            log_file.write_text(stop_payload)
+        except Exception:
+            pass
+
+    return {"ok": True, "killed_ffmpeg": killed}
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
