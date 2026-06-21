@@ -1821,14 +1821,20 @@ async def get_instagram_config():
 
 @app.post("/api/instagram/config")
 async def set_instagram_config(
-    ig_user_id: str = Form(...),
-    access_token: str = Form(...),
+    ig_user_id: str = Form(""),
+    access_token: str = Form(""),
     post_reels: str = Form("true"),
-    post_story: str = Form("true"),
+    post_story: str = Form("false"),
 ):
+    existing = get_ig_config()
+    uid = ig_user_id.strip() or existing.get("ig_user_id", "")
+    tok = access_token.strip() or existing.get("access_token", "")
+    if not uid or not tok:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Kullanıcı ID ve Access Token gerekli")
     cfg = {
-        "ig_user_id": ig_user_id.strip(),
-        "access_token": access_token.strip(),
+        "ig_user_id": uid,
+        "access_token": tok,
         "post_reels": post_reels == "true",
         "post_story": post_story == "true",
     }
@@ -2447,17 +2453,18 @@ async def auto_shorts_job():
                     title=d.get("title", ""),
                     suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
                     ig_cfg=ig_cfg,
+                    source="TR-Shorts",
                 ))
 
     except Exception as e:
         save_sched_log("error", f"{e}")
 
 
-async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict):
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = ""):
     """Instagram gönderisi arka planda çalışır — scheduler'ı bloke etmez."""
     # Aynı başlık son 4 saatte atıldıysa tekrar atma
     if _ig_recently_posted(title):
-        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP] Zaten atıldı, atlanıyor: {title[:60]}"}))
+        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP:{source}] Zaten atıldı, atlanıyor: {title[:60]}"}))
         return
     _ig_mark_posted(title)
 
@@ -2836,6 +2843,7 @@ async def auto_en_shorts_job():
                         title=d.get("title", ""),
                         suggested_tags=d.get("suggested_tags", "#Shorts #news"),
                         ig_cfg=ig_cfg,
+                        source="EN-Shorts",
                     ))
 
     except Exception as e:
