@@ -470,25 +470,27 @@ Rules:
         if font_path:
             drawtext += f":fontfile={font_path}"
 
-        try:
-            result = subprocess.run([
-                "ffmpeg", "-y",
-                "-loop", "1", "-i", str(png),
-                "-t", str(dur),
-                "-vf", drawtext,
-                "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-            ], capture_output=True, timeout=90)
-            if result.returncode != 0:
-                # drawtext hata verdiyse metinsiz olarak dene
-                subprocess.run([
+        # Ken Burns efekti dene — başarısız olursa statik fallback
+        kb_ok = _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
+        if not kb_ok:
+            try:
+                result = subprocess.run([
                     "ffmpeg", "-y",
                     "-loop", "1", "-i", str(png),
                     "-t", str(dur),
-                    "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                    "-vf", drawtext,
                     "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-                ], check=True, capture_output=True, timeout=90)
-        except Exception as fe:
-            raise RuntimeError(f"ffmpeg scene {i} failed: {fe}")
+                ], capture_output=True, timeout=90)
+                if result.returncode != 0:
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-loop", "1", "-i", str(png),
+                        "-t", str(dur),
+                        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                        "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+                    ], check=True, capture_output=True, timeout=90)
+            except Exception as fe:
+                raise RuntimeError(f"ffmpeg scene {i} failed: {fe}")
         clip_files.append(clip_path)
 
     # Ses dosyalarını birleştir
@@ -1876,6 +1878,43 @@ def _save_as_jpeg(data: bytes, img_path: Path) -> bool:
         img = Image.open(io.BytesIO(data)).convert("RGB")
         img.save(str(img_path), "JPEG", quality=92)
         return True
+    except Exception:
+        return False
+
+
+def _try_ken_burns_clip(
+    img_path: Path, dur: float, clip_path: Path,
+    text_file=None, font_path: str = None,
+) -> bool:
+    """Ken Burns zoom efektiyle klip oluşturmayı dene. Başarısız olursa False döner."""
+    frames = max(1, int(dur * 30))
+    zoom_expr = f"'min(1+0.12*on/{frames},1.12)'"
+    zoompan = (
+        f"scale=1296:2304:force_original_aspect_ratio=increase,"
+        f"crop=1296:2304,"
+        f"zoompan=z={zoom_expr}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+        f":d={frames}:s=1080x1920:fps=30"
+    )
+    if text_file and Path(text_file).exists():
+        dt = (
+            f"drawtext=textfile={Path(text_file).absolute()}"
+            f":fontsize=42:fontcolor=white:bordercolor=black:borderw=2"
+            f":x=(w-text_w)/2:y=h-th-420:line_spacing=12"
+            f":box=1:boxcolor=black@0.55:boxborderw=18"
+        )
+        if font_path:
+            dt += f":fontfile={font_path}"
+        vf = zoompan + "," + dt
+    else:
+        vf = zoompan
+    try:
+        result = subprocess.run([
+            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+            "-t", str(dur), "-vf", vf,
+            "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+            "-pix_fmt", "yuv420p", str(clip_path),
+        ], capture_output=True, timeout=90)
+        return result.returncode == 0 and clip_path.exists() and clip_path.stat().st_size > 0
     except Exception:
         return False
 
