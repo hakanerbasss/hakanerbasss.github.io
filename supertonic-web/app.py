@@ -3062,6 +3062,151 @@ def _rebuild_tnlv_scheduler():
             pass
 
 
+# ── TR Instagram-Only Scheduler ─────────────────────────────────────────────
+IG_ONLY_TR_SCHED_CONFIG = Path("ig_only_tr_sched_config.json")
+IG_ONLY_TR_SCHED_LOG    = Path("ig_only_tr_sched_log.json")
+IG_ONLY_TR_DAILY_TOPICS = Path("ig_only_tr_daily_topics.json")
+
+
+def load_ig_only_tr_config():
+    if IG_ONLY_TR_SCHED_CONFIG.exists():
+        return json.loads(IG_ONLY_TR_SCHED_CONFIG.read_text())
+    return {"enabled": False, "times": ["09:00", "14:00", "19:00", "22:00"], "voice": "F1"}
+
+
+def save_ig_only_tr_log(status: str, message: str):
+    IG_ONLY_TR_SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "ts": time.time()},
+        ensure_ascii=False,
+    ))
+
+
+def get_ig_only_tr_used_topics() -> list[str]:
+    today = time.strftime("%Y-%m-%d")
+    if IG_ONLY_TR_DAILY_TOPICS.exists():
+        data = json.loads(IG_ONLY_TR_DAILY_TOPICS.read_text())
+        if data.get("date") == today:
+            return data.get("topics", [])
+    return []
+
+
+def add_ig_only_tr_used_topic(title: str):
+    today = time.strftime("%Y-%m-%d")
+    topics = get_ig_only_tr_used_topics()
+    topics.append(title.strip()[:120])
+    IG_ONLY_TR_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
+
+
+_ig_only_tr_job_lock = False
+
+
+async def auto_ig_only_tr_job():
+    global _ig_only_tr_job_lock
+    if _ig_only_tr_job_lock:
+        save_ig_only_tr_log("error", "Önceki job hâlâ çalışıyor, atlandı")
+        return
+    _ig_only_tr_job_lock = True
+    save_ig_only_tr_log("running", "Video üretiliyor…")
+    try:
+        api_key = get_deepseek_key()
+        if not api_key:
+            save_ig_only_tr_log("error", "DeepSeek API key kayıtlı değil")
+            return
+        ig_cfg = get_ig_config()
+        if not ig_cfg.get("ig_user_id") or not ig_cfg.get("access_token"):
+            save_ig_only_tr_log("error", "Instagram yapılandırılmamış")
+            return
+
+        cfg = load_ig_only_tr_config()
+        s_voice = cfg.get("voice", "F1")
+        used_topics = get_ig_only_tr_used_topics()
+        exclude_str = " | ".join(used_topics) if used_topics else ""
+
+        async with httpx.AsyncClient(timeout=900) as client:
+            r = await client.post(
+                "http://localhost:8001/api/generate-shorts",
+                data={"topic": "", "api_key": api_key, "lang": "tr", "voice": s_voice,
+                      "speed": "1.0", "exclude_topics": exclude_str, "region": "TR"},
+            )
+            if r.status_code != 200:
+                save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:300]}")
+                return
+            d = r.json()
+            add_ig_only_tr_used_topic(d.get("title", ""))
+            filename = d["video"].split("/").pop()
+
+        # Sadece Instagram — YouTube'a gönderilmez
+        ig_cfg["post_reels"] = True
+        vw = d.get("visual_warning", "")
+        log_title = d.get("title", "") + (f" ⚠️ {vw}" if vw else "")
+
+        await _post_to_instagram_bg(
+            filename=filename,
+            title=d.get("title", ""),
+            suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
+            ig_cfg=ig_cfg,
+            source="IG-Only-TR",
+        )
+        save_ig_only_tr_log("success", log_title)
+
+    except Exception as e:
+        save_ig_only_tr_log("error", str(e))
+    finally:
+        _ig_only_tr_job_lock = False
+
+
+def _rebuild_ig_only_tr_scheduler():
+    for job in scheduler.get_jobs():
+        if job.id.startswith("ig_only_tr_"):
+            job.remove()
+    cfg = load_ig_only_tr_config()
+    if not cfg.get("enabled"):
+        return
+    for t in cfg.get("times", []):
+        try:
+            hour, minute = t.strip().split(":")
+            scheduler.add_job(
+                auto_ig_only_tr_job,
+                CronTrigger(hour=int(hour), minute=int(minute), timezone="Europe/Istanbul"),
+                id=f"ig_only_tr_{t.replace(':', '')}",
+                replace_existing=True,
+                max_instances=1,
+            )
+        except Exception:
+            pass
+
+
+@app.get("/api/ig-only-tr/config")
+async def get_ig_only_tr_sched_config():
+    cfg = load_ig_only_tr_config()
+    log = {}
+    if IG_ONLY_TR_SCHED_LOG.exists():
+        log = json.loads(IG_ONLY_TR_SCHED_LOG.read_text())
+    jobs = [j for j in scheduler.get_jobs() if j.id.startswith("ig_only_tr_")]
+    next_run = min((j.next_run_time for j in jobs if j.next_run_time), default=None)
+    return {**cfg, "log": log, "next_run": next_run.isoformat() if next_run else None}
+
+
+@app.post("/api/ig-only-tr/config")
+async def save_ig_only_tr_sched_config(
+    enabled: str = Form("false"),
+    times: str = Form(""),
+    voice: str = Form("F1"),
+):
+    times_list = [t.strip() for t in times.split(",") if t.strip()]
+    cfg = {"enabled": enabled == "true", "times": times_list, "voice": voice}
+    IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg))
+    _rebuild_ig_only_tr_scheduler()
+    return {"ok": True}
+
+
+@app.post("/api/ig-only-tr/run-now")
+async def run_ig_only_tr_now():
+    asyncio.create_task(auto_ig_only_tr_job())
+    return {"ok": True}
+
+
+# ── Startup / Shutdown ────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
     scheduler.start()
@@ -3070,6 +3215,7 @@ async def startup_event():
     _rebuild_lv_en_scheduler()
     _rebuild_en_shorts_scheduler()
     _rebuild_tnlv_scheduler()
+    _rebuild_ig_only_tr_scheduler()
 
 
 @app.on_event("shutdown")
@@ -3288,7 +3434,7 @@ async def stop_all_jobs():
 
     # Tüm log dosyalarını "durduruldu" olarak sıfırla
     stop_payload = json.dumps({"status": "error", "message": "Kullanıcı tarafından durduruldu", "url": "", "ts": time.time()})
-    for log_file in [SCHED_LOG, LV_SCHED_LOG, LV_EN_SCHED_LOG, EN_SHORTS_SCHED_LOG, TNLV_SCHED_LOG]:
+    for log_file in [SCHED_LOG, LV_SCHED_LOG, LV_EN_SCHED_LOG, EN_SHORTS_SCHED_LOG, TNLV_SCHED_LOG, IG_ONLY_TR_SCHED_LOG]:
         try:
             log_file.write_text(stop_payload)
         except Exception:

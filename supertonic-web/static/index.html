@@ -1268,6 +1268,48 @@
       <div id="en-shorts-sched-last-url"></div>
     </div>
 
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📸 TR Instagram-Only Otomatik</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">Sadece Instagram'a gönderir — YouTube'a yüklenmez. TR trend haberlerinden video üretir.</p>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+        <input type="checkbox" id="ig-only-tr-enabled" style="width:18px;height:18px;accent-color:#e1306c;" onchange="saveIGOnlyTRScheduler()">
+        Instagram-Only otomatiği etkinleştir
+      </label>
+    </div>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+      <input type="text" id="ig-only-tr-times" value="09:00,14:00,19:00,22:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+
+    <div class="field" style="margin-bottom:14px;">
+      <label>Ses</label>
+      <select id="ig-only-tr-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        <option value="F1" selected>F1 (Kadın)</option>
+        <option value="F2">F2 (Kadın)</option>
+        <option value="F3">F3 (Kadın)</option>
+        <option value="M1">M1 (Erkek)</option>
+        <option value="M2">M2 (Erkek)</option>
+        <option value="M3">M3 (Erkek)</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+      <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+        <div class="spinner" id="spin-ig-only-tr-run-now"></div>
+        Şimdi Çalıştır
+      </button>
+    </div>
+
+    <div id="ig-only-tr-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+      <div id="ig-only-tr-next" style="color:#888;"></div>
+      <div id="ig-only-tr-last-status"></div>
+      <div id="ig-only-tr-last-msg" style="color:#888;word-break:break-all;"></div>
+    </div>
+
     <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
@@ -1586,6 +1628,7 @@ async function openSettings() {
   checkYTENStatus();
   loadLVENSchedulerStatus();
   loadENShortsSchedulerStatus();
+  loadIGOnlyTRStatus();
   checkOpenAIStatus();
   checkInstagramStatus();
   loadInstagramLog();
@@ -2190,6 +2233,54 @@ async function runENShortsNow() {
       document.getElementById('spin-en-shorts-run-now').style.display = 'none';
       document.getElementById('btn-en-shorts-run-now').disabled = false;
       loadENShortsSchedulerStatus();
+    }
+  }, 5000);
+}
+
+// ── TR Instagram-Only Scheduler ───────────────────────────────────────────────
+async function loadIGOnlyTRStatus() {
+  try {
+    const r = await fetch('/api/ig-only-tr/config');
+    const d = await r.json();
+    document.getElementById('ig-only-tr-enabled').checked = d.enabled;
+    document.getElementById('ig-only-tr-times').value = (d.times || ['09:00','14:00','19:00','22:00']).join(',');
+    if (d.voice) document.getElementById('ig-only-tr-voice').value = d.voice;
+
+    const st = document.getElementById('ig-only-tr-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('ig-only-tr-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const statusEl = document.getElementById('ig-only-tr-last-status');
+      statusEl.textContent = log.status ? `Durum: ${log.status}` : '';
+      statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
+      document.getElementById('ig-only-tr-last-msg').textContent = log.message || '';
+    }
+  } catch(e) {}
+}
+
+async function saveIGOnlyTRScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('ig-only-tr-enabled').checked ? 'true' : 'false');
+  fd.append('times', document.getElementById('ig-only-tr-times').value);
+  fd.append('voice', document.getElementById('ig-only-tr-voice').value);
+  await fetch('/api/ig-only-tr/config', { method: 'POST', body: fd });
+  await loadIGOnlyTRStatus();
+}
+
+async function runIGOnlyTRNow() {
+  document.getElementById('spin-ig-only-tr-run-now').style.display = 'inline-block';
+  document.getElementById('btn-ig-only-tr-run-now').disabled = true;
+  await fetch('/api/ig-only-tr/run-now', { method: 'POST' });
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/ig-only-tr/config');
+    const d = await r.json();
+    const log = d.log || {};
+    if (log.status && log.status !== 'running') {
+      clearInterval(poll);
+      document.getElementById('spin-ig-only-tr-run-now').style.display = 'none';
+      document.getElementById('btn-ig-only-tr-run-now').disabled = false;
+      loadIGOnlyTRStatus();
     }
   }, 5000);
 }
