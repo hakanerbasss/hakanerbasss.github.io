@@ -2681,11 +2681,32 @@ function formatNum(n) {
 let _comedySessionId = null;
 let _comedyUid = null;
 
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('comedy-photos');
+  if (input) input.addEventListener('change', () => {
+    const thumbs = document.getElementById('comedy-thumbs');
+    thumbs.innerHTML = '';
+    const btn = document.getElementById('comedy-upload-btn');
+    if (!input.files.length) { btn.style.display = 'none'; return; }
+    for (let i = 0; i < input.files.length; i++) {
+      const f = input.files[i];
+      const url = URL.createObjectURL(f);
+      thumbs.innerHTML += `<div style="text-align:center;">
+        <img src="${url}" style="width:70px;height:95px;object-fit:cover;border-radius:6px;border:2px solid #3b2d6e;">
+        <div style="color:#a78bfa;font-size:11px;margin-top:2px;">${i+1}</div>
+      </div>`;
+    }
+    document.getElementById('comedy-upload-status').textContent = `${input.files.length} fotoğraf seçildi — sırayı kontrol et, sonra yükle.`;
+    btn.style.display = 'flex';
+  });
+});
+
 async function uploadComedyPhotos() {
   const input = document.getElementById('comedy-photos');
   if (!input.files.length) { alert('Önce fotoğraf seç'); return; }
   const status = document.getElementById('comedy-upload-status');
   status.textContent = 'Yükleniyor...';
+  document.getElementById('comedy-upload-btn').disabled = true;
   const fd = new FormData();
   for (const f of input.files) fd.append('files', f);
   try {
@@ -2695,13 +2716,12 @@ async function uploadComedyPhotos() {
     _comedySessionId = d.session_id;
     status.textContent = `✓ ${d.count} fotoğraf yüklendi`;
     document.getElementById('comedy-session-id').textContent = d.session_id;
-    document.getElementById('comedy-photo-list').textContent = d.photos.join(', ');
     document.getElementById('comedy-session-info').style.display = 'block';
     document.getElementById('comedy-create-section').style.display = 'block';
-    document.getElementById('comedy-video-status').textContent =
-      '→ Fotoğrafları bu chatte bana gönder. Ben haber metnini yazıp videoyu oluştururum.';
+    document.getElementById('comedy-upload-btn').style.display = 'none';
   } catch(e) {
     status.textContent = 'Hata: ' + e.message;
+    document.getElementById('comedy-upload-btn').disabled = false;
   }
 }
 
@@ -2777,14 +2797,19 @@ function deleteComedyVideo() {
   <p style="color:#666;font-size:13px;margin-bottom:24px;">Fotoğraflarını yükle → bana gönder → ben haberi yazarım → video hazır → beğenirsen Instagram'a gönder</p>
 
   <div style="background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:20px;">
-    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:12px;">1. Fotoğrafları Yükle</h3>
-    <p style="color:#888;font-size:12px;margin-bottom:12px;">Telefondan fotoğrafları <strong style="color:#ccc;">1.jpg, 2.jpg, 3.jpg</strong> olarak isimlendirin. Sıra bu isimlere göre belirlenir. Küçültmeye gerek yok, sistem otomatik ayarlar.</p>
-    <input type="file" id="comedy-photos" multiple accept="image/*" style="color:#ccc;font-size:13px;margin-bottom:12px;display:block;">
-    <button onclick="uploadComedyPhotos()">📤 Yükle</button>
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:10px;">1. Fotoğrafları Seç &amp; Yükle</h3>
+    <p style="color:#888;font-size:12px;margin-bottom:14px;">Yeniden isimlendirmeye gerek yok. Galeride <strong style="color:#ccc;">sırayla tıklayarak</strong> seç — o sıra sahne sırası olur.</p>
+    <input type="file" id="comedy-photos" multiple style="display:none">
+    <div onclick="document.getElementById('comedy-photos').click()" style="border:2px dashed #3b2d6e;border-radius:10px;padding:28px;text-align:center;cursor:pointer;background:#0d0d1e;margin-bottom:12px;" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#3b2d6e'">
+      <div style="font-size:36px;margin-bottom:8px;">📷</div>
+      <div style="color:#a78bfa;font-size:15px;font-weight:600;">Fotoğraf Seç</div>
+      <div style="color:#555;font-size:12px;margin-top:4px;">Birden fazla seçebilirsin</div>
+    </div>
+    <button id="comedy-upload-btn" onclick="uploadComedyPhotos()" style="display:none;width:100%;justify-content:center;">📤 Yükle</button>
     <div id="comedy-upload-status" style="color:#888;margin-top:10px;font-size:13px;"></div>
-    <div id="comedy-session-info" style="display:none;margin-top:14px;background:#1a1a2e;padding:10px 14px;border-radius:8px;font-size:12px;">
-      <span style="color:#a78bfa;">Session: </span><span id="comedy-session-id" style="color:#fff;font-family:monospace;"></span>
-      <br><span style="color:#666;margin-top:4px;display:block;">Fotoğraflar: <span id="comedy-photo-list" style="color:#aaa;"></span></span>
+    <div id="comedy-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+    <div id="comedy-session-info" style="display:none;margin-top:12px;background:#1a1a2e;padding:8px 12px;border-radius:8px;font-size:11px;color:#666;">
+      Session: <span id="comedy-session-id" style="color:#a78bfa;font-family:monospace;"></span>
     </div>
   </div>
 

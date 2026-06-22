@@ -2480,6 +2480,14 @@ async def get_video(filename: str):
     return FileResponse(str(path), media_type="video/mp4")
 
 
+@app.get("/api/comedy/photo/{session_id}/{filename}")
+async def get_comedy_photo(session_id: str, filename: str):
+    path = COMEDY_UPLOAD_DIR / session_id / filename
+    if not path.exists():
+        raise HTTPException(404, "Fotoğraf bulunamadı")
+    return FileResponse(str(path))
+
+
 # ── DeepSeek server-side config ──────────────────────────────────────────────
 
 def get_deepseek_key():
@@ -3613,19 +3621,18 @@ async def stop_all_jobs():
 
 @app.post("/api/comedy/upload")
 async def comedy_upload_photos(files: list[UploadFile] = File(...)):
-    """Komik haber için fotoğraf yükle. Dosya adları sırayı belirler (1.jpg, 2.jpg...)."""
+    """Komik haber için fotoğraf yükle. Yükleme sırasına göre 1.jpg, 2.jpg... olarak kaydeder."""
     if not files:
         raise HTTPException(400, "Fotoğraf yüklenmedi")
     session_id = uuid.uuid4().hex[:8]
     session_dir = COMEDY_UPLOAD_DIR / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
     saved = []
-    for f in files:
-        safe_name = Path(f.filename).name
-        dest = session_dir / safe_name
+    for i, f in enumerate(files, start=1):
+        ext = Path(f.filename).suffix.lower() or ".jpg"
+        dest = session_dir / f"{i}{ext}"
         dest.write_bytes(await f.read())
-        saved.append(safe_name)
-    saved.sort(key=lambda x: int(re.sub(r'\D', '', Path(x).stem) or '0'))
+        saved.append(dest.name)
     return {"session_id": session_id, "photos": saved, "count": len(saved)}
 
 
