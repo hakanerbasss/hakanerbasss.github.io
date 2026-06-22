@@ -314,7 +314,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
 Rules:
 - 5 to 7 scenes
-- FIRST scene text MUST start with a strong hook. Use VARIETY — never repeat the same hook phrase across videos. Examples: "Biliyor muydunuz?", "Peki ne oldu?", "İşte o an!", "Herkes bunu merak ediyor:", "Rakamlar şaşırtıyor:", "Tarihin en...", "Kimse beklemiyordu:". Do NOT use "Şok gelişme" repeatedly.
+- FIRST scene text MUST use a CURIOSITY-GAP hook — never state the answer directly in the first sentence. Create suspense or partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Herkes bunu merak ediyordu — cevap şoke etti.", "Tarihin en büyük...", "Peki gerçekte ne oldu?". NEVER open with a plain news statement. The viewer must NEED to keep watching to get the answer. Do NOT repeat the same opener across videos.
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
@@ -1180,7 +1180,7 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - Exactly {scene_count} scenes
-- FIRST scene text MUST start with a strong, varied hook. Do NOT use "Şok gelişme" every time. Rotate between: "Biliyor muydunuz?", "Peki ne oldu?", "İşte o an!", "Herkes bunu merak ediyor:", "Rakamlar şaşırtıyor:", "Tarihin en...", "Kimse beklemiyordu:", or similar creative openers matching the topic.
+- FIRST scene text MUST use a CURIOSITY-GAP hook — never state the answer directly. Create suspense, ask a question, or give a partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Cevap herkesi şoke etti.", "Peki gerçekte ne oldu?", "Tarihin en büyük...". The viewer MUST feel compelled to keep watching. NEVER open with a plain news statement. Vary the opener every video.
 - LAST scene text MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
 - Each scene: 2-3 sentences packed with facts, context and detail — NOT simple or vague
 - Cover the topic thoroughly: introduction, key facts, interesting details, historical context, conclusion
@@ -1389,7 +1389,7 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - One segment per trending topic ({len(topics_list)} segments total, {len(topics_list)*2} scenes)
-- VERY FIRST scene of the entire video MUST start with a strong, creative hook that fits the topic. Do NOT use the same phrase every time (avoid repeating "Şok gelişme"). Use varied openers: "Biliyor muydunuz?", "Peki ne oldu?", "İşte o an!", "Herkes bunu merak ediyor:", "Rakamlar şaşırtıyor:", etc. Critical for retention.
+- VERY FIRST scene MUST use a CURIOSITY-GAP hook — never state the answer directly. Withhold the key fact, create suspense or partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Peki gerçekte ne oldu?", "Cevap herkesi şoke etti.", "Tarihin en büyük...". The viewer MUST feel compelled to keep watching. Critical for retention — never open with a plain news headline.
 - VERY LAST scene MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
 - Each segment: exactly 2 scenes, informative and engaging
 - hashtags: 10-15 tags mixing {lang_name} and English, always include news-related tags, no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika")
