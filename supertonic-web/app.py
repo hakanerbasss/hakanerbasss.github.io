@@ -101,42 +101,12 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
     text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
 
     if lang == "tr":
-        # Tarih: 22.06.2026 → 22 Haziran 2026
-        _ay = {1:"Ocak",2:"Şubat",3:"Mart",4:"Nisan",5:"Mayıs",6:"Haziran",
-               7:"Temmuz",8:"Ağustos",9:"Eylül",10:"Ekim",11:"Kasım",12:"Aralık"}
-        def _tarih(m):
-            try:
-                return f"{int(m.group(1))} {_ay[int(m.group(2))]} {m.group(3)}"
-            except Exception:
-                return m.group(0)
-        text = re.sub(r'\b(\d{1,2})\.(\d{2})\.(\d{4})\b', _tarih, text)
-        # Saat/zaman damgası kaldır: 09:06
-        text = re.sub(r'\b\d{1,2}:\d{2}\b', '', text)
-        # Rakam+nokta+rakam: 1.500 → 1500
+        # 1.500 → 1500
         text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
-        # Yüzde: %85 → yüzde 85
+        # %85 → yüzde 85
         text = re.sub(r'%\s*(\d+)', r'yüzde \1', text)
-        # Derece: 32° → 32 derece
+        # 32° → 32 derece
         text = re.sub(r'(\d+)°', r'\1 derece', text)
-
-        # Kelime gibi okunan kısaltmalar
-        _word_abbrevs = {
-            "NATO", "NASA", "FIFA", "UEFA", "UNICEF", "UNESCO",
-            "INTERPOL", "OPEC", "FETÖ", "PKK", "TOGG",
-        }
-        # Uzun büyük harf kelimeler (6+ harf) = Türkçe başlık stili → normal case
-        text = re.sub(
-            r'\b[A-ZÇĞİÖŞÜ]{6,}\b',
-            lambda m: m.group(0)[0] + m.group(0)[1:].lower(),
-            text,
-        )
-        # Kısa büyük harf kısaltmalar (2-5 harf) → harf harf oku
-        def _space_abbrev(m):
-            word = m.group(0)
-            if word in _word_abbrevs:
-                return word[0] + word[1:].lower()  # Nato, Fifa
-            return " ".join(word)  # A Y T, Ö S Y M
-        text = re.sub(r'\b[A-ZÇĞİÖŞÜ]{2,4}\b', _space_abbrev, text)
 
     # URL'leri kaldır
     text = re.sub(r'https?://\S+', '', text)
