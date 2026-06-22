@@ -102,12 +102,27 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
 
     if lang == "tr":
         # Rakam+nokta+rakam → TTS "bin beş yüz" demesin diye noktayı kaldır
-        # 1.500 → 1500, 2.300 → 2300
         text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
         # Yüzde: %85 → yüzde 85
         text = re.sub(r'%\s*(\d+)', r'yüzde \1', text)
         # Derece: 32° → 32 derece
         text = re.sub(r'(\d+)°', r'\1 derece', text)
+
+        # Kelime gibi okunan kısaltmalar — olduğu gibi bırak (küçük harfe çevir)
+        _word_abbrevs = {
+            "NATO", "NASA", "FIFA", "UEFA", "UNICEF", "UNESCO",
+            "INTERPOL", "OPEC", "FETÖ", "PKK",
+        }
+
+        # Büyük harf kısaltmalara harf harf oku için boşluk ekle
+        # ÖSYM → Ö S Y M, TBMM → T B M M, ABD → A B D
+        def _space_abbrev(m):
+            word = m.group(0)
+            if word in _word_abbrevs:
+                return word.capitalize()
+            return " ".join(word)
+
+        text = re.sub(r'\b[A-ZÇĞİÖŞÜ]{2,}\b', _space_abbrev, text)
 
     # URL'leri kaldır
     text = re.sub(r'https?://\S+', '', text)
