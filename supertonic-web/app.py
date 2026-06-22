@@ -1559,23 +1559,22 @@ _IG_DEDUP_HOURS = 4  # aynı başlık bu süreden önce atıldıysa tekrar atma
 
 
 def _ig_recently_posted(title: str) -> bool:
-    """Son 4 saat içinde aynı başlık Instagram'a atıldıysa True döner."""
+    """Aynı başlık daha önce Instagram'a atıldıysa True döner (süre sınırı yok)."""
     if not IG_RECENT_FILE.exists():
         return False
     try:
         records = json.loads(IG_RECENT_FILE.read_text())
-        cutoff = time.time() - _IG_DEDUP_HOURS * 3600
         title_lower = title.strip().lower()[:80]
-        return any(r.get("ts", 0) > cutoff and r.get("title", "").lower()[:80] == title_lower for r in records)
+        return any(r.get("title", "").lower()[:80] == title_lower for r in records)
     except Exception:
         return False
 
 
 def _ig_mark_posted(title: str) -> None:
-    """Başlığı IG son-gönderi listesine ekle, 12 saatten eski kayıtları temizle."""
+    """Başlığı IG son-gönderi listesine ekle, 30 günden eski kayıtları temizle."""
     try:
         records = json.loads(IG_RECENT_FILE.read_text()) if IG_RECENT_FILE.exists() else []
-        cutoff = time.time() - 12 * 3600
+        cutoff = time.time() - 30 * 24 * 3600
         records = [r for r in records if r.get("ts", 0) > cutoff]
         records.append({"ts": time.time(), "title": title.strip()[:120]})
         IG_RECENT_FILE.write_text(json.dumps(records))
