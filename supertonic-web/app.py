@@ -514,21 +514,23 @@ Rules:
 
     slideshow = scene_dir / "slideshow.mp4"
     subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file),
-        "-c", "copy", str(slideshow)
-    ], check=True, capture_output=True, timeout=120)
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
+        str(slideshow.absolute())
+    ], check=True, capture_output=True, timeout=300)
 
     # Ses ekle — YouTube + Instagram uyumlu encode
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
     subprocess.run([
-        "ffmpeg", "-y", "-i", str(slideshow), "-i", str(combined_audio),
+        "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
-        "-shortest", str(output_file)
-    ], check=True, capture_output=True, timeout=180)
+        "-shortest", str(output_file.absolute())
+    ], check=True, capture_output=True, timeout=300)
 
     full_script = " ".join(s["text"] for s in scenes)
     generated_title = data.get("title", topic or scenes[0]["text"][:60])
@@ -3776,19 +3778,22 @@ async def comedy_create_video(request: Request):
             f.write(f"file '{cp.absolute()}'\n")
     slideshow = work_dir / "slideshow.mp4"
     subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file), "-c", "copy", str(slideshow)
-    ], check=True, capture_output=True, timeout=120)
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
+        str(slideshow.absolute())
+    ], check=True, capture_output=True, timeout=300)
 
     # Final encode
     output_file = OUTPUT_DIR / f"{uid}_comedy.mp4"
     subprocess.run([
-        "ffmpeg", "-y", "-i", str(slideshow), "-i", str(combined_audio),
+        "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
-        "-movflags", "+faststart", "-shortest", str(output_file)
-    ], check=True, capture_output=True, timeout=180)
+        "-movflags", "+faststart", "-shortest", str(output_file.absolute())
+    ], check=True, capture_output=True, timeout=300)
 
     # Meta kaydet (Instagram gönderimi için)
     (session_dir / "video_meta.json").write_text(json.dumps({
