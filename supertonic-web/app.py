@@ -91,6 +91,33 @@ def get_tts():
     return tts_model
 
 
+def _clean_tts_text(text: str, lang: str = "tr") -> str:
+    """TTS'e gitmeden önce metni temizle — imla/format hatalarını düzelt."""
+    import re
+    # Markdown kalıntılarını kaldır
+    text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)  # **bold** *italic*
+    text = re.sub(r'#{1,6}\s*', '', text)                   # ## başlık
+    text = re.sub(r'`[^`]*`', '', text)                     # `kod`
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)   # [link](url)
+
+    if lang == "tr":
+        # Rakam+nokta+rakam → TTS "bin beş yüz" demesin diye noktayı kaldır
+        # 1.500 → 1500, 2.300 → 2300
+        text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
+        # Yüzde: %85 → yüzde 85
+        text = re.sub(r'%\s*(\d+)', r'yüzde \1', text)
+        # Derece: 32° → 32 derece
+        text = re.sub(r'(\d+)°', r'\1 derece', text)
+
+    # URL'leri kaldır
+    text = re.sub(r'https?://\S+', '', text)
+    # Emoji ve özel semboller (TTS bunları okumaya çalışır)
+    text = re.sub(r'[#@|_~^\\<>{}[\]]', ' ', text)
+    # Birden fazla boşluk/satır sonu → tek boşluk
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
 def get_whisper():
     global whisper_model
     if whisper_model is None:
@@ -126,7 +153,7 @@ async def synthesize(
     style = tts.get_voice_style(voice_name=voice)
 
     wav, duration = tts.synthesize(
-        text=text,
+        text=_clean_tts_text(text, lang),
         lang=lang,
         voice_style=style,
         total_steps=8,
@@ -196,7 +223,7 @@ async def voice_video(
     tts = get_tts()
     style = tts.get_voice_style(voice_name=voice)
     wav, _ = tts.synthesize(
-        text=transcript,
+        text=_clean_tts_text(transcript, lang),
         lang=lang,
         voice_style=style,
         total_steps=8,
@@ -324,7 +351,7 @@ Rules:
 
     for i, scene in enumerate(scenes):
         wav, dur = tts.synthesize(
-            text=scene["text"],
+            text=_clean_tts_text(scene["text"], lang),
             lang=lang,
             voice_style=style,
             total_steps=8,
@@ -1192,7 +1219,7 @@ Rules:
     for i, scene in enumerate(scenes):
         # TTS
         wav, dur = tts.synthesize(
-            text=scene["text"], lang=lang, voice_style=style,
+            text=_clean_tts_text(scene["text"], lang), lang=lang, voice_style=style,
             total_steps=8, speed=speed,
         )
         dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
@@ -1405,7 +1432,7 @@ Rules:
 
     for i, scene in enumerate(scenes):
         wav, dur = tts.synthesize(
-            text=scene["text"], lang=lang, voice_style=style,
+            text=_clean_tts_text(scene["text"], lang), lang=lang, voice_style=style,
             total_steps=8, speed=speed,
         )
         dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
