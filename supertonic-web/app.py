@@ -32,8 +32,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 OUTPUT_DIR = Path("outputs")
 UPLOAD_DIR = Path("uploads")
+COMEDY_UPLOAD_DIR = Path("uploads/comedy")
 OUTPUT_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
+COMEDY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 tts_model = None
 whisper_model = None
@@ -3602,6 +3604,225 @@ async def stop_all_jobs():
             pass
 
     return {"ok": True, "killed_ffmpeg": killed}
+
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# KOMİK HABER — fotoğraftan video oluştur
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.post("/api/comedy/upload")
+async def comedy_upload_photos(files: list[UploadFile] = File(...)):
+    """Komik haber için fotoğraf yükle. Dosya adları sırayı belirler (1.jpg, 2.jpg...)."""
+    if not files:
+        raise HTTPException(400, "Fotoğraf yüklenmedi")
+    session_id = uuid.uuid4().hex[:8]
+    session_dir = COMEDY_UPLOAD_DIR / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    saved = []
+    for f in files:
+        safe_name = Path(f.filename).name
+        dest = session_dir / safe_name
+        dest.write_bytes(await f.read())
+        saved.append(safe_name)
+    saved.sort(key=lambda x: int(re.sub(r'\D', '', Path(x).stem) or '0'))
+    return {"session_id": session_id, "photos": saved, "count": len(saved)}
+
+
+@app.post("/api/comedy/create")
+async def comedy_create_video(request: Request):
+    """
+    Fotoğraflardan komik haber videosu oluştur.
+    Body: {
+      "session_id": "abc12345",
+      "scenes": [{"photo": "1.jpg", "text": "Alt yazı...", "tts": "Seslendir..."}],
+      "voice": "M3",
+      "title": "Video başlığı"
+    }
+    """
+    body = await request.json()
+    session_id = body.get("session_id", "")
+    scenes = body.get("scenes", [])
+    voice = body.get("voice", "M3")
+
+    if not session_id or not scenes:
+        raise HTTPException(400, "session_id ve scenes gerekli")
+
+    session_dir = COMEDY_UPLOAD_DIR / session_id
+    if not session_dir.exists():
+        raise HTTPException(404, f"Session bulunamadı: {session_id}")
+
+    uid = uuid.uuid4().hex[:8]
+    work_dir = COMEDY_UPLOAD_DIR / f"work_{uid}"
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    tts = get_tts()
+    style = tts.get_voice_style(voice_name=voice)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((fp for fp in font_candidates if Path(fp).exists()), None)
+
+    audio_files = []
+    clip_files = []
+
+    from PIL import Image
+
+    for i, scene in enumerate(scenes):
+        photo_name = scene.get("photo", "")
+        text = scene.get("text", "")
+        tts_text = _clean_tts_text(scene.get("tts", text), "tr")
+
+        photo_src = session_dir / photo_name
+        if not photo_src.exists():
+            raise HTTPException(404, f"Fotoğraf bulunamadı: {photo_name}")
+
+        # Fotoğrafı 1080x1920 dikey formata crop/resize
+        img = Image.open(photo_src).convert("RGB")
+        src_ratio = img.width / img.height
+        tgt_ratio = 1080 / 1920
+        if src_ratio > tgt_ratio:
+            new_h = 1920
+            new_w = int(new_h * src_ratio)
+        else:
+            new_w = 1080
+            new_h = int(new_w / src_ratio)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+        left = (new_w - 1080) // 2
+        top = (new_h - 1920) // 2
+        img = img.crop((left, top, left + 1080, top + 1920))
+        png_path = work_dir / f"scene_{i}.jpg"
+        img.save(str(png_path), "JPEG", quality=90)
+
+        # TTS
+        wav, duration = tts.synthesize(
+            text=tts_text,
+            lang="tr",
+            voice_style=style,
+            total_steps=8,
+            speed=1.0,
+        )
+        audio_path = work_dir / f"audio_{i}.wav"
+        tts.save_audio(wav, str(audio_path))
+        dur = float(duration[0]) if hasattr(duration, '__getitem__') else float(duration)
+        audio_files.append((audio_path, dur))
+
+        # Alt yazı dosyası
+        words = text.split()
+        lines, line = [], []
+        for w in words:
+            if len(" ".join(line + [w])) > 38:
+                lines.append(" ".join(line))
+                line = [w]
+            else:
+                line.append(w)
+        if line:
+            lines.append(" ".join(line))
+        text_file = work_dir / f"text_{i}.txt"
+        text_file.write_text("\n".join(lines), encoding="utf-8")
+
+        clip_path = work_dir / f"clip_{i}.mp4"
+        kb_ok = _try_ken_burns_clip(png_path, dur, clip_path, text_file, font_path)
+        if not kb_ok:
+            drawtext = (
+                f"scale=1080:1920:force_original_aspect_ratio=increase,"
+                f"crop=1080:1920,"
+                f"drawtext=textfile={text_file.absolute()}"
+                f":fontsize=42:fontcolor=white:bordercolor=black:borderw=2"
+                f":x=(w-text_w)/2:y=h-th-420:line_spacing=12"
+                f":box=1:boxcolor=black@0.55:boxborderw=18"
+            )
+            if font_path:
+                drawtext += f":fontfile={font_path}"
+            r = subprocess.run([
+                "ffmpeg", "-y", "-loop", "1", "-i", str(png_path),
+                "-t", str(dur), "-vf", drawtext,
+                "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+            ], capture_output=True, timeout=90)
+            if r.returncode != 0:
+                subprocess.run([
+                    "ffmpeg", "-y", "-loop", "1", "-i", str(png_path),
+                    "-t", str(dur), "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                    "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
+                ], check=True, capture_output=True, timeout=90)
+        clip_files.append(clip_path)
+
+    # Ses birleştir
+    audio_list_file = work_dir / "audio_list.txt"
+    combined_audio = work_dir / "combined.wav"
+    with open(audio_list_file, "w") as f:
+        for af, _ in audio_files:
+            f.write(f"file '{af.absolute()}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list_file), "-c", "copy", str(combined_audio)],
+        check=True, capture_output=True, timeout=120
+    )
+
+    # Video kliplerini birleştir
+    clip_list_file = work_dir / "clip_list.txt"
+    with open(clip_list_file, "w") as f:
+        for cp in clip_files:
+            f.write(f"file '{cp.absolute()}'\n")
+    slideshow = work_dir / "slideshow.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file), "-c", "copy", str(slideshow)
+    ], check=True, capture_output=True, timeout=120)
+
+    # Final encode
+    output_file = OUTPUT_DIR / f"{uid}_comedy.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-i", str(slideshow), "-i", str(combined_audio),
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
+        "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+        "-movflags", "+faststart", "-shortest", str(output_file)
+    ], check=True, capture_output=True, timeout=180)
+
+    # Meta kaydet (Instagram gönderimi için)
+    (session_dir / "video_meta.json").write_text(json.dumps({
+        "video_file": output_file.name,
+        "uid": uid,
+        "title": body.get("title", ""),
+        "ts": time.time(),
+    }))
+
+    return {
+        "ok": True,
+        "video": f"/api/video/{output_file.name}",
+        "session_id": session_id,
+        "uid": uid,
+    }
+
+
+@app.post("/api/comedy/send-instagram")
+async def comedy_send_instagram(request: Request):
+    """Oluşturulan komik haber videosunu Instagram Reels olarak gönder."""
+    body = await request.json()
+    uid = body.get("uid", "")
+    caption = body.get("caption", "").strip() or "😄 #komedi #günlük #yaşam"
+
+    if not uid:
+        raise HTTPException(400, "uid gerekli")
+
+    output_file = OUTPUT_DIR / f"{uid}_comedy.mp4"
+    if not output_file.exists():
+        raise HTTPException(404, "Video bulunamadı")
+
+    cfg = get_ig_config()
+    if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+        raise HTTPException(400, "Instagram konfigürasyonu eksik — Ayarlar'dan yapılandır")
+
+    media_id, err = await post_reel_to_instagram(
+        output_file, caption, cfg["ig_user_id"], cfg["access_token"]
+    )
+    if err:
+        return {"ok": False, "error": err}
+    return {"ok": True, "media_id": media_id}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

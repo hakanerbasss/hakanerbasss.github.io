@@ -252,6 +252,7 @@
   <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
   <div class="tab" onclick="switchTab('tnlv')">Trend Haber LV</div>
   <div class="tab" onclick="switchTab('analytics')">📊 Analitik</div>
+  <div class="tab" onclick="switchTab('comedy')">📰 Komik Haber</div>
 </div>
 
 <!-- TEXT TO SPEECH -->
@@ -2675,6 +2676,132 @@ function formatNum(n) {
   if (n >= 1000) return (n/1000).toFixed(1) + 'K';
   return String(n);
 }
+
+// ─── KOMİK HABER ────────────────────────────────────────────────────────────
+let _comedySessionId = null;
+let _comedyUid = null;
+
+async function uploadComedyPhotos() {
+  const input = document.getElementById('comedy-photos');
+  if (!input.files.length) { alert('Önce fotoğraf seç'); return; }
+  const status = document.getElementById('comedy-upload-status');
+  status.textContent = 'Yükleniyor...';
+  const fd = new FormData();
+  for (const f of input.files) fd.append('files', f);
+  try {
+    const r = await fetch('/api/comedy/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    _comedySessionId = d.session_id;
+    status.textContent = `✓ ${d.count} fotoğraf yüklendi`;
+    document.getElementById('comedy-session-id').textContent = d.session_id;
+    document.getElementById('comedy-photo-list').textContent = d.photos.join(', ');
+    document.getElementById('comedy-session-info').style.display = 'block';
+    document.getElementById('comedy-create-section').style.display = 'block';
+    document.getElementById('comedy-video-status').textContent =
+      '→ Fotoğrafları bu chatte bana gönder. Ben haber metnini yazıp videoyu oluştururum.';
+  } catch(e) {
+    status.textContent = 'Hata: ' + e.message;
+  }
+}
+
+async function createComedyVideo(scenes, title, voice) {
+  // Bu fonksiyon Claude tarafından çağrılır (chat üzerinden API isteği)
+  if (!_comedySessionId) { alert('Önce fotoğraf yükle'); return; }
+  const status = document.getElementById('comedy-video-status');
+  status.textContent = 'Video oluşturuluyor... (bu birkaç dakika sürebilir)';
+  document.getElementById('comedy-create-btn').disabled = true;
+  try {
+    const r = await fetch('/api/comedy/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: _comedySessionId,
+        scenes: scenes,
+        voice: voice || 'M3',
+        title: title || '',
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    _comedyUid = d.uid;
+    status.textContent = '✓ Video hazır!';
+    document.getElementById('comedy-video-player').src = d.video;
+    document.getElementById('comedy-preview-section').style.display = 'block';
+  } catch(e) {
+    status.textContent = 'Hata: ' + e.message;
+  } finally {
+    document.getElementById('comedy-create-btn').disabled = false;
+  }
+}
+
+async function sendComedyToInstagram() {
+  if (!_comedyUid) { alert('Önce video oluştur'); return; }
+  const caption = document.getElementById('comedy-caption').value.trim();
+  const status = document.getElementById('comedy-send-status');
+  status.textContent = 'Instagram\'a gönderiliyor...';
+  try {
+    const r = await fetch('/api/comedy/send-instagram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: _comedyUid, caption })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = '#4ade80';
+      status.textContent = '✓ Instagram\'a gönderildi! Media ID: ' + d.media_id;
+    } else {
+      status.style.color = '#f87171';
+      status.textContent = 'Hata: ' + d.error;
+    }
+  } catch(e) {
+    status.style.color = '#f87171';
+    status.textContent = 'Hata: ' + e.message;
+  }
+}
+
+function deleteComedyVideo() {
+  document.getElementById('comedy-video-player').src = '';
+  document.getElementById('comedy-preview-section').style.display = 'none';
+  document.getElementById('comedy-send-status').textContent = '';
+  _comedyUid = null;
+}
 </script>
+
+<!-- KOMİK HABER PANELİ -->
+<div class="panel" id="tab-comedy">
+  <h2 style="color:#fff;margin-bottom:6px;">📰 Komik Haber Video</h2>
+  <p style="color:#666;font-size:13px;margin-bottom:24px;">Fotoğraflarını yükle → bana gönder → ben haberi yazarım → video hazır → beğenirsen Instagram'a gönder</p>
+
+  <div style="background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:20px;">
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:12px;">1. Fotoğrafları Yükle</h3>
+    <p style="color:#888;font-size:12px;margin-bottom:12px;">Telefondan fotoğrafları <strong style="color:#ccc;">1.jpg, 2.jpg, 3.jpg</strong> olarak isimlendirin. Sıra bu isimlere göre belirlenir. Küçültmeye gerek yok, sistem otomatik ayarlar.</p>
+    <input type="file" id="comedy-photos" multiple accept="image/*" style="color:#ccc;font-size:13px;margin-bottom:12px;display:block;">
+    <button onclick="uploadComedyPhotos()">📤 Yükle</button>
+    <div id="comedy-upload-status" style="color:#888;margin-top:10px;font-size:13px;"></div>
+    <div id="comedy-session-info" style="display:none;margin-top:14px;background:#1a1a2e;padding:10px 14px;border-radius:8px;font-size:12px;">
+      <span style="color:#a78bfa;">Session: </span><span id="comedy-session-id" style="color:#fff;font-family:monospace;"></span>
+      <br><span style="color:#666;margin-top:4px;display:block;">Fotoğraflar: <span id="comedy-photo-list" style="color:#aaa;"></span></span>
+    </div>
+  </div>
+
+  <div id="comedy-create-section" style="display:none;background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:20px;">
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:10px;">2. Haber Metnini Oluştur</h3>
+    <div id="comedy-video-status" style="color:#888;font-size:13px;line-height:1.6;margin-bottom:12px;"></div>
+    <button id="comedy-create-btn" style="display:none;" onclick="">▶ Video Oluştur</button>
+  </div>
+
+  <div id="comedy-preview-section" style="display:none;background:#111;border:1px solid #222;border-radius:10px;padding:20px;">
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:12px;">3. İzle &amp; Gönder</h3>
+    <video id="comedy-video-player" controls style="width:100%;max-width:360px;border-radius:8px;background:#000;display:block;margin-bottom:14px;"></video>
+    <input type="text" id="comedy-caption" placeholder="Instagram alt yazısı (opsiyonel — boş bırakırsan varsayılan kullanılır)" style="width:100%;padding:10px 12px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:8px;font-size:13px;margin-bottom:10px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button onclick="sendComedyToInstagram()" style="background:#059669;">📤 Instagram'a Gönder</button>
+      <button onclick="deleteComedyVideo()" style="background:#333;color:#ccc;">🗑 Sil</button>
+    </div>
+    <div id="comedy-send-status" style="margin-top:10px;font-size:13px;"></div>
+  </div>
+</div>
+
 </body>
 </html>
