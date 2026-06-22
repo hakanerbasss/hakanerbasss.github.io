@@ -1555,6 +1555,46 @@ OPENAI_CONFIG = Path("openai_config.json")
 IG_CONFIG = Path("ig_config.json")
 IG_LOG = Path("ig_log.json")
 IG_RECENT_FILE = Path("ig_recent_posts.json")  # duplicate prevention
+
+TELEGRAM_CONFIG = Path("telegram_config.json")
+
+
+def get_telegram_config() -> dict:
+    if TELEGRAM_CONFIG.exists():
+        try:
+            return json.loads(TELEGRAM_CONFIG.read_text())
+        except Exception:
+            pass
+    return {}
+
+
+async def send_telegram_alert(source: str, message: str) -> None:
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    chat_id = cfg.get("chat_id", "").strip()
+    if not token or not chat_id:
+        return
+    import datetime
+    ts = datetime.datetime.now().strftime("%d %B %Y %H:%M")
+    text = f"🚨 *Supertonic Hata*\n─────────────────\n📌 Kaynak: {source}\n❌ {message}\n🕐 {ts}"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            )
+    except Exception:
+        pass
+
+
+def _fire_telegram(source: str, message: str) -> None:
+    """Sync context'ten Telegram alert gönder (event loop'a task ekler)."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(send_telegram_alert(source, message))
+    except Exception:
+        pass
 SCHED_CONFIG = Path("scheduler_config.json")
 SCHED_LOG = Path("scheduler_log.json")
 SCOPES = [
@@ -1869,9 +1909,11 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
             )
             if resp.status_code == 401:
                 print(f"[GÖRSEL] Pexels key geçersiz (401): '{keyword}'", file=sys.stderr)
+                _fire_telegram("Pexels", "API key geçersiz (401) — yeni key gerekiyor")
                 return False, "Pexels 401 key geçersiz"
             if resp.status_code == 429:
                 print(f"[GÖRSEL] Pexels kota doldu (429): '{keyword}'", file=sys.stderr)
+                _fire_telegram("Pexels", "Aylık kota doldu (429) — limit: 20.000 istek/ay")
                 return False, "Pexels 429 kota doldu"
             photos = resp.json().get("photos", [])
             if photos:
@@ -2441,6 +2483,8 @@ def save_lv_sched_log(status: str, message: str, url: str = ""):
         {"status": status, "message": message, "url": url, "ts": time.time()},
         ensure_ascii=False,
     ))
+    if status == "error":
+        _fire_telegram("LV Uzun Video", message)
 
 
 SHORTS_DAILY_TOPICS = Path("shorts_daily_topics.json")
@@ -2496,6 +2540,8 @@ def save_sched_log(status: str, message: str, url: str = ""):
         {"status": status, "message": message, "url": url, "ts": time.time()},
         ensure_ascii=False,
     ))
+    if status == "error":
+        _fire_telegram("TR Shorts", message)
 
 
 _shorts_job_lock = False
@@ -2599,6 +2645,8 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         reel_id, reel_err = await post_reel_to_instagram(video_file, caption, ig_user_id, ig_token)
         ig_log = f"Reels hatası: {reel_err}" if reel_err else f"Reels yüklendi: {reel_id}"
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
+        if reel_err:
+            await send_telegram_alert(f"Instagram Reels [{source}]", reel_err)
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
@@ -2606,6 +2654,8 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
         combined = f"{ig_log} | {story_log}" if ig_log else story_log
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": combined}))
+        if story_err:
+            await send_telegram_alert(f"Instagram Story [{source}]", story_err)
 
 
 def _rebuild_scheduler():
@@ -2751,6 +2801,8 @@ def save_lv_en_sched_log(status: str, message: str, url: str = ""):
         {"status": status, "message": message, "url": url, "ts": time.time()},
         ensure_ascii=False,
     ))
+    if status == "error":
+        _fire_telegram("EN Uzun Video", message)
 
 
 async def auto_lv_en_job():
@@ -2873,6 +2925,8 @@ def save_en_shorts_sched_log(status: str, message: str, url: str = ""):
         {"status": status, "message": message, "url": url, "ts": time.time()},
         ensure_ascii=False,
     ))
+    if status == "error":
+        _fire_telegram("EN Shorts", message)
 
 
 def get_en_shorts_used_topics() -> list[str]:
@@ -3012,6 +3066,8 @@ def save_tnlv_sched_log(status: str, message: str, url: str = ""):
         {"status": status, "message": message, "url": url, "ts": time.time()},
         ensure_ascii=False,
     ))
+    if status == "error":
+        _fire_telegram("TNLV Shorts", message)
 
 
 async def auto_tnlv_job():
@@ -3105,6 +3161,8 @@ def save_ig_only_tr_log(status: str, message: str):
         {"status": status, "message": message, "ts": time.time()},
         ensure_ascii=False,
     ))
+    if status == "error":
+        _fire_telegram("TR Instagram-Only", message)
 
 
 def get_ig_only_tr_used_topics() -> list[str]:
@@ -3432,6 +3490,42 @@ async def save_tnlv_scheduler_config(
 async def run_tnlv_now():
     asyncio.create_task(auto_tnlv_job())
     return {"ok": True}
+
+
+@app.get("/api/telegram/config")
+async def get_telegram_cfg():
+    cfg = get_telegram_config()
+    return {"bot_token": cfg.get("bot_token", ""), "chat_id": cfg.get("chat_id", "")}
+
+
+@app.post("/api/telegram/config")
+async def save_telegram_cfg(
+    bot_token: str = Form(""),
+    chat_id: str = Form(""),
+):
+    cfg = {"bot_token": bot_token.strip(), "chat_id": chat_id.strip()}
+    TELEGRAM_CONFIG.write_text(json.dumps(cfg))
+    return {"ok": True}
+
+
+@app.post("/api/telegram/test")
+async def test_telegram():
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    chat_id = cfg.get("chat_id", "").strip()
+    if not token or not chat_id:
+        raise HTTPException(400, "Bot token veya Chat ID eksik")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": "✅ Supertonic bağlantısı başarılı! Bildirimler aktif.", "parse_mode": "Markdown"},
+            )
+        if r.status_code == 200:
+            return {"ok": True}
+        return {"ok": False, "error": r.text[:300]}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.post("/api/stop-all")

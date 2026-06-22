@@ -923,6 +923,22 @@
     </div>
     <button onclick="saveOpenAIKey()" style="font-size:12px;padding:8px 16px;margin-bottom:4px;">Kaydet</button>
     <hr style="border-color:#2a2a2a;margin:20px 0;">
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📨 Telegram Bildirimleri</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">Hata olduğunda (Instagram, Pexels, DeepSeek, YouTube) anında Telegram mesajı gönderir.</p>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Bot Token</label>
+      <input type="password" id="cfg-tg-token" placeholder="123456:ABC-DEF..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Chat ID</label>
+      <input type="text" id="cfg-tg-chatid" placeholder="-100123456789 veya @username" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:6px;">
+      <button onclick="saveTelegramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+      <button onclick="testTelegram()" id="btn-tg-test" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">Test Gönder</button>
+    </div>
+    <div id="tg-status" style="font-size:12px;margin-top:6px;color:#888;"></div>
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
     <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📸 Instagram Otopaylaşım</h3>
     <p style="color:#666;font-size:12px;margin-bottom:12px;">Short yüklendikten sonra otomatik Instagram Reels ve Story atar. Facebook Graph API v21.0 kullanır.</p>
     <div id="ig-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
@@ -1629,6 +1645,7 @@ async function openSettings() {
   loadLVENSchedulerStatus();
   loadENShortsSchedulerStatus();
   loadIGOnlyTRStatus();
+  loadTelegramConfig();
   checkOpenAIStatus();
   checkInstagramStatus();
   loadInstagramLog();
@@ -2283,6 +2300,54 @@ async function runIGOnlyTRNow() {
       loadIGOnlyTRStatus();
     }
   }, 5000);
+}
+
+// ── Telegram Bildirimleri ─────────────────────────────────────────────────────
+async function loadTelegramConfig() {
+  try {
+    const r = await fetch('/api/telegram/config');
+    const d = await r.json();
+    if (d.bot_token) document.getElementById('cfg-tg-token').value = d.bot_token;
+    if (d.chat_id) document.getElementById('cfg-tg-chatid').value = d.chat_id;
+    if (d.bot_token && d.chat_id) {
+      document.getElementById('tg-status').textContent = '✓ Telegram yapılandırılmış';
+      document.getElementById('tg-status').style.color = '#4ade80';
+    }
+  } catch(e) {}
+}
+
+async function saveTelegramConfig() {
+  const fd = new FormData();
+  fd.append('bot_token', document.getElementById('cfg-tg-token').value.trim());
+  fd.append('chat_id', document.getElementById('cfg-tg-chatid').value.trim());
+  const r = await fetch('/api/telegram/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('tg-status').textContent = '✓ Kaydedildi';
+    document.getElementById('tg-status').style.color = '#4ade80';
+  }
+}
+
+async function testTelegram() {
+  const btn = document.getElementById('btn-tg-test');
+  const st = document.getElementById('tg-status');
+  btn.disabled = true;
+  st.textContent = 'Gönderiliyor...';
+  st.style.color = '#fbbf24';
+  try {
+    const r = await fetch('/api/telegram/test', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      st.textContent = '✅ Test mesajı gönderildi!';
+      st.style.color = '#4ade80';
+    } else {
+      st.textContent = '❌ Hata: ' + (d.error || 'Bilinmeyen hata');
+      st.style.color = '#f87171';
+    }
+  } catch(e) {
+    st.textContent = '❌ Bağlantı hatası';
+    st.style.color = '#f87171';
+  }
+  btn.disabled = false;
 }
 
 // ── DeepSeek sunucu config ────────────────────────────────────────────────────
