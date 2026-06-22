@@ -95,40 +95,54 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
     """TTS'e gitmeden önce metni temizle — imla/format hatalarını düzelt."""
     import re
     # Markdown kalıntılarını kaldır
-    text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)  # **bold** *italic*
-    text = re.sub(r'#{1,6}\s*', '', text)                   # ## başlık
-    text = re.sub(r'`[^`]*`', '', text)                     # `kod`
-    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)   # [link](url)
+    text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)
+    text = re.sub(r'#{1,6}\s*', '', text)
+    text = re.sub(r'`[^`]*`', '', text)
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
 
     if lang == "tr":
-        # Rakam+nokta+rakam → TTS "bin beş yüz" demesin diye noktayı kaldır
+        # Tarih: 22.06.2026 → 22 Haziran 2026
+        _ay = {1:"Ocak",2:"Şubat",3:"Mart",4:"Nisan",5:"Mayıs",6:"Haziran",
+               7:"Temmuz",8:"Ağustos",9:"Eylül",10:"Ekim",11:"Kasım",12:"Aralık"}
+        def _tarih(m):
+            try:
+                return f"{int(m.group(1))} {_ay[int(m.group(2))]} {m.group(3)}"
+            except Exception:
+                return m.group(0)
+        text = re.sub(r'\b(\d{1,2})\.(\d{2})\.(\d{4})\b', _tarih, text)
+        # Saat/zaman damgası kaldır: 09:06
+        text = re.sub(r'\b\d{1,2}:\d{2}\b', '', text)
+        # Rakam+nokta+rakam: 1.500 → 1500
         text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
         # Yüzde: %85 → yüzde 85
         text = re.sub(r'%\s*(\d+)', r'yüzde \1', text)
         # Derece: 32° → 32 derece
         text = re.sub(r'(\d+)°', r'\1 derece', text)
 
-        # Kelime gibi okunan kısaltmalar — olduğu gibi bırak (küçük harfe çevir)
+        # Kelime gibi okunan kısaltmalar
         _word_abbrevs = {
             "NATO", "NASA", "FIFA", "UEFA", "UNICEF", "UNESCO",
-            "INTERPOL", "OPEC", "FETÖ", "PKK",
+            "INTERPOL", "OPEC", "FETÖ", "PKK", "TOGG",
         }
-
-        # Büyük harf kısaltmalara harf harf oku için boşluk ekle
-        # ÖSYM → Ö S Y M, TBMM → T B M M, ABD → A B D
+        # Uzun büyük harf kelimeler (6+ harf) = Türkçe başlık stili → normal case
+        text = re.sub(
+            r'\b[A-ZÇĞİÖŞÜ]{6,}\b',
+            lambda m: m.group(0)[0] + m.group(0)[1:].lower(),
+            text,
+        )
+        # Kısa büyük harf kısaltmalar (2-5 harf) → harf harf oku
         def _space_abbrev(m):
             word = m.group(0)
             if word in _word_abbrevs:
-                return word.capitalize()
-            return " ".join(word)
-
-        text = re.sub(r'\b[A-ZÇĞİÖŞÜ]{2,}\b', _space_abbrev, text)
+                return word[0] + word[1:].lower()  # Nato, Fifa
+            return " ".join(word)  # A Y T, Ö S Y M
+        text = re.sub(r'\b[A-ZÇĞİÖŞÜ]{2,4}\b', _space_abbrev, text)
 
     # URL'leri kaldır
     text = re.sub(r'https?://\S+', '', text)
-    # Emoji ve özel semboller (TTS bunları okumaya çalışır)
+    # Özel semboller
     text = re.sub(r'[#@|_~^\\<>{}[\]]', ' ', text)
-    # Birden fazla boşluk/satır sonu → tek boşluk
+    # Birden fazla boşluk → tek boşluk
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
