@@ -2705,11 +2705,14 @@ async function uploadComedyPhotos() {
   }
 }
 
-async function createComedyVideo(scenes, title, voice) {
-  // Bu fonksiyon Claude tarafından çağrılır (chat üzerinden API isteği)
+async function createComedyVideo() {
   if (!_comedySessionId) { alert('Önce fotoğraf yükle'); return; }
+  const jsonText = document.getElementById('comedy-scenes-json').value.trim();
+  if (!jsonText) { alert('JSON alanı boş — Claude\'dan aldığın metni yapıştır'); return; }
+  let parsed;
+  try { parsed = JSON.parse(jsonText); } catch(e) { alert('JSON geçersiz: ' + e.message); return; }
   const status = document.getElementById('comedy-video-status');
-  status.textContent = 'Video oluşturuluyor... (bu birkaç dakika sürebilir)';
+  status.textContent = 'Video oluşturuluyor... (birkaç dakika sürebilir)';
   document.getElementById('comedy-create-btn').disabled = true;
   try {
     const r = await fetch('/api/comedy/create', {
@@ -2717,9 +2720,9 @@ async function createComedyVideo(scenes, title, voice) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         session_id: _comedySessionId,
-        scenes: scenes,
-        voice: voice || 'M3',
-        title: title || '',
+        scenes: parsed.scenes || parsed,
+        voice: parsed.voice || 'M3',
+        title: parsed.title || '',
       })
     });
     const d = await r.json();
@@ -2786,9 +2789,11 @@ function deleteComedyVideo() {
   </div>
 
   <div id="comedy-create-section" style="display:none;background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:20px;">
-    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:10px;">2. Haber Metnini Oluştur</h3>
-    <div id="comedy-video-status" style="color:#888;font-size:13px;line-height:1.6;margin-bottom:12px;"></div>
-    <button id="comedy-create-btn" style="display:none;" onclick="">▶ Video Oluştur</button>
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:10px;">2. Haber Metnini Yapıştır</h3>
+    <p style="color:#888;font-size:12px;margin-bottom:10px;">Claude'dan aldığın JSON'u buraya yapıştır, sonra "Video Oluştur"a bas.</p>
+    <textarea id="comedy-scenes-json" placeholder='{"scenes":[{"photo":"1.jpg","text":"...","tts":"..."}], "title":"...", "voice":"M3"}' style="width:100%;min-height:160px;background:#0a0a1a;border:1px solid #333;color:#ccc;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;resize:vertical;margin-bottom:10px;"></textarea>
+    <button id="comedy-create-btn" onclick="createComedyVideo()">▶ Video Oluştur</button>
+    <div id="comedy-video-status" style="color:#888;font-size:13px;margin-top:10px;"></div>
   </div>
 
   <div id="comedy-preview-section" style="display:none;background:#111;border:1px solid #222;border-radius:10px;padding:20px;">
