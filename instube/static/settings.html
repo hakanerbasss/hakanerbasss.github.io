@@ -13,6 +13,18 @@
   <div id="nav" class="nav"></div>
   <div id="badges" class="badges"></div>
 
+  <!-- supertonic-web'den içe aktar -->
+  <div class="card">
+    <h2>⬇️ supertonic-web'den içe aktar</h2>
+    <p class="hint">Eski projedeki Instagram, DeepSeek, Pexels, OpenAI anahtarlarını
+      ve YouTube token'larını tek tıkla kopyalar — hiçbirini elle girmene gerek kalmaz.
+      Sadece disk dosyalarını okur, o servisin açık olması gerekmez.</p>
+    <label>Kaynak klasör (boş = otomatik: ../supertonic-web)</label>
+    <input id="src_dir" placeholder="/root/hakanerbasss.github.io/supertonic-web">
+    <div style="margin-top:14px"><button class="btn-primary" onclick="importSupertonic()">İçe Aktar</button></div>
+    <div id="importMsg"></div>
+  </div>
+
   <!-- API anahtarları -->
   <div class="card">
     <h2>API Anahtarları</h2>
@@ -114,6 +126,22 @@ async function saveYt() {
   fd.append('client_secret', document.getElementById('yt_client_secret').value);
   const { j } = await api('/api/yt/config', { method: 'POST', body: fd });
   msg('ytMsg', j.ok ? 'ok' : 'err', j.ok ? 'Kaydedildi ✓ — şimdi kanalı yetkilendir.' : (j.error || 'Hata'));
+  loadSettings(); renderBadges();
+}
+async function importSupertonic() {
+  msg('importMsg', 'info', 'İçe aktarılıyor…');
+  const fd = new FormData();
+  fd.append('src_dir', document.getElementById('src_dir').value);
+  const { j } = await api('/api/import-supertonic', { method: 'POST', body: fd });
+  if (!j.ok) {
+    msg('importMsg', 'err', j.error || 'İçe aktarma başarısız');
+    return;
+  }
+  const lines = [];
+  if (j.imported && j.imported.length) lines.push('✓ Aktarıldı: ' + j.imported.join(', '));
+  if (j.skipped && j.skipped.length) lines.push('• Bulunamadı/atlandı: ' + j.skipped.join(', '));
+  lines.push('Kaynak: ' + j.source);
+  msg('importMsg', 'ok', lines.join('\n'));
   loadSettings(); renderBadges();
 }
 loadSettings();

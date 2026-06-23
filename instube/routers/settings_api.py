@@ -3,6 +3,7 @@ from fastapi import APIRouter, Form
 
 from config import load_settings, save_settings, mask
 import youtube
+import importer
 
 router = APIRouter()
 
@@ -36,6 +37,13 @@ async def post_settings(
             s[key] = val.strip()
     save_settings(s)
     return {"ok": True}
+
+
+@router.post("/api/import-supertonic")
+async def import_supertonic(src_dir: str = Form("")):
+    """supertonic-web'in disk config'inden IG/DeepSeek/Pexels/OpenAI/YouTube aktar."""
+    report = importer.import_from_supertonic(src_dir.strip() or None)
+    return {"ok": "error" not in report, **report}
 
 
 @router.get("/api/status")
