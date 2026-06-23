@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsTube — Ayarlar</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ Ayarlar</h1>
+  <div class="sub">Anahtarlar burada saklanır (settings.json). Boş bıraktığın alanın mevcut değeri korunur.</div>
+  <div id="nav" class="nav"></div>
+  <div id="badges" class="badges"></div>
+
+  <div class="card">
+    <label>DeepSeek API anahtarı</label>
+    <input id="deepseek_key" type="password" placeholder="Kayıtlıysa boş bırak">
+    <div class="hint" id="dsHint"></div>
+
+    <label>Instagram Business User ID</label>
+    <input id="ig_user_id" placeholder="örn. 178414…">
+
+    <label>Instagram Access Token (uzun ömürlü)</label>
+    <input id="ig_access_token" type="password" placeholder="Kayıtlıysa boş bırak">
+    <div class="hint" id="igHint"></div>
+
+    <label>Motor adresi (video üretim sunucusu)</label>
+    <input id="engine_url" placeholder="http://localhost:8001">
+    <div class="hint">YouTube OAuth ve Pexels anahtarı motorda zaten kayıtlı — burada istenmez.</div>
+
+    <div style="margin-top:16px"><button class="btn-primary" onclick="saveSettings()">Ayarları Kaydet</button></div>
+    <div id="settingsMsg"></div>
+  </div>
+</div>
+<script src="/common.js"></script>
+<script>
+renderNav('settings'); renderBadges(); setInterval(renderBadges, 30000);
+
+async function loadSettings() {
+  const { j } = await api('/api/settings');
+  document.getElementById('ig_user_id').value = j.ig_user_id || '';
+  document.getElementById('engine_url').value = j.engine_url || '';
+  document.getElementById('dsHint').textContent = j.deepseek_set ? 'Kayıtlı: ' + j.deepseek_masked : 'Henüz ayarlanmadı';
+  document.getElementById('igHint').textContent = j.ig_token_set ? 'Token kayıtlı: ' + j.ig_token_masked : 'Token ayarlanmadı';
+}
+async function saveSettings() {
+  const fd = new FormData();
+  fd.append('deepseek_key', document.getElementById('deepseek_key').value);
+  fd.append('ig_user_id', document.getElementById('ig_user_id').value);
+  fd.append('ig_access_token', document.getElementById('ig_access_token').value);
+  fd.append('engine_url', document.getElementById('engine_url').value);
+  const { j } = await api('/api/settings', { method: 'POST', body: fd });
+  msg('settingsMsg', j.ok ? 'ok' : 'err', j.ok ? 'Kaydedildi ✓' : (j.error || 'Hata'));
+  document.getElementById('deepseek_key').value = '';
+  document.getElementById('ig_access_token').value = '';
+  loadSettings(); renderBadges();
+}
+loadSettings();
+</script>
+</body>
+</html>

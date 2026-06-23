@@ -3,291 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>InsTube — Yayın Paneli</title>
-<style>
-  :root{
-    --bg:#f4f6f9; --card:#ffffff; --ink:#1c2430; --muted:#6b7787;
-    --line:#e3e8ef; --brand:#2563eb; --brand-d:#1d4ed8;
-    --ok:#1a8f4c; --ok-bg:#e7f7ee; --err:#c0392b; --err-bg:#fdecea;
-    --warn:#9a6b00; --warn-bg:#fff6e0;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-       background:var(--bg);color:var(--ink);line-height:1.5}
-  .wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
-  h1{font-size:22px;margin:0}
-  .sub{color:var(--muted);font-size:13px;margin-top:2px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
-        padding:18px;margin-top:16px;box-shadow:0 1px 2px rgba(20,30,50,.04)}
-  label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}
-  input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);
-        border-radius:9px;font-size:14px;background:#fff;color:var(--ink);font-family:inherit}
-  textarea{resize:vertical;min-height:70px}
-  .row{display:flex;gap:12px;flex-wrap:wrap}
-  .row>div{flex:1;min-width:140px}
-  button{cursor:pointer;border:none;border-radius:9px;font-size:14px;font-weight:600;
-         padding:11px 16px;transition:.15s}
-  .btn-primary{background:var(--brand);color:#fff}
-  .btn-primary:hover{background:var(--brand-d)}
-  .btn-ghost{background:#eef2f8;color:var(--ink)}
-  .btn-ghost:hover{background:#e2e8f2}
-  button:disabled{opacity:.55;cursor:not-allowed}
-  .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-  .badge{font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;
-         background:#eef2f8;color:var(--muted)}
-  .badge.on{background:var(--ok-bg);color:var(--ok)}
-  .badge.off{background:var(--err-bg);color:var(--err)}
-  .tabs{display:flex;gap:8px;margin-top:4px}
-  .tab{flex:1;text-align:center;padding:11px;border-radius:10px;background:#eef2f8;
-       font-weight:600;cursor:pointer;font-size:14px;border:2px solid transparent}
-  .tab.active{background:#fff;border-color:var(--brand);color:var(--brand)}
-  .toggle{display:flex;align-items:center;gap:10px;margin:14px 0;font-weight:600;font-size:14px}
-  .switch{position:relative;width:46px;height:26px;flex:none}
-  .switch input{opacity:0;width:0;height:0}
-  .slider{position:absolute;inset:0;background:#cdd5e0;border-radius:26px;transition:.2s}
-  .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;
-       background:#fff;border-radius:50%;transition:.2s}
-  .switch input:checked+.slider{background:var(--brand)}
-  .switch input:checked+.slider:before{transform:translateX(20px)}
-  video{width:100%;max-width:300px;border-radius:12px;display:block;margin:8px auto;background:#000}
-  .msg{padding:11px 14px;border-radius:9px;font-size:13px;margin-top:12px;white-space:pre-wrap;
-       word-break:break-word}
-  .msg.ok{background:var(--ok-bg);color:var(--ok)}
-  .msg.err{background:var(--err-bg);color:var(--err)}
-  .msg.warn{background:var(--warn-bg);color:var(--warn)}
-  .msg.info{background:#eef2f8;color:var(--muted)}
-  .hide{display:none}
-  details summary{cursor:pointer;font-weight:600;font-size:14px}
-  .hint{font-size:12px;color:var(--muted);margin-top:4px}
-  .spin{display:inline-block;width:13px;height:13px;border:2px solid #fff;border-top-color:transparent;
-        border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:6px}
-  @keyframes s{to{transform:rotate(360deg)}}
-</style>
+<title>InsTube</title>
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="wrap">
   <h1>InsTube</h1>
-  <div class="sub">Sade yayın paneli — üret, test et, YouTube ve/veya Instagram'a gönder.</div>
-  <div class="badges" id="badges"></div>
+  <div class="sub">Sade yayın paneli — her iş ayrı sayfada, hata olunca erken görürsün.</div>
+  <div id="nav" class="nav"></div>
+  <div id="badges" class="badges"></div>
 
-  <!-- Ayarlar -->
-  <details class="card" id="settingsCard">
-    <summary>⚙️ Ayarlar (anahtarlar)</summary>
-    <label>DeepSeek API anahtarı</label>
-    <input id="deepseek_key" type="password" placeholder="Kayıtlıysa boş bırak">
-    <div class="hint" id="dsHint"></div>
-    <label>Instagram Business User ID</label>
-    <input id="ig_user_id" placeholder="örn. 178414...">
-    <label>Instagram Access Token (uzun ömürlü)</label>
-    <input id="ig_access_token" type="password" placeholder="Kayıtlıysa boş bırak">
-    <div class="hint" id="igHint"></div>
-    <label>Motor adresi (video üretim sunucusu)</label>
-    <input id="engine_url" placeholder="http://localhost:8001">
-    <div style="margin-top:14px"><button class="btn-primary" onclick="saveSettings()">Ayarları Kaydet</button></div>
-    <div id="settingsMsg"></div>
-  </details>
-
-  <!-- Üretim -->
   <div class="card">
-    <label>Konu (boş bırakırsan trend haberden seçer)</label>
-    <input id="topic" placeholder="örn. yapay zeka, deprem, ekonomi…">
-    <div class="row">
-      <div>
-        <label>Dil</label>
-        <select id="lang">
-          <option value="tr">Türkçe</option>
-          <option value="en">English</option>
-          <option value="de">Deutsch</option>
-          <option value="fr">Français</option>
-          <option value="es">Español</option>
-          <option value="ar">العربية</option>
-        </select>
-      </div>
-      <div>
-        <label>Ses</label>
-        <select id="voice">
-          <option value="M1">M1 (Erkek)</option>
-          <option value="M2">M2 (Erkek)</option>
-          <option value="M3">M3 (Erkek)</option>
-          <option value="F1">F1 (Kadın)</option>
-          <option value="F2">F2 (Kadın)</option>
-          <option value="F3">F3 (Kadın)</option>
-        </select>
-      </div>
-      <div>
-        <label>Bölge</label>
-        <select id="region">
-          <option value="TR">Türkiye</option>
-          <option value="US">ABD</option>
-          <option value="GB">İngiltere</option>
-          <option value="DE">Almanya</option>
-        </select>
-      </div>
+    <h2>Ne yapmak istersin?</h2>
+    <div class="nav" style="margin-top:12px">
+      <a href="/instagram.html">📸 Sadece Instagram</a>
+      <a href="/youtube.html">▶️ YouTube + Instagram</a>
+      <a href="/settings.html">⚙️ Ayarlar</a>
     </div>
-    <div style="margin-top:16px">
-      <button class="btn-primary" id="genBtn" onclick="generate()">▶ Üret (Test)</button>
-      <span class="hint" style="margin-left:8px">Sadece üretir, yayınlamaz. Hata olursa burada görürsün.</span>
-    </div>
-    <div id="genMsg"></div>
-  </div>
-
-  <!-- Sonuç + yayın -->
-  <div class="card hide" id="resultCard">
-    <video id="preview" controls playsinline></video>
-    <label>Başlık</label>
-    <input id="r_title">
-    <label>Etiketler</label>
-    <input id="r_tags">
-    <label>Açıklama</label>
-    <textarea id="r_desc"></textarea>
-    <div id="warnMsg"></div>
-
-    <div class="tabs" style="margin-top:18px">
-      <div class="tab active" data-tab="ig" onclick="setTab('ig')">📸 Instagram</div>
-      <div class="tab" data-tab="yt" onclick="setTab('yt')">▶️ YouTube + Instagram</div>
-    </div>
-
-    <!-- Instagram sekmesi -->
-    <div id="pane-ig" style="margin-top:14px">
-      <button class="btn-primary" id="igBtn" onclick="publish('instagram')">📸 Instagram'a Yayınla</button>
-    </div>
-
-    <!-- YouTube sekmesi -->
-    <div id="pane-yt" class="hide" style="margin-top:14px">
-      <div class="row">
-        <div>
-          <label>Gizlilik</label>
-          <select id="privacy">
-            <option value="public">Herkese açık</option>
-            <option value="unlisted">Liste dışı</option>
-            <option value="private">Gizli</option>
-          </select>
-        </div>
-        <div>
-          <label>Kanal</label>
-          <select id="channel">
-            <option value="tr">TR kanalı</option>
-            <option value="en">EN kanalı</option>
-          </select>
-        </div>
-      </div>
-      <div class="toggle">
-        <span class="switch"><input type="checkbox" id="alsoIg" checked><span class="slider"></span></span>
-        Instagram'a da gönder
-      </div>
-      <button class="btn-primary" id="ytBtn" onclick="publish('youtube')">▶️ YouTube'a Yayınla</button>
-    </div>
-
-    <div id="pubMsg"></div>
+    <p class="hint" style="margin-top:14px">
+      Her sayfada önce <b>Üret (Test)</b> ile videoyu yayınlamadan üretip kontrol
+      edebilir, sonra ilgili butonla yayınlayabilirsin. v1'de otomatik zamanlayıcı yok.
+    </p>
   </div>
 </div>
-
-<script>
-let current = null;        // {filename, ...}
-let activeTab = 'ig';
-
-function msg(el, kind, text){
-  document.getElementById(el).innerHTML =
-    text ? `<div class="msg ${kind}">${text}</div>` : '';
-}
-async function api(path, opts){
-  const r = await fetch(path, opts);
-  let j = {};
-  try{ j = await r.json(); }catch(e){ j = {ok:false, error:'Geçersiz yanıt'}; }
-  return {status:r.status, j};
-}
-
-async function loadStatus(){
-  const {j} = await api('/api/status');
-  const b = document.getElementById('badges');
-  const item = (label,on)=>`<span class="badge ${on?'on':'off'}">${on?'✓':'✗'} ${label}</span>`;
-  b.innerHTML =
-    item('Motor', j.engine_ok) +
-    item('DeepSeek', j.deepseek_set) +
-    item('Instagram', j.instagram_set) +
-    item('YouTube TR', j.youtube_tr) +
-    item('YouTube EN', j.youtube_en);
-}
-async function loadSettings(){
-  const {j} = await api('/api/settings');
-  document.getElementById('ig_user_id').value = j.ig_user_id || '';
-  document.getElementById('engine_url').value = j.engine_url || '';
-  document.getElementById('dsHint').textContent = j.deepseek_set ? 'Kayıtlı: '+j.deepseek_masked : 'Henüz ayarlanmadı';
-  document.getElementById('igHint').textContent = j.ig_token_set ? 'Token kayıtlı: '+j.ig_token_masked : 'Token ayarlanmadı';
-}
-async function saveSettings(){
-  const fd = new FormData();
-  fd.append('deepseek_key', document.getElementById('deepseek_key').value);
-  fd.append('ig_user_id', document.getElementById('ig_user_id').value);
-  fd.append('ig_access_token', document.getElementById('ig_access_token').value);
-  fd.append('engine_url', document.getElementById('engine_url').value);
-  const {j} = await api('/api/settings', {method:'POST', body:fd});
-  msg('settingsMsg', j.ok?'ok':'err', j.ok?'Kaydedildi ✓':(j.error||'Hata'));
-  document.getElementById('deepseek_key').value='';
-  document.getElementById('ig_access_token').value='';
-  loadSettings(); loadStatus();
-}
-
-function setTab(t){
-  activeTab = t;
-  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active', el.dataset.tab===t));
-  document.getElementById('pane-ig').classList.toggle('hide', t!=='ig');
-  document.getElementById('pane-yt').classList.toggle('hide', t!=='yt');
-}
-
-async function generate(){
-  const btn = document.getElementById('genBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Üretiliyor… (1-3 dk)';
-  msg('genMsg','info','Trend seçiliyor, seslendirme ve video hazırlanıyor…');
-  const fd = new FormData();
-  fd.append('topic', document.getElementById('topic').value);
-  fd.append('lang', document.getElementById('lang').value);
-  fd.append('voice', document.getElementById('voice').value);
-  fd.append('region', document.getElementById('region').value);
-  const {j} = await api('/api/generate', {method:'POST', body:fd});
-  btn.disabled = false; btn.innerHTML = '▶ Üret (Test)';
-  if(!j.ok){ msg('genMsg','err','Üretim başarısız:\n'+(j.error||'Bilinmeyen hata')); return; }
-  current = j;
-  msg('genMsg','ok','Video üretildi ✓ ('+(j.scene_count||'?')+' sahne)');
-  document.getElementById('resultCard').classList.remove('hide');
-  document.getElementById('r_title').value = j.title||'';
-  document.getElementById('r_tags').value = j.tags||'';
-  document.getElementById('r_desc').value = j.description||'';
-  const v = document.getElementById('preview'); v.src = j.video_url; v.load();
-  msg('warnMsg', j.warning?'warn':'', j.warning?('⚠ '+j.warning):'');
-  msg('pubMsg','','');
-}
-
-async function publish(target){
-  if(!current || !current.filename){ msg('pubMsg','err','Önce video üret.'); return; }
-  const btnId = target==='youtube' ? 'ytBtn' : 'igBtn';
-  const btn = document.getElementById(btnId);
-  const orig = btn.innerHTML;
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Yayınlanıyor…';
-  msg('pubMsg','info','Gönderiliyor… Instagram işlemesi birkaç dakika sürebilir.');
-  const fd = new FormData();
-  fd.append('filename', current.filename);
-  fd.append('title', document.getElementById('r_title').value);
-  fd.append('tags', document.getElementById('r_tags').value);
-  fd.append('description', document.getElementById('r_desc').value);
-  fd.append('target', target);
-  fd.append('also_instagram', document.getElementById('alsoIg').checked ? 'true':'false');
-  fd.append('privacy', document.getElementById('privacy').value);
-  fd.append('channel', document.getElementById('channel').value);
-  const {j} = await api('/api/publish', {method:'POST', body:fd});
-  btn.disabled = false; btn.innerHTML = orig;
-  const lines = [];
-  const res = j.results || {};
-  if(res.youtube){ lines.push(res.youtube.ok ? '✓ YouTube: '+(res.youtube.url||'yüklendi')
-                                             : '✗ YouTube: '+res.youtube.error); }
-  if(res.instagram){ lines.push(res.instagram.ok ? '✓ Instagram: yayınlandı ('+(res.instagram.media_id||'')+')'
-                                                  : '✗ Instagram: '+res.instagram.error); }
-  if(!lines.length) lines.push(j.error||'Sonuç yok');
-  msg('pubMsg', j.ok?'ok':'err', lines.join('\n'));
-}
-
-loadStatus(); loadSettings();
-setInterval(loadStatus, 30000);
-</script>
+<script src="/common.js"></script>
+<script>renderNav('home'); renderBadges(); setInterval(renderBadges, 30000);</script>
 </body>
 </html>

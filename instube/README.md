@@ -1,29 +1,42 @@
 # InsTube — Sade Yayın Paneli
 
 Eski `supertonic-web` projesindeki birbirine girmiş scheduler'lar ve yutulan
-hatalardan bağımsız, **temiz ve sade** bir yayın kontrol paneli.
+hatalardan bağımsız, **temiz ve sade** bir yayın paneli. Her iş **ayrı sayfada**
+ve kod **ayrı modüllerde** — hata olunca erken ve net görünsün.
 
-## Ne yapar?
+## Sayfalar (her iş ayrı)
 
-- **2 sekme:**
-  - **📸 Instagram** — videoyu sadece Instagram Reels olarak yayınlar.
-  - **▶️ YouTube + Instagram** — YouTube'a yükler; "Instagram'a da gönder"
-    toggle'ı açıksa aynı videoyu Instagram'a da atar (kapatınca sadece YouTube).
-- **▶ Üret (Test)** — videoyu üretir ama yayınlamaz. Hata olursa **net biçimde
-  ekranda gösterir** (eski sistemin en büyük derdi hataların görünmemesiydi).
-- v1'de **otomatik zamanlayıcı yok** — her şey manuel. Önce sağlam çalışsın.
+- **`/`** — ana sayfa / yönlendirme + durum rozetleri
+- **`/settings.html`** — anahtarlar (DeepSeek, Instagram, motor adresi)
+- **`/instagram.html`** — videoyu üret, test et, **sadece Instagram** Reels yayınla
+- **`/youtube.html`** — videoyu üret, test et, **YouTube**'a yükle; "Instagram'a da
+  gönder" toggle'ı açıksa aynı videoyu Instagram'a da atar (kapalıysa sadece YouTube)
+
+Her üretim sayfasında **▶ Üret (Test)** videoyu yayınlamadan üretir; hata olursa
+motorun **gerçek hata detayını** ekranda gösterir.
+
+## Kod yapısı (ayrı dosyalar)
+
+```
+app.py                    ince ana modül — router'ları bağlar, statik sayfaları sunar
+config.py                 settings.json oku/yaz
+engine.py                 motor (:8001) ile konuşma (üretim, YT yükleme, indirme)
+instagram.py              Instagram Reels gönderimi (Graph API)
+routers/settings_api.py   /api/settings, /api/status
+routers/generate_api.py   /api/generate, /api/video/{filename}
+routers/publish_api.py    /api/publish/instagram, /api/publish/youtube
+static/                   index / settings / instagram / youtube sayfaları + style.css + common.js
+```
 
 ## Mimari
 
-Ağır ve zaten kanıtlanmış işler hâlâ çalışan **motora** (supertonic-web,
-varsayılan `http://localhost:8001`) HTTP ile delege edilir:
+Ağır ve zaten **kanıtlanmış** işler (DeepSeek içerik + Supertonic TTS + ffmpeg
+video + YouTube OAuth) hâlâ çalışan **motora** (supertonic-web, varsayılan
+`http://localhost:8001`) HTTP ile delege edilir. InsTube yalnızca arayüzü, net
+hata gösterimini, test modunu ve **Instagram Reels gönderimini** kendisi yapar.
+Böylece çalışan kod hiç bozulmadan üstüne temiz bir katman eklenir.
 
-- Video üretimi → `POST /api/generate-shorts`
-- YouTube yükleme → `POST /api/yt/upload`
-
-InsTube yalnızca arayüzü, hata gösterimini, test modunu ve **Instagram Reels
-gönderimini** (resmî Graph API) kendisi yapar. Böylece çalışan kod hiç
-bozulmadan, üzerine temiz bir katman eklenir.
+v1'de **otomatik zamanlayıcı yok** — her şey manuel.
 
 ## Çalıştırma
 
@@ -33,13 +46,8 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8002
 ```
 
-Tarayıcıdan `http://SUNUCU:8002` → **⚙️ Ayarlar**'dan:
+Tarayıcı → `http://SUNUCU:8002` → **⚙️ Ayarlar**'dan DeepSeek anahtarı + Instagram
+Business User ID & uzun ömürlü Access Token gir. (YouTube OAuth ve Pexels motorda
+zaten kayıtlı.)
 
-- **DeepSeek API anahtarı** (içerik üretimi için)
-- **Instagram Business User ID** + **uzun ömürlü Access Token**
-- **Motor adresi** (boşsa `http://localhost:8001`)
-
-> Not: YouTube OAuth ve Pexels anahtarı motorda (supertonic-web) zaten kayıtlı
-> olduğu için burada tekrar istenmez.
-
-`settings.json` ve `downloads/` git'e dahil değildir (`.gitignore`).
+`settings.json` ve `downloads/` git'e dahil değildir.
