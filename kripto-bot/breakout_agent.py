@@ -39,7 +39,7 @@ STABLECOINS = {
 }
 
 SCAN_INTERVAL    = 180      # saniye (3 dakika) — pump genellikle 10-30dk sürer, 3dk'da içerideyiz
-MONITOR_SEC      = 5        # saniye
+MONITOR_SEC      = 2        # saniye — hızlı dump için sık kontrol
 MIN_VOL_24H      = 500_000   # Testnet'te coin sınırlı; gerçek Binance veri, testnet alım
                               # (Koç: breakout_min_vol_24h ile real'de 2M kontrol)
 MAX_BREAKOUT_POS = 3        # aynı anda max breakout pozisyonu
@@ -75,11 +75,12 @@ FG_MIN           = 15     # Fear & Greed bu değerin altındaysa yeni alım yok 
 
 def _trail_distance(peak_pct):
     """Peak kâr yüzdesine göre trail mesafesi (peak'ten % düşüş).
-    Küçük pump'larda dar (kârı kilitle), büyük pump'larda biraz geniş (moon'a izin ver)."""
-    if peak_pct >= 40:   return 10.0  # +40%+ : geniş trail, moon shot trendi sür
-    if peak_pct >= 25:   return 6.0   # +25-40%: yüksek kârı sıkı koru (eski: 15%)
-    if peak_pct >= 10:   return 5.0   # +10-25%: orta (eski: 8%)
-    return 3.0                         # +3-10% : dar, küçük kârı hemen kilitle
+    Sıkı tutulur — kazanılan kâr hızlı kilitlenir."""
+    if peak_pct >= 30:   return 5.0  # +30%+ : biraz alan bırak
+    if peak_pct >= 20:   return 4.0  # +20-30%
+    if peak_pct >= 10:   return 3.0  # +10-20%
+    if peak_pct >= 5:    return 2.0  # +5-10%
+    return 1.5                        # +3-5% : hemen kilitle
 
 
 # ─── Yardımcı Fonksiyonlar ────────────────────────────────────────────────────
@@ -496,6 +497,10 @@ class BreakoutAgent:
             elif trail_active:
                 trail_dist  = pos.get('ceo_trail_pct') or _trail_distance(peak_pct)
                 trail_price = peak * (1 - trail_dist / 100)
+                # Kâr kilidi: peak %5+ gördüyse trail asla (peak-6%) kârının altına düşmesin
+                if peak_pct >= 5:
+                    profit_floor_pct = max(0.0, peak_pct - 6.0)
+                    trail_price = max(trail_price, entry * (1 + profit_floor_pct / 100))
                 # Trail stop asla entry'nin altına inemez — kazananı kaybedene çevirme
                 trail_price = max(trail_price, entry)
                 if price <= trail_price:
