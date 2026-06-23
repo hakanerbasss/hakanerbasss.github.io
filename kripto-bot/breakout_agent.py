@@ -494,24 +494,27 @@ class BreakoutAgent:
             print(f'[Breakout] Alım başarısız: {symbol} — {res.get("error")}')
             return
 
-        # Pozisyona trailing meta verisi ekle (tek sembol, kilit altında)
-        pos_now = load_positions().get(symbol, {})
-        update_position(symbol,
-                        agent='BREAKOUT',
-                        peak_price=pos_now.get('avg_price', result['price']),
-                        trail_active=False)
+        pos_now   = load_positions().get(symbol, {})
+        avg_price = pos_now.get('avg_price', result['price'])
+        buy_qty   = pos_now.get('qty', 0)
 
-        max_loss_str = f'🛡 Max zarar: ${max_loss:.0f}\n' if max_loss > 0 else ''
+        update_position(symbol, agent='BREAKOUT', peak_price=avg_price, trail_active=False)
+
+        # Anında stop emri: alım fiyatının altına düşünce sat (komisyon haricinde kayıp yok)
+        if buy_qty > 0:
+            stop_id = _place_stop_order(client, symbol, buy_qty, avg_price)
+            if stop_id:
+                update_position(symbol, stop_order_id=stop_id, stop_order_price=avg_price)
+
         send_telegram(
             f'🚀 <b>BREAKOUT ALIM</b>\n'
             f'💎 {symbol}\n'
             f'📈 Son 2s hareket: +{result["pct_2h"]}%\n'
             f'📊 Hacim spike: {result["vol_spike"]}x\n'
             f'🎯 Skor: {result["score"]}/10\n'
-            f'💵 Tutar: ${usdt}\n'
-            f'{max_loss_str}'
-            f'🔒 Trail: +3-5%→-1.5% | +5-10%→-2% | +10-20%→-3% | +20%+→-4-5%\n'
-            f'🛑 Hard stop -%{HARD_STOP_PCT} (sadece +3% görmeden)\n'
+            f'💵 Tutar: ${usdt:.0f}\n'
+            f'🛑 Stop: ANLIK (alım fiyatında) — düşerse komisyon kaybı\n'
+            f'🔒 Trail: kâr arttıkça stop yükselir\n'
             f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
         )
 
@@ -576,68 +579,63 @@ class BreakoutAgent:
             if meta_update:
                 update_position(sym, **meta_update)
 
-            reason = None
-            peak_pct = (peak - entry) / entry * 100
+            reason    = None
+            peak_pct  = (peak - entry) / entry * 100
+            stop_id   = pos.get('stop_order_id')
+            stop_price= float(pos.get('stop_order_price') or 0)
 
-            # 1. Trail aktifse: Binance stop emri ile çık (polling yedek)
+            # Trail aktifse stop hedefi trail_price, değilse entry (hiç zarar yok)
             if trail_active:
                 trail_dist  = pos.get('ceo_trail_pct') or _trail_distance(peak_pct)
                 trail_price = peak * (1 - trail_dist / 100)
                 if peak_pct >= 5:
                     profit_floor_pct = max(0.0, peak_pct - 6.0)
                     trail_price = max(trail_price, entry * (1 + profit_floor_pct / 100))
-                trail_price = max(trail_price, entry)
+                target_stop = max(trail_price, entry)
+            else:
+                target_stop = entry   # henüz kâra geçmedi: stop entry'de
 
-                stop_id    = pos.get('stop_order_id')
-                stop_price = float(pos.get('stop_order_price') or 0)
-
-                # Mevcut stop emrinin durumunu kontrol et
-                if stop_id:
-                    try:
-                        order  = client.get_order(symbol=sym, orderId=int(stop_id))
-                        status = order.get('status', '')
-                        if status == 'FILLED':
-                            _handle_stop_fill(sym, pos, order)
-                            continue  # pozisyon kapandı
-                        elif status in ('CANCELED', 'EXPIRED', 'REJECTED'):
-                            update_position(sym, stop_order_id=None, stop_order_price=0)
-                            stop_id = None
-                        elif price < trail_price * 0.99:
-                            # Hızlı düşüş: stop tetiklendi ama limit dolmadı → piyasa sat
-                            _cancel_stop_order(client, sym, stop_id)
-                            update_position(sym, stop_order_id=None, stop_order_price=0)
-                            stop_id = None
-                            reason = f'TRAIL STOP (hızlı piyasa) | peak=+{peak_pct:.1f}%'
-                    except Exception as e:
-                        print(f'[Breakout] {sym} stop kontrol: {e}')
+            # ── Stop Emri Kontrol & Güncelle ──────────────────────────────────
+            if stop_id:
+                try:
+                    order  = client.get_order(symbol=sym, orderId=int(stop_id))
+                    status = order.get('status', '')
+                    if status == 'FILLED':
+                        _handle_stop_fill(sym, pos, order)
+                        continue
+                    elif status in ('CANCELED', 'EXPIRED', 'REJECTED'):
+                        update_position(sym, stop_order_id=None, stop_order_price=0)
                         stop_id = None
+                    elif price < target_stop * 0.99:
+                        # Hızlı düşüş: limit dolmadı → piyasa sat
+                        _cancel_stop_order(client, sym, stop_id)
+                        update_position(sym, stop_order_id=None, stop_order_price=0)
+                        stop_id = None
+                        src = 'BREAKOUT TRAIL_STOP' if trail_active else 'BREAKOUT HARD_STOP'
+                        reason = f'STOP (hızlı piyasa) | pnl={pnl_pct:.1f}%'
+                except Exception as e:
+                    print(f'[Breakout] {sym} stop kontrol: {e}')
+                    stop_id = None
 
-                if not reason:
-                    # Stop emri yok veya fiyat anlamlı değiştiyse (>%0.5 artış) güncelle
-                    needs_update = stop_id is None or trail_price > stop_price * 1.005
-                    if needs_update:
-                        if stop_id:
-                            _cancel_stop_order(client, sym, stop_id)
-                            stop_id = None
-                        new_id = _place_stop_order(client, sym, qty, trail_price)
-                        if new_id:
-                            update_position(sym, stop_order_id=new_id,
-                                            stop_order_price=trail_price)
-                            stop_id = new_id
+            if not reason:
+                # Stop emri yok veya target_stop anlamlı yükseldi → güncelle
+                needs_update = stop_id is None or target_stop > stop_price * 1.005
+                if needs_update:
+                    if stop_id:
+                        _cancel_stop_order(client, sym, stop_id)
+                        stop_id = None
+                    new_id = _place_stop_order(client, sym, qty, target_stop)
+                    if new_id:
+                        update_position(sym, stop_order_id=new_id,
+                                        stop_order_price=target_stop)
+                        stop_id = new_id
 
-                    # Polling yedek: stop emri yerleştirilemedi ise manuel kontrol
-                    if not stop_id and price <= trail_price:
-                        reason = (f'TRAIL STOP -{trail_dist:.0f}% | peak=+{peak_pct:.1f}% '
-                                  f'pnl=+{pnl_pct:.1f}%')
-
-            # 2. Trail henüz aktif değilse: hard stop -%3
-            elif pnl_pct <= -HARD_STOP_PCT:
-                reason = f'HARD STOP ({pnl_pct:.1f}%)'
-
-            # 3. Başabaş koruması: +%2 görüldüyse net zarara dönmesin
-            #    (trailing daha yüksekte yakalamadıysa devreye girer)
-            if not reason and check_breakeven(sym, pos, pnl_pct):
-                reason = f'BAŞABAŞ +{pnl_pct:.1f}%'
+                # Polling yedek: stop emri yoksa manuel kontrol
+                if not stop_id:
+                    if trail_active and price <= target_stop:
+                        reason = f'TRAIL STOP -{trail_dist:.0f}% | peak=+{peak_pct:.1f}%'
+                    elif not trail_active and price < entry:
+                        reason = f'STOP AT ENTRY ({pnl_pct:.2f}%)'
 
             if reason:
                 print(f'[Breakout] {sym} ÇIKIŞ: {reason}')
