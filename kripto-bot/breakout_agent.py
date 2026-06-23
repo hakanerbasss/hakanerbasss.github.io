@@ -68,7 +68,7 @@ MIN_REENTRY_HOURS = 1.0
 # Çıkış parametreleri — SABİT TP YOK, KADEMELİ TRAIL
 # Kâr arttıkça trail daralır → küçük kârı kilitle, büyük pump'a yer aç
 TRAIL_ACTIVATE_PCT = 3.0   # bu kadar kazanç → trailing başlasın
-HARD_STOP_PCT      = 5.0   # bu kadar zarar → anında çık
+HARD_STOP_PCT      = 3.0   # bu kadar zarar → anında çık (eski: 5%)
 
 # Piyasa durumu eşiği — Aşırı Korku ortamında breakout stratejisi başarısız olur
 FG_MIN           = 15     # Fear & Greed bu değerin altındaysa yeni alım yok (Koç: breakout_fg_min)
@@ -280,8 +280,8 @@ class BreakoutAgent:
             f'📊 Min Skor: {_tun(cfg, "breakout_min_score", MIN_SCORE):g}/10 | '
             f'Min Hacim: ${_tun(cfg, "breakout_min_vol_24h", MIN_VOL_24H)/1_000_000:g}M | '
             f'Max 24s: +%{_tun(cfg, "breakout_max_chg_24h", MAX_CHG_24H):g}\n'
-            f'🔒 Kademeli Trail: +3-10%→-3% | +10-25%→-5% | +25-40%→-6% | +40%+→-10%\n'
-            f'🛑 Hard Stop: -%{HARD_STOP_PCT}\n'
+            f'🔒 Kademeli Trail: +3-5%→-1.5% | +5-10%→-2% | +10-20%→-3% | +20-30%→-4% | +30%+→-5%\n'
+            f'🛑 Hard Stop: -%{HARD_STOP_PCT} (trail aktif değilken) | Trail aktifken: min başabaş\n'
             f'{hour_ban_text(exempt=True)}\n'
             f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler'
         )
@@ -420,8 +420,8 @@ class BreakoutAgent:
             f'🎯 Skor: {result["score"]}/10\n'
             f'💵 Tutar: ${usdt}\n'
             f'{max_loss_str}'
-            f'🔒 Trail: +3-10%→-3% | +10-25%→-5% | +25-40%→-6% | +40%+→-10%\n'
-            f'⚠️ Sabit TP YOK — kâr arttıkça trail genişler\n'
+            f'🔒 Trail: +3-5%→-1.5% | +5-10%→-2% | +10-20%→-3% | +20%+→-4-5%\n'
+            f'🛑 Hard stop -%{HARD_STOP_PCT} (sadece +3% görmeden)\n'
             f'⏰ {datetime.datetime.now().strftime("%H:%M:%S")}'
         )
 
@@ -489,23 +489,24 @@ class BreakoutAgent:
             reason = None
             peak_pct = (peak - entry) / entry * 100
 
-            # 1. Hard stop: -%5
-            if pnl_pct <= -HARD_STOP_PCT:
-                reason = f'HARD STOP ({pnl_pct:.1f}%)'
-
-            # 2. Kademeli trailing stop: CEO ayarlamışsa onu kullan, yoksa otomatik hesapla
-            elif trail_active:
+            # 1. Trail aktifse: trail önce kontrol edilir, hard stop devre dışı
+            #    (kârda olan pozisyon hard stop ile kapatılmaz)
+            if trail_active:
                 trail_dist  = pos.get('ceo_trail_pct') or _trail_distance(peak_pct)
                 trail_price = peak * (1 - trail_dist / 100)
                 # Kâr kilidi: peak %5+ gördüyse trail asla (peak-6%) kârının altına düşmesin
                 if peak_pct >= 5:
                     profit_floor_pct = max(0.0, peak_pct - 6.0)
                     trail_price = max(trail_price, entry * (1 + profit_floor_pct / 100))
-                # Trail stop asla entry'nin altına inemez — kazananı kaybedene çevirme
+                # Trail aktifken minimum çıkış: entry (başabaş) — asla zarara izin verme
                 trail_price = max(trail_price, entry)
                 if price <= trail_price:
                     reason = (f'TRAIL STOP -{trail_dist:.0f}% | peak=+{peak_pct:.1f}% '
                               f'pnl=+{pnl_pct:.1f}%')
+
+            # 2. Trail henüz aktif değilse: hard stop -%3
+            elif pnl_pct <= -HARD_STOP_PCT:
+                reason = f'HARD STOP ({pnl_pct:.1f}%)'
 
             # 3. Başabaş koruması: +%2 görüldüyse net zarara dönmesin
             #    (trailing daha yüksekte yakalamadıysa devreye girer)
