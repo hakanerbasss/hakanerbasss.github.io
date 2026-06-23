@@ -30,6 +30,35 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": str(exc), "trace": traceback.format_exc()},
     )
 
+
+def run_ffmpeg(cmd, timeout, retries=0, step=""):
+    """ffmpeg çağrısını çalıştırır.
+
+    subprocess'in varsayılan CalledProcessError mesajı yalnızca komutu yazar,
+    ffmpeg'in asıl stderr çıktısını gizler — bu yüzden loglarda "neden" hiç
+    görünmüyordu. Burada stderr'in son satırlarını hata mesajına ekliyoruz ve
+    geçici (OOM/yük) hatalar için opsiyonel retry sağlıyoruz.
+    """
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            return subprocess.run(cmd, check=True, capture_output=True, timeout=timeout)
+        except subprocess.CalledProcessError as e:
+            err = e.stderr or b""
+            if isinstance(err, bytes):
+                err = err.decode("utf-8", "ignore")
+            err_tail = "\n".join(err.strip().splitlines()[-8:]) or "stderr boş"
+            last_err = RuntimeError(
+                f"ffmpeg {step} başarısız (exit {e.returncode}): {err_tail}"
+            )
+        except subprocess.TimeoutExpired:
+            last_err = RuntimeError(
+                f"ffmpeg {step} {timeout}sn içinde tamamlanamadı (timeout)"
+            )
+        if attempt < retries:
+            time.sleep(2 * (attempt + 1))
+    raise last_err
+
 OUTPUT_DIR = Path("outputs")
 UPLOAD_DIR = Path("uploads")
 COMEDY_UPLOAD_DIR = Path("uploads/comedy")
@@ -501,9 +530,13 @@ Rules:
     with open(audio_list_file, "w") as f:
         for af in audio_files:
             f.write(f"file '{af.absolute()}'\n")
-    subprocess.run(
-        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list_file), "-c", "copy", str(combined_audio)],
-        check=True, capture_output=True, timeout=120
+    # -c copy yerine yeniden encode: sahnelerin TTS çıktısı farklı örnekleme
+    # hızı/kanal ile gelirse concat copy sessizce bozuk akış üretip sonraki
+    # mux'taki -map 1:a:0'ı düşürüyordu. pcm ile akış tek tip olur.
+    run_ffmpeg(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list_file),
+         "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1", str(combined_audio)],
+        timeout=120, step="ses birleştirme"
     )
 
     # Video kliplerini birleştir
@@ -513,16 +546,16 @@ Rules:
             f.write(f"file '{cp.absolute()}'\n")
 
     slideshow = scene_dir / "slideshow.mp4"
-    subprocess.run([
+    run_ffmpeg([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
         "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
         str(slideshow.absolute())
-    ], check=True, capture_output=True, timeout=300)
+    ], timeout=600, step="slideshow")
 
     # Ses ekle — YouTube + Instagram uyumlu encode
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
-    subprocess.run([
+    run_ffmpeg([
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
@@ -530,7 +563,7 @@ Rules:
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         "-shortest", str(output_file.absolute())
-    ], check=True, capture_output=True, timeout=300)
+    ], timeout=600, retries=1, step="ses+video mux")
 
     full_script = " ".join(s["text"] for s in scenes)
     generated_title = data.get("title", topic or scenes[0]["text"][:60])
