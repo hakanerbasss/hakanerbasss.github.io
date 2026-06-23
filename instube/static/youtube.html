@@ -76,6 +76,7 @@
 <script src="/common.js"></script>
 <script>
 renderNav('yt'); renderBadges(); setInterval(renderBadges, 30000);
+resumeActiveJob();
 
 async function publishYoutube() {
   const cur = requireGenerated(); if (!cur) return;

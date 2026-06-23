@@ -1,10 +1,9 @@
-"""Video üretimi ve önizleme — üretim yerel generator ile yapılır."""
+"""Video üretimi (arka plan işi) ve önizleme."""
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse, FileResponse
-from starlette.concurrency import run_in_threadpool
 
 from config import get_deepseek_key, OUTPUT_DIR, THUMB_DIR
-import generator
+import jobs
 
 router = APIRouter()
 
@@ -21,24 +20,24 @@ async def generate(
     if not api_key:
         return JSONResponse(status_code=400, content={"ok": False,
             "error": "DeepSeek API anahtarı ayarlanmamış. Ayarlar sayfasından ekle."})
-    try:
-        # Ağır iş thread havuzunda — event loop kilitlenmez, site responsive kalır
-        d = await run_in_threadpool(generator.generate_short, api_key, topic, lang, voice, region, speed)
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+    # Arka planda başlat; iş bağlantıdan bağımsız sürer (telefon kapansa da devam eder)
+    job_id, started = jobs.start_generation({
+        "api_key": api_key, "topic": topic, "lang": lang,
+        "voice": voice, "region": region, "speed": speed,
+    })
+    return {"ok": True, "job_id": job_id, "started": started}
 
-    return {
-        "ok": True,
-        "filename": d["filename"],
-        "title": d["title"],
-        "tags": d["tags"],
-        "description": d["description"],
-        "script": d["script"],
-        "scene_count": d["scene_count"],
-        "thumbnail": d.get("thumbnail"),
-        "warning": d.get("warning", ""),
-        "video_url": f"/api/video/{d['filename']}",
-    }
+
+@router.get("/api/job")
+async def job_latest():
+    j = jobs.latest_job()
+    return j or {"status": "none"}
+
+
+@router.get("/api/job/{job_id}")
+async def job_status(job_id: str):
+    j = jobs.get_job(job_id)
+    return j or {"status": "none"}
 
 
 @router.get("/api/video/{filename}")

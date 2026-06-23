@@ -4,6 +4,7 @@ yt_token.json
 yt_token_en.json
 yt_verifier*.txt
 trends_cache.json
+jobs.json
 outputs/
 uploads/
 thumbnails/

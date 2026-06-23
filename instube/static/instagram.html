@@ -60,6 +60,7 @@
 <script src="/common.js"></script>
 <script>
 renderNav('ig'); renderBadges(); setInterval(renderBadges, 30000);
+resumeActiveJob();
 
 async function publishInstagram() {
   const cur = requireGenerated(); if (!cur) return;
