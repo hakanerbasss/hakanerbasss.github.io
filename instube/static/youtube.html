@@ -92,6 +92,7 @@ async function publishYoutube() {
   fd.append('description', document.getElementById('r_desc').value);
   fd.append('privacy', document.getElementById('privacy').value);
   fd.append('channel', document.getElementById('channel').value);
+  fd.append('thumbnail', cur.thumbnail || '');
   fd.append('also_instagram', alsoIg ? 'true' : 'false');
   const { j } = await api('/api/publish/youtube', { method: 'POST', body: fd });
   btn.disabled = false; btn.innerHTML = orig;

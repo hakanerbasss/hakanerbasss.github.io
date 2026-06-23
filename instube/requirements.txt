@@ -2,3 +2,9 @@ fastapi
 uvicorn[standard]
 httpx
 python-multipart
+pillow
+openai
+supertonic
+google-auth
+google-auth-oauthlib
+google-api-python-client

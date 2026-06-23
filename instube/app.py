@@ -1,14 +1,21 @@
 """
-InsTube — sade, bağımsız yayın paneli (ince ana modül).
+InsTube — sade, TAMAMEN BAĞIMSIZ yayın paneli (ince ana modül).
 
-Sorumluluklar modüllere bölünmüştür:
-  config.py             — ayar/anahtar saklama
-  engine.py             — motor (supertonic-web :8001) ile konuşma
+Hiçbir dış servise (eski supertonic-web :8001) bağımlı DEĞİL — video üretimi,
+TTS, görseller, ffmpeg ve YouTube yüklemesi hepsi burada. Eski projedeki
+birbirine girmiş 5-6 scheduler yok; v1 tamamen manuel. Ağır üretim thread
+havuzunda çalışır, böylece bir üretim patlasa bile site/diğer işler düşmez.
+
+Modüller:
+  config.py             — ayar/anahtar/yol sabitleri
+  generator.py          — DeepSeek içerik + TTS + görsel + ffmpeg pipeline
+  visuals.py            — sahne görselleri + overlay'ler
+  youtube.py            — YouTube OAuth + yükleme
   instagram.py          — Instagram Reels gönderimi (Graph API)
-  routers/settings_api  — /api/settings, /api/status
-  routers/generate_api  — /api/generate, /api/video/{filename}
-  routers/publish_api   — /api/publish/instagram, /api/publish/youtube
-  static/*.html         — her iş için AYRI sayfa (ayarlar / instagram / youtube)
+  trends.py             — Google News / YouTube trend verisi
+  ffmpeg_util.py        — gerçek hatayı gösteren ffmpeg sarmalayıcı
+  routers/*             — settings / generate / publish / youtube uçları
+  static/*.html         — her iş için AYRI sayfa
 
 Çalıştırma:  uvicorn app:app --host 0.0.0.0 --port 8002
 """
@@ -19,7 +26,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import BASE_DIR
-from routers import settings_api, generate_api, publish_api
+from routers import settings_api, generate_api, publish_api, youtube_api
 
 app = FastAPI(title="InsTube")
 
@@ -36,6 +43,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(settings_api.router)
 app.include_router(generate_api.router)
 app.include_router(publish_api.router)
+app.include_router(youtube_api.router)
 
 # Statik sayfalar — en son mount edilir ki /api/* uçları öncelikli kalsın.
 app.mount("/", StaticFiles(directory=str(BASE_DIR / "static"), html=True), name="static")

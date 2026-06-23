@@ -1,42 +1,47 @@
-# InsTube — Sade Yayın Paneli
+# InsTube — Sade, Bağımsız Yayın Paneli
 
-Eski `supertonic-web` projesindeki birbirine girmiş scheduler'lar ve yutulan
-hatalardan bağımsız, **temiz ve sade** bir yayın paneli. Her iş **ayrı sayfada**
-ve kod **ayrı modüllerde** — hata olunca erken ve net görünsün.
+Eski `supertonic-web` projesindeki birbirine girmiş scheduler'lar, yutulan
+hatalar ve "site bazen hiç açılmıyor" derdinden kurtulmak için **sıfırdan,
+tamamen bağımsız** yazılmış yayın paneli. Hiçbir dış servise bağımlı değildir —
+video üretimi, TTS, görseller, ffmpeg ve YouTube yüklemesi **hepsi içindedir**.
+
+## Neden daha sağlam?
+
+- **Tek işe odaklı, scheduler yok (v1).** Eskiden tek süreçte 5-6 zamanlanmış iş
+  vardı; biri patlayınca tüm site düşüyordu. Burada her şey manuel ve izole.
+- **Ağır üretim thread havuzunda çalışır** → bir video üretimi patlasa bile
+  arayüz ve diğer işlemler ayakta kalır.
+- **Hatalar yutulmaz.** ffmpeg gerçek hata çıktısını gösterir; üretim/yayın
+  hataları ilgili sayfada net görünür.
+- _Not:_ Üretim sırasındaki ffmpeg hatasının kökü sunucu RAM/CPU yetersizliği
+  (OOM) ise, bunu hiçbir yazılım çözemez — ama InsTube sana **tam sebebi
+  gösterir** (örn. `exit 137` = bellek yetersiz → swap/RAM gerekir).
 
 ## Sayfalar (her iş ayrı)
 
-- **`/`** — ana sayfa / yönlendirme + durum rozetleri
-- **`/settings.html`** — anahtarlar (DeepSeek, Instagram, motor adresi)
-- **`/instagram.html`** — videoyu üret, test et, **sadece Instagram** Reels yayınla
-- **`/youtube.html`** — videoyu üret, test et, **YouTube**'a yükle; "Instagram'a da
-  gönder" toggle'ı açıksa aynı videoyu Instagram'a da atar (kapalıysa sadece YouTube)
+- **`/`** — giriş + durum rozetleri
+- **`/settings.html`** — API anahtarları (DeepSeek, Pexels, OpenAI), Instagram,
+  YouTube OAuth
+- **`/instagram.html`** — üret, test et, **sadece Instagram** Reels
+- **`/youtube.html`** — üret, test et, **YouTube**'a yükle; toggle açıksa
+  Instagram'a da gönder
 
-Her üretim sayfasında **▶ Üret (Test)** videoyu yayınlamadan üretir; hata olursa
-motorun **gerçek hata detayını** ekranda gösterir.
+**▶ Üret (Test)** videoyu yayınlamadan üretir; hata olursa ekranda gösterir.
 
 ## Kod yapısı (ayrı dosyalar)
 
 ```
-app.py                    ince ana modül — router'ları bağlar, statik sayfaları sunar
-config.py                 settings.json oku/yaz
-engine.py                 motor (:8001) ile konuşma (üretim, YT yükleme, indirme)
-instagram.py              Instagram Reels gönderimi (Graph API)
-routers/settings_api.py   /api/settings, /api/status
-routers/generate_api.py   /api/generate, /api/video/{filename}
-routers/publish_api.py    /api/publish/instagram, /api/publish/youtube
-static/                   index / settings / instagram / youtube sayfaları + style.css + common.js
+app.py            ince ana modül — router'ları bağlar, sayfaları sunar
+config.py         ayar/anahtar/yol sabitleri
+generator.py      DeepSeek içerik + Supertonic TTS + görsel + ffmpeg pipeline
+visuals.py        sahne görselleri (DALL-E/Wikimedia/Pexels) + overlay'ler
+youtube.py        YouTube OAuth + yükleme
+instagram.py      Instagram Reels gönderimi (Graph API)
+trends.py         Google News / YouTube trend verisi
+ffmpeg_util.py    gerçek hatayı gösteren ffmpeg sarmalayıcı
+routers/          settings / generate / publish / youtube uçları
+static/           index / settings / instagram / youtube sayfaları
 ```
-
-## Mimari
-
-Ağır ve zaten **kanıtlanmış** işler (DeepSeek içerik + Supertonic TTS + ffmpeg
-video + YouTube OAuth) hâlâ çalışan **motora** (supertonic-web, varsayılan
-`http://localhost:8001`) HTTP ile delege edilir. InsTube yalnızca arayüzü, net
-hata gösterimini, test modunu ve **Instagram Reels gönderimini** kendisi yapar.
-Böylece çalışan kod hiç bozulmadan üstüne temiz bir katman eklenir.
-
-v1'de **otomatik zamanlayıcı yok** — her şey manuel.
 
 ## Çalıştırma
 
@@ -46,8 +51,14 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8002
 ```
 
-Tarayıcı → `http://SUNUCU:8002` → **⚙️ Ayarlar**'dan DeepSeek anahtarı + Instagram
-Business User ID & uzun ömürlü Access Token gir. (YouTube OAuth ve Pexels motorda
-zaten kayıtlı.)
+`http://SUNUCU:8002` → **⚙️ Ayarlar**:
 
-`settings.json` ve `downloads/` git'e dahil değildir.
+1. **DeepSeek** ve **Pexels** anahtarlarını gir (zorunlu). OpenAI opsiyonel.
+2. **Instagram** Business User ID + uzun ömürlü Access Token gir.
+3. **YouTube**: Client ID/Secret gir, sonra TR/EN kanalını yetkilendir.
+   - Google Cloud konsolunda yetkili yönlendirme URI olarak şunu eklemen gerekir:
+     `http://SUNUCU:8002/auth/youtube/callback` (EN için `/auth/youtube/en/callback`).
+
+> `ffmpeg` ve Supertonic TTS sunucuda kurulu olmalı (supertonic-web zaten
+> kullandığı için mevcut). `settings.json`, token'lar ve üretim klasörleri
+> git'e dahil değildir.

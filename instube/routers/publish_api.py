@@ -1,27 +1,26 @@
-"""Yayınlama uçları — Instagram ve YouTube ayrı ayrı raporlanır."""
+"""Yayınlama — Instagram ve YouTube ayrı ayrı, sonuçlar ayrı raporlanır."""
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
-from config import load_settings
-import engine
-from engine import EngineError
+from config import load_settings, OUTPUT_DIR
 from instagram import post_reel_to_instagram
+import youtube
 
 router = APIRouter()
 
 
-async def _publish_instagram(filename: str, title: str, tags: str) -> dict:
+async def _publish_instagram(filename: str, title: str, tags: str, thumbnail: str = "") -> dict:
     s = load_settings()
     ig_user_id = s.get("ig_user_id", "")
     ig_token = s.get("ig_access_token", "")
     if not ig_user_id or not ig_token:
         return {"ok": False, "error": "Instagram kimliği/token ayarlanmamış (Ayarlar)."}
-    try:
-        local = await engine.download_video(filename)
-    except EngineError as e:
-        return {"ok": False, "error": str(e)}
+    video_path = OUTPUT_DIR / filename
+    if not video_path.exists():
+        return {"ok": False, "error": "Video bulunamadı (önce üret)."}
     caption = f"{title}\n\n{tags}".strip()
-    media_id, err = await post_reel_to_instagram(local, caption, ig_user_id, ig_token)
+    media_id, err = await post_reel_to_instagram(video_path, caption, ig_user_id, ig_token)
     if err:
         return {"ok": False, "error": err}
     return {"ok": True, "media_id": media_id}
@@ -47,6 +46,7 @@ async def publish_youtube(
     description: str = Form(""),
     privacy: str = Form("public"),
     channel: str = Form("tr"),
+    thumbnail: str = Form(""),
     also_instagram: str = Form("false"),
 ):
     if not filename:
@@ -54,9 +54,11 @@ async def publish_youtube(
     results: dict = {}
 
     try:
-        yt = await engine.yt_upload(filename, title, description, tags, privacy, channel)
+        yt = await run_in_threadpool(
+            youtube.upload_video, filename, title, description, tags, privacy, channel, thumbnail
+        )
         results["youtube"] = {"ok": True, **yt}
-    except EngineError as e:
+    except Exception as e:
         results["youtube"] = {"ok": False, "error": str(e)}
 
     if also_instagram == "true":

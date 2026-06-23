@@ -32,8 +32,8 @@ async function renderBadges() {
   const { j } = await api('/api/status');
   const item = (label, on) => `<span class="badge ${on ? 'on' : 'off'}">${on ? '✓' : '✗'} ${label}</span>`;
   el.innerHTML =
-    item('Motor', j.engine_ok) +
     item('DeepSeek', j.deepseek_set) +
+    item('Pexels', j.pexels_set) +
     item('Instagram', j.instagram_set) +
     item('YouTube TR', j.youtube_tr) +
     item('YouTube EN', j.youtube_en);
