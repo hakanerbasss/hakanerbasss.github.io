@@ -835,6 +835,14 @@ def execute_sell(client, symbol, sell_pct, source='MANUEL', period='—'):
                 clear_position(symbol)
                 return {'ok': False, 'error': f'Toz pozisyon (${qty*price:.2f}), temizlendi'}
 
+            # Bekleyen stop emrini iptal et (çift satışı önle)
+            stop_order_id = pos.get('stop_order_id')
+            if stop_order_id:
+                try:
+                    client.cancel_order(symbol=symbol, orderId=int(stop_order_id))
+                except Exception:
+                    pass
+
             try:
                 order = client.order_market_sell(symbol=symbol, quantity=qty)
             except Exception as api_err:
