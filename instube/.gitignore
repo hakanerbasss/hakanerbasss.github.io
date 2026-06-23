@@ -10,3 +10,5 @@ thumbnails/
 downloads/
 __pycache__/
 *.pyc
+*.log
+nohup.out
