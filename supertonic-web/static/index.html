@@ -2256,6 +2256,8 @@ async function runENShortsNow() {
 }
 
 // ── TR Instagram-Only Scheduler ───────────────────────────────────────────────
+let _igOnlyTRPolling = null;
+
 async function loadIGOnlyTRStatus() {
   try {
     const r = await fetch('/api/ig-only-tr/config');
@@ -2273,6 +2275,20 @@ async function loadIGOnlyTRStatus() {
       statusEl.textContent = log.status ? `Durum: ${log.status}` : '';
       statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
       document.getElementById('ig-only-tr-last-msg').textContent = log.message || '';
+
+      if (log.status === 'running') {
+        // Job devam ediyorsa her 8 saniyede bir yenile
+        if (!_igOnlyTRPolling) {
+          _igOnlyTRPolling = setInterval(loadIGOnlyTRStatus, 8000);
+        }
+      } else {
+        // Bitti — polling durdur, butonu serbest bırak
+        if (_igOnlyTRPolling) { clearInterval(_igOnlyTRPolling); _igOnlyTRPolling = null; }
+        const btn = document.getElementById('btn-ig-only-tr-run-now');
+        const spin = document.getElementById('spin-ig-only-tr-run-now');
+        if (btn) btn.disabled = false;
+        if (spin) spin.style.display = 'none';
+      }
     }
   } catch(e) {}
 }
@@ -2290,17 +2306,7 @@ async function runIGOnlyTRNow() {
   document.getElementById('spin-ig-only-tr-run-now').style.display = 'inline-block';
   document.getElementById('btn-ig-only-tr-run-now').disabled = true;
   await fetch('/api/ig-only-tr/run-now', { method: 'POST' });
-  const poll = setInterval(async () => {
-    const r = await fetch('/api/ig-only-tr/config');
-    const d = await r.json();
-    const log = d.log || {};
-    if (log.status && log.status !== 'running') {
-      clearInterval(poll);
-      document.getElementById('spin-ig-only-tr-run-now').style.display = 'none';
-      document.getElementById('btn-ig-only-tr-run-now').disabled = false;
-      loadIGOnlyTRStatus();
-    }
-  }, 5000);
+  setTimeout(loadIGOnlyTRStatus, 2000);
 }
 
 // ── Telegram Bildirimleri ─────────────────────────────────────────────────────
