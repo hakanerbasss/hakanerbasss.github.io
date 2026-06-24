@@ -20,6 +20,7 @@ class NotificationReaderService : NotificationListenerService() {
     private var ttsReady = false
     private var wakeLock: PowerManager.WakeLock? = null
     private val prefs by lazy { AppPreferences(this) }
+    private val spokenNotifications = mutableMapOf<String, String>() // key -> last spoken text
 
     companion object {
         private const val CHANNEL_ID = "notif_reader_fg"
@@ -60,9 +61,17 @@ class NotificationReaderService : NotificationListenerService() {
             listOf(extractLatestText(extras))
         }
 
+        val key = sbn.key
         texts.filter { it.isNotBlank() }.forEach { text ->
-            speak(buildUtterance(appName, title, text))
+            val utterance = buildUtterance(appName, title, text)
+            if (spokenNotifications[key] == utterance) return@forEach
+            spokenNotifications[key] = utterance
+            speak(utterance)
         }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        spokenNotifications.remove(sbn.key)
     }
 
     private fun buildUtterance(appName: String, title: String, text: String): String {
