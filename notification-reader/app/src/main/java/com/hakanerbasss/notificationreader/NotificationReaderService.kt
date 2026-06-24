@@ -1,15 +1,12 @@
 package com.hakanerbasss.notificationreader
 
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.pm.PackageManager
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import androidx.core.app.NotificationCompat
 import java.util.Locale
 
 class NotificationReaderService : NotificationListenerService() {
@@ -20,15 +17,11 @@ class NotificationReaderService : NotificationListenerService() {
     private val prefs by lazy { AppPreferences(this) }
 
     companion object {
-        private const val CHANNEL_ID = "notif_reader_foreground"
-        private const val FOREGROUND_ID = 1001
         private const val WAKELOCK_TIMEOUT_MS = 30_000L
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        createNotificationChannel()
-        startForeground(FOREGROUND_ID, buildForegroundNotification())
         initTts()
     }
 
@@ -51,8 +44,7 @@ class NotificationReaderService : NotificationListenerService() {
         if (text.isBlank()) return
 
         val appName = getAppLabel(sbn.packageName)
-        val utterance = buildUtterance(appName, title, text)
-        speak(utterance)
+        speak(buildUtterance(appName, title, text))
     }
 
     private fun buildUtterance(appName: String, title: String, text: String): String {
@@ -109,29 +101,6 @@ class NotificationReaderService : NotificationListenerService() {
         tts?.shutdown()
         tts = null
         releaseWakeLock()
-    }
-
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Bildirim Okuyucu Servisi",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Servis aktif durum bildirimi"
-            setShowBadge(false)
-        }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-    }
-
-    private fun buildForegroundNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Bildirim Okuyucu Aktif")
-            .setContentText("Seçilen uygulamalardan gelen bildirimler sesli okunuyor")
-            .setSmallIcon(R.drawable.ic_service)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .setSilent(true)
-            .build()
     }
 
     override fun onDestroy() {
