@@ -1,15 +1,17 @@
 package com.hakanerbasss.notificationreader
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.pm.PackageManager
-import android.os.Handler
-import android.os.Looper
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import java.util.Locale
 
 class NotificationReaderService : NotificationListenerService() {
@@ -20,11 +22,21 @@ class NotificationReaderService : NotificationListenerService() {
     private val prefs by lazy { AppPreferences(this) }
 
     companion object {
+        private const val CHANNEL_ID = "notif_reader_fg"
+        private const val FG_ID = 1001
         private const val WAKELOCK_TIMEOUT_MS = 30_000L
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        createChannel()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(FG_ID, buildFgNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(FG_ID, buildFgNotification())
+            }
+        } catch (_: Exception) {}
         initTts()
     }
 
@@ -40,30 +52,23 @@ class NotificationReaderService : NotificationListenerService() {
 
         val extras = sbn.notification.extras
         val title = extras.getString(Notification.EXTRA_TITLE).orEmpty().trim()
-
-        // WhatsApp ve benzeri uygulamalar MessagingStyle kullanır — mesaj EXTRA_MESSAGES içinde
         val text = extractText(extras)
         if (text.isBlank()) return
 
         val appName = getAppLabel(sbn.packageName)
-        val utterance = buildUtterance(appName, title, text)
-        toast("Okunuyor: $utterance")
-        speak(utterance)
+        speak(buildUtterance(appName, title, text))
     }
 
     @Suppress("DEPRECATION")
     private fun extractText(extras: android.os.Bundle): String {
-        // 1. MessagingStyle: son mesajı al (WhatsApp, Telegram vb.)
         val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
         if (messages != null && messages.isNotEmpty()) {
-            val last = messages.last() as? android.os.Bundle
-            val msgText = last?.getCharSequence("text")?.toString().orEmpty().trim()
+            val msgText = (messages.last() as? android.os.Bundle)
+                ?.getCharSequence("text")?.toString().orEmpty().trim()
             if (msgText.isNotBlank()) return msgText
         }
-        // 2. Standart text
         val text = extras.getString(Notification.EXTRA_TEXT).orEmpty().trim()
         if (text.isNotBlank()) return text
-        // 3. BigText (uzun mesajlar)
         return extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty().trim()
     }
 
@@ -92,21 +97,12 @@ class NotificationReaderService : NotificationListenerService() {
         tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "u_${System.currentTimeMillis()}")
     }
 
-    private fun toast(msg: String) {
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
-        }
-    }
-
     private fun initTts() {
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val result = tts?.setLanguage(Locale("tr", "TR"))
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     tts?.language = Locale.getDefault()
-                    toast("TTS: Turkce ses paketi yok, varsayilan kullaniliyor")
-                } else {
-                    toast("TTS hazir - Turkce aktif")
                 }
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
@@ -115,8 +111,6 @@ class NotificationReaderService : NotificationListenerService() {
                     override fun onError(utteranceId: String?) = releaseWakeLock()
                 })
                 ttsReady = true
-            } else {
-                toast("TTS BASLATILAM ADI - hata kodu: $status")
             }
         }
     }
@@ -132,6 +126,24 @@ class NotificationReaderService : NotificationListenerService() {
         tts?.shutdown()
         tts = null
         releaseWakeLock()
+    }
+
+    private fun createChannel() {
+        val ch = NotificationChannel(CHANNEL_ID, "Bildirim Okuyucu",
+            NotificationManager.IMPORTANCE_LOW).apply {
+            setShowBadge(false)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
+    }
+
+    private fun buildFgNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Bildirim Okuyucu aktif")
+            .setSmallIcon(R.drawable.ic_service)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setSilent(true)
+            .build()
     }
 
     override fun onDestroy() {
