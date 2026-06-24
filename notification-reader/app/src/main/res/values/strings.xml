@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bildirim Okuyucu</string>
+    <string name="status_active">● Servis aktif — bildirimler sesli okunuyor</string>
+    <string name="status_inactive">● Bildirim erişimi verilmedi — aşağıdan izin verin</string>
+    <string name="permission_title">Bildirim Erişimi Gerekli</string>
+    <string name="permission_message">Bildirimleri sesli okuyabilmek için bildirim erişim izni verilmesi gerekiyor.\n\nAçılacak ekranda \"Bildirim Okuyucu\" uygulamasını etkinleştirin.</string>
+    <string name="permission_grant">Ayarlara Git</string>
+    <string name="permission_cancel">İptal</string>
+</resources>
