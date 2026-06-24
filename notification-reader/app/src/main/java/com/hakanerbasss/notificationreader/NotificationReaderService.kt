@@ -37,14 +37,29 @@ class NotificationReaderService : NotificationListenerService() {
 
         val extras = sbn.notification.extras
         val title = extras.getString(Notification.EXTRA_TITLE).orEmpty().trim()
-        val text = (extras.getString(Notification.EXTRA_TEXT)
-            ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
-            .orEmpty().trim()
 
+        // WhatsApp ve benzeri uygulamalar MessagingStyle kullanır — mesaj EXTRA_MESSAGES içinde
+        val text = extractText(extras)
         if (text.isBlank()) return
 
         val appName = getAppLabel(sbn.packageName)
         speak(buildUtterance(appName, title, text))
+    }
+
+    @Suppress("DEPRECATION")
+    private fun extractText(extras: android.os.Bundle): String {
+        // 1. MessagingStyle: son mesajı al (WhatsApp, Telegram vb.)
+        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        if (messages != null && messages.isNotEmpty()) {
+            val last = messages.last() as? android.os.Bundle
+            val msgText = last?.getCharSequence("text")?.toString().orEmpty().trim()
+            if (msgText.isNotBlank()) return msgText
+        }
+        // 2. Standart text
+        val text = extras.getString(Notification.EXTRA_TEXT).orEmpty().trim()
+        if (text.isNotBlank()) return text
+        // 3. BigText (uzun mesajlar)
+        return extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty().trim()
     }
 
     private fun buildUtterance(appName: String, title: String, text: String): String {
