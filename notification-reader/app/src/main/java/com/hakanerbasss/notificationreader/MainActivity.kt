@@ -85,6 +85,17 @@ class MainActivity : AppCompatActivity() {
             get = { prefs.isSkipDuplicates() },
             set = { prefs.setSkipDuplicates(it) }
         )
+
+        val permRow = findViewById<View>(R.id.row_open_permission)
+        permRow.findViewById<TextView>(R.id.setting_title).text = "Bildirim erişim izni"
+        permRow.findViewById<TextView>(R.id.setting_desc).apply {
+            text = "İzin vermek veya yenilemek için dokun"
+            visibility = View.VISIBLE
+        }
+        permRow.findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.setting_switch).visibility = View.GONE
+        permRow.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
     }
 
     private fun bindSetting(

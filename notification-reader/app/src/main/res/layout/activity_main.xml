@@ -46,6 +46,8 @@
             android:id="@+id/row_read_all" />
         <include layout="@layout/item_setting"
             android:id="@+id/row_skip_duplicates" />
+        <include layout="@layout/item_setting"
+            android:id="@+id/row_open_permission" />
 
     </LinearLayout>
 
