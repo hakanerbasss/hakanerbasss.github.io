@@ -10,13 +10,13 @@
         android:pathData="M54,28 L36,44 L26,44 L26,64 L36,64 L54,80 Z" />
     <!-- Sound waves -->
     <path
-        android:fillColor="none"
+        android:fillColor="#00000000"
         android:strokeColor="#FFFFFF"
         android:strokeWidth="4"
         android:strokeLineCap="round"
         android:pathData="M63,42 Q72,54 63,66" />
     <path
-        android:fillColor="none"
+        android:fillColor="#00000000"
         android:strokeColor="#FFFFFF"
         android:strokeWidth="4"
         android:strokeLineCap="round"
