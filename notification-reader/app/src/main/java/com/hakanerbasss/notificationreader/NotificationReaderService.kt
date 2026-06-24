@@ -108,8 +108,12 @@ class NotificationReaderService : NotificationListenerService() {
     private fun extractLatestText(extras: android.os.Bundle): String {
         val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
         if (messages != null && messages.isNotEmpty()) {
-            val t = (messages.last() as? android.os.Bundle)
-                ?.getCharSequence("text")?.toString().orEmpty().trim()
+            // sender null ise kendi gönderdiğimiz mesaj, atla
+            val incoming = messages.filterIsInstance<android.os.Bundle>()
+                .filter { it.getCharSequence("sender") != null }
+            val bundle = (if (incoming.isNotEmpty()) incoming.last() else null)
+                ?: (messages.last() as? android.os.Bundle)
+            val t = bundle?.getCharSequence("text")?.toString().orEmpty().trim()
             if (t.isNotBlank()) return t
         }
         val t = extras.getString(Notification.EXTRA_TEXT).orEmpty().trim()
@@ -121,10 +125,11 @@ class NotificationReaderService : NotificationListenerService() {
     private fun extractAllTexts(extras: android.os.Bundle): List<String> {
         val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
         if (messages != null && messages.size > 1) {
-            val all = messages.mapNotNull {
-                (it as? android.os.Bundle)?.getCharSequence("text")?.toString()?.trim()
-            }.filter { it.isNotBlank() }
-            if (all.isNotEmpty()) return all
+            val incoming = messages.filterIsInstance<android.os.Bundle>()
+                .filter { it.getCharSequence("sender") != null }
+                .mapNotNull { it.getCharSequence("text")?.toString()?.trim() }
+                .filter { it.isNotBlank() }
+            if (incoming.isNotEmpty()) return incoming
         }
         return listOf(extractLatestText(extras))
     }
