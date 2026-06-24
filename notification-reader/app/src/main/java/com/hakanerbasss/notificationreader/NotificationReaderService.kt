@@ -2,11 +2,14 @@ package com.hakanerbasss.notificationreader
 
 import android.app.Notification
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.widget.Toast
 import java.util.Locale
 
 class NotificationReaderService : NotificationListenerService() {
@@ -43,7 +46,9 @@ class NotificationReaderService : NotificationListenerService() {
         if (text.isBlank()) return
 
         val appName = getAppLabel(sbn.packageName)
-        speak(buildUtterance(appName, title, text))
+        val utterance = buildUtterance(appName, title, text)
+        toast("Okunuyor: $utterance")
+        speak(utterance)
     }
 
     @Suppress("DEPRECATION")
@@ -87,12 +92,21 @@ class NotificationReaderService : NotificationListenerService() {
         tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "u_${System.currentTimeMillis()}")
     }
 
+    private fun toast(msg: String) {
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun initTts() {
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val result = tts?.setLanguage(Locale("tr", "TR"))
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     tts?.language = Locale.getDefault()
+                    toast("TTS: Turkce ses paketi yok, varsayilan kullaniliyor")
+                } else {
+                    toast("TTS hazir - Turkce aktif")
                 }
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
@@ -101,6 +115,8 @@ class NotificationReaderService : NotificationListenerService() {
                     override fun onError(utteranceId: String?) = releaseWakeLock()
                 })
                 ttsReady = true
+            } else {
+                toast("TTS BASLATILAM ADI - hata kodu: $status")
             }
         }
     }
