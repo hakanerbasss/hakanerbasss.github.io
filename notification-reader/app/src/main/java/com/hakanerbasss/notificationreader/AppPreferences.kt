@@ -23,4 +23,7 @@ class AppPreferences(context: Context) {
 
     fun isReadAllMessages(): Boolean = prefs.getBoolean("read_all_msgs", false)
     fun setReadAllMessages(v: Boolean) { prefs.edit().putBoolean("read_all_msgs", v).apply() }
+
+    fun isSkipDuplicates(): Boolean = prefs.getBoolean("skip_duplicates", true)
+    fun setSkipDuplicates(v: Boolean) { prefs.edit().putBoolean("skip_duplicates", v).apply() }
 }

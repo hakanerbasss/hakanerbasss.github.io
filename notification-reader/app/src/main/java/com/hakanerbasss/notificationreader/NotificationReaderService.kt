@@ -62,9 +62,10 @@ class NotificationReaderService : NotificationListenerService() {
         }
 
         val key = sbn.key
+        val skipDuplicates = prefs.isSkipDuplicates()
         texts.filter { it.isNotBlank() }.forEach { text ->
             val utterance = buildUtterance(appName, title, text)
-            if (spokenNotifications[key] == utterance) return@forEach
+            if (skipDuplicates && spokenNotifications[key] == utterance) return@forEach
             spokenNotifications[key] = utterance
             speak(utterance)
         }

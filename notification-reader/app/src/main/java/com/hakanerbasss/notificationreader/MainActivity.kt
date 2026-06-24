@@ -78,6 +78,13 @@ class MainActivity : AppCompatActivity() {
             get = { prefs.isReadAllMessages() },
             set = { prefs.setReadAllMessages(it) }
         )
+        bindSetting(
+            rowId = R.id.row_skip_duplicates,
+            title = "Aynı bildirimi tekrar okuma",
+            desc = "Kapalıysa uygulama açılınca bildirim yeniden okunur",
+            get = { prefs.isSkipDuplicates() },
+            set = { prefs.setSkipDuplicates(it) }
+        )
     }
 
     private fun bindSetting(
