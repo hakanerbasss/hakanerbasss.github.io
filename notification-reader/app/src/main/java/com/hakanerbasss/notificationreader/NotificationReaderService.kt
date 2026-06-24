@@ -52,32 +52,71 @@ class NotificationReaderService : NotificationListenerService() {
 
         val extras = sbn.notification.extras
         val title = extras.getString(Notification.EXTRA_TITLE).orEmpty().trim()
-        val text = extractText(extras)
-        if (text.isBlank()) return
-
         val appName = getAppLabel(sbn.packageName)
-        speak(buildUtterance(appName, title, text))
-    }
 
-    @Suppress("DEPRECATION")
-    private fun extractText(extras: android.os.Bundle): String {
-        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
-        if (messages != null && messages.isNotEmpty()) {
-            val msgText = (messages.last() as? android.os.Bundle)
-                ?.getCharSequence("text")?.toString().orEmpty().trim()
-            if (msgText.isNotBlank()) return msgText
+        val texts = if (prefs.isReadAllMessages()) {
+            extractAllTexts(extras)
+        } else {
+            listOf(extractLatestText(extras))
         }
-        val text = extras.getString(Notification.EXTRA_TEXT).orEmpty().trim()
-        if (text.isNotBlank()) return text
-        return extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty().trim()
+
+        texts.filter { it.isNotBlank() }.forEach { text ->
+            speak(buildUtterance(appName, title, text))
+        }
     }
 
     private fun buildUtterance(appName: String, title: String, text: String): String {
-        return if (title.isNotBlank() && !title.equals(appName, ignoreCase = true)) {
-            "$appName, $title: $text"
-        } else {
-            "$appName: $text"
+        val parts = mutableListOf<String>()
+
+        if (prefs.isAnnounceApp()) {
+            parts.add(appName)
         }
+
+        if (prefs.isAnnounceSender()) {
+            val isSenderSameAsApp = title.isBlank() || title.equals(appName, ignoreCase = true)
+            if (!isSenderSameAsApp) {
+                if (isPhoneNumber(title)) {
+                    if (prefs.isAnnounceNumber()) parts.add(title)
+                } else {
+                    parts.add(title)
+                }
+            }
+        }
+
+        return if (parts.isEmpty()) {
+            text
+        } else {
+            "${parts.joinToString(", ")}: $text"
+        }
+    }
+
+    private fun isPhoneNumber(text: String): Boolean =
+        text.replace("+", "").replace("-", "").replace(" ", "")
+            .all { it.isDigit() } && text.length >= 5
+
+    @Suppress("DEPRECATION")
+    private fun extractLatestText(extras: android.os.Bundle): String {
+        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        if (messages != null && messages.isNotEmpty()) {
+            val t = (messages.last() as? android.os.Bundle)
+                ?.getCharSequence("text")?.toString().orEmpty().trim()
+            if (t.isNotBlank()) return t
+        }
+        val t = extras.getString(Notification.EXTRA_TEXT).orEmpty().trim()
+        if (t.isNotBlank()) return t
+        return extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty().trim()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun extractAllTexts(extras: android.os.Bundle): List<String> {
+        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        if (messages != null && messages.size > 1) {
+            val all = messages.mapNotNull {
+                (it as? android.os.Bundle)?.getCharSequence("text")?.toString()?.trim()
+            }.filter { it.isNotBlank() }
+            if (all.isNotEmpty()) return all
+        }
+        return listOf(extractLatestText(extras))
     }
 
     private fun getAppLabel(packageName: String): String {
@@ -130,9 +169,7 @@ class NotificationReaderService : NotificationListenerService() {
 
     private fun createChannel() {
         val ch = NotificationChannel(CHANNEL_ID, "Bildirim Okuyucu",
-            NotificationManager.IMPORTANCE_LOW).apply {
-            setShowBadge(false)
-        }
+            NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) }
         getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
     }
 

@@ -18,20 +18,56 @@
         android:layout_height="1dp"
         android:background="?android:attr/listDivider" />
 
+    <!-- Genel Ayarlar -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingHorizontal="16dp"
         android:paddingTop="12dp"
         android:paddingBottom="4dp"
-        android:text="Dinlenecek uygulamalar"
+        android:text="Genel Ayarlar"
+        android:textSize="12sp"
+        android:textAllCaps="true"
+        android:alpha="0.6" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="8dp">
+
+        <include layout="@layout/item_setting"
+            android:id="@+id/row_announce_app" />
+        <include layout="@layout/item_setting"
+            android:id="@+id/row_announce_sender" />
+        <include layout="@layout/item_setting"
+            android:id="@+id/row_announce_number" />
+        <include layout="@layout/item_setting"
+            android:id="@+id/row_read_all" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/listDivider" />
+
+    <!-- Uygulama Listesi -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="4dp"
+        android:text="Dinlenecek Uygulamalar"
         android:textSize="12sp"
         android:textAllCaps="true"
         android:alpha="0.6" />
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
         <ProgressBar
             android:id="@+id/progress_bar"

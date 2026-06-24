@@ -9,6 +9,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -39,12 +40,62 @@ class MainActivity : AppCompatActivity() {
         recyclerView.layoutManager = lm
         recyclerView.addItemDecoration(DividerItemDecoration(this, lm.orientation))
 
+        setupSettings()
         loadApps()
     }
 
     override fun onResume() {
         super.onResume()
         updatePermissionStatus()
+    }
+
+    private fun setupSettings() {
+        bindSetting(
+            rowId = R.id.row_announce_app,
+            title = "Uygulama adını söyle",
+            desc = "Örn: \"WhatsApp: Merhaba\"",
+            get = { prefs.isAnnounceApp() },
+            set = { prefs.setAnnounceApp(it) }
+        )
+        bindSetting(
+            rowId = R.id.row_announce_sender,
+            title = "Gönderen adını söyle",
+            desc = "Örn: \"WhatsApp, Ahmet: Merhaba\"",
+            get = { prefs.isAnnounceSender() },
+            set = { prefs.setAnnounceSender(it) }
+        )
+        bindSetting(
+            rowId = R.id.row_announce_number,
+            title = "Ad yoksa numara söyle",
+            desc = "Kişi kayıtlı değilse telefon numarasını oku",
+            get = { prefs.isAnnounceNumber() },
+            set = { prefs.setAnnounceNumber(it) }
+        )
+        bindSetting(
+            rowId = R.id.row_read_all,
+            title = "Tüm birikmiş mesajları oku",
+            desc = "Kapalıysa sadece en son mesaj okunur",
+            get = { prefs.isReadAllMessages() },
+            set = { prefs.setReadAllMessages(it) }
+        )
+    }
+
+    private fun bindSetting(
+        rowId: Int,
+        title: String,
+        desc: String,
+        get: () -> Boolean,
+        set: (Boolean) -> Unit
+    ) {
+        val row = findViewById<View>(rowId)
+        row.findViewById<TextView>(R.id.setting_title).text = title
+        val descView = row.findViewById<TextView>(R.id.setting_desc)
+        descView.text = desc
+        descView.visibility = View.VISIBLE
+        val sw = row.findViewById<SwitchCompat>(R.id.setting_switch)
+        sw.isChecked = get()
+        sw.setOnCheckedChangeListener { _, checked -> set(checked) }
+        row.setOnClickListener { sw.toggle() }
     }
 
     private fun updatePermissionStatus() {
