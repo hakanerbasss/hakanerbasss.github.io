@@ -954,7 +954,7 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
 
     # ⑤ SON DAKİKA — dar eğik kırmızı badge (tam genişlik değil)
     bdf = lf(80); bt = badge_text; btw = int(tw(bt, bdf))
-    bw2 = btw + 130; bx_b = CX - bw2 // 2; byy = 1300; bhh = 140; sk2 = 28
+    bw2 = btw + 130; bx_b = CX - bw2 // 2; byy = 1050; bhh = 140; sk2 = 28
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(glow).ellipse([(CX - 360, byy + 60), (CX + 360, byy + 240)], fill=(255, 30, 40, 80))
     glow = glow.filter(ImageFilter.GaussianBlur(40))
