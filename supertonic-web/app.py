@@ -188,12 +188,9 @@ async def synthesize(
     tts = get_tts()
     style = tts.get_voice_style(voice_name=voice)
 
-    wav, duration = tts.synthesize(
-        text=_clean_tts_text(text, lang),
-        lang=lang,
-        voice_style=style,
-        total_steps=8,
-        speed=speed,
+    wav, duration = await asyncio.to_thread(tts.synthesize,
+        _clean_tts_text(text, lang), lang=lang,
+        voice_style=style, total_steps=8, speed=speed,
     )
 
     out_file = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
@@ -247,23 +244,22 @@ async def voice_video(
 
     # transkript
     whisper_m = get_whisper()
-    result = whisper_m.transcribe(str(audio_extracted))
+    result = await asyncio.to_thread(whisper_m.transcribe, str(audio_extracted))
     transcript = result["text"]
 
     # çeviri istenmişse
     if translate_to and translate_to != lang:
-        transcript = GoogleTranslator(source="auto", target=translate_to).translate(transcript)
+        transcript = await asyncio.to_thread(
+            GoogleTranslator(source="auto", target=translate_to).translate, transcript
+        )
         lang = translate_to
 
     # TTS
     tts = get_tts()
     style = tts.get_voice_style(voice_name=voice)
-    wav, _ = tts.synthesize(
-        text=_clean_tts_text(transcript, lang),
-        lang=lang,
-        voice_style=style,
-        total_steps=8,
-        speed=speed,
+    wav, _ = await asyncio.to_thread(tts.synthesize,
+        _clean_tts_text(transcript, lang), lang=lang,
+        voice_style=style, total_steps=8, speed=speed,
     )
     tts.save_audio(wav, str(tts_audio))
 
@@ -387,12 +383,9 @@ Rules:
     visual_warnings: set = set()
 
     for i, scene in enumerate(scenes):
-        wav, dur = tts.synthesize(
-            text=_clean_tts_text(scene["text"], lang),
-            lang=lang,
-            voice_style=style,
-            total_steps=8,
-            speed=speed,
+        wav, dur = await asyncio.to_thread(tts.synthesize,
+            _clean_tts_text(scene["text"], lang), lang=lang,
+            voice_style=style, total_steps=8, speed=speed,
         )
         dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
         audio_path = scene_dir / f"audio_{i}.wav"
@@ -1268,9 +1261,9 @@ Rules:
 
     for i, scene in enumerate(scenes):
         # TTS
-        wav, dur = tts.synthesize(
-            text=_clean_tts_text(scene["text"], lang), lang=lang, voice_style=style,
-            total_steps=8, speed=speed,
+        wav, dur = await asyncio.to_thread(tts.synthesize,
+            _clean_tts_text(scene["text"], lang), lang=lang,
+            voice_style=style, total_steps=8, speed=speed,
         )
         dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
         audio_path = scene_dir / f"audio_{i}.wav"
@@ -1485,9 +1478,9 @@ Rules:
     durations = []
 
     for i, scene in enumerate(scenes):
-        wav, dur = tts.synthesize(
-            text=_clean_tts_text(scene["text"], lang), lang=lang, voice_style=style,
-            total_steps=8, speed=speed,
+        wav, dur = await asyncio.to_thread(tts.synthesize,
+            _clean_tts_text(scene["text"], lang), lang=lang,
+            voice_style=style, total_steps=8, speed=speed,
         )
         dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
         audio_path = scene_dir / f"audio_{i}.wav"
@@ -3845,12 +3838,8 @@ async def comedy_create_video(request: Request):
         img.save(str(png_path), "JPEG", quality=90)
 
         # TTS
-        wav, duration = tts.synthesize(
-            text=tts_text,
-            lang="tr",
-            voice_style=style,
-            total_steps=8,
-            speed=1.0,
+        wav, duration = await asyncio.to_thread(tts.synthesize,
+            tts_text, lang="tr", voice_style=style, total_steps=8, speed=1.0,
         )
         audio_path = work_dir / f"audio_{i}.wav"
         tts.save_audio(wav, str(audio_path))
