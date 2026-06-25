@@ -2336,9 +2336,15 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
     creds_data = json.loads(tok.read_text())
     creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
     if creds.expired and creds.refresh_token:
-        import google.auth.transport.requests
-        creds.refresh(google.auth.transport.requests.Request())
-        tok.write_text(creds.to_json())
+        try:
+            import google.auth.transport.requests
+            creds.refresh(google.auth.transport.requests.Request())
+            tok.write_text(creds.to_json())
+        except Exception as ref_err:
+            if "invalid_grant" in str(ref_err).lower() or "token has been expired" in str(ref_err).lower():
+                tok.unlink(missing_ok=True)
+                raise HTTPException(401, "token_expired")
+            raise HTTPException(401, str(ref_err))
 
     end_date   = datetime.date.today()
     start_date = end_date - datetime.timedelta(days=days - 1)
@@ -2520,8 +2526,14 @@ async def upload_youtube(
     from google.auth.transport.requests import Request as GRequest
     creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)
     if creds.expired and creds.refresh_token:
-        creds.refresh(GRequest())
-        token_file.write_text(creds.to_json())
+        try:
+            creds.refresh(GRequest())
+            token_file.write_text(creds.to_json())
+        except Exception as ref_err:
+            if "invalid_grant" in str(ref_err).lower() or "token has been expired" in str(ref_err).lower():
+                token_file.unlink(missing_ok=True)
+                raise HTTPException(401, "token_expired")
+            raise HTTPException(401, str(ref_err))
     youtube = build("youtube", "v3", credentials=creds)
 
     # Tag listesi — virgül veya boşluk ayırıcı kabul et

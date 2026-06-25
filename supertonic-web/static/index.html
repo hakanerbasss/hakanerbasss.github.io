@@ -2695,7 +2695,13 @@ async function loadAnalytics() {
     document.getElementById('analytics-loading').style.display = 'none';
     const el = document.getElementById('analytics-error');
     el.style.display = 'block';
-    el.textContent = '⚠ ' + e.message + (e.message.includes('bağlı değil') ? ' — YouTube hesabını bağlayın.' : '');
+    const channel = document.getElementById('analytics-channel')?.value || 'tr';
+    const authPath = channel === 'en' ? '/auth/youtube/en' : '/auth/youtube';
+    if (e.message === 'token_expired' || e.message.includes('bağlı değil')) {
+      el.innerHTML = '🔑 YouTube token süresi dolmuş — <a href="' + authPath + '" style="color:#7c3aed;font-weight:bold;">Yeniden Bağlan ↗</a>';
+    } else {
+      el.textContent = '⚠ ' + e.message;
+    }
   }
 }
 
