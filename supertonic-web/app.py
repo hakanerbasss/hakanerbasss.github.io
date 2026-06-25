@@ -2136,17 +2136,16 @@ async def instagram_analytics(limit: int = 15):
         posts = []
         for m in media_list:
             is_video = m.get("media_type") in ("VIDEO", "REEL")
-            insight_metrics = "plays,reach,likes,comments,shares,saved" if is_video else "impressions,reach,likes,comments,saved"
+            # plays metriği 21 Nisan 2025'te kaldırıldı, yeni adı views
+            insight_metrics = "views,reach,likes,comments,shares,saved" if is_video else "impressions,reach,likes,comments,saved"
             r_ins = await client.get(f"{graph}/{m['id']}/insights", params={
                 "metric": insight_metrics,
                 "period": "lifetime",
-                "metric_type": "total_value",   # API v17+ yeni format
                 "access_token": token,
             })
             insights = {}
             if r_ins.status_code == 200:
                 for item in r_ins.json().get("data", []):
-                    # v17+ format: total_value.value  |  eski format: values[0].value veya value
                     if "total_value" in item:
                         val = item["total_value"].get("value", 0)
                     elif "values" in item:
@@ -2154,8 +2153,7 @@ async def instagram_analytics(limit: int = 15):
                     else:
                         val = item.get("value", 0)
                     insights[item["name"]] = val or 0
-            # views: media object'ten al (daha güvenilir), insights.plays fallback
-            media_views = m.get("views") or insights.get("plays") or 0
+            media_views = m.get("views") or insights.get("views") or 0
             posts.append({
                 "id":          m["id"],
                 "type":        m.get("media_type", ""),
