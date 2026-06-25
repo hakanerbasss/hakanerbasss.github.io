@@ -2736,6 +2736,156 @@ function downloadIGAnalyticsJSON() {
   a.click();
 }
 
+function _engScore(p) {
+  return (p.likes||0) + (p.comments||0)*2 + (p.shares||0)*3 + (p.saved||0)*2;
+}
+
+function buildTimeAnalysis(posts) {
+  const slots = [
+    {label:'00:00–06:00', min:0,  max:6,  emoji:'🌙'},
+    {label:'06:00–09:00', min:6,  max:9,  emoji:'🌅'},
+    {label:'09:00–12:00', min:9,  max:12, emoji:'☀️'},
+    {label:'12:00–15:00', min:12, max:15, emoji:'🌤'},
+    {label:'15:00–18:00', min:15, max:18, emoji:'🌇'},
+    {label:'18:00–21:00', min:18, max:21, emoji:'🌆'},
+    {label:'21:00–24:00', min:21, max:24, emoji:'🌃'},
+  ];
+  slots.forEach(s => {
+    const sp = posts.filter(p => {
+      if (!p.timestamp) return false;
+      const h = new Date(p.timestamp).getHours();
+      return h >= s.min && h < s.max;
+    });
+    s.count = sp.length;
+    s.avgLikes  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.likes||0),0)/s.count) : 0;
+    s.avgReach  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.reach||0),0)/s.count) : 0;
+    s.avgShares = s.count ? Math.round(sp.reduce((a,p)=>a+(p.shares||0),0)/s.count) : 0;
+    s.avgSaved  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.saved||0),0)/s.count) : 0;
+    s.score     = s.avgLikes + s.avgShares*3 + s.avgSaved*2;
+  });
+  const active = slots.filter(s => s.count > 0);
+  if (!active.length) return '';
+  const maxScore = Math.max(...active.map(s => s.score), 1);
+  const bestScore = Math.max(...active.map(s => s.score));
+  return `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="color:#facc15;font-size:13px;font-weight:700;margin-bottom:12px;">⏰ Saat Dilimi Analizi</div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${active.map(s => {
+      const pct = Math.round(s.score / maxScore * 100);
+      const isBest = s.score === bestScore && bestScore > 0;
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:92px;color:#888;font-size:11px;flex-shrink:0;">${s.emoji} ${s.label}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:16px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${isBest?'#7c3aed':'#2a2a5a'};border-radius:4px;"></div>
+        </div>
+        <div style="width:24px;color:#666;font-size:10px;text-align:right;">${s.count}x</div>
+        <div style="width:58px;text-align:right;font-size:11px;${isBest?'color:#a78bfa;font-weight:700;':'color:#555;'}">❤ ${s.avgLikes}</div>
+        <div style="width:64px;text-align:right;font-size:11px;${isBest?'color:#4ade80;font-weight:700;':'color:#444;'}">👁 ${formatNum(s.avgReach)}</div>
+      </div>`;
+    }).join('')}
+    </div>
+    <div style="color:#444;font-size:10px;margin-top:8px;">x = paylaşım sayısı · ❤ ort. beğeni · 👁 ort. erişim</div>
+  </div>`;
+}
+
+function buildTopicAnalysis(posts) {
+  const tagMap = {};
+  posts.forEach(p => {
+    const tags = (p.caption || '').match(/#[\wışğİüöçâîûÀ-ɏ]+/g) || [];
+    const score = _engScore(p);
+    const uniq = [...new Set(tags.map(t => t.toLowerCase()))];
+    uniq.forEach(tag => {
+      if (!tagMap[tag]) tagMap[tag] = {count:0, totalScore:0, totalLikes:0, totalReach:0};
+      tagMap[tag].count++;
+      tagMap[tag].totalScore += score;
+      tagMap[tag].totalLikes += p.likes||0;
+      tagMap[tag].totalReach += p.reach||0;
+    });
+  });
+  const tags = Object.entries(tagMap)
+    .map(([tag, v]) => ({tag, count:v.count, avgScore:Math.round(v.totalScore/v.count), avgLikes:Math.round(v.totalLikes/v.count), avgReach:Math.round(v.totalReach/v.count)}))
+    .filter(t => t.count >= 2)
+    .sort((a,b) => b.avgScore - a.avgScore)
+    .slice(0, 10);
+  if (!tags.length) return '';
+  const maxScore = Math.max(...tags.map(t => t.avgScore), 1);
+  return `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="color:#38bdf8;font-size:13px;font-weight:700;margin-bottom:12px;">🏷 Konu / Hashtag Analizi <span style="color:#444;font-weight:400;font-size:11px;">(en az 2 paylaşım)</span></div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${tags.map((t, i) => {
+      const pct = Math.round(t.avgScore / maxScore * 100);
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:120px;color:${i<3?'#a78bfa':'#666'};font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.tag}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:14px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${i===0?'#0369a1':i<3?'#1d4ed8':'#1e3a5f'};border-radius:4px;"></div>
+        </div>
+        <div style="width:24px;color:#555;font-size:10px;text-align:right;">${t.count}x</div>
+        <div style="width:50px;text-align:right;font-size:11px;color:${i<3?'#f97316':'#555'};">❤ ${t.avgLikes}</div>
+      </div>`;
+    }).join('')}
+    </div>
+  </div>`;
+}
+
+function buildRecommendations(posts) {
+  if (!posts.length) return '';
+  const slots = [
+    {label:'00:00–06:00', min:0,  max:6},
+    {label:'06:00–09:00', min:6,  max:9},
+    {label:'09:00–12:00', min:9,  max:12},
+    {label:'12:00–15:00', min:12, max:15},
+    {label:'15:00–18:00', min:15, max:18},
+    {label:'18:00–21:00', min:18, max:21},
+    {label:'21:00–24:00', min:21, max:24},
+  ];
+  slots.forEach(s => {
+    const sp = posts.filter(p => {
+      if (!p.timestamp) return false;
+      const h = new Date(p.timestamp).getHours();
+      return h >= s.min && h < s.max;
+    });
+    s.count = sp.length;
+    s.score = s.count ? Math.round(sp.reduce((a,p)=>a+_engScore(p),0)/s.count) : 0;
+  });
+  const bestSlots = slots.filter(s => s.count > 0).sort((a,b) => b.score - a.score).slice(0,2);
+
+  const withTime = posts.filter(p => p.timestamp);
+  let freqText = '';
+  if (withTime.length >= 2) {
+    const times = withTime.map(p => new Date(p.timestamp).getTime()).sort((a,b)=>a-b);
+    const spanDays = (times[times.length-1] - times[0]) / 86400000;
+    const perDay = spanDays > 0 ? (withTime.length / spanDays).toFixed(1) : '?';
+    freqText = `Mevcut sıklık: günde ~<b style="color:#facc15;">${perDay}</b> paylaşım`;
+  }
+
+  const tagMap = {};
+  posts.forEach(p => {
+    const tags = (p.caption||'').match(/#[\wışğİüöçâîûÀ-ɏ]+/g) || [];
+    const score = _engScore(p);
+    [...new Set(tags.map(t=>t.toLowerCase()))].forEach(tag => {
+      if (!tagMap[tag]) tagMap[tag] = {count:0, total:0};
+      tagMap[tag].count++; tagMap[tag].total += score;
+    });
+  });
+  const topTags = Object.entries(tagMap).filter(([,v])=>v.count>=2)
+    .map(([tag,v])=>({tag,avg:v.total/v.count}))
+    .sort((a,b)=>b.avg-a.avg).slice(0,3).map(t=>t.tag);
+
+  const lines = [];
+  if (bestSlots.length) lines.push(`📅 En iyi paylaşım saati: <b style="color:#facc15;">${bestSlots.map(s=>s.label).join('</b> ve <b style="color:#facc15;">')}</b>`);
+  if (topTags.length) lines.push(`🏷 En çok etkileşim alan konular: <b style="color:#a78bfa;">${topTags.join(', ')}</b>`);
+  if (freqText) lines.push(`📊 ${freqText}`);
+  if (bestSlots.length >= 2) lines.push(`💡 Öneri: günde 2 paylaşım — <b style="color:#4ade80;">${bestSlots[0].label}</b> ve <b style="color:#4ade80;">${bestSlots[1].label}</b> arasında`);
+  else if (bestSlots.length === 1) lines.push(`💡 Öneri: <b style="color:#4ade80;">${bestSlots[0].label}</b> saatlerinde paylaş`);
+
+  return `<div style="background:#0d1f12;border:1px solid #1a4a2a;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="color:#4ade80;font-size:13px;font-weight:700;margin-bottom:10px;">💡 Öneriler</div>
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#ccc;line-height:1.6;">
+      ${lines.map(l=>`<div>${l}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
 async function loadIGAnalytics() {
   document.getElementById('ig-an-error').style.display = 'none';
   document.getElementById('ig-an-content').style.display = 'none';
@@ -2777,10 +2927,17 @@ async function loadIGAnalytics() {
         `▶ ${formatNum(best.plays||0)}  ❤ ${formatNum(best.likes)}  💬 ${formatNum(best.comments)}  ↗ ${formatNum(best.shares||0)}  🔖 ${formatNum(best.saved||0)}`;
     }
 
+    // Analiz bölümleri
+    document.getElementById('ig-an-time-analysis').innerHTML = buildTimeAnalysis(d.posts);
+    document.getElementById('ig-an-topic-analysis').innerHTML = buildTopicAnalysis(d.posts);
+    document.getElementById('ig-an-recommendations').innerHTML = buildRecommendations(d.posts);
+
     // Gönderi listesi
     const container = document.getElementById('ig-an-posts');
     container.innerHTML = d.posts.map(post => {
-      const dt = post.timestamp ? new Date(post.timestamp).toLocaleDateString('tr-TR') : '';
+      const dt = post.timestamp ? new Date(post.timestamp).toLocaleString('tr-TR', {
+        day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'
+      }) : '';
       const bar = post.plays > 0
         ? `<span style="color:#7c3aed;">▶ ${formatNum(post.plays)}</span>`
         : `<span style="color:#888;">▶ 0</span>`;
@@ -2788,7 +2945,7 @@ async function loadIGAnalytics() {
         <img src="${post.thumb}" style="width:36px;height:64px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
         <div style="flex:1;min-width:0;">
           <div style="color:#ccc;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${post.caption || '(altyazı yok)'}</div>
-          <div style="color:#666;font-size:11px;margin-top:2px;">${dt}</div>
+          <div style="color:#555;font-size:11px;margin-top:2px;">${dt}</div>
         </div>
         <div style="text-align:right;font-size:12px;white-space:nowrap;flex-shrink:0;">
           ${bar} &nbsp;
@@ -2983,6 +3140,11 @@ function deleteComedyVideo() {
         </div>
       </div>
     </div>
+
+    <!-- Analiz bölümleri -->
+    <div id="ig-an-recommendations"></div>
+    <div id="ig-an-time-analysis"></div>
+    <div id="ig-an-topic-analysis"></div>
 
     <!-- Gönderi listesi -->
     <h3 style="color:#aaa;font-size:13px;margin-bottom:10px;">Son Gönderiler</h3>
