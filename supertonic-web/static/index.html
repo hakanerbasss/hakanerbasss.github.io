@@ -2288,6 +2288,10 @@ async function loadIGOnlyTRStatus() {
       const log = d.log || {};
       const statusEl = document.getElementById('ig-only-tr-last-status');
       let statusText = log.status ? `Durum: ${log.status}` : '';
+      if (log.ts) {
+        const startTime = new Date(log.ts * 1000).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+        statusText += ` — Başladı: ${startTime}`;
+      }
       if (log.status === 'running' && log.ts) {
         const mins = Math.round((Date.now()/1000 - log.ts) / 60);
         if (mins > 0) statusText += ` (${mins} dk)`;
