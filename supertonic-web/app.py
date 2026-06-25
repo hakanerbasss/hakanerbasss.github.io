@@ -6,6 +6,7 @@ import json
 import time
 import re
 from pathlib import Path
+import shutil
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -552,7 +553,7 @@ Rules:
     await arun_ffmpeg([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-        "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
+        "-r", "30", "-fps_mode", "cfr", "-pix_fmt", "yuv420p",
         str(slideshow.absolute())
     ], timeout=600, step="slideshow")
 
@@ -562,7 +563,7 @@ Rules:
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-        "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
+        "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         "-shortest", str(output_file.absolute())
@@ -583,12 +584,14 @@ Rules:
     # Thumbnail — overlay'li ilk sahneyi kopyala (ayrıca create_thumbnail gerekmez)
     thumb_path = None
     try:
-        import shutil
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
         shutil.copy2(str(png_files[0]), str(thumb_out))
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
+
+    # Geçici dosyaları temizle (disk dolmaması için)
+    shutil.rmtree(scene_dir, ignore_errors=True)
 
     return {
         "video": f"/api/video/{output_file.name}",
@@ -1372,6 +1375,8 @@ Rules:
     except Exception:
         pass
 
+    shutil.rmtree(scene_dir, ignore_errors=True)
+
     return {
         "video": f"/api/video/{output_file.name}",
         "thumbnail": thumb_path,
@@ -1582,6 +1587,8 @@ Rules:
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
+
+    shutil.rmtree(scene_dir, ignore_errors=True)
 
     return {
         "video": f"/api/video/{output_file.name}",
@@ -2108,7 +2115,7 @@ async def test_instagram():
         if r.status_code == 200:
             d = r.json()
             return {"ok": True, "username": d.get("username") or d.get("name"), "id": d.get("id")}
-        return {"ok": False, "error": f"{r.status_code}: {r.text[:300]}"}
+        return {"ok": False, "error": f"{r.status_code}: {r.text[:800]}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -2762,7 +2769,7 @@ async def auto_shorts_job():
                       "speed": "1.0", "exclude_topics": exclude_str},
             )
             if r.status_code != 200:
-                save_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
+                save_sched_log("error", f"Video üretilemedi: {r.text[:800]}")
                 return
             d = r.json()
             add_shorts_used_topic(d.get("title", ""))
@@ -2914,7 +2921,7 @@ Pick something different and interesting each time."""}],
                       "voice": voice, "speed": "1.0", "duration_min": str(duration_min)},
             )
             if r.status_code != 200:
-                save_lv_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
+                save_lv_sched_log("error", f"Video üretilemedi: {r.text[:800]}")
                 return
             d = r.json()
 
@@ -3041,7 +3048,7 @@ Pick something DIFFERENT and interesting each time."""}],
                       "voice": voice, "speed": "1.0", "duration_min": str(duration_min)},
             )
             if r.status_code != 200:
-                save_lv_en_sched_log("error", f"Video failed: {r.text[:300]}")
+                save_lv_en_sched_log("error", f"Video failed: {r.text[:800]}")
                 return
             d = r.json()
 
@@ -3167,7 +3174,7 @@ async def auto_en_shorts_job():
                 },
             )
             if r.status_code != 200:
-                save_en_shorts_sched_log("error", f"Video failed: {r.text[:300]}")
+                save_en_shorts_sched_log("error", f"Video failed: {r.text[:800]}")
                 return
             d = r.json()
             add_en_shorts_used_topic(d.get("title", ""))
@@ -3281,7 +3288,7 @@ async def auto_tnlv_job():
                 data={"api_key": api_key, "lang": lang, "voice": voice, "speed": "1.0", "region": "TR"},
             )
             if r.status_code != 200:
-                save_tnlv_sched_log("error", f"Video üretilemedi: {r.text[:300]}")
+                save_tnlv_sched_log("error", f"Video üretilemedi: {r.text[:800]}")
                 return
             d = r.json()
 
@@ -3403,7 +3410,7 @@ async def auto_ig_only_tr_job():
                       "speed": "1.0", "exclude_topics": exclude_str, "region": "TR"},
             )
             if r.status_code != 200:
-                save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:300]}")
+                save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
                 return
             d = r.json()
             add_ig_only_tr_used_topic(d.get("title", ""))
@@ -3725,7 +3732,7 @@ async def test_telegram():
             )
         if r.status_code == 200:
             return {"ok": True}
-        return {"ok": False, "error": r.text[:300]}
+        return {"ok": False, "error": r.text[:800]}
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -3927,7 +3934,7 @@ async def comedy_create_video(request: Request):
     await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
          "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-         "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
+         "-r", "30", "-fps_mode", "cfr", "-pix_fmt", "yuv420p",
          str(slideshow.absolute())],
         check=True, capture_output=True, timeout=300,
     )
@@ -3938,7 +3945,7 @@ async def comedy_create_video(request: Request):
         ["ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
          "-map", "0:v:0", "-map", "1:a:0",
          "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
+         "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr",
          "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
          "-movflags", "+faststart", "-shortest", str(output_file.absolute())],
         check=True, capture_output=True, timeout=300,
@@ -3951,6 +3958,8 @@ async def comedy_create_video(request: Request):
         "title": body.get("title", ""),
         "ts": time.time(),
     }))
+
+    shutil.rmtree(work_dir, ignore_errors=True)
 
     return {
         "ok": True,
