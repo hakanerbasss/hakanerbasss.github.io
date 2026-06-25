@@ -2177,6 +2177,51 @@ async def instagram_analytics(limit: int = 15):
     }
 
 
+@app.get("/api/instagram/debug-insights")
+async def debug_instagram_insights():
+    """İlk Reel'in ham API yanıtını gösterir — tanı için."""
+    cfg = get_ig_config()
+    uid   = cfg["ig_user_id"]
+    token = cfg["access_token"]
+    graph = "https://graph.facebook.com/v21.0"
+    result = {}
+    async with httpx.AsyncClient(timeout=20) as client:
+        # İlk medyayı çek
+        r_media = await client.get(f"{graph}/{uid}/media", params={
+            "fields": "id,media_type,timestamp,views",
+            "limit": 3,
+            "access_token": token,
+        })
+        result["media_raw"] = r_media.json()
+        media_list = r_media.json().get("data", [])
+        if not media_list:
+            return result
+        mid = media_list[0]["id"]
+        result["testing_media_id"] = mid
+        # 1. views,reach lifetime
+        r1 = await client.get(f"{graph}/{mid}/insights", params={
+            "metric": "views,reach,likes,comments,shares,saved",
+            "period": "lifetime",
+            "access_token": token,
+        })
+        result["insights_views_lifetime"] = {"status": r1.status_code, "body": r1.json()}
+        # 2. views singletons
+        r2 = await client.get(f"{graph}/{mid}/insights", params={
+            "metric": "views",
+            "period": "lifetime",
+            "access_token": token,
+        })
+        result["insights_views_only"] = {"status": r2.status_code, "body": r2.json()}
+        # 3. reach day
+        r3 = await client.get(f"{graph}/{mid}/insights", params={
+            "metric": "reach",
+            "period": "day",
+            "access_token": token,
+        })
+        result["insights_reach_day"] = {"status": r3.status_code, "body": r3.json()}
+    return result
+
+
 def load_yt_config():
     if CONFIG_FILE.exists():
         return json.loads(CONFIG_FILE.read_text())
