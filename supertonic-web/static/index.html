@@ -2736,8 +2736,9 @@ function downloadIGAnalyticsJSON() {
   a.click();
 }
 
+function _views(p) { return p.views || p.plays || 0; }
 function _engScore(p) {
-  return (p.likes||0) + (p.comments||0)*2 + (p.shares||0)*3 + (p.saved||0)*2;
+  return (p.likes||0) + (p.comments||0)*2 + (p.shares||0)*10 + (p.saved||0)*3 + Math.round(_views(p)/100);
 }
 
 function buildTimeAnalysis(posts) {
@@ -2758,10 +2759,11 @@ function buildTimeAnalysis(posts) {
     });
     s.count = sp.length;
     s.avgLikes  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.likes||0),0)/s.count) : 0;
+    s.avgViews  = s.count ? Math.round(sp.reduce((a,p)=>a+_views(p),0)/s.count) : 0;
     s.avgReach  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.reach||0),0)/s.count) : 0;
     s.avgShares = s.count ? Math.round(sp.reduce((a,p)=>a+(p.shares||0),0)/s.count) : 0;
     s.avgSaved  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.saved||0),0)/s.count) : 0;
-    s.score     = s.avgLikes + s.avgShares*3 + s.avgSaved*2;
+    s.score     = s.avgLikes + s.avgShares*10 + s.avgSaved*3 + Math.round(s.avgViews/100);
   });
   const active = slots.filter(s => s.count > 0);
   if (!active.length) return '';
@@ -2779,12 +2781,12 @@ function buildTimeAnalysis(posts) {
           <div style="width:${pct}%;height:100%;background:${isBest?'#7c3aed':'#2a2a5a'};border-radius:4px;"></div>
         </div>
         <div style="width:24px;color:#666;font-size:10px;text-align:right;">${s.count}x</div>
+        <div style="width:70px;text-align:right;font-size:11px;${isBest?'color:#7c3aed;font-weight:700;':'color:#444;'}">👁 ${formatNum(s.avgViews)}</div>
         <div style="width:58px;text-align:right;font-size:11px;${isBest?'color:#a78bfa;font-weight:700;':'color:#555;'}">❤ ${s.avgLikes}</div>
-        <div style="width:64px;text-align:right;font-size:11px;${isBest?'color:#4ade80;font-weight:700;':'color:#444;'}">👁 ${formatNum(s.avgReach)}</div>
       </div>`;
     }).join('')}
     </div>
-    <div style="color:#444;font-size:10px;margin-top:8px;">x = paylaşım sayısı · ❤ ort. beğeni · 👁 ort. erişim</div>
+    <div style="color:#444;font-size:10px;margin-top:8px;">x = paylaşım sayısı · 👁 ort. görüntüleme · ❤ ort. beğeni</div>
   </div>`;
 }
 
@@ -2903,7 +2905,7 @@ async function loadIGAnalytics() {
 
     let totPlays = 0, totReach = 0, totLikes = 0, totComments = 0, totShares = 0, totSaved = 0;
     d.posts.forEach(post => {
-      totPlays    += post.plays    || 0;
+      totPlays    += post.views || post.plays || 0;
       totReach    += post.reach    || 0;
       totLikes    += post.likes    || 0;
       totComments += post.comments || 0;
@@ -2918,13 +2920,13 @@ async function loadIGAnalytics() {
     document.getElementById('ig-an-total-saved').textContent    = formatNum(totSaved);
 
     // En iyi gönderi
-    const best = [...d.posts].sort((a,b) => (b.plays||b.reach||0) - (a.plays||a.reach||0))[0];
+    const best = [...d.posts].sort((a,b) => ((b.views||b.plays||0)+(b.shares||0)*10) - ((a.views||a.plays||0)+(a.shares||0)*10))[0];
     if (best) {
       document.getElementById('ig-an-best').style.display = 'block';
       document.getElementById('ig-an-best-thumb').src = best.thumb;
       document.getElementById('ig-an-best-caption').textContent = best.caption || '(altyazı yok)';
       document.getElementById('ig-an-best-stats').textContent =
-        `▶ ${formatNum(best.plays||0)}  ❤ ${formatNum(best.likes)}  💬 ${formatNum(best.comments)}  ↗ ${formatNum(best.shares||0)}  🔖 ${formatNum(best.saved||0)}`;
+        `👁 ${formatNum(best.views||best.plays||0)}  ❤ ${formatNum(best.likes)}  ↗ ${formatNum(best.shares||0)}  🔖 ${formatNum(best.saved||0)}`;
     }
 
     // Analiz bölümleri
@@ -2938,9 +2940,10 @@ async function loadIGAnalytics() {
       const dt = post.timestamp ? new Date(post.timestamp).toLocaleString('tr-TR', {
         day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'
       }) : '';
-      const bar = post.plays > 0
-        ? `<span style="color:#7c3aed;">▶ ${formatNum(post.plays)}</span>`
-        : `<span style="color:#888;">▶ 0</span>`;
+      const vw = post.views || post.plays || 0;
+      const bar = vw > 0
+        ? `<span style="color:#7c3aed;">👁 ${formatNum(vw)}</span>`
+        : `<span style="color:#444;">👁 0</span>`;
       return `<div style="background:#111;border:1px solid #222;border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;">
         <img src="${post.thumb}" style="width:36px;height:64px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
         <div style="flex:1;min-width:0;">
@@ -3105,7 +3108,7 @@ function deleteComedyVideo() {
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
       <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
         <div style="font-size:22px;font-weight:bold;color:#7c3aed;" id="ig-an-total-plays">-</div>
-        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Oynanma</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Görüntüleme</div>
       </div>
       <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
         <div style="font-size:22px;font-weight:bold;color:#4ade80;" id="ig-an-total-reach">-</div>
@@ -3131,7 +3134,7 @@ function deleteComedyVideo() {
 
     <!-- En iyi gönderi -->
     <div id="ig-an-best" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
-      <div style="color:#4ade80;font-size:12px;font-weight:700;margin-bottom:8px;">🏆 En İyi Gönderi (Oynanma)</div>
+      <div style="color:#4ade80;font-size:12px;font-weight:700;margin-bottom:8px;">🏆 En İyi Gönderi (Görüntüleme + Paylaşım)</div>
       <div style="display:flex;gap:12px;align-items:flex-start;">
         <img id="ig-an-best-thumb" src="" style="width:54px;height:96px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">
         <div>

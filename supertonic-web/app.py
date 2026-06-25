@@ -2122,9 +2122,9 @@ async def instagram_analytics(limit: int = 15):
             raise HTTPException(502, f"Profil alınamadı: {r_profile.text[:200]}")
         profile = r_profile.json()
 
-        # 2. Son gönderiler
+        # 2. Son gönderiler — views Reels'te doğrudan media object'ten geliyor
         r_media = await client.get(f"{graph}/{uid}/media", params={
-            "fields": "id,caption,media_type,timestamp,like_count,comments_count,thumbnail_url,media_url,permalink",
+            "fields": "id,caption,media_type,timestamp,like_count,comments_count,thumbnail_url,media_url,permalink,views",
             "limit": limit,
             "access_token": token,
         })
@@ -2135,15 +2135,19 @@ async def instagram_analytics(limit: int = 15):
         # 3. Her gönderi için insights
         posts = []
         for m in media_list:
-            insight_metrics = "plays,reach,likes,comments,shares,saved" if m.get("media_type") == "VIDEO" else "impressions,reach,likes,comments,saved"
+            is_video = m.get("media_type") in ("VIDEO", "REEL")
+            insight_metrics = "plays,reach,likes,comments,shares,saved" if is_video else "impressions,reach,likes,comments,saved"
             r_ins = await client.get(f"{graph}/{m['id']}/insights", params={
                 "metric": insight_metrics,
+                "period": "lifetime",
                 "access_token": token,
             })
             insights = {}
             if r_ins.status_code == 200:
                 for item in r_ins.json().get("data", []):
                     insights[item["name"]] = item.get("values", [{}])[0].get("value") if "values" in item else item.get("value", 0)
+            # views: media object'ten al (daha güvenilir), insights.plays fallback
+            media_views = m.get("views") or insights.get("plays") or 0
             posts.append({
                 "id":          m["id"],
                 "type":        m.get("media_type", ""),
@@ -2153,7 +2157,8 @@ async def instagram_analytics(limit: int = 15):
                 "permalink":   m.get("permalink", ""),
                 "likes":       m.get("like_count", 0),
                 "comments":    m.get("comments_count", 0),
-                "plays":       insights.get("plays", 0),
+                "views":       media_views,
+                "plays":       media_views,
                 "reach":       insights.get("reach", 0),
                 "shares":      insights.get("shares", 0),
                 "saved":       insights.get("saved", 0),
