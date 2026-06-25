@@ -252,6 +252,7 @@
   <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
   <div class="tab" onclick="switchTab('tnlv')">Trend Haber LV</div>
   <div class="tab" onclick="switchTab('analytics')">📊 Analitik</div>
+  <div class="tab" onclick="switchTab('iganalytics')">📸 IG Analitik</div>
   <div class="tab" onclick="switchTab('comedy')">📰 Komik Haber</div>
 </div>
 
@@ -1393,7 +1394,7 @@ async function loadMeta() {
 }
 
 function switchTab(name) {
-  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics'];
+  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy'];
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', names[i] === name);
   });
@@ -1402,6 +1403,7 @@ function switchTab(name) {
   if (name === 'tnlv') updateTNLVApiKeyStatus();
   if (name === 'longvideo') updateLVApiKeyStatus();
   if (name === 'analytics') loadAnalytics();
+  if (name === 'iganalytics') loadIGAnalytics();
 }
 
 async function generateLongVideo() {
@@ -2722,6 +2724,77 @@ function formatNum(n) {
   return String(n);
 }
 
+// ─── INSTAGRAM ANALİTİK ─────────────────────────────────────────────────────
+async function loadIGAnalytics() {
+  document.getElementById('ig-an-error').style.display = 'none';
+  document.getElementById('ig-an-content').style.display = 'none';
+  document.getElementById('ig-an-loading').style.display = 'block';
+  try {
+    const r = await fetch('/api/instagram/analytics?limit=15');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+
+    const p = d.profile;
+    document.getElementById('ig-an-username').textContent = '@' + (p.username || '?');
+    document.getElementById('ig-an-followers').textContent = formatNum(p.followers_count || 0);
+    document.getElementById('ig-an-media-count').textContent = p.media_count || 0;
+
+    let totPlays = 0, totReach = 0, totLikes = 0, totComments = 0, totShares = 0, totSaved = 0;
+    d.posts.forEach(post => {
+      totPlays    += post.plays    || 0;
+      totReach    += post.reach    || 0;
+      totLikes    += post.likes    || 0;
+      totComments += post.comments || 0;
+      totShares   += post.shares   || 0;
+      totSaved    += post.saved    || 0;
+    });
+    document.getElementById('ig-an-total-plays').textContent    = formatNum(totPlays);
+    document.getElementById('ig-an-total-reach').textContent    = formatNum(totReach);
+    document.getElementById('ig-an-total-likes').textContent    = formatNum(totLikes);
+    document.getElementById('ig-an-total-comments').textContent = formatNum(totComments);
+    document.getElementById('ig-an-total-shares').textContent   = formatNum(totShares);
+    document.getElementById('ig-an-total-saved').textContent    = formatNum(totSaved);
+
+    // En iyi gönderi
+    const best = [...d.posts].sort((a,b) => (b.plays||b.reach||0) - (a.plays||a.reach||0))[0];
+    if (best) {
+      document.getElementById('ig-an-best').style.display = 'block';
+      document.getElementById('ig-an-best-thumb').src = best.thumb;
+      document.getElementById('ig-an-best-caption').textContent = best.caption || '(altyazı yok)';
+      document.getElementById('ig-an-best-stats').textContent =
+        `▶ ${formatNum(best.plays||0)}  ❤ ${formatNum(best.likes)}  💬 ${formatNum(best.comments)}  ↗ ${formatNum(best.shares||0)}  🔖 ${formatNum(best.saved||0)}`;
+    }
+
+    // Gönderi listesi
+    const container = document.getElementById('ig-an-posts');
+    container.innerHTML = d.posts.map(post => {
+      const dt = post.timestamp ? new Date(post.timestamp).toLocaleDateString('tr-TR') : '';
+      const bar = post.plays > 0
+        ? `<span style="color:#7c3aed;">▶ ${formatNum(post.plays)}</span>`
+        : `<span style="color:#888;">▶ 0</span>`;
+      return `<div style="background:#111;border:1px solid #222;border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;">
+        <img src="${post.thumb}" style="width:36px;height:64px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
+        <div style="flex:1;min-width:0;">
+          <div style="color:#ccc;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${post.caption || '(altyazı yok)'}</div>
+          <div style="color:#666;font-size:11px;margin-top:2px;">${dt}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;white-space:nowrap;flex-shrink:0;">
+          ${bar} &nbsp;
+          <span style="color:#f97316;">❤ ${formatNum(post.likes)}</span> &nbsp;
+          <span style="color:#34d399;">🔖 ${formatNum(post.saved||0)}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('ig-an-loading').style.display = 'none';
+    document.getElementById('ig-an-content').style.display = 'block';
+  } catch(e) {
+    document.getElementById('ig-an-loading').style.display = 'none';
+    document.getElementById('ig-an-error').style.display = 'block';
+    document.getElementById('ig-an-error').textContent = 'Hata: ' + e.message;
+  }
+}
+
 // ─── KOMİK HABER ────────────────────────────────────────────────────────────
 let _comedySessionId = null;
 let _comedyUid = null;
@@ -2835,6 +2908,74 @@ function deleteComedyVideo() {
   _comedyUid = null;
 }
 </script>
+
+<!-- INSTAGRAM ANALİTİK PANELİ -->
+<div class="panel" id="tab-iganalytics">
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+    <h2 style="color:#fff;font-size:18px;margin:0;flex:1;">📸 Instagram Analitik</h2>
+    <button onclick="loadIGAnalytics()" style="font-size:12px;padding:8px 14px;">↻ Yenile</button>
+  </div>
+  <div id="ig-an-error" style="display:none;color:#f87171;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:16px;"></div>
+  <div id="ig-an-loading" style="display:none;color:#888;font-size:14px;text-align:center;padding:40px;">Yükleniyor...</div>
+
+  <div id="ig-an-content" style="display:none;">
+    <!-- Profil özeti -->
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+      <div>
+        <div style="color:#888;font-size:11px;margin-bottom:2px;">Hesap</div>
+        <div style="color:#a78bfa;font-weight:700;font-size:15px;" id="ig-an-username">-</div>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <span style="color:#ccc;font-size:13px;">Takipçi: <b id="ig-an-followers" style="color:#facc15;">-</b></span>
+        <span style="color:#ccc;font-size:13px;">Gönderi: <b id="ig-an-media-count" style="color:#4ade80;">-</b></span>
+      </div>
+    </div>
+
+    <!-- Toplam metrikler -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#7c3aed;" id="ig-an-total-plays">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Oynanma</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#4ade80;" id="ig-an-total-reach">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Erişim</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#f97316;" id="ig-an-total-likes">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Beğeni</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#38bdf8;" id="ig-an-total-comments">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Yorum</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#a78bfa;" id="ig-an-total-shares">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Paylaşım</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#34d399;" id="ig-an-total-saved">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Kaydedilen</div>
+      </div>
+    </div>
+
+    <!-- En iyi gönderi -->
+    <div id="ig-an-best" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
+      <div style="color:#4ade80;font-size:12px;font-weight:700;margin-bottom:8px;">🏆 En İyi Gönderi (Oynanma)</div>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <img id="ig-an-best-thumb" src="" style="width:54px;height:96px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">
+        <div>
+          <div id="ig-an-best-caption" style="color:#ccc;font-size:12px;line-height:1.5;margin-bottom:6px;"></div>
+          <div id="ig-an-best-stats" style="color:#888;font-size:11px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gönderi listesi -->
+    <h3 style="color:#aaa;font-size:13px;margin-bottom:10px;">Son Gönderiler</h3>
+    <div id="ig-an-posts" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
 
 <!-- KOMİK HABER PANELİ -->
 <div class="panel" id="tab-comedy">

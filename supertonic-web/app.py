@@ -2102,6 +2102,70 @@ async def test_instagram():
         return {"ok": False, "error": str(e)}
 
 
+@app.get("/api/instagram/analytics")
+async def instagram_analytics(limit: int = 15):
+    """Son Reels + hesap özeti. limit: kaç gönderi çekilsin."""
+    cfg = get_ig_config()
+    if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+        raise HTTPException(400, "Instagram yapılandırması eksik")
+    uid   = cfg["ig_user_id"]
+    token = cfg["access_token"]
+    graph = "https://graph.facebook.com/v21.0"
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        # 1. Profil
+        r_profile = await client.get(f"{graph}/{uid}", params={
+            "fields": "username,followers_count,media_count,biography",
+            "access_token": token,
+        })
+        if r_profile.status_code != 200:
+            raise HTTPException(502, f"Profil alınamadı: {r_profile.text[:200]}")
+        profile = r_profile.json()
+
+        # 2. Son gönderiler
+        r_media = await client.get(f"{graph}/{uid}/media", params={
+            "fields": "id,caption,media_type,timestamp,like_count,comments_count,thumbnail_url,media_url,permalink",
+            "limit": limit,
+            "access_token": token,
+        })
+        if r_media.status_code != 200:
+            raise HTTPException(502, f"Medya alınamadı: {r_media.text[:200]}")
+        media_list = r_media.json().get("data", [])
+
+        # 3. Her gönderi için insights
+        posts = []
+        for m in media_list:
+            insight_metrics = "plays,reach,likes,comments,shares,saved" if m.get("media_type") == "VIDEO" else "impressions,reach,likes,comments,saved"
+            r_ins = await client.get(f"{graph}/{m['id']}/insights", params={
+                "metric": insight_metrics,
+                "access_token": token,
+            })
+            insights = {}
+            if r_ins.status_code == 200:
+                for item in r_ins.json().get("data", []):
+                    insights[item["name"]] = item.get("values", [{}])[0].get("value") if "values" in item else item.get("value", 0)
+            posts.append({
+                "id":          m["id"],
+                "type":        m.get("media_type", ""),
+                "caption":     (m.get("caption") or "")[:80],
+                "timestamp":   m.get("timestamp", ""),
+                "thumb":       m.get("thumbnail_url") or m.get("media_url") or "",
+                "permalink":   m.get("permalink", ""),
+                "likes":       m.get("like_count", 0),
+                "comments":    m.get("comments_count", 0),
+                "plays":       insights.get("plays", 0),
+                "reach":       insights.get("reach", 0),
+                "shares":      insights.get("shares", 0),
+                "saved":       insights.get("saved", 0),
+                "impressions": insights.get("impressions", 0),
+            })
+
+    return {
+        "profile":   profile,
+        "posts":     posts,
+    }
+
+
 def load_yt_config():
     if CONFIG_FILE.exists():
         return json.loads(CONFIG_FILE.read_text())
