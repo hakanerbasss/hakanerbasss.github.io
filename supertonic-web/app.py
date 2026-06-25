@@ -553,7 +553,7 @@ Rules:
     await arun_ffmpeg([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-        "-r", "30", "-fps_mode", "cfr", "-pix_fmt", "yuv420p",
+        "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
         str(slideshow.absolute())
     ], timeout=600, step="slideshow")
 
@@ -563,7 +563,7 @@ Rules:
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-        "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr",
+        "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         "-shortest", str(output_file.absolute())
@@ -3934,7 +3934,7 @@ async def comedy_create_video(request: Request):
     await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
          "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-         "-r", "30", "-fps_mode", "cfr", "-pix_fmt", "yuv420p",
+         "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
          str(slideshow.absolute())],
         check=True, capture_output=True, timeout=300,
     )
@@ -3945,7 +3945,7 @@ async def comedy_create_video(request: Request):
         ["ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
          "-map", "0:v:0", "-map", "1:a:0",
          "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-         "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr",
+         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
          "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
          "-movflags", "+faststart", "-shortest", str(output_file.absolute())],
         check=True, capture_output=True, timeout=300,
