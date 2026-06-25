@@ -59,6 +59,12 @@ def run_ffmpeg(cmd, timeout, retries=0, step=""):
             time.sleep(2 * (attempt + 1))
     raise last_err
 
+
+async def arun_ffmpeg(cmd, timeout, retries=0, step=""):
+    """run_ffmpeg'in async sürümü — event loop'u bloke etmez."""
+    return await asyncio.to_thread(run_ffmpeg, cmd, timeout, retries=retries, step=step)
+
+
 OUTPUT_DIR = Path("outputs")
 UPLOAD_DIR = Path("uploads")
 COMEDY_UPLOAD_DIR = Path("uploads/comedy")
@@ -233,10 +239,10 @@ async def voice_video(
         await f.write(content)
 
     # videodan ses çıkar
-    subprocess.run(
+    await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-i", str(video_path), "-vn", "-ar", "16000", "-ac", "1",
          "-f", "wav", str(audio_extracted)],
-        check=True, capture_output=True, timeout=180
+        check=True, capture_output=True, timeout=180,
     )
 
     # transkript
@@ -262,11 +268,11 @@ async def voice_video(
     tts.save_audio(wav, str(tts_audio))
 
     # sesi videoyla birleştir
-    subprocess.run(
+    await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-i", str(video_path), "-i", str(tts_audio),
          "-map", "0:v:0", "-map", "1:a:0",
          "-c:v", "copy", "-shortest", str(output_video)],
-        check=True, capture_output=True, timeout=180
+        check=True, capture_output=True, timeout=180,
     )
 
     return {
@@ -420,11 +426,12 @@ Rules:
                 img = PILImage.new("RGB", (1080, 1920), color=(20, 20, 30))
                 img.save(str(png_path), "JPEG", quality=92)
             except Exception:
-                subprocess.run([
-                    "ffmpeg", "-y", "-f", "lavfi",
-                    "-i", "color=black:size=1080x1920:rate=1",
-                    "-frames:v", "1", str(png_path)
-                ], capture_output=True, timeout=90)
+                await asyncio.to_thread(subprocess.run,
+                    ["ffmpeg", "-y", "-f", "lavfi",
+                     "-i", "color=black:size=1080x1920:rate=1",
+                     "-frames:v", "1", str(png_path)],
+                    capture_output=True, timeout=90,
+                )
 
         png_files.append(png_path)
 
@@ -462,13 +469,14 @@ Rules:
         # Son sahne (endcard): metin overlay ekleme — endcard zaten tasarımlı
         if is_last and endcard_used:
             try:
-                subprocess.run([
-                    "ffmpeg", "-y",
-                    "-loop", "1", "-i", str(png),
-                    "-t", str(dur),
-                    "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-                    "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-                ], check=True, capture_output=True, timeout=90)
+                await asyncio.to_thread(subprocess.run,
+                    ["ffmpeg", "-y",
+                     "-loop", "1", "-i", str(png),
+                     "-t", str(dur),
+                     "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                     "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)],
+                    check=True, capture_output=True, timeout=90,
+                )
             except Exception as fe:
                 raise RuntimeError(f"ffmpeg endcard scene failed: {fe}")
             clip_files.append(clip_path)
@@ -502,24 +510,26 @@ Rules:
             drawtext += f":fontfile={font_path}"
 
         # Ken Burns efekti dene — başarısız olursa statik fallback
-        kb_ok = _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
+        kb_ok = await _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
         if not kb_ok:
             try:
-                result = subprocess.run([
-                    "ffmpeg", "-y",
-                    "-loop", "1", "-i", str(png),
-                    "-t", str(dur),
-                    "-vf", drawtext,
-                    "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-                ], capture_output=True, timeout=90)
+                result = await asyncio.to_thread(subprocess.run,
+                    ["ffmpeg", "-y",
+                     "-loop", "1", "-i", str(png),
+                     "-t", str(dur),
+                     "-vf", drawtext,
+                     "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)],
+                    capture_output=True, timeout=90,
+                )
                 if result.returncode != 0:
-                    subprocess.run([
-                        "ffmpeg", "-y",
-                        "-loop", "1", "-i", str(png),
-                        "-t", str(dur),
-                        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-                        "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-                    ], check=True, capture_output=True, timeout=90)
+                    await asyncio.to_thread(subprocess.run,
+                        ["ffmpeg", "-y",
+                         "-loop", "1", "-i", str(png),
+                         "-t", str(dur),
+                         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                         "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)],
+                        check=True, capture_output=True, timeout=90,
+                    )
             except Exception as fe:
                 raise RuntimeError(f"ffmpeg scene {i} failed: {fe}")
         clip_files.append(clip_path)
@@ -533,7 +543,7 @@ Rules:
     # -c copy yerine yeniden encode: sahnelerin TTS çıktısı farklı örnekleme
     # hızı/kanal ile gelirse concat copy sessizce bozuk akış üretip sonraki
     # mux'taki -map 1:a:0'ı düşürüyordu. pcm ile akış tek tip olur.
-    run_ffmpeg(
+    await arun_ffmpeg(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list_file),
          "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1", str(combined_audio)],
         timeout=120, step="ses birleştirme"
@@ -546,7 +556,7 @@ Rules:
             f.write(f"file '{cp.absolute()}'\n")
 
     slideshow = scene_dir / "slideshow.mp4"
-    run_ffmpeg([
+    await arun_ffmpeg([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
         "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
@@ -555,7 +565,7 @@ Rules:
 
     # Ses ekle — YouTube + Instagram uyumlu encode
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
-    run_ffmpeg([
+    await arun_ffmpeg([
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
@@ -1273,11 +1283,12 @@ Rules:
         photo_saved = fetch_scene_visual(scene.get("keyword", topic), "landscape", pexels_key, img_path)
 
         if not photo_saved:
-            subprocess.run([
-                "ffmpeg", "-y", "-f", "lavfi",
-                "-i", "color=black:size=1920x1080:rate=1",
-                "-frames:v", "1", str(img_path)
-            ], capture_output=True, timeout=90)
+            await asyncio.to_thread(subprocess.run,
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", "color=black:size=1920x1080:rate=1",
+                 "-frames:v", "1", str(img_path)],
+                capture_output=True, timeout=90,
+            )
 
         # Clip oluştur (yatay 1920x1080)
         clip_path = scene_dir / f"clip_{i}.mp4"
@@ -1305,13 +1316,14 @@ Rules:
         if font_path:
             drawtext += f":fontfile={font_path}"
 
-        subprocess.run([
-            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
-            "-t", str(dur_val),
-            "-vf", drawtext,
-            "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-            "-pix_fmt", "yuv420p", str(clip_path)
-        ], check=True, capture_output=True, timeout=180)
+        await asyncio.to_thread(subprocess.run,
+            ["ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+             "-t", str(dur_val),
+             "-vf", drawtext,
+             "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-pix_fmt", "yuv420p", str(clip_path)],
+            check=True, capture_output=True, timeout=180,
+        )
         clip_files.append(clip_path)
 
     # Sesleri birleştir
@@ -1320,9 +1332,9 @@ Rules:
     with open(audio_list, "w") as f:
         for af in audio_files:
             f.write(f"file '{af.absolute()}'\n")
-    subprocess.run(
+    await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list), "-c", "copy", str(combined_audio)],
-        check=True, capture_output=True, timeout=180
+        check=True, capture_output=True, timeout=180,
     )
 
     # Klipleri birleştir
@@ -1331,18 +1343,19 @@ Rules:
     with open(clip_list, "w") as f:
         for cp in clip_files:
             f.write(f"file '{cp.absolute()}'\n")
-    subprocess.run(
+    await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list), "-c", "copy", str(merged)],
-        check=True, capture_output=True, timeout=180
+        check=True, capture_output=True, timeout=180,
     )
 
     # Ses ekle
     output_file = OUTPUT_DIR / f"{uid}_long.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
-        "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
-    ], check=True, capture_output=True, timeout=120)
+    await asyncio.to_thread(subprocess.run,
+        ["ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
+         "-map", "0:v:0", "-map", "1:a:0",
+         "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)],
+        check=True, capture_output=True, timeout=120,
+    )
 
     full_script = " ".join(s["text"] for s in scenes)
     total_dur = round(sum(durations), 1)
@@ -1487,11 +1500,12 @@ Rules:
         photo_saved = fetch_scene_visual(kw, "landscape", pexels_key, img_path)
 
         if not photo_saved:
-            subprocess.run([
-                "ffmpeg", "-y", "-f", "lavfi",
-                "-i", "color=black:size=1920x1080:rate=1",
-                "-frames:v", "1", str(img_path)
-            ], capture_output=True, timeout=90)
+            await asyncio.to_thread(subprocess.run,
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", "color=black:size=1920x1080:rate=1",
+                 "-frames:v", "1", str(img_path)],
+                capture_output=True, timeout=90,
+            )
 
         clip_path = scene_dir / f"clip_{i}.mp4"
         words = scene["text"].split()
@@ -1518,13 +1532,14 @@ Rules:
         if font_path:
             drawtext += f":fontfile={font_path}"
 
-        subprocess.run([
-            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
-            "-t", str(dur_val),
-            "-vf", drawtext,
-            "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-            "-pix_fmt", "yuv420p", str(clip_path)
-        ], check=True, capture_output=True, timeout=180)
+        await asyncio.to_thread(subprocess.run,
+            ["ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+             "-t", str(dur_val),
+             "-vf", drawtext,
+             "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-pix_fmt", "yuv420p", str(clip_path)],
+            check=True, capture_output=True, timeout=180,
+        )
         clip_files.append(clip_path)
 
     audio_list = scene_dir / "audio_list.txt"
@@ -1532,9 +1547,9 @@ Rules:
     with open(audio_list, "w") as f:
         for af in audio_files:
             f.write(f"file '{af.absolute()}'\n")
-    subprocess.run(
+    await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list), "-c", "copy", str(combined_audio)],
-        check=True, capture_output=True, timeout=180
+        check=True, capture_output=True, timeout=180,
     )
 
     clip_list = scene_dir / "clip_list.txt"
@@ -1542,17 +1557,18 @@ Rules:
     with open(clip_list, "w") as f:
         for cp in clip_files:
             f.write(f"file '{cp.absolute()}'\n")
-    subprocess.run(
+    await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list), "-c", "copy", str(merged)],
-        check=True, capture_output=True, timeout=180
+        check=True, capture_output=True, timeout=180,
     )
 
     output_file = OUTPUT_DIR / f"{uid}_tnlv.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
-        "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)
-    ], check=True, capture_output=True, timeout=120)
+    await asyncio.to_thread(subprocess.run,
+        ["ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
+         "-map", "0:v:0", "-map", "1:a:0",
+         "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)],
+        check=True, capture_output=True, timeout=120,
+    )
 
     full_script = " ".join(s["text"] for s in scenes)
     total_dur = round(sum(durations), 1)
@@ -1921,7 +1937,7 @@ def _save_as_jpeg(data: bytes, img_path: Path) -> bool:
         return False
 
 
-def _try_ken_burns_clip(
+async def _try_ken_burns_clip(
     img_path: Path, dur: float, clip_path: Path,
     text_file=None, font_path: str = None,
 ) -> bool:
@@ -1947,12 +1963,13 @@ def _try_ken_burns_clip(
     else:
         vf = zoompan
     try:
-        result = subprocess.run([
-            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
-            "-t", str(dur), "-vf", vf,
-            "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-            "-pix_fmt", "yuv420p", str(clip_path),
-        ], capture_output=True, timeout=90)
+        result = await asyncio.to_thread(subprocess.run,
+            ["ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+             "-t", str(dur), "-vf", vf,
+             "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-pix_fmt", "yuv420p", str(clip_path)],
+            capture_output=True, timeout=90,
+        )
         return result.returncode == 0 and clip_path.exists() and clip_path.stat().st_size > 0
     except Exception:
         return False
@@ -3710,7 +3727,7 @@ async def stop_all_jobs():
     # FFmpeg proseslerini öldür
     killed = 0
     try:
-        result = subprocess.run(["pgrep", "-x", "ffmpeg"], capture_output=True, text=True)
+        result = await asyncio.to_thread(subprocess.run, ["pgrep", "-x", "ffmpeg"], capture_output=True, text=True)
         pids = result.stdout.strip().split()
         for pid in pids:
             try:
@@ -3855,7 +3872,7 @@ async def comedy_create_video(request: Request):
         text_file.write_text("\n".join(lines), encoding="utf-8")
 
         clip_path = work_dir / f"clip_{i}.mp4"
-        kb_ok = _try_ken_burns_clip(png_path, dur, clip_path, text_file, font_path)
+        kb_ok = await _try_ken_burns_clip(png_path, dur, clip_path, text_file, font_path)
         if not kb_ok:
             drawtext = (
                 f"scale=1080:1920:force_original_aspect_ratio=increase,"
@@ -3867,17 +3884,19 @@ async def comedy_create_video(request: Request):
             )
             if font_path:
                 drawtext += f":fontfile={font_path}"
-            r = subprocess.run([
-                "ffmpeg", "-y", "-loop", "1", "-i", str(png_path),
-                "-t", str(dur), "-vf", drawtext,
-                "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-            ], capture_output=True, timeout=90)
+            r = await asyncio.to_thread(subprocess.run,
+                ["ffmpeg", "-y", "-loop", "1", "-i", str(png_path),
+                 "-t", str(dur), "-vf", drawtext,
+                 "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)],
+                capture_output=True, timeout=90,
+            )
             if r.returncode != 0:
-                subprocess.run([
-                    "ffmpeg", "-y", "-loop", "1", "-i", str(png_path),
-                    "-t", str(dur), "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-                    "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)
-                ], check=True, capture_output=True, timeout=90)
+                await asyncio.to_thread(subprocess.run,
+                    ["ffmpeg", "-y", "-loop", "1", "-i", str(png_path),
+                     "-t", str(dur), "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                     "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)],
+                    check=True, capture_output=True, timeout=90,
+                )
         clip_files.append(clip_path)
 
     # Ses birleştir
@@ -3886,9 +3905,9 @@ async def comedy_create_video(request: Request):
     with open(audio_list_file, "w") as f:
         for af, _ in audio_files:
             f.write(f"file '{af.absolute()}'\n")
-    subprocess.run(
+    await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(audio_list_file), "-c", "copy", str(combined_audio)],
-        check=True, capture_output=True, timeout=120
+        check=True, capture_output=True, timeout=120,
     )
 
     # Video kliplerini birleştir
@@ -3897,23 +3916,25 @@ async def comedy_create_video(request: Request):
         for cp in clip_files:
             f.write(f"file '{cp.absolute()}'\n")
     slideshow = work_dir / "slideshow.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-        "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
-        str(slideshow.absolute())
-    ], check=True, capture_output=True, timeout=300)
+    await asyncio.to_thread(subprocess.run,
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(clip_list_file.absolute()),
+         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+         "-r", "30", "-vsync", "cfr", "-pix_fmt", "yuv420p",
+         str(slideshow.absolute())],
+        check=True, capture_output=True, timeout=300,
+    )
 
     # Final encode
     output_file = OUTPUT_DIR / f"{uid}_comedy.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
-        "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-        "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
-        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
-        "-movflags", "+faststart", "-shortest", str(output_file.absolute())
-    ], check=True, capture_output=True, timeout=300)
+    await asyncio.to_thread(subprocess.run,
+        ["ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
+         "-map", "0:v:0", "-map", "1:a:0",
+         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
+         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
+         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+         "-movflags", "+faststart", "-shortest", str(output_file.absolute())],
+        check=True, capture_output=True, timeout=300,
+    )
 
     # Meta kaydet (Instagram gönderimi için)
     (session_dir / "video_meta.json").write_text(json.dumps({
