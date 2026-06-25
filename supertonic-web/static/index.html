@@ -940,6 +940,19 @@
     </div>
     <div id="tg-status" style="font-size:12px;margin-top:6px;color:#888;"></div>
     <hr style="border-color:#2a2a2a;margin:20px 0;">
+
+    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">💾 Yedekleme</h3>
+    <p style="color:#666;font-size:12px;margin-bottom:12px;">Tüm API key'leri ve ayarları ZIP olarak indir. Sunucu değişirse geri yükle.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+      <a href="/api/backup/download" download style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">⬇ Yedek İndir</a>
+      <label style="background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+        ⬆ Yedek Yükle
+        <input type="file" accept=".zip" style="display:none;" onchange="restoreBackup(this)">
+      </label>
+    </div>
+    <div id="backup-status" style="font-size:12px;color:#888;margin-top:6px;"></div>
+
+    <hr style="border-color:#2a2a2a;margin:20px 0;">
     <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📸 Instagram Otopaylaşım</h3>
     <p style="color:#666;font-size:12px;margin-bottom:12px;">Short yüklendikten sonra otomatik Instagram Reels ve Story atar. Facebook Graph API v21.0 kullanır.</p>
     <div id="ig-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
@@ -2307,6 +2320,32 @@ async function runIGOnlyTRNow() {
   document.getElementById('btn-ig-only-tr-run-now').disabled = true;
   await fetch('/api/ig-only-tr/run-now', { method: 'POST' });
   setTimeout(loadIGOnlyTRStatus, 2000);
+}
+
+// ── Yedekleme ────────────────────────────────────────────────────────────────
+async function restoreBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('backup-status');
+  status.style.color = '#888';
+  status.textContent = 'Yükleniyor...';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch('/api/backup/restore', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = '#4ade80';
+      status.textContent = `✓ Geri yüklendi: ${d.restored.join(', ')}`;
+    } else {
+      status.style.color = '#f87171';
+      status.textContent = 'Hata: ' + (d.detail || JSON.stringify(d));
+    }
+  } catch(e) {
+    status.style.color = '#f87171';
+    status.textContent = 'Hata: ' + e.message;
+  }
+  input.value = '';
 }
 
 // ── Telegram Bildirimleri ─────────────────────────────────────────────────────

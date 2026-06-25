@@ -3870,6 +3870,68 @@ async def comedy_send_instagram(request: Request):
     return {"ok": True, "media_id": media_id}
 
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# YEDEKLEME — config dosyalarını ZIP indir / geri yükle
+# ──────────────────────────────────────────────────────────────────────────────
+
+_BACKUP_FILES = [
+    TOKEN_FILE,
+    PEXELS_CONFIG,
+    DS_CONFIG,
+    OPENAI_CONFIG,
+    IG_CONFIG,
+    IG_RECENT_FILE,
+    TELEGRAM_CONFIG,
+    SCHED_CONFIG,
+    LV_SCHED_CONFIG,
+    LV_EN_SCHED_CONFIG,
+    EN_SHORTS_SCHED_CONFIG,
+    TNLV_SCHED_CONFIG,
+    IG_ONLY_TR_SCHED_CONFIG,
+    IG_ONLY_TR_SCHED_LOG,
+    IG_ONLY_TR_DAILY_TOPICS,
+]
+
+
+@app.get("/api/backup/download")
+async def backup_download():
+    """Tüm config dosyalarını ZIP olarak indir."""
+    import zipfile, io, datetime
+    buf = io.BytesIO()
+    today = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in _BACKUP_FILES:
+            if p.exists():
+                zf.write(str(p), p.name)
+    buf.seek(0)
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=supertonic_backup_{today}.zip"},
+    )
+
+
+@app.post("/api/backup/restore")
+async def backup_restore(file: UploadFile = File(...)):
+    """Yedek ZIP dosyasından config dosyalarını geri yükle."""
+    import zipfile, io
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(400, "ZIP dosyası gerekli")
+    content = await file.read()
+    restored, skipped = [], []
+    allowed = {p.name for p in _BACKUP_FILES}
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        for name in zf.namelist():
+            if name in allowed:
+                Path(name).write_bytes(zf.read(name))
+                restored.append(name)
+            else:
+                skipped.append(name)
+    return {"ok": True, "restored": restored, "skipped": skipped}
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
