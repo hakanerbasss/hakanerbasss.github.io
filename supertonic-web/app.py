@@ -2140,12 +2140,20 @@ async def instagram_analytics(limit: int = 15):
             r_ins = await client.get(f"{graph}/{m['id']}/insights", params={
                 "metric": insight_metrics,
                 "period": "lifetime",
+                "metric_type": "total_value",   # API v17+ yeni format
                 "access_token": token,
             })
             insights = {}
             if r_ins.status_code == 200:
                 for item in r_ins.json().get("data", []):
-                    insights[item["name"]] = item.get("values", [{}])[0].get("value") if "values" in item else item.get("value", 0)
+                    # v17+ format: total_value.value  |  eski format: values[0].value veya value
+                    if "total_value" in item:
+                        val = item["total_value"].get("value", 0)
+                    elif "values" in item:
+                        val = item["values"][0].get("value", 0) if item["values"] else 0
+                    else:
+                        val = item.get("value", 0)
+                    insights[item["name"]] = val or 0
             # views: media object'ten al (daha güvenilir), insights.plays fallback
             media_views = m.get("views") or insights.get("plays") or 0
             posts.append({
