@@ -2725,14 +2725,26 @@ function formatNum(n) {
 }
 
 // ─── INSTAGRAM ANALİTİK ─────────────────────────────────────────────────────
+let _igAnData = null;
+
+function downloadIGAnalyticsJSON() {
+  if (!_igAnData) return;
+  const blob = new Blob([JSON.stringify(_igAnData, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ig_analytics_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
 async function loadIGAnalytics() {
   document.getElementById('ig-an-error').style.display = 'none';
   document.getElementById('ig-an-content').style.display = 'none';
   document.getElementById('ig-an-loading').style.display = 'block';
   try {
-    const r = await fetch('/api/instagram/analytics?limit=15');
+    const r = await fetch('/api/instagram/analytics?limit=25');
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    _igAnData = d;
 
     const p = d.profile;
     document.getElementById('ig-an-username').textContent = '@' + (p.username || '?');
@@ -2914,6 +2926,7 @@ function deleteComedyVideo() {
   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
     <h2 style="color:#fff;font-size:18px;margin:0;flex:1;">📸 Instagram Analitik</h2>
     <button onclick="loadIGAnalytics()" style="font-size:12px;padding:8px 14px;">↻ Yenile</button>
+    <button onclick="downloadIGAnalyticsJSON()" style="font-size:12px;padding:8px 14px;background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;">⬇ JSON İndir</button>
   </div>
   <div id="ig-an-error" style="display:none;color:#f87171;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:16px;"></div>
   <div id="ig-an-loading" style="display:none;color:#888;font-size:14px;text-align:center;padding:40px;">Yükleniyor...</div>
