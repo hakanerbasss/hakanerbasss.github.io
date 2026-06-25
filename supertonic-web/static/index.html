@@ -2287,7 +2287,12 @@ async function loadIGOnlyTRStatus() {
       document.getElementById('ig-only-tr-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
       const log = d.log || {};
       const statusEl = document.getElementById('ig-only-tr-last-status');
-      statusEl.textContent = log.status ? `Durum: ${log.status}` : '';
+      let statusText = log.status ? `Durum: ${log.status}` : '';
+      if (log.status === 'running' && log.ts) {
+        const mins = Math.round((Date.now()/1000 - log.ts) / 60);
+        if (mins > 0) statusText += ` (${mins} dk)`;
+      }
+      statusEl.textContent = statusText;
       statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
       document.getElementById('ig-only-tr-last-msg').textContent = log.message || '';
 

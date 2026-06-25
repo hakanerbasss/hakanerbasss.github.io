@@ -3455,6 +3455,17 @@ async def run_ig_only_tr_now():
 # ── Startup / Shutdown ────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
+    # Servis restart olduysa "running" kalan log'u temizle
+    if IG_ONLY_TR_SCHED_LOG.exists():
+        try:
+            log = json.loads(IG_ONLY_TR_SCHED_LOG.read_text())
+            if log.get("status") == "running":
+                IG_ONLY_TR_SCHED_LOG.write_text(json.dumps(
+                    {"status": "error", "message": "Servis yeniden başlatıldı, job kesildi", "ts": time.time()},
+                    ensure_ascii=False,
+                ))
+        except Exception:
+            pass
     scheduler.start()
     _rebuild_scheduler()
     _rebuild_lv_scheduler()
