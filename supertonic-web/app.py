@@ -1640,9 +1640,10 @@ async def send_telegram_alert(source: str, message: str) -> None:
 def _fire_telegram(source: str, message: str) -> None:
     """Sync context'ten Telegram alert gönder (event loop'a task ekler)."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.create_task(send_telegram_alert(source, message))
+        loop = asyncio.get_running_loop()  # Python 3.10+ uyumlu
+        loop.create_task(send_telegram_alert(source, message))
+    except RuntimeError:
+        pass  # event loop çalışmıyor
     except Exception:
         pass
 SCHED_CONFIG = Path("scheduler_config.json")
@@ -2807,6 +2808,7 @@ async def auto_shorts_job():
 
     except Exception as e:
         save_sched_log("error", f"{e}")
+        await send_telegram_alert("TR Shorts", str(e))
     finally:
         _shorts_job_lock = False
 
@@ -2941,6 +2943,7 @@ Pick something different and interesting each time."""}],
 
     except Exception as e:
         save_lv_sched_log("error", str(e))
+        await send_telegram_alert("TR Uzun Video", str(e))
 
 
 def _rebuild_lv_scheduler():
@@ -3070,6 +3073,7 @@ Pick something DIFFERENT and interesting each time."""}],
 
     except Exception as e:
         save_lv_en_sched_log("error", str(e))
+        await send_telegram_alert("EN Uzun Video", str(e))
 
 
 def _rebuild_lv_en_scheduler():
@@ -3207,6 +3211,7 @@ async def auto_en_shorts_job():
 
     except Exception as e:
         save_en_shorts_sched_log("error", str(e))
+        await send_telegram_alert("EN Shorts", str(e))
 
 
 def _rebuild_en_shorts_scheduler():
@@ -3305,6 +3310,7 @@ async def auto_tnlv_job():
 
     except Exception as e:
         save_tnlv_sched_log("error", str(e))
+        await send_telegram_alert("TNLV Video", str(e))
 
 
 def _rebuild_tnlv_scheduler():
@@ -3419,6 +3425,7 @@ async def auto_ig_only_tr_job():
 
     except Exception as e:
         save_ig_only_tr_log("error", str(e))
+        await send_telegram_alert("TR Instagram-Only", str(e))
     finally:
         _ig_only_tr_job_lock = False
 
