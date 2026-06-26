@@ -59,6 +59,10 @@ async def auth_middleware(request: Request, call_next):
     # Login sayfası ve statik dosyalar serbest
     if path in ("/login", "/logout") or path.startswith("/static/"):
         return await call_next(request)
+    # Localhost'tan gelen scheduler iç çağrıları serbest
+    client_host = request.client.host if request.client else ""
+    if client_host in ("127.0.0.1", "::1"):
+        return await call_next(request)
     token = request.cookies.get(_COOKIE)
     if not _valid_session(token):
         if path.startswith("/api/"):
