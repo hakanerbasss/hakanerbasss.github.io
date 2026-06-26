@@ -308,13 +308,20 @@
         </div>
         <p class="setting-info" id="speed-info">Her kare 160ms — tam tur ~57 saniye</p>
 
-        <span class="setting-label">İrtifa</span>
-        <div class="seg-group" id="altitude-group">
-          <button class="seg-btn" data-val="low"    onclick="setSetting('altitude','low')">🏠 Alçak</button>
-          <button class="seg-btn active" data-val="normal" onclick="setSetting('altitude','normal')">🏙️ Normal</button>
-          <button class="seg-btn" data-val="high"   onclick="setSetting('altitude','high')">🌤️ Yüksek</button>
+        <span class="setting-label">Orbit Mesafesi (parsele uzaklık)</span>
+        <div class="seg-group" id="orbitMult-group">
+          <button class="seg-btn" data-val="1.5" onclick="setSetting('orbitMult',1.5)">Çok Yakın</button>
+          <button class="seg-btn" data-val="2.5" onclick="setSetting('orbitMult',2.5)">Yakın</button>
+          <button class="seg-btn active" data-val="4" onclick="setSetting('orbitMult',4)">Normal</button>
+          <button class="seg-btn" data-val="6"   onclick="setSetting('orbitMult',6)">Uzak</button>
         </div>
-        <p class="setting-info" id="altitude-info">Parsel boyutuna göre ×1.0 çarpan</p>
+        <p class="setting-info" id="orbit-info">Parsel boyutunun ×4 katı mesafeden uçar</p>
+
+        <span class="setting-label">Uçuş Yüksekliği (yerden)</span>
+        <input type="range" id="min-alt-range" min="30" max="500" value="100" step="10"
+          style="width:100%;accent-color:#5b4fcf;margin-bottom:6px"
+          oninput="onAltChange(+this.value)" />
+        <p class="setting-info">Min: <span id="alt-val">100m</span> — Maks: <span id="alt-max-val">~250m</span></p>
 
         <span class="setting-label">Tur Sayısı</span>
         <div class="seg-group" id="orbits-group">
@@ -397,7 +404,8 @@
   // ── Settings State ───────────────────────────────────────
   const settings = {
     speed: 'normal',      // slow=240ms / normal=160ms / fast=80ms
-    altitude: 'normal',   // low=0.7× / normal=1.0× / high=1.5×
+    orbitMult: 4,         // parsel boyutunun kaç katı mesafe (1.5 / 2.5 / 4 / 6)
+    minAltM: 100,         // yerden minimum yükseklik (metre)
     orbits: 1,            // 1 / 2 / 3
     startAngle: 0,        // 0–359 derece
     quality: 'hd',        // sd=4M / hd=8M / 4k=16M
@@ -405,11 +413,16 @@
     renderScale: 1,       // 0.75 / 1 / 1.5
   };
 
-  const speedMs     = { slow: 240, normal: 160, fast: 80 };
-  const speedLabel  = { slow: 'Her kare 240ms — tam tur ~86 saniye', normal: 'Her kare 160ms — tam tur ~57 saniye', fast: 'Her kare 80ms — tam tur ~29 saniye' };
-  const altMult     = { low: 0.7, normal: 1.0, high: 1.5 };
-  const altLabel    = { low: 'Parsel boyutuna göre ×0.7 çarpan — binalara yakın', normal: 'Parsel boyutuna göre ×1.0 çarpan', high: 'Parsel boyutuna göre ×1.5 çarpan — genel bakış' };
-  const qualityBps  = { sd: 4_000_000, hd: 8_000_000, '4k': 16_000_000 };
+  const speedMs    = { slow: 240, normal: 160, fast: 80 };
+  const speedLabel = { slow: 'Her kare 240ms — tam tur ~86 saniye', normal: 'Her kare 160ms — tam tur ~57 saniye', fast: 'Her kare 80ms — tam tur ~29 saniye' };
+  const orbitLabel = { 1.5: 'Parsel boyutunun ×1.5 katı — çok yakın geçiş', 2.5: 'Parsel boyutunun ×2.5 katı — yakın', 4: 'Parsel boyutunun ×4 katı — normal görüş', 6: 'Parsel boyutunun ×6 katı — geniş açı' };
+  const qualityBps = { sd: 4_000_000, hd: 8_000_000, '4k': 16_000_000 };
+
+  function onAltChange(val) {
+    settings.minAltM = val;
+    document.getElementById('alt-val').textContent = val + 'm';
+    document.getElementById('alt-max-val').textContent = '~' + Math.round(val * 2.5) + 'm';
+  }
 
   function switchPanel(tab) {
     const isParsel = tab === 'parsel';
@@ -429,8 +442,8 @@
       );
     }
     // Bilgi metni güncelle
-    if (key === 'speed')    document.getElementById('speed-info').textContent    = speedLabel[val];
-    if (key === 'altitude') document.getElementById('altitude-info').textContent = altLabel[val];
+    if (key === 'speed')     document.getElementById('speed-info').textContent = speedLabel[val];
+    if (key === 'orbitMult') document.getElementById('orbit-info').textContent = orbitLabel[val];
     // Render scale anlık uygula
     if (key === 'renderScale' && viewer) viewer.resolutionScale = val;
   }
@@ -605,7 +618,7 @@
       const lonExt = (Math.max(...lons) - Math.min(...lons)) * 111320 * Math.cos(lat * Math.PI / 180);
       const latExt = (Math.max(...lats) - Math.min(...lats)) * 110540;
       const parselM = Math.max(lonExt, latExt);
-      orbitMeters = Math.min(Math.max(parselM * 4, 80), 600);
+      orbitMeters = Math.min(Math.max(parselM * settings.orbitMult, 30), 3000);
 
       viewer.entities.add({
         polygon: {
@@ -647,13 +660,12 @@
     const mPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
 
     // Ayarları uygula
-    const mult       = altMult[settings.altitude];
     const interval   = speedMs[settings.speed];
     const totalSteps = 360 * settings.orbits;
     const startRad   = (settings.startAngle * Math.PI) / 180;
 
-    const minAlt = Math.max(orbitMeters * 0.6 * mult, 60);
-    const maxAlt = Math.max(orbitMeters * 2.2 * mult, 150);
+    const minAlt = Math.max(settings.minAltM, 20);
+    const maxAlt = Math.max(minAlt * 2.5, minAlt + 80);
 
     let step = 0;
 
