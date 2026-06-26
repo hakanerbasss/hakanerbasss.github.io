@@ -161,6 +161,7 @@ def _handle_stop_fill(sym, pos, order):
             'type': 'sell', 'symbol': sym, 'qty': exec_qty,
             'price': fill_price, 'pnl': net_pnl,
             'source': 'BREAKOUT TRAIL_STOP', 'period': 'trail', 'agent': 'BREAKOUT',
+            'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         })
         send_telegram(
             f'🏁 <b>BREAKOUT STOP EMRİ DOLDU</b>\n'
