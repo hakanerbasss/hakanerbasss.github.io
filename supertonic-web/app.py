@@ -353,7 +353,7 @@ Rules:
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
-- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), always include "Shorts", no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")
+- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), ALWAYS include "Shorts", "sondakika", "gündem", "keşfet", "haberler" — then add topic-specific tags. No # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")
 """
 
     data = None
@@ -1232,7 +1232,7 @@ Rules:
 - LAST scene text MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
 - Each scene: 2-3 sentences packed with facts, context and detail — NOT simple or vague
 - Cover the topic thoroughly: introduction, key facts, interesting details, historical context, conclusion
-- hashtags: 8-12 relevant tags mixing {lang_name} and English terms, no # symbol, NO spaces within a tag (e.g. "yapayZeka" or "yapayZeka", never "yapay zeka")
+- hashtags: 8-12 relevant tags mixing {lang_name} and English terms, ALWAYS include "Shorts", "belgesel", "eğitim", "keşfet" — then add topic-specific tags. No # symbol, NO spaces within a tag (e.g. "yapayZeka" not "yapay zeka")
 - keyword: English, specific and visual"""
 
     response = client.chat.completions.create(
@@ -1447,7 +1447,7 @@ Rules:
 - VERY FIRST scene MUST use a CURIOSITY-GAP hook — never state the answer directly. Withhold the key fact, create suspense or partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Peki gerçekte ne oldu?", "Cevap herkesi şoke etti.", "Tarihin en büyük...". The viewer MUST feel compelled to keep watching. Critical for retention — never open with a plain news headline.
 - VERY LAST scene MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
 - Each segment: exactly 2 scenes, informative and engaging
-- hashtags: 10-15 tags mixing {lang_name} and English, always include news-related tags, no # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika")
+- hashtags: 10-15 tags mixing {lang_name} and English, ALWAYS include "Shorts", "sondakika", "gündem", "keşfet", "haberler", "güncel" — then add topic-specific tags. No # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika")
 - keyword: English, 2-3 words, visual and specific"""
 
     response = client.chat.completions.create(
@@ -2833,7 +2833,11 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
 
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
-    caption = f"{title}\n\n{suggested_tags}"
+    _POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
+    existing_lower = suggested_tags.lower()
+    extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
+    full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
+    caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
     ig_log = ""
 
     if ig_cfg.get("post_reels", True):
