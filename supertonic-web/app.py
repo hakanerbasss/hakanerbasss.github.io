@@ -4159,6 +4159,39 @@ async def comedy_create_video(request: Request):
     }
 
 
+@app.post("/api/shorts/send-instagram")
+async def shorts_send_instagram(request: Request):
+    """Manuel üretilen shorts videosunu Instagram Reels olarak gönder."""
+    body = await request.json()
+    filename = body.get("filename", "").strip()
+    title = body.get("title", "").strip()
+    tags = body.get("tags", "").strip()
+
+    if not filename:
+        raise HTTPException(400, "filename gerekli")
+
+    output_file = OUTPUT_DIR / filename
+    if not output_file.exists():
+        raise HTTPException(404, "Video bulunamadı")
+
+    cfg = get_ig_config()
+    if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+        raise HTTPException(400, "Instagram konfigürasyonu eksik — Ayarlar'dan yapılandır")
+
+    _POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
+    existing_lower = tags.lower()
+    extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
+    full_tags = f"{tags} {extra}".strip() if extra else tags
+    caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}" if title else full_tags
+
+    media_id, err = await post_reel_to_instagram(
+        output_file, caption, cfg["ig_user_id"], cfg["access_token"]
+    )
+    if err:
+        return {"ok": False, "error": err}
+    return {"ok": True, "media_id": media_id}
+
+
 @app.post("/api/comedy/send-instagram")
 async def comedy_send_instagram(request: Request):
     """Oluşturulan komik haber videosunu Instagram Reels olarak gönder."""

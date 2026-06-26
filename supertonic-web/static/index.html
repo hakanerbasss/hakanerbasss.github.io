@@ -554,14 +554,21 @@
             Yetişkin içerik (18+ yaş kısıtlaması)
           </label>
         </div>
-        <button onclick="uploadToYouTube()" id="btn-yt-upload" style="margin-top:16px;background:#c00;">
-          <div class="spinner" id="spin-yt"></div>
-          YouTube'a Yükle
-        </button>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+          <button onclick="uploadToYouTube()" id="btn-yt-upload" style="background:#c00;">
+            <div class="spinner" id="spin-yt"></div>
+            YouTube'a Yükle
+          </button>
+          <button onclick="sendShortsToInstagram()" id="btn-shorts-ig" style="background:linear-gradient(135deg,#e1306c,#c13584);">
+            <div class="spinner" id="spin-shorts-ig"></div>
+            Instagram'da Paylaş
+          </button>
+        </div>
         <div class="error" id="err-yt"></div>
         <div id="yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
           Yüklendi! → <a id="yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
         </div>
+        <div id="shorts-ig-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
       </div>
     </div>
   </div>
@@ -1879,6 +1886,43 @@ async function uploadToYouTube() {
     showError('err-yt', e.message);
   } finally {
     setLoading('btn-yt-upload', 'spin-yt', false);
+  }
+}
+
+async function sendShortsToInstagram() {
+  if (!currentVideoFilename) { alert('Önce video oluştur'); return; }
+  const res = document.getElementById('shorts-ig-result');
+  res.style.display = 'none';
+  setLoading('btn-shorts-ig', 'spin-shorts-ig', true);
+  try {
+    const r = await fetch('/api/shorts/send-instagram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: currentVideoFilename,
+        title: document.getElementById('yt-title').value || '',
+        tags: document.getElementById('yt-tags').value || ''
+      })
+    });
+    const d = await r.json();
+    res.style.display = 'block';
+    if (d.ok) {
+      res.style.background = '#0a1f0a';
+      res.style.border = '1px solid #1a5a1a';
+      res.style.color = '#4ade80';
+      res.textContent = 'Instagram\'a yüklendi! ✓';
+    } else {
+      res.style.background = '#1a0a0a';
+      res.style.border = '1px solid #5a1a1a';
+      res.style.color = '#f87171';
+      res.textContent = 'Hata: ' + (d.error || 'Bilinmeyen hata');
+    }
+  } catch(e) {
+    res.style.display = 'block';
+    res.style.color = '#f87171';
+    res.textContent = 'Hata: ' + e.message;
+  } finally {
+    setLoading('btn-shorts-ig', 'spin-shorts-ig', false);
   }
 }
 
