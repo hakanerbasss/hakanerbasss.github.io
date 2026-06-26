@@ -685,6 +685,9 @@ Rules:
     # Geçici dosyaları temizle (disk dolmaması için)
     shutil.rmtree(scene_dir, ignore_errors=True)
 
+    # Kullanılan konuyu kaydet — scheduler aynı haberi tekrar seçmesin
+    add_shorts_used_topic(generated_title)
+
     return {
         "video": f"/api/video/{output_file.name}",
         "thumbnail": thumb_path,
