@@ -235,6 +235,33 @@
       bottom: 16px !important;
     }
   }
+
+  /* Accordion */
+  .acc-item { border-bottom: 1px solid #1e1e1e; }
+  .acc-item:last-child { border-bottom: none; }
+  .acc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 20px; cursor: pointer; user-select: none;
+    transition: background 0.12s;
+  }
+  .acc-header:hover { background: #212121; }
+  .acc-title { font-size: 14px; font-weight: 600; color: #d4d4d4; }
+  .acc-right { display: flex; align-items: center; gap: 8px; }
+  .acc-badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    font-weight: 600; white-space: nowrap;
+  }
+  .acc-badge.ok  { background: #14532d; color: #4ade80; }
+  .acc-badge.err { background: #450a0a; color: #f87171; }
+  .acc-badge.run { background: #422006; color: #facc15; }
+  .acc-badge.off { background: #1c1c1c; color: #555; }
+  .acc-chevron {
+    color: #555; font-size: 18px; line-height: 1;
+    display: inline-block; transition: transform 0.2s;
+  }
+  .acc-chevron.open { transform: rotate(90deg); }
+  .acc-body { display: none; padding: 4px 20px 20px; }
+  .acc-body.open { display: block; }
 </style>
 </head>
 <body>
@@ -880,468 +907,508 @@
   </div>
 </div>
 
-<!-- YouTube Ayarları Modal -->
+<!-- Ayarlar Modal -->
 <div id="yt-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;">
-  <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;width:440px;max-width:90vw;position:relative;max-height:88vh;overflow-y:auto;">
-    <button onclick="closeYTModal()" style="position:absolute;top:12px;right:12px;background:#333;border-radius:6px;padding:4px 10px;font-size:16px;line-height:1;">✕</button>
-    <h3 style="color:#fff;margin-bottom:4px;font-size:16px;">YouTube OAuth Ayarları</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:20px;">Google Cloud Console → API & Services → Credentials → OAuth 2.0 Client</p>
-    <div id="yt-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:16px;">
-      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Kayıtlı — bağlantı aktif</div>
-      <button onclick="resetYTConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir / Sıfırla</button>
-    </div>
-    <div id="yt-input-state">
-      <div class="field">
-        <label>Client ID</label>
-        <input type="text" id="cfg-client-id" placeholder="337037...apps.googleusercontent.com" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-      </div>
-      <div class="field" style="margin-top:12px;">
-        <label>Client Secret</label>
-        <input type="password" id="cfg-client-secret" placeholder="GOCSPX-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-      </div>
-      <div style="display:flex;gap:12px;margin-top:20px;">
-        <button onclick="saveYTConfig()">Kaydet ve Bağlan</button>
-        <button onclick="document.getElementById('yt-modal').style.display='none'" style="background:#333;">İptal</button>
-      </div>
-    </div>
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">Pexels API</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">pexels.com → Üye ol → API Key</p>
-    <div id="pexels-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Pexels bağlı</div>
-      <button onclick="resetPexelsConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
-    </div>
-    <div id="pexels-input-state">
-      <input type="password" id="cfg-pexels-key" placeholder="Pexels API Key..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
-      <button onclick="savePexelsConfig()">Kaydet</button>
-    </div>
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">🎨 OpenAI DALL-E (Opsiyonel)</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">DALL-E 3 API key — varsa görseller DALL-E ile üretilir, yoksa Wikimedia → Pexels kullanılır</p>
-    <div id="openai-key-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
-    <div class="field">
-      <label>OpenAI API Key</label>
-      <input type="password" id="openai-api-key" placeholder="sk-..." style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-    </div>
-    <button onclick="saveOpenAIKey()" style="font-size:12px;padding:8px 16px;margin-bottom:4px;">Kaydet</button>
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📨 Telegram Bildirimleri</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Hata olduğunda (Instagram, Pexels, DeepSeek, YouTube) anında Telegram mesajı gönderir.</p>
-    <div class="field" style="margin-bottom:10px;">
-      <label>Bot Token</label>
-      <input type="password" id="cfg-tg-token" placeholder="123456:ABC-DEF..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-    </div>
-    <div class="field" style="margin-bottom:10px;">
-      <label>Chat ID</label>
-      <input type="text" id="cfg-tg-chatid" placeholder="-100123456789 veya @username" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:6px;">
-      <button onclick="saveTelegramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="testTelegram()" id="btn-tg-test" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">Test Gönder</button>
-    </div>
-    <div id="tg-status" style="font-size:12px;margin-top:6px;color:#888;"></div>
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;width:460px;max-width:95vw;position:relative;max-height:90vh;overflow-y:auto;overflow-x:hidden;">
 
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">💾 Yedekleme</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Tüm API key'leri ve ayarları ZIP olarak indir. Sunucu değişirse geri yükle.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-      <a href="/api/backup/download" download style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">⬇ Yedek İndir</a>
-      <label style="background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-        ⬆ Yedek Yükle
-        <input type="file" accept=".zip" style="display:none;" onchange="restoreBackup(this)">
-      </label>
-    </div>
-    <div id="backup-status" style="font-size:12px;color:#888;margin-top:6px;"></div>
-
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📸 Instagram Otopaylaşım</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Short yüklendikten sonra otomatik Instagram Reels ve Story atar. Facebook Graph API v21.0 kullanır.</p>
-    <div id="ig-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
-    <div class="field">
-      <label>Instagram Kullanıcı ID</label>
-      <input type="text" id="ig-user-id" placeholder="17841400000000000" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-    </div>
-    <div class="field">
-      <label>Access Token (90 günlük)</label>
-      <input type="password" id="ig-access-token" placeholder="EAABs..." style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-    </div>
-    <div style="display:flex;gap:20px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:13px;margin:0;">
-        <input type="checkbox" id="ig-post-reels" checked style="width:16px;height:16px;accent-color:#7c3aed;">
-        Reels olarak paylaş
-      </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:13px;margin:0;">
-        <input type="checkbox" id="ig-post-story" checked style="width:16px;height:16px;accent-color:#7c3aed;">
-        Story olarak paylaş
-      </label>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <button onclick="saveInstagramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="testInstagram()" style="font-size:12px;padding:8px 16px;background:#1a3a1a;">Bağlantıyı Test Et</button>
-    </div>
-    <div id="ig-test-result" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
-    <div id="ig-last-log" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">DeepSeek API (Otomasyon için)</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Otomatik video üretimi için sunucuda saklanır</p>
-    <div id="ds-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ DeepSeek key sunucuda kayıtlı</div>
-      <button onclick="resetDSConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
-    </div>
-    <div id="ds-input-state">
-      <input type="password" id="cfg-ds-key" placeholder="sk-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
-      <button onclick="saveDSConfig()">Kaydet</button>
+    <!-- Sticky başlık -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #2a2a2a;position:sticky;top:0;background:#1a1a1a;z-index:2;">
+      <span style="font-size:15px;font-weight:700;color:#fff;">⚙ Ayarlar</span>
+      <button onclick="closeYTModal()" style="background:#2a2a2a;border-radius:6px;padding:4px 10px;font-size:16px;line-height:1;">✕</button>
     </div>
 
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-
-    <div style="background:#1a0a0a;border:1px solid #7f1d1d;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div>
-        <div style="color:#f87171;font-weight:700;font-size:14px;">⛔ Tüm İşlemleri Durdur</div>
-        <div style="color:#666;font-size:11px;margin-top:2px;">Çalışan tüm video üretimlerini ve FFmpeg işlemlerini anında durdurur</div>
-      </div>
-      <button onclick="stopAllJobs()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">Durdur</button>
-    </div>
-
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">⚡ Otomatik Yayın</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Belirlenen saatlerde trend haberden Short üretip YouTube'a yükler</p>
-
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
-        <input type="checkbox" id="sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveScheduler()">
-        Otomatik yayını etkinleştir
-      </label>
-    </div>
-
-    <div class="field" style="margin-bottom:12px;">
-      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-      <input type="text" id="sched-times" value="07:00,10:00,13:00,17:00,21:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div class="field">
-        <label>Seslendirme Dili</label>
-        <select id="sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="tr" selected>Türkçe</option>
-          <option value="en">English</option>
-          <option value="de">Deutsch</option>
-          <option value="fr">Français</option>
-          <option value="es">Español</option>
-          <option value="ar">العربية</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Ses</label>
-        <select id="sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="F1" selected>F1 (Kadın)</option>
-          <option value="F2">F2 (Kadın)</option>
-          <option value="F3">F3 (Kadın)</option>
-          <option value="M1">M1 (Erkek)</option>
-          <option value="M2">M2 (Erkek)</option>
-          <option value="M3">M3 (Erkek)</option>
-        </select>
+    <!-- Durdur (her zaman görünür) -->
+    <div style="padding:10px 16px;border-bottom:1px solid #1e1e1e;">
+      <div style="background:#1a0a0a;border:1px solid #7f1d1d;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="color:#f87171;font-weight:700;font-size:13px;">⛔ Tüm İşlemleri Durdur</div>
+          <div style="color:#555;font-size:11px;margin-top:2px;">Çalışan video üretimlerini ve FFmpeg işlemlerini anında durdurur</div>
+        </div>
+        <button onclick="stopAllJobs()" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:7px 12px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;">Durdur</button>
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <button onclick="saveScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="runNow()" id="btn-run-now" style="background:#1a3a1a;font-size:12px;padding:8px 16px;">
-        <div class="spinner" id="spin-run-now"></div>
-        Şimdi Çalıştır
-      </button>
-    </div>
-
-    <div id="sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
-      <div id="sched-next" style="color:#888;"></div>
-      <div id="sched-last-status"></div>
-      <div id="sched-last-msg" style="color:#888;word-break:break-all;"></div>
-      <div id="sched-last-url"></div>
-    </div>
-
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📹 Otomatik Uzun Video</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Her gün belirlenen kategorilerden AI konu seçer, belgesel üretir, YouTube'a yükler</p>
-
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
-        <input type="checkbox" id="lv-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveLVScheduler()">
-        Otomatik uzun videoyu etkinleştir
-      </label>
-    </div>
-
-    <div class="field" style="margin-bottom:12px;">
-      <label>Kategoriler (virgülle ayır)</label>
-      <textarea id="lv-sched-categories" style="min-height:64px;font-size:13px;">teknoloji, bilim, tarih, uzay, doğa, yapay zeka</textarea>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div class="field">
-        <label>Yayın saati</label>
-        <input type="text" id="lv-sched-time" value="10:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+    <!-- 1. TR Otomatik Short -->
+    <div class="acc-item" id="acc-tr-short">
+      <div class="acc-header" onclick="toggleAcc('tr-short')">
+        <span class="acc-title">⚡ TR Otomatik Short</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-short"></span><span class="acc-chevron" id="acc-chev-tr-short">›</span></span>
       </div>
-      <div class="field">
-        <label>Video süresi</label>
-        <select id="lv-sched-duration" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="3">~3 dakika</option>
-          <option value="5" selected>~5 dakika</option>
-          <option value="8">~8 dakika</option>
-          <option value="10">~10 dakika</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Dil</label>
-        <select id="lv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="tr" selected>Türkçe</option>
-          <option value="en">English</option>
-          <option value="de">Deutsch</option>
-          <option value="fr">Français</option>
-          <option value="es">Español</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Ses</label>
-        <select id="lv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="F1" selected>F1 (Kadın)</option>
-          <option value="F2">F2 (Kadın)</option>
-          <option value="F3">F3 (Kadın)</option>
-          <option value="M1">M1 (Erkek)</option>
-          <option value="M2">M2 (Erkek)</option>
-          <option value="M3">M3 (Erkek)</option>
-        </select>
+      <div class="acc-body" id="acc-body-tr-short">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Belirlenen saatlerde trend haberden Short üretip YouTube'a yükler</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveScheduler()">
+            Otomatik yayını etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+          <input type="text" id="sched-times" value="07:00,10:00,13:00,17:00,21:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="field">
+            <label>Seslendirme Dili</label>
+            <select id="sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="tr" selected>Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="F1" selected>F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+              <option value="M1">M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runNow()" id="btn-run-now" style="background:#1a3a1a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="sched-next" style="color:#888;"></div>
+          <div id="sched-last-status"></div>
+          <div id="sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="sched-last-url"></div>
+        </div>
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button onclick="saveLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="runLVNow()" id="btn-lv-run-now" style="background:#1a2a3a;font-size:12px;padding:8px 16px;">
-        <div class="spinner" id="spin-lv-run-now"></div>
-        Şimdi Çalıştır
-      </button>
-    </div>
-
-    <div id="lv-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
-      <div id="lv-sched-next" style="color:#888;"></div>
-      <div id="lv-sched-last-status"></div>
-      <div id="lv-sched-last-msg" style="color:#888;word-break:break-all;"></div>
-      <div id="lv-sched-last-url"></div>
-    </div>
-
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📰 Otomatik Trend Haber LV</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Günde 2 kez trend haberlerden otomatik uzun video üretir ve YouTube'a yükler</p>
-
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
-        <input type="checkbox" id="tnlv-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveTNLVScheduler()">
-        Otomatik trend haber LV'yi etkinleştir
-      </label>
-    </div>
-
-    <div class="field" style="margin-bottom:12px;">
-      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-      <input type="text" id="tnlv-sched-times" value="08:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div class="field">
-        <label>Dil</label>
-        <select id="tnlv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="tr" selected>Türkçe</option>
-          <option value="en">English</option>
-          <option value="de">Deutsch</option>
-          <option value="fr">Français</option>
-          <option value="es">Español</option>
-        </select>
+    <!-- 2. TR Uzun Video -->
+    <div class="acc-item" id="acc-tr-lv">
+      <div class="acc-header" onclick="toggleAcc('tr-lv')">
+        <span class="acc-title">📹 TR Uzun Video</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-lv"></span><span class="acc-chevron" id="acc-chev-tr-lv">›</span></span>
       </div>
-      <div class="field">
-        <label>Ses</label>
-        <select id="tnlv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="F1" selected>F1 (Kadın)</option>
-          <option value="F2">F2 (Kadın)</option>
-          <option value="F3">F3 (Kadın)</option>
-          <option value="M1">M1 (Erkek)</option>
-          <option value="M2">M2 (Erkek)</option>
-          <option value="M3">M3 (Erkek)</option>
-        </select>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button onclick="saveTNLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="runTNLVNow()" id="btn-tnlv-run-now" style="background:#2a1a0a;font-size:12px;padding:8px 16px;">
-        <div class="spinner" id="spin-tnlv-run-now"></div>
-        Şimdi Çalıştır
-      </button>
-    </div>
-
-    <div id="tnlv-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
-      <div id="tnlv-sched-next" style="color:#888;"></div>
-      <div id="tnlv-sched-last-status"></div>
-      <div id="tnlv-sched-last-msg" style="color:#888;word-break:break-all;"></div>
-      <div id="tnlv-sched-last-url"></div>
-    </div>
-
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">🎬 2. Kanal — Belgesel (EN)</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce belgesel kanalı — ayrı YouTube hesabı, her gün 1 video</p>
-
-    <div id="yt-en-not-linked" style="background:#1a1010;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="color:#f87171;font-size:13px;margin-bottom:8px;">✗ EN kanal bağlı değil</div>
-      <p style="color:#888;font-size:12px;margin-bottom:8px;">Bağlamadan önce YouTube'da 2. kanalınıza geçin, sonra tıklayın:</p>
-      <button onclick="window.location='/auth/youtube/en'" style="background:#c00;font-size:12px;padding:8px 16px;">EN Kanal Bağla</button>
-    </div>
-    <div id="yt-en-linked" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ EN kanal bağlı</div>
-      <button onclick="window.location='/auth/youtube/en'" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Yeniden Bağla</button>
-    </div>
-
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
-        <input type="checkbox" id="lv-en-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveLVENScheduler()">
-        Otomatik EN belgesel videoyu etkinleştir
-      </label>
-    </div>
-
-    <div class="field" style="margin-bottom:12px;">
-      <label>Kategoriler (virgülle ayır, İngilizce)</label>
-      <textarea id="lv-en-sched-categories" style="min-height:64px;font-size:13px;">history, science, space, technology, nature, ancient civilizations, physics</textarea>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div class="field">
-        <label>Yayın saati (İstanbul)</label>
-        <input type="text" id="lv-en-sched-time" value="14:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-      </div>
-      <div class="field">
-        <label>Video süresi</label>
-        <select id="lv-en-sched-duration" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="3">~3 dakika</option>
-          <option value="5" selected>~5 dakika</option>
-          <option value="8">~8 dakika</option>
-          <option value="10">~10 dakika</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Ses</label>
-        <select id="lv-en-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-          <option value="M1" selected>M1 (Erkek)</option>
-          <option value="M2">M2 (Erkek)</option>
-          <option value="M3">M3 (Erkek)</option>
-          <option value="F1">F1 (Kadın)</option>
-          <option value="F2">F2 (Kadın)</option>
-          <option value="F3">F3 (Kadın)</option>
-        </select>
+      <div class="acc-body" id="acc-body-tr-lv">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Her gün belirlenen kategorilerden AI konu seçer, belgesel üretir, YouTube'a yükler</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="lv-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveLVScheduler()">
+            Otomatik uzun videoyu etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Kategoriler (virgülle ayır)</label>
+          <textarea id="lv-sched-categories" style="min-height:64px;font-size:13px;">teknoloji, bilim, tarih, uzay, doğa, yapay zeka</textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="field">
+            <label>Yayın saati</label>
+            <input type="text" id="lv-sched-time" value="10:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          </div>
+          <div class="field">
+            <label>Video süresi</label>
+            <select id="lv-sched-duration" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="3">~3 dakika</option>
+              <option value="5" selected>~5 dakika</option>
+              <option value="8">~8 dakika</option>
+              <option value="10">~10 dakika</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Dil</label>
+            <select id="lv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="tr" selected>Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="lv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="F1" selected>F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+              <option value="M1">M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runLVNow()" id="btn-lv-run-now" style="background:#1a2a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-lv-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="lv-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="lv-sched-next" style="color:#888;"></div>
+          <div id="lv-sched-last-status"></div>
+          <div id="lv-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="lv-sched-last-url"></div>
+        </div>
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button onclick="saveLVENScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="runLVENNow()" id="btn-lv-en-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
-        <div class="spinner" id="spin-lv-en-run-now"></div>
-        Şimdi Çalıştır
-      </button>
+    <!-- 3. Trend Haber LV -->
+    <div class="acc-item" id="acc-tr-tnlv">
+      <div class="acc-header" onclick="toggleAcc('tr-tnlv')">
+        <span class="acc-title">📰 Trend Haber LV</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-tnlv"></span><span class="acc-chevron" id="acc-chev-tr-tnlv">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-tr-tnlv">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Günde 2 kez trend haberlerden otomatik uzun video üretir ve YouTube'a yükler</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="tnlv-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveTNLVScheduler()">
+            Otomatik trend haber LV'yi etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+          <input type="text" id="tnlv-sched-times" value="08:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="field">
+            <label>Dil</label>
+            <select id="tnlv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="tr" selected>Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="tnlv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="F1" selected>F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+              <option value="M1">M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveTNLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runTNLVNow()" id="btn-tnlv-run-now" style="background:#2a1a0a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-tnlv-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="tnlv-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="tnlv-sched-next" style="color:#888;"></div>
+          <div id="tnlv-sched-last-status"></div>
+          <div id="tnlv-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="tnlv-sched-last-url"></div>
+        </div>
+      </div>
     </div>
 
-    <div id="lv-en-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
-      <div id="lv-en-sched-next" style="color:#888;"></div>
-      <div id="lv-en-sched-last-status"></div>
-      <div id="lv-en-sched-last-msg" style="color:#888;word-break:break-all;"></div>
-      <div id="lv-en-sched-last-url"></div>
+    <!-- 4. EN Belgesel -->
+    <div class="acc-item" id="acc-en-belgesel">
+      <div class="acc-header" onclick="toggleAcc('en-belgesel')">
+        <span class="acc-title">🎬 EN Belgesel</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-en-belgesel"></span><span class="acc-chevron" id="acc-chev-en-belgesel">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-en-belgesel">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce belgesel kanalı — ayrı YouTube hesabı, her gün 1 video</p>
+        <div id="yt-en-not-linked" style="background:#1a1010;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#f87171;font-size:13px;margin-bottom:8px;">✗ EN kanal bağlı değil</div>
+          <p style="color:#888;font-size:12px;margin-bottom:8px;">Bağlamadan önce YouTube'da 2. kanalınıza geçin, sonra tıklayın:</p>
+          <button onclick="window.location='/auth/youtube/en'" style="background:#c00;font-size:12px;padding:8px 16px;">EN Kanal Bağla</button>
+        </div>
+        <div id="yt-en-linked" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ EN kanal bağlı</div>
+          <button onclick="window.location='/auth/youtube/en'" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Yeniden Bağla</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="lv-en-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveLVENScheduler()">
+            Otomatik EN belgesel videoyu etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Kategoriler (virgülle ayır, İngilizce)</label>
+          <textarea id="lv-en-sched-categories" style="min-height:64px;font-size:13px;">history, science, space, technology, nature, ancient civilizations, physics</textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="field">
+            <label>Yayın saati (İstanbul)</label>
+            <input type="text" id="lv-en-sched-time" value="14:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          </div>
+          <div class="field">
+            <label>Video süresi</label>
+            <select id="lv-en-sched-duration" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="3">~3 dakika</option>
+              <option value="5" selected>~5 dakika</option>
+              <option value="8">~8 dakika</option>
+              <option value="10">~10 dakika</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="lv-en-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="M1" selected>M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+              <option value="F1">F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveLVENScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runLVENNow()" id="btn-lv-en-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-lv-en-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="lv-en-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="lv-en-sched-next" style="color:#888;"></div>
+          <div id="lv-en-sched-last-status"></div>
+          <div id="lv-en-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="lv-en-sched-last-url"></div>
+        </div>
+      </div>
     </div>
 
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">⚡ EN Otomatik Short</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce kanalına otomatik trend haberden Short üretip yükler (ABD trendleri)</p>
-
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
-        <input type="checkbox" id="en-shorts-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
-        EN otomatik shortu etkinleştir
-      </label>
+    <!-- 5. EN Short -->
+    <div class="acc-item" id="acc-en-short">
+      <div class="acc-header" onclick="toggleAcc('en-short')">
+        <span class="acc-title">⚡ EN Otomatik Short</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-en-short"></span><span class="acc-chevron" id="acc-chev-en-short">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-en-short">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce kanalına otomatik trend haberden Short üretip yükler (ABD trendleri)</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="en-shorts-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
+            EN otomatik shortu etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+          <input type="text" id="en-shorts-sched-times" value="08:00,14:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Ses</label>
+          <select id="en-shorts-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+            <option value="M1" selected>M1 (Erkek)</option>
+            <option value="M2">M2 (Erkek)</option>
+            <option value="M3">M3 (Erkek)</option>
+            <option value="F1">F1 (Kadın)</option>
+            <option value="F2">F2 (Kadın)</option>
+            <option value="F3">F3 (Kadın)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="en-shorts-ig-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
+            Instagram'a da paylaş
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveENShortsScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runENShortsNow()" id="btn-en-shorts-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-en-shorts-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="en-shorts-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="en-shorts-sched-next" style="color:#888;"></div>
+          <div id="en-shorts-sched-last-status"></div>
+          <div id="en-shorts-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="en-shorts-sched-last-url"></div>
+        </div>
+      </div>
     </div>
 
-    <div class="field" style="margin-bottom:12px;">
-      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-      <input type="text" id="en-shorts-sched-times" value="08:00,14:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+    <!-- 6. TR Instagram-Only -->
+    <div class="acc-item" id="acc-tr-ig-only">
+      <div class="acc-header" onclick="toggleAcc('tr-ig-only')">
+        <span class="acc-title">📸 TR Instagram-Only</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-ig-only"></span><span class="acc-chevron" id="acc-chev-tr-ig-only">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-tr-ig-only">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Sadece Instagram'a gönderir — YouTube'a yüklenmez. TR trend haberlerinden video üretir.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="ig-only-tr-enabled" style="width:18px;height:18px;accent-color:#e1306c;" onchange="saveIGOnlyTRScheduler()">
+            Instagram-Only otomatiği etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+          <input type="text" id="ig-only-tr-times" value="09:00,14:00,19:00,22:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Ses</label>
+          <select id="ig-only-tr-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+            <option value="F1" selected>F1 (Kadın)</option>
+            <option value="F2">F2 (Kadın)</option>
+            <option value="F3">F3 (Kadın)</option>
+            <option value="M1">M1 (Erkek)</option>
+            <option value="M2">M2 (Erkek)</option>
+            <option value="M3">M3 (Erkek)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-ig-only-tr-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="ig-only-tr-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="ig-only-tr-next" style="color:#888;"></div>
+          <div id="ig-only-tr-last-status"></div>
+          <div id="ig-only-tr-last-msg" style="color:#888;word-break:break-all;"></div>
+        </div>
+        <div class="error" id="err-cfg" style="margin-top:8px;"></div>
+      </div>
     </div>
 
-    <div class="field" style="margin-bottom:14px;">
-      <label>Ses</label>
-      <select id="en-shorts-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-        <option value="M1" selected>M1 (Erkek)</option>
-        <option value="M2">M2 (Erkek)</option>
-        <option value="M3">M3 (Erkek)</option>
-        <option value="F1">F1 (Kadın)</option>
-        <option value="F2">F2 (Kadın)</option>
-        <option value="F3">F3 (Kadın)</option>
-      </select>
+    <!-- 7. Instagram API -->
+    <div class="acc-item" id="acc-ig-api">
+      <div class="acc-header" onclick="toggleAcc('ig-api')">
+        <span class="acc-title">📸 Instagram API</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-ig-api"></span><span class="acc-chevron" id="acc-chev-ig-api">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-ig-api">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Short yüklendikten sonra otomatik Instagram Reels ve Story atar. Facebook Graph API v21.0 kullanır.</p>
+        <div id="ig-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
+        <div class="field">
+          <label>Instagram Kullanıcı ID</label>
+          <input type="text" id="ig-user-id" placeholder="17841400000000000" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <div class="field">
+          <label>Access Token (90 günlük)</label>
+          <input type="password" id="ig-access-token" placeholder="EAABs..." style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <div style="display:flex;gap:20px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:13px;margin:0;">
+            <input type="checkbox" id="ig-post-reels" checked style="width:16px;height:16px;accent-color:#7c3aed;">
+            Reels olarak paylaş
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:13px;margin:0;">
+            <input type="checkbox" id="ig-post-story" checked style="width:16px;height:16px;accent-color:#7c3aed;">
+            Story olarak paylaş
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button onclick="saveInstagramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="testInstagram()" style="font-size:12px;padding:8px 16px;background:#1a3a1a;">Bağlantıyı Test Et</button>
+        </div>
+        <div id="ig-test-result" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
+        <div id="ig-last-log" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
+      </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
-        <input type="checkbox" id="en-shorts-ig-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
-        Instagram'a da paylaş
-      </label>
+    <!-- 8. API Bağlantıları -->
+    <div class="acc-item" id="acc-api-keys">
+      <div class="acc-header" onclick="toggleAcc('api-keys')">
+        <span class="acc-title">🔑 API Bağlantıları</span>
+        <span class="acc-right"><span class="acc-chevron" id="acc-chev-api-keys">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-api-keys">
+
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">YouTube OAuth</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">Google Cloud Console → API &amp; Services → Credentials → OAuth 2.0 Client</p>
+        <div id="yt-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Kayıtlı — bağlantı aktif</div>
+          <button onclick="resetYTConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir / Sıfırla</button>
+        </div>
+        <div id="yt-input-state">
+          <div class="field">
+            <label>Client ID</label>
+            <input type="text" id="cfg-client-id" placeholder="337037...apps.googleusercontent.com" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <label>Client Secret</label>
+            <input type="password" id="cfg-client-secret" placeholder="GOCSPX-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+          </div>
+          <div style="display:flex;gap:12px;margin-top:16px;margin-bottom:4px;">
+            <button onclick="saveYTConfig()">Kaydet ve Bağlan</button>
+            <button onclick="document.getElementById('yt-modal').style.display='none'" style="background:#333;">İptal</button>
+          </div>
+        </div>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Pexels API</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">pexels.com → Üye ol → API Key</p>
+        <div id="pexels-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Pexels bağlı</div>
+          <button onclick="resetPexelsConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
+        </div>
+        <div id="pexels-input-state">
+          <input type="password" id="cfg-pexels-key" placeholder="Pexels API Key..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+          <button onclick="savePexelsConfig()">Kaydet</button>
+        </div>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">DeepSeek API</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">Otomatik video üretimi için sunucuda saklanır</p>
+        <div id="ds-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ DeepSeek key sunucuda kayıtlı</div>
+          <button onclick="resetDSConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
+        </div>
+        <div id="ds-input-state">
+          <input type="password" id="cfg-ds-key" placeholder="sk-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+          <button onclick="saveDSConfig()">Kaydet</button>
+        </div>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🎨 OpenAI DALL-E (Opsiyonel)</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">DALL-E 3 API key — varsa görseller DALL-E ile üretilir, yoksa Wikimedia → Pexels kullanılır</p>
+        <div id="openai-key-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
+        <div class="field">
+          <label>OpenAI API Key</label>
+          <input type="password" id="openai-api-key" placeholder="sk-..." style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <button onclick="saveOpenAIKey()" style="font-size:12px;padding:8px 16px;margin-bottom:4px;">Kaydet</button>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📨 Telegram Bildirimleri</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">Hata olduğunda (Instagram, Pexels, DeepSeek, YouTube) anında Telegram mesajı gönderir.</p>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Bot Token</label>
+          <input type="password" id="cfg-tg-token" placeholder="123456:ABC-DEF..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Chat ID</label>
+          <input type="text" id="cfg-tg-chatid" placeholder="-100123456789 veya @username" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <button onclick="saveTelegramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="testTelegram()" id="btn-tg-test" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">Test Gönder</button>
+        </div>
+        <div id="tg-status" style="font-size:12px;margin-top:6px;color:#888;"></div>
+      </div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <button onclick="saveENShortsScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="runENShortsNow()" id="btn-en-shorts-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
-        <div class="spinner" id="spin-en-shorts-run-now"></div>
-        Şimdi Çalıştır
-      </button>
+    <!-- 9. Sistem -->
+    <div class="acc-item" id="acc-sistem">
+      <div class="acc-header" onclick="toggleAcc('sistem')">
+        <span class="acc-title">💾 Sistem / Yedek</span>
+        <span class="acc-right"><span class="acc-chevron" id="acc-chev-sistem">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-sistem">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Tüm API key'leri ve ayarları ZIP olarak indir. Sunucu değişirse geri yükle.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+          <a href="/api/backup/download" download style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">⬇ Yedek İndir</a>
+          <label style="background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+            ⬆ Yedek Yükle
+            <input type="file" accept=".zip" style="display:none;" onchange="restoreBackup(this)">
+          </label>
+        </div>
+        <div id="backup-status" style="font-size:12px;color:#888;margin-top:6px;"></div>
+      </div>
     </div>
 
-    <div id="en-shorts-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
-      <div id="en-shorts-sched-next" style="color:#888;"></div>
-      <div id="en-shorts-sched-last-status"></div>
-      <div id="en-shorts-sched-last-msg" style="color:#888;word-break:break-all;"></div>
-      <div id="en-shorts-sched-last-url"></div>
-    </div>
-
-    <hr style="border-color:#2a2a2a;margin:20px 0;">
-    <h3 style="color:#fff;margin-bottom:4px;font-size:15px;">📸 TR Instagram-Only Otomatik</h3>
-    <p style="color:#666;font-size:12px;margin-bottom:12px;">Sadece Instagram'a gönderir — YouTube'a yüklenmez. TR trend haberlerinden video üretir.</p>
-
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
-        <input type="checkbox" id="ig-only-tr-enabled" style="width:18px;height:18px;accent-color:#e1306c;" onchange="saveIGOnlyTRScheduler()">
-        Instagram-Only otomatiği etkinleştir
-      </label>
-    </div>
-
-    <div class="field" style="margin-bottom:12px;">
-      <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-      <input type="text" id="ig-only-tr-times" value="09:00,14:00,19:00,22:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
-    </div>
-
-    <div class="field" style="margin-bottom:14px;">
-      <label>Ses</label>
-      <select id="ig-only-tr-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
-        <option value="F1" selected>F1 (Kadın)</option>
-        <option value="F2">F2 (Kadın)</option>
-        <option value="F3">F3 (Kadın)</option>
-        <option value="M1">M1 (Erkek)</option>
-        <option value="M2">M2 (Erkek)</option>
-        <option value="M3">M3 (Erkek)</option>
-      </select>
-    </div>
-
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-      <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
-        <div class="spinner" id="spin-ig-only-tr-run-now"></div>
-        Şimdi Çalıştır
-      </button>
-    </div>
-
-    <div id="ig-only-tr-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
-      <div id="ig-only-tr-next" style="color:#888;"></div>
-      <div id="ig-only-tr-last-status"></div>
-      <div id="ig-only-tr-last-msg" style="color:#888;word-break:break-all;"></div>
-    </div>
-
-    <div class="error" id="err-cfg" style="margin-top:12px;"></div>
   </div>
 </div>
 
@@ -1640,9 +1707,46 @@ async function checkYTStatus() {
   } catch(e) {}
 }
 
+const _ACC_IDS = ['tr-short','tr-lv','tr-tnlv','en-belgesel','en-short','tr-ig-only','ig-api','api-keys','sistem'];
+
+function toggleAcc(id) {
+  const body = document.getElementById('acc-body-' + id);
+  const chev = document.getElementById('acc-chev-' + id);
+  if (!body) return;
+  const open = body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open', open);
+  const state = JSON.parse(localStorage.getItem('acc_state') || '{}');
+  state[id] = open;
+  localStorage.setItem('acc_state', JSON.stringify(state));
+}
+
+function initAccordions() {
+  const state = JSON.parse(localStorage.getItem('acc_state') || '{}');
+  _ACC_IDS.forEach(id => {
+    const body = document.getElementById('acc-body-' + id);
+    const chev = document.getElementById('acc-chev-' + id);
+    if (!body) return;
+    const open = !!state[id];
+    body.classList.toggle('open', open);
+    if (chev) chev.classList.toggle('open', open);
+  });
+}
+
+function setAccBadge(id, log, enabled) {
+  const badge = document.getElementById('acc-badge-' + id);
+  if (!badge) return;
+  if (!enabled) { badge.className = 'acc-badge off'; badge.textContent = '○ kapalı'; return; }
+  if (!log || !log.status) { badge.className = 'acc-badge'; badge.textContent = ''; return; }
+  if (log.status === 'error')   { badge.className = 'acc-badge err'; badge.textContent = '✗ hata'; }
+  else if (log.status === 'running') { badge.className = 'acc-badge run'; badge.textContent = '▶ çalışıyor'; }
+  else if (log.status === 'success') { badge.className = 'acc-badge ok';  badge.textContent = '✓ ok'; }
+  else { badge.className = 'acc-badge'; badge.textContent = ''; }
+}
+
 async function openSettings() {
   document.getElementById('yt-modal').style.display = 'flex';
   history.pushState({modal:'yt'}, '', '');
+  initAccordions();
   checkYTStatus();
   // DeepSeek sunucu key durumu
   try {
@@ -1962,6 +2066,7 @@ async function loadLVSchedulerStatus() {
       document.getElementById('lv-sched-last-url').innerHTML = log.url
         ? `<a href="${log.url}" target="_blank" style="color:#a78bfa;">${log.url}</a>` : '';
     }
+    setAccBadge('tr-lv', d.log, d.enabled);
   } catch(e) {}
 }
 
@@ -2125,6 +2230,7 @@ async function loadTNLVSchedulerStatus() {
       document.getElementById('tnlv-sched-last-msg').textContent = log.message || '';
       document.getElementById('tnlv-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
     }
+    setAccBadge('tr-tnlv', d.log, d.enabled);
   } catch(e) {}
 }
 
@@ -2187,6 +2293,7 @@ async function loadLVENSchedulerStatus() {
       document.getElementById('lv-en-sched-last-msg').textContent = log.message || '';
       document.getElementById('lv-en-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
     }
+    setAccBadge('en-belgesel', d.log, d.enabled);
   } catch(e) {}
 }
 
@@ -2240,6 +2347,7 @@ async function loadENShortsSchedulerStatus() {
       const urlEl = document.getElementById('en-shorts-sched-last-url');
       urlEl.innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
     }
+    setAccBadge('en-short', d.log, d.enabled);
   } catch(e) {}
 }
 
@@ -2299,6 +2407,7 @@ async function loadIGOnlyTRStatus() {
       statusEl.textContent = statusText;
       statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
       document.getElementById('ig-only-tr-last-msg').textContent = log.message || '';
+      setAccBadge('tr-ig-only', log, d.enabled);
 
       if (log.status === 'running') {
         // Job devam ediyorsa her 8 saniyede bir yenile
@@ -2552,6 +2661,7 @@ async function loadSchedulerStatus() {
       document.getElementById('sched-last-url').innerHTML = log.url
         ? `<a href="${log.url}" target="_blank" style="color:#a78bfa;">${log.url}</a>` : '';
     }
+    setAccBadge('tr-short', d.log, d.enabled);
   } catch(e) {}
 }
 
