@@ -1397,6 +1397,21 @@
         <span class="acc-right"><span class="acc-chevron" id="acc-chev-sistem">›</span></span>
       </div>
       <div class="acc-body" id="acc-body-sistem">
+
+        <!-- Şifre Değiştir -->
+        <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🔒 Panel Şifresi</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+          <input type="password" id="old-pw" placeholder="Mevcut şifre" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#e0e0e0;font-size:13px;outline:none;">
+          <input type="password" id="new-pw" placeholder="Yeni şifre (min 6 karakter)" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#e0e0e0;font-size:13px;outline:none;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button onclick="changePassword()" style="background:#e1306c;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">Şifreyi Güncelle</button>
+            <span id="pw-status" style="font-size:12px;color:#888;"></span>
+          </div>
+        </div>
+
+        <div style="height:1px;background:#1e1e1e;margin-bottom:16px;"></div>
+
+        <!-- Yedek -->
         <p style="color:#666;font-size:12px;margin-bottom:12px;">Tüm API key'leri ve ayarları ZIP olarak indir. Sunucu değişirse geri yükle.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
           <a href="/api/backup/download" download style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">⬇ Yedek İndir</a>
@@ -1406,6 +1421,11 @@
           </label>
         </div>
         <div id="backup-status" style="font-size:12px;color:#888;margin-top:6px;"></div>
+
+        <!-- Çıkış -->
+        <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
+        <button onclick="window.location='/logout'" style="background:#1a1a1a;color:#f87171;border:1px solid #3a1a1a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">⏻ Çıkış Yap</button>
+
       </div>
     </div>
 
@@ -2443,6 +2463,27 @@ async function runIGOnlyTRNow() {
 }
 
 // ── Yedekleme ────────────────────────────────────────────────────────────────
+async function changePassword() {
+  const oldPw = document.getElementById('old-pw').value.trim();
+  const newPw = document.getElementById('new-pw').value.trim();
+  const st = document.getElementById('pw-status');
+  if (!oldPw || !newPw) { st.style.color='#f87171'; st.textContent='Alanlar boş olamaz'; return; }
+  if (newPw.length < 6) { st.style.color='#f87171'; st.textContent='En az 6 karakter'; return; }
+  st.style.color='#888'; st.textContent='Güncelleniyor...';
+  const r = await fetch('/api/auth/change-password', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({old_password: oldPw, new_password: newPw})
+  });
+  if (r.ok) {
+    st.style.color='#4ade80'; st.textContent='Şifre güncellendi!';
+    document.getElementById('old-pw').value='';
+    document.getElementById('new-pw').value='';
+  } else {
+    const d = await r.json();
+    st.style.color='#f87171'; st.textContent = d.detail || 'Hata';
+  }
+}
+
 async function restoreBackup(input) {
   const file = input.files[0];
   if (!file) return;

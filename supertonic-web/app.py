@@ -5,10 +5,12 @@ import subprocess
 import json
 import time
 import re
+import hashlib
+import secrets
 from pathlib import Path
 import shutil
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import traceback
@@ -23,6 +25,91 @@ from deep_translator import GoogleTranslator
 import whisper
 
 app = FastAPI()
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+AUTH_CONFIG = Path("auth_config.json")
+_sessions: dict = {}  # token -> expiry (time.time() + 24h)
+_SESSION_TTL = 24 * 3600
+_COOKIE = "instube_session"
+
+
+def _hash_pw(pw: str) -> str:
+    return hashlib.sha256(pw.encode()).hexdigest()
+
+
+def _get_auth_cfg() -> dict:
+    if not AUTH_CONFIG.exists():
+        AUTH_CONFIG.write_text(json.dumps({"password_hash": _hash_pw("instube2026")}))
+    return json.loads(AUTH_CONFIG.read_text())
+
+
+def _valid_session(token: str | None) -> bool:
+    if not token:
+        return False
+    exp = _sessions.get(token)
+    if not exp or time.time() > exp:
+        _sessions.pop(token, None)
+        return False
+    return True
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    # Login sayfası ve statik dosyalar serbest
+    if path in ("/login", "/logout") or path.startswith("/static/"):
+        return await call_next(request)
+    token = request.cookies.get(_COOKIE)
+    if not _valid_session(token):
+        if path.startswith("/api/"):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        return RedirectResponse("/login", status_code=302)
+    return await call_next(request)
+
+
+@app.get("/login")
+async def login_page():
+    return FileResponse("static/login.html")
+
+
+@app.post("/login")
+async def login(request: Request, response: Response):
+    form = await request.form()
+    password = form.get("password", "")
+    cfg = _get_auth_cfg()
+    if _hash_pw(password) != cfg.get("password_hash", ""):
+        return FileResponse("static/login.html", status_code=401, headers={"X-Login-Error": "1"})
+    token = secrets.token_hex(32)
+    _sessions[token] = time.time() + _SESSION_TTL
+    resp = RedirectResponse("/", status_code=302)
+    resp.set_cookie(_COOKIE, token, httponly=True, samesite="lax", max_age=_SESSION_TTL)
+    return resp
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    token = request.cookies.get(_COOKIE)
+    _sessions.pop(token, None)
+    resp = RedirectResponse("/login", status_code=302)
+    resp.delete_cookie(_COOKIE)
+    return resp
+
+
+@app.post("/api/auth/change-password")
+async def change_password(request: Request):
+    body = await request.json()
+    old_pw = body.get("old_password", "")
+    new_pw = body.get("new_password", "")
+    if len(new_pw) < 6:
+        raise HTTPException(400, "Şifre en az 6 karakter olmalı")
+    cfg = _get_auth_cfg()
+    if _hash_pw(old_pw) != cfg.get("password_hash", ""):
+        raise HTTPException(403, "Mevcut şifre yanlış")
+    cfg["password_hash"] = _hash_pw(new_pw)
+    AUTH_CONFIG.write_text(json.dumps(cfg))
+    return {"ok": True}
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
