@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ParselDrone — Ada/Parsel ile Drone Videosu</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e0e0f0;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .logo { font-size: 18px; font-weight: 800; color: #5b4fcf; letter-spacing: -0.5px; }
+    .logo span { color: #1a1a2e; }
+    #auth-bar { display: flex; gap: 8px; align-items: center; }
+    #credits-badge {
+      background: #f0eeff; border: 1px solid #c0b8f0;
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; color: #5b4fcf; font-weight: 600;
+      display: none;
+    }
+
+    /* BUTTONS */
+    button {
+      cursor: pointer; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; padding: 8px 14px;
+      transition: all .15s;
+    }
+    button:hover { filter: brightness(.93); }
+    button:disabled { opacity: .45; cursor: default; }
+    .btn-primary { background: #5b4fcf; color: #fff; }
+    .btn-ghost { background: transparent; color: #5b4fcf; border: 1px solid #c0b8f0; }
+    .btn-danger { background: #fff0f0; color: #d04040; border: 1px solid #f0c0c0; }
+
+    /* LAYOUT */
+    main { display: flex; height: calc(100vh - 53px); }
+
+    #panel {
+      width: 320px; flex-shrink: 0;
+      background: #fff;
+      border-right: 1px solid #e0e0f0;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    #map-container { flex: 1; position: relative; background: #222; }
+    #cesiumContainer { width: 100%; height: 100%; }
+
+    /* CARD */
+    .card {
+      background: #fafafe;
+      border: 1px solid #e8e8f8;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .card-title {
+      font-size: 11px; font-weight: 700;
+      color: #8888aa; text-transform: uppercase;
+      letter-spacing: .6px; margin-bottom: 10px;
+    }
+
+    /* PANEL TABS */
+    .panel-tabs {
+      display: flex;
+      gap: 4px;
+      background: #f0f2f5;
+      border-radius: 10px;
+      padding: 4px;
+      flex-shrink: 0;
+    }
+    .panel-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #888;
+      transition: all .15s;
+      user-select: none;
+    }
+    .panel-tab.active { background: #5b4fcf; color: #fff; }
+    .panel-tab:hover:not(.active) { background: #e8e6ff; color: #5b4fcf; }
+
+    /* SETTINGS */
+    .setting-label {
+      font-size: 11px; font-weight: 700;
+      color: #8888aa; text-transform: uppercase;
+      letter-spacing: .6px;
+      display: block; margin: 12px 0 6px;
+    }
+    .setting-label:first-child { margin-top: 0; }
+
+    .seg-group {
+      display: flex;
+      gap: 4px;
+    }
+    .seg-btn {
+      flex: 1;
+      padding: 8px 4px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 7px;
+      background: #f0f2f5;
+      color: #666;
+      border: 1.5px solid #e0e0f0;
+      transition: all .15s;
+    }
+    .seg-btn:hover:not(.active) { background: #e8e6ff; color: #5b4fcf; border-color: #c0b8f0; }
+    .seg-btn.active { background: #5b4fcf; color: #fff; border-color: #5b4fcf; }
+
+    .setting-info {
+      font-size: 11px; color: #aaa;
+      margin-top: 6px; line-height: 1.4;
+    }
+
+    /* FORM */
+    .select-wrap { position: relative; margin-bottom: 8px; }
+    .select-wrap::after {
+      content: '▾'; position: absolute;
+      right: 10px; top: 50%; transform: translateY(-50%);
+      color: #aaa; pointer-events: none; font-size: 11px;
+    }
+    select, input {
+      width: 100%;
+      background: #fff; border: 1.5px solid #ddd;
+      border-radius: 8px; color: #1a1a2e;
+      padding: 9px 12px; font-size: 14px;
+      outline: none; transition: border-color .15s;
+      appearance: none;
+    }
+    select:focus, input:focus { border-color: #5b4fcf; }
+    select:disabled { background: #f5f5f8; color: #aaa; }
+    select option { color: #1a1a2e; }
+    input::placeholder { color: #bbb; }
+    .row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .row input { margin-bottom: 0; }
+
+    #generate-btn {
+      width: 100%; background: #5b4fcf; color: #fff;
+      padding: 12px; font-size: 14px; border-radius: 10px;
+      margin-top: 2px;
+    }
+    #record-btn {
+      width: 100%; background: #fff0f0; color: #d04040;
+      border: 1px solid #f0c0c0;
+      padding: 10px; font-size: 13px; border-radius: 10px;
+      margin-top: 6px; display: none;
+    }
+
+    #status-msg {
+      font-size: 12px; text-align: center;
+      margin-top: 8px; min-height: 16px; color: #8888aa;
+    }
+    #status-msg.error { color: #d04040; }
+    #status-msg.success { color: #2a9d5c; }
+
+    /* HISTORY */
+    .history-item {
+      padding: 10px; border: 1px solid #e8e8f8;
+      border-radius: 8px; margin-bottom: 6px;
+      cursor: pointer; transition: background .15s;
+    }
+    .history-item:hover { background: #f0eeff; }
+    .h-label { font-size: 13px; font-weight: 600; color: #5b4fcf; }
+    .h-sub { font-size: 12px; color: #666; margin-top: 2px; }
+    .h-date { font-size: 11px; color: #aaa; margin-top: 3px; }
+
+    /* RECORD BAR */
+    #record-bar {
+      position: absolute; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      display: none; gap: 10px; align-items: center;
+      background: rgba(255,255,255,.95);
+      backdrop-filter: blur(8px);
+      border: 1px solid #e0e0f0;
+      border-radius: 40px; padding: 10px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
+    }
+    #rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #d04040; animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+    #rec-label { font-size: 13px; color: #333; }
+
+    /* AUTH MODAL */
+    #modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px;
+    }
+    #modal {
+      background: #fff; border-radius: 16px;
+      padding: 28px; width: 100%; max-width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    #modal h2 { font-size: 20px; margin-bottom: 18px; color: #1a1a2e; }
+    .modal-tabs {
+      display: flex; gap: 4px; margin-bottom: 16px;
+      background: #f0f2f5; border-radius: 8px; padding: 4px;
+    }
+    .modal-tab {
+      flex: 1; text-align: center; padding: 7px;
+      border-radius: 6px; font-size: 13px;
+      cursor: pointer; color: #888; transition: all .15s;
+    }
+    .modal-tab.active { background: #5b4fcf; color: #fff; }
+    #modal-error { color: #d04040; font-size: 12px; margin-bottom: 8px; min-height: 16px; }
+    #modal input { margin-bottom: 10px; }
+
+    /* MOBILE */
+    @media (max-width: 700px) {
+      main { flex-direction: column; height: auto; }
+      #panel { width: 100%; border-right: none; border-bottom: 1px solid #e0e0f0; }
+      #map-container { height: 60vw; min-height: 280px; }
+      header { padding: 10px 14px; }
+      .logo { font-size: 16px; }
+      button { padding: 7px 10px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Parsel<span>Drone</span></div>
+  <div id="auth-bar">
+    <div id="credits-badge">💳 <span id="credit-count">0</span> kredi</div>
+    <button class="btn-ghost" id="history-btn" style="display:none" onclick="loadHistory()">Geçmiş</button>
+    <button class="btn-danger" id="logout-btn" style="display:none" onclick="logout()">Çıkış</button>
+    <button class="btn-primary" id="login-open-btn" onclick="openModal()">Giriş Yap</button>
+  </div>
+</header>
+
+<main>
+  <div id="panel">
+
+    <!-- PANEL TABS -->
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchPanel('parsel')">🛸 Parsel</div>
+      <div class="panel-tab" onclick="switchPanel('ayarlar')">⚙️ Ayarlar</div>
+    </div>
+
+    <!-- PARSEL PANELİ -->
+    <div id="parsel-panel">
+      <div class="card">
+        <div class="card-title">Parsel Bilgileri</div>
+
+        <div class="select-wrap">
+          <select id="il-select" onchange="loadIlceler()">
+            <option value="">İl yükleniyor…</option>
+          </select>
+        </div>
+        <div class="select-wrap">
+          <select id="ilce-select" onchange="loadMahalleler()" disabled>
+            <option value="">Önce il seçin</option>
+          </select>
+        </div>
+        <div class="select-wrap" style="margin-bottom:10px">
+          <select id="mahalle-select" disabled>
+            <option value="">Önce ilçe seçin</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <input id="ada" type="text" placeholder="Ada No" />
+          <input id="parsel" type="text" placeholder="Parsel No" />
+        </div>
+
+        <button id="map-pick-btn" onclick="toggleMapPick()" style="width:100%;background:#f0eeff;color:#5b4fcf;border:1.5px solid #c0b8f0;padding:10px;font-size:13px;border-radius:10px;margin-bottom:8px">
+          📍 Haritaya Tıklayarak Seç
+        </button>
+        <button id="generate-btn" onclick="generateDrone()">🛸 Drone Videosu Oluştur</button>
+        <button id="record-btn" onclick="startRecording()">⏺ Kaydet</button>
+        <div id="status-msg"></div>
+      </div>
+
+      <div class="card" id="history-card" style="display:none">
+        <div class="card-title">Son Sorgular</div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+    <!-- AYARLAR PANELİ -->
+    <div id="ayarlar-panel" style="display:none">
+
+      <div class="card">
+        <div class="card-title">🚁 Drone Uçuş Ayarları</div>
+
+        <span class="setting-label">Uçuş Hızı</span>
+        <div class="seg-group" id="speed-group">
+          <button class="seg-btn" data-val="slow"   onclick="setSetting('speed','slow')">🐢 Yavaş</button>
+          <button class="seg-btn active" data-val="normal" onclick="setSetting('speed','normal')">🚁 Normal</button>
+          <button class="seg-btn" data-val="fast"   onclick="setSetting('speed','fast')">⚡ Hızlı</button>
+        </div>
+        <p class="setting-info" id="speed-info">Her kare 160ms — tam tur ~57 saniye</p>
+
+        <span class="setting-label">İrtifa</span>
+        <div class="seg-group" id="altitude-group">
+          <button class="seg-btn" data-val="low"    onclick="setSetting('altitude','low')">🏠 Alçak</button>
+          <button class="seg-btn active" data-val="normal" onclick="setSetting('altitude','normal')">🏙️ Normal</button>
+          <button class="seg-btn" data-val="high"   onclick="setSetting('altitude','high')">🌤️ Yüksek</button>
+        </div>
+        <p class="setting-info" id="altitude-info">Parsel boyutuna göre ×1.0 çarpan</p>
+
+        <span class="setting-label">Tur Sayısı</span>
+        <div class="seg-group" id="orbits-group">
+          <button class="seg-btn active" data-val="1" onclick="setSetting('orbits',1)">1 tur</button>
+          <button class="seg-btn" data-val="2"        onclick="setSetting('orbits',2)">2 tur</button>
+          <button class="seg-btn" data-val="3"        onclick="setSetting('orbits',3)">3 tur</button>
+        </div>
+
+        <span class="setting-label">Başlangıç Açısı</span>
+        <input type="range" id="start-angle" min="0" max="359" value="0"
+          style="width:100%;accent-color:#5b4fcf;margin-bottom:4px"
+          oninput="settings.startAngle=+this.value; document.getElementById('angle-val').textContent=this.value+'°'" />
+        <p class="setting-info">Açı: <span id="angle-val">0°</span> — 0° = Doğu, 90° = Kuzey</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🎬 Video Kayıt Ayarları</div>
+
+        <span class="setting-label">Video Kalitesi</span>
+        <div class="seg-group" id="quality-group">
+          <button class="seg-btn" data-val="sd"   onclick="setSetting('quality','sd')">SD<br><small>4 Mbps</small></button>
+          <button class="seg-btn active" data-val="hd" onclick="setSetting('quality','hd')">HD<br><small>8 Mbps</small></button>
+          <button class="seg-btn" data-val="4k"   onclick="setSetting('quality','4k')">4K<br><small>16 Mbps</small></button>
+        </div>
+        <p class="setting-info">Yüksek kalite = büyük dosya boyutu</p>
+
+        <span class="setting-label">Kare Hızı (FPS)</span>
+        <div class="seg-group" id="fps-group">
+          <button class="seg-btn" data-val="24" onclick="setSetting('fps',24)">24 fps</button>
+          <button class="seg-btn active" data-val="30" onclick="setSetting('fps',30)">30 fps</button>
+          <button class="seg-btn" data-val="60" onclick="setSetting('fps',60)">60 fps</button>
+        </div>
+
+        <span class="setting-label">Harita Render Kalitesi</span>
+        <div class="seg-group" id="render-group">
+          <button class="seg-btn" data-val="0.75" onclick="setSetting('renderScale',0.75)">Hızlı</button>
+          <button class="seg-btn active" data-val="1" onclick="setSetting('renderScale',1)">Normal</button>
+          <button class="seg-btn" data-val="1.5" onclick="setSetting('renderScale',1.5)">Keskin</button>
+        </div>
+        <p class="setting-info">Keskin mod GPU'yu zorlar, performans düşebilir</p>
+      </div>
+
+    </div>
+    <!-- /AYARLAR PANELİ -->
+
+  </div>
+
+  <div id="map-container">
+    <div id="cesiumContainer"></div>
+    <div id="record-bar">
+      <div id="rec-dot"></div>
+      <span id="rec-label">Kaydediliyor…</span>
+      <button class="btn-danger" onclick="stopRecording()">Durdur & İndir</button>
+    </div>
+  </div>
+</main>
+
+<div id="modal-overlay" style="display:none">
+  <div id="modal">
+    <h2>Hesap</h2>
+    <div class="modal-tabs">
+      <div class="modal-tab active" onclick="switchTab('login')">Giriş</div>
+      <div class="modal-tab" onclick="switchTab('register')">Kayıt Ol</div>
+    </div>
+    <p id="modal-error"></p>
+    <input id="auth-email" type="email" placeholder="E-posta" />
+    <input id="auth-password" type="password" placeholder="Şifre" />
+    <button class="btn-primary" style="width:100%;padding:12px" id="auth-submit-btn" onclick="submitAuth()">Giriş Yap</button>
+  </div>
+</div>
+
+<script>
+  const API = 'http://45.143.4.169/api';
+  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzZTg0MzEyMy1lNjhiLTRjYTMtODJmMC0xNGUwMmYxY2VhMmIiLCJpZCI6NDQzMjk4LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODExOTY0NTR9.T-xpMd4EZDA8Dk39U0eL1xAuJBzDPF7AeU293KiPANw';
+
+  let viewer, mediaRecorder, recordedChunks = [], flightInterval = null;
+  let authMode = 'login';
+  let token = localStorage.getItem('token') || null;
+
+  // ── Settings State ───────────────────────────────────────
+  const settings = {
+    speed: 'normal',      // slow=240ms / normal=160ms / fast=80ms
+    altitude: 'normal',   // low=0.7× / normal=1.0× / high=1.5×
+    orbits: 1,            // 1 / 2 / 3
+    startAngle: 0,        // 0–359 derece
+    quality: 'hd',        // sd=4M / hd=8M / 4k=16M
+    fps: 30,              // 24 / 30 / 60
+    renderScale: 1,       // 0.75 / 1 / 1.5
+  };
+
+  const speedMs     = { slow: 240, normal: 160, fast: 80 };
+  const speedLabel  = { slow: 'Her kare 240ms — tam tur ~86 saniye', normal: 'Her kare 160ms — tam tur ~57 saniye', fast: 'Her kare 80ms — tam tur ~29 saniye' };
+  const altMult     = { low: 0.7, normal: 1.0, high: 1.5 };
+  const altLabel    = { low: 'Parsel boyutuna göre ×0.7 çarpan — binalara yakın', normal: 'Parsel boyutuna göre ×1.0 çarpan', high: 'Parsel boyutuna göre ×1.5 çarpan — genel bakış' };
+  const qualityBps  = { sd: 4_000_000, hd: 8_000_000, '4k': 16_000_000 };
+
+  function switchPanel(tab) {
+    const isParsel = tab === 'parsel';
+    document.getElementById('parsel-panel').style.display  = isParsel ? '' : 'none';
+    document.getElementById('ayarlar-panel').style.display = isParsel ? 'none' : '';
+    document.querySelectorAll('.panel-tab').forEach((t, i) =>
+      t.classList.toggle('active', (i === 0 && isParsel) || (i === 1 && !isParsel))
+    );
+  }
+
+  function setSetting(key, val) {
+    settings[key] = val;
+    const group = document.getElementById(key + '-group');
+    if (group) {
+      group.querySelectorAll('.seg-btn').forEach(btn =>
+        btn.classList.toggle('active', String(btn.dataset.val) === String(val))
+      );
+    }
+    // Bilgi metni güncelle
+    if (key === 'speed')    document.getElementById('speed-info').textContent    = speedLabel[val];
+    if (key === 'altitude') document.getElementById('altitude-info').textContent = altLabel[val];
+    // Render scale anlık uygula
+    if (key === 'renderScale' && viewer) viewer.resolutionScale = val;
+  }
+
+  // ── Cesium ──────────────────────────────────────────────
+  try {
+    viewer = new Cesium.Viewer('cesiumContainer', {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+      animation: false, timeline: false, baseLayerPicker: false,
+      navigationHelpButton: false, homeButton: false,
+      sceneModePicker: false, geocoder: false,
+      infoBox: false, selectionIndicator: false,
+    });
+    viewer.scene.globe.enableLighting = true;
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.resolutionScale = settings.renderScale;
+
+    // OSM 3D binalar
+    Cesium.Cesium3DTileset.fromIonAssetId(96188).then(tileset => {
+      viewer.scene.primitives.add(tileset);
+    }).catch(() => {
+      Cesium.Cesium3DTileset.fromIonAssetId(354307).then(tileset => {
+        viewer.scene.primitives.add(tileset);
+      }).catch(e => console.log('3D bina yüklenemedi:', e));
+    });
+  } catch(e) {
+    console.error('Cesium init error:', e);
+  }
+
+  // ── Dropdowns ────────────────────────────────────────────
+  async function loadIller() {
+    const sel = document.getElementById('il-select');
+    try {
+      const res = await fetch(API + '/iller');
+      const data = await res.json();
+      sel.innerHTML = '<option value="">— İl seçin —</option>';
+      data.forEach(il => {
+        const o = document.createElement('option');
+        o.value = il.id; o.textContent = il.text;
+        sel.appendChild(o);
+      });
+    } catch {
+      sel.innerHTML = '<option value="">Yüklenemedi, yenile</option>';
+    }
+  }
+
+  async function loadIlceler() {
+    const ilId = document.getElementById('il-select').value;
+    const ilceSel = document.getElementById('ilce-select');
+    const mahalleSel = document.getElementById('mahalle-select');
+    ilceSel.innerHTML = '<option value="">Yükleniyor…</option>'; ilceSel.disabled = true;
+    mahalleSel.innerHTML = '<option value="">Önce ilçe seçin</option>'; mahalleSel.disabled = true;
+    if (!ilId) return;
+    try {
+      const res = await fetch(API + '/ilceler/' + ilId);
+      const data = await res.json();
+      ilceSel.innerHTML = '<option value="">— İlçe seçin —</option>';
+      data.forEach(i => { const o = document.createElement('option'); o.value = i.id; o.textContent = i.text; ilceSel.appendChild(o); });
+      ilceSel.disabled = false;
+    } catch { ilceSel.innerHTML = '<option value="">Yüklenemedi</option>'; }
+  }
+
+  async function loadMahalleler() {
+    const ilceId = document.getElementById('ilce-select').value;
+    const mahalleSel = document.getElementById('mahalle-select');
+    mahalleSel.innerHTML = '<option value="">Yükleniyor…</option>'; mahalleSel.disabled = true;
+    if (!ilceId) return;
+    try {
+      const res = await fetch(API + '/mahalleler/' + ilceId);
+      const data = await res.json();
+      mahalleSel.innerHTML = '<option value="">— Mahalle seçin —</option>';
+      data.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.text; mahalleSel.appendChild(o); });
+      mahalleSel.disabled = false;
+    } catch { mahalleSel.innerHTML = '<option value="">Yüklenemedi</option>'; }
+  }
+
+  // ── Auth ─────────────────────────────────────────────────
+  function openModal() { document.getElementById('modal-overlay').style.display = 'flex'; }
+  function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+  function switchTab(mode) {
+    authMode = mode;
+    document.querySelectorAll('.modal-tab').forEach((t, i) =>
+      t.classList.toggle('active', (i===0&&mode==='login')||(i===1&&mode==='register'))
+    );
+    document.getElementById('auth-submit-btn').textContent = mode==='login' ? 'Giriş Yap' : 'Kayıt Ol';
+    document.getElementById('modal-error').textContent = '';
+  }
+  async function submitAuth() {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    if (!email || !password) return;
+    try {
+      const res = await fetch(API + (authMode==='login' ? '/login' : '/register'), {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, password}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Hata');
+      token = data.token; localStorage.setItem('token', token);
+      updateAuthUI(data.credits); closeModal();
+    } catch(e) { document.getElementById('modal-error').textContent = e.message; }
+  }
+  function logout() {
+    token = null; localStorage.removeItem('token');
+    ['credits-badge','history-btn','logout-btn'].forEach(id => document.getElementById(id).style.display='none');
+    document.getElementById('login-open-btn').style.display='';
+    document.getElementById('history-card').style.display='none';
+  }
+  function updateAuthUI(credits) {
+    document.getElementById('credit-count').textContent = credits;
+    document.getElementById('credits-badge').style.display='';
+    document.getElementById('history-btn').style.display='';
+    document.getElementById('logout-btn').style.display='';
+    document.getElementById('login-open-btn').style.display='none';
+  }
+  async function checkSession() {
+    if (!token) return;
+    try {
+      const res = await fetch(API+'/me', {headers:{Authorization:'Bearer '+token}});
+      if (!res.ok) { logout(); return; }
+      updateAuthUI((await res.json()).credits);
+    } catch { logout(); }
+  }
+
+  // ── Parsel ───────────────────────────────────────────────
+  async function generateDrone() {
+    if (!token) { openModal(); return; }
+    const ilSel = document.getElementById('il-select');
+    const ilceSel = document.getElementById('ilce-select');
+    const mahalleSel = document.getElementById('mahalle-select');
+    const ada = document.getElementById('ada').value.trim();
+    const parsel = document.getElementById('parsel').value.trim();
+    if (!ilSel.value || !ilceSel.value || !mahalleSel.value) { setStatus('İl, ilçe ve mahalle seçin','error'); return; }
+    if (!ada || !parsel) { setStatus('Ada ve parsel girin','error'); return; }
+    setStatus('Parsel aranıyor…');
+    document.getElementById('generate-btn').disabled = true;
+    try {
+      const res = await fetch(API+'/parsel', {
+        method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token},
+        body: JSON.stringify({
+          il_id: parseInt(ilSel.value), il_adi: ilSel.options[ilSel.selectedIndex].text,
+          ilce_id: parseInt(ilceSel.value), ilce_adi: ilceSel.options[ilceSel.selectedIndex].text,
+          mahalle_id: parseInt(mahalleSel.value), mahalle_adi: mahalleSel.options[mahalleSel.selectedIndex].text,
+          ada, parsel,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Hata');
+      document.getElementById('credit-count').textContent = data.remaining_credits;
+      setStatus('Parsel bulundu — drone uçuşu başladı ✓','success');
+      document.getElementById('record-btn').style.display = '';
+      flyToParsel(data.lat, data.lon, data.coordinates);
+    } catch(e) { setStatus(e.message,'error'); }
+    finally { document.getElementById('generate-btn').disabled = false; }
+  }
+
+  function flyToParsel(lat, lon, coordinates) {
+    if (!viewer) return;
+
+    if (flightInterval) { clearInterval(flightInterval); flightInterval = null; }
+    viewer.camera.cancelFlight();
+    viewer.entities.removeAll();
+
+    let orbitMeters = 120;
+
+    if (coordinates?.length) {
+      const lons = coordinates.map(c => c[0]);
+      const lats = coordinates.map(c => c[1]);
+      const lonExt = (Math.max(...lons) - Math.min(...lons)) * 111320 * Math.cos(lat * Math.PI / 180);
+      const latExt = (Math.max(...lats) - Math.min(...lats)) * 110540;
+      const parselM = Math.max(lonExt, latExt);
+      orbitMeters = Math.min(Math.max(parselM * 4, 80), 600);
+
+      viewer.entities.add({
+        polygon: {
+          hierarchy: new Cesium.PolygonHierarchy(coordinates.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1]))),
+          material: Cesium.Color.YELLOW.withAlpha(0.4),
+          classificationType: Cesium.ClassificationType.BOTH,
+        },
+      });
+
+      viewer.entities.add({
+        polyline: {
+          positions: [...coordinates, coordinates[0]].map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1])),
+          width: 3,
+          material: new Cesium.ColorMaterialProperty(Cesium.Color.YELLOW),
+          clampToGround: true,
+        },
+      });
+
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(lon, lat),
+        point: {
+          pixelSize: 12,
+          color: Cesium.Color.RED,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        },
+      });
+    }
+
+    startDroneFlight(lat, lon, orbitMeters);
+  }
+
+  function startDroneFlight(lat, lon, orbitMeters) {
+    if (!viewer) return;
+
+    const mPerDegLat = 110540;
+    const mPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
+
+    // Ayarları uygula
+    const mult       = altMult[settings.altitude];
+    const interval   = speedMs[settings.speed];
+    const totalSteps = 360 * settings.orbits;
+    const startRad   = (settings.startAngle * Math.PI) / 180;
+
+    const minAlt = Math.max(orbitMeters * 0.6 * mult, 60);
+    const maxAlt = Math.max(orbitMeters * 2.2 * mult, 150);
+
+    let step = 0;
+
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(
+        lon + (orbitMeters / mPerDegLon) * Math.cos(startRad),
+        lat,
+        (minAlt + maxAlt) / 2
+      ),
+      orientation: { heading: Cesium.Math.toRadians(270), pitch: Cesium.Math.toRadians(-25), roll: 0 },
+    });
+
+    flightInterval = setInterval(() => {
+      if (!viewer || step >= totalSteps) {
+        clearInterval(flightInterval); flightInterval = null;
+        setStatus('Uçuş tamamlandı ✓', 'success');
+        return;
+      }
+      step++;
+      const angle = startRad + (step / totalSteps) * Math.PI * 2 * settings.orbits;
+
+      const camLon = lon + (orbitMeters / mPerDegLon) * Math.cos(angle);
+      const camLat = lat + (orbitMeters / mPerDegLat) * Math.sin(angle);
+
+      const altPhase = 0.5 + 0.5 * Math.sin(angle * 2 - Math.PI / 2);
+      const camAlt   = minAlt + (maxAlt - minAlt) * altPhase;
+      const pitchDeg = -25 - 30 * altPhase;
+      const headingRad = ((3 * Math.PI / 2) - angle + 4 * Math.PI) % (2 * Math.PI);
+
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, camAlt),
+        orientation: { heading: headingRad, pitch: Cesium.Math.toRadians(pitchDeg), roll: 0 },
+      });
+    }, interval);
+  }
+
+  // ── Recording ────────────────────────────────────────────
+  function startRecording() {
+    if (!viewer) return;
+    recordedChunks = [];
+    const stream = viewer.scene.canvas.captureStream(settings.fps);
+    const bps    = qualityBps[settings.quality];
+
+    let mimeType = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bps });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.start();
+
+    const qualLabel = { sd: 'SD 4Mbps', hd: 'HD 8Mbps', '4k': '4K 16Mbps' };
+    document.getElementById('rec-label').textContent = `Kaydediliyor… ${qualLabel[settings.quality]} · ${settings.fps}fps`;
+    document.getElementById('record-bar').style.display = 'flex';
+    document.getElementById('record-btn').style.display = 'none';
+  }
+
+  function stopRecording() {
+    if (!mediaRecorder) return;
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, {type:'video/webm'});
+      const url  = URL.createObjectURL(blob);
+      Object.assign(document.createElement('a'), { href: url, download: `parsel-drone-${Date.now()}.webm` }).click();
+      URL.revokeObjectURL(url);
+    };
+    mediaRecorder.stop();
+    document.getElementById('record-bar').style.display = 'none';
+    document.getElementById('record-btn').style.display = '';
+  }
+
+  // ── History ──────────────────────────────────────────────
+  async function loadHistory() {
+    if (!token) return;
+    try {
+      const data = await (await fetch(API+'/history', {headers:{Authorization:'Bearer '+token}})).json();
+      const list = document.getElementById('history-list');
+      list.innerHTML = data.length ? '' : '<p style="color:#aaa;font-size:12px">Henüz sorgu yok</p>';
+      data.forEach(r => {
+        const d = document.createElement('div');
+        d.className = 'history-item';
+        d.innerHTML = `<div class="h-label">${r.il} / ${r.ilce}</div><div class="h-sub">${r.mahalle} — Ada ${r.ada}, Parsel ${r.parsel}</div><div class="h-date">${r.date}</div>`;
+        d.onclick = () => flyToParsel(r.lat, r.lon, null);
+        list.appendChild(d);
+      });
+      document.getElementById('history-card').style.display = 'block';
+    } catch {}
+  }
+
+  function setStatus(msg, type='') {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg; el.className = type;
+  }
+
+  // ── Haritadan Seç ───────────────────────────────────────
+  let mapPickMode = false;
+
+  function normalizeTR(s) {
+    return s.toUpperCase()
+      .replace(/İ/g,'I').replace(/I/g,'I')
+      .replace(/Ğ/g,'G').replace(/Ü/g,'U')
+      .replace(/Ö/g,'O').replace(/Ş/g,'S').replace(/Ç/g,'C')
+      .replace('ILCESI','').replace('ILI','').trim();
+  }
+
+  function findAndSelectOption(selectEl, text) {
+    const norm = normalizeTR(text);
+    for (const opt of selectEl.options) {
+      if (normalizeTR(opt.text) === norm) { selectEl.value = opt.value; return true; }
+    }
+    for (const opt of selectEl.options) {
+      const n = normalizeTR(opt.text);
+      if (n.includes(norm) || norm.includes(n)) { selectEl.value = opt.value; return true; }
+    }
+    return false;
+  }
+
+  function toggleMapPick() {
+    mapPickMode = !mapPickMode;
+    const btn = document.getElementById('map-pick-btn');
+    if (mapPickMode) {
+      btn.style.background = '#5b4fcf'; btn.style.color = '#fff';
+      btn.textContent = '✕ Tıklama Modunu Kapat';
+      setStatus('Haritada herhangi bir yere tıklayın…');
+      document.getElementById('cesiumContainer').style.cursor = 'crosshair';
+    } else {
+      btn.style.background = '#f0eeff'; btn.style.color = '#5b4fcf';
+      btn.textContent = '📍 Haritaya Tıklayarak Seç';
+      setStatus('');
+      document.getElementById('cesiumContainer').style.cursor = '';
+    }
+  }
+
+  if (viewer) {
+    viewer.screenSpaceEventHandler.setInputAction(async (click) => {
+      if (!mapPickMode) return;
+      if (!token) { openModal(); return; }
+
+      const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+      if (!cartesian) return;
+
+      const carto = Cesium.Cartographic.fromCartesian(cartesian);
+      const lon   = Cesium.Math.toDegrees(carto.longitude);
+      const lat   = Cesium.Math.toDegrees(carto.latitude);
+
+      setStatus('İl/İlçe tanımlanıyor…');
+
+      try {
+        const res  = await fetch(`${API}/reverse-geocode?lon=${lon}&lat=${lat}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail);
+
+        const ilSel   = document.getElementById('il-select');
+        const ilFound = findAndSelectOption(ilSel, data.il);
+
+        if (ilFound) {
+          await loadIlceler();
+          const ilceSel   = document.getElementById('ilce-select');
+          const ilceFound = data.ilce ? findAndSelectOption(ilceSel, data.ilce) : false;
+          if (ilceFound && ilceSel.value) {
+            await loadMahalleler();
+            const mahalleSel = document.getElementById('mahalle-select');
+            if (data.mahalle) findAndSelectOption(mahalleSel, data.mahalle);
+            setStatus(`${data.il} / ${ilceSel.options[ilceSel.selectedIndex].text} — Ada ve Parsel girin`, 'success');
+          } else {
+            const hint = data.ilce ? ` (Nominatim: "${data.ilce}")` : '';
+            setStatus(`${data.il} bulundu${hint} — İlçe ve Mahalle seçin`, 'success');
+          }
+        } else {
+          setStatus(`İl tanımlanamadı ("${data.il}") — manuel seçin`, 'error');
+        }
+
+        viewer.entities.removeAll();
+        viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lon, lat),
+          point: {
+            pixelSize: 14, color: Cesium.Color.DODGERBLUE,
+            outlineColor: Cesium.Color.WHITE, outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+        });
+
+        toggleMapPick();
+      } catch (e) {
+        setStatus(e.message || 'Konum tanımlanamadı', 'error');
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  }
+
+  checkSession();
+  loadIller();
+</script>
+</body>
+</html>
