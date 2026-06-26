@@ -656,10 +656,6 @@
   function startDroneFlight(lat, lon, orbitMeters) {
     if (!viewer) return;
 
-    const mPerDegLat = 110540;
-    const mPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
-
-    // Ayarları uygula
     const interval   = speedMs[settings.speed];
     const totalSteps = 360 * settings.orbits;
     const startRad   = (settings.startAngle * Math.PI) / 180;
@@ -667,38 +663,33 @@
     const minAlt = Math.max(settings.minAltM, 20);
     const maxAlt = Math.max(minAlt * 2.5, minAlt + 80);
 
-    let step = 0;
+    // Kamera her zaman parsel merkezine bakar
+    const target = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
 
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(
-        lon + (orbitMeters / mPerDegLon) * Math.cos(startRad),
-        lat,
-        (minAlt + maxAlt) / 2
-      ),
-      orientation: { heading: Cesium.Math.toRadians(270), pitch: Cesium.Math.toRadians(-25), roll: 0 },
-    });
+    let step = 0;
+    const midAlt  = (minAlt + maxAlt) / 2;
+    const initRange = Math.sqrt(orbitMeters ** 2 + midAlt ** 2);
+    viewer.camera.lookAt(
+      target,
+      new Cesium.HeadingPitchRange(startRad, -Math.atan2(midAlt, orbitMeters), initRange)
+    );
 
     flightInterval = setInterval(() => {
       if (!viewer || step >= totalSteps) {
         clearInterval(flightInterval); flightInterval = null;
+        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
         setStatus('Uçuş tamamlandı ✓', 'success');
         return;
       }
       step++;
-      const angle = startRad + (step / totalSteps) * Math.PI * 2 * settings.orbits;
-
-      const camLon = lon + (orbitMeters / mPerDegLon) * Math.cos(angle);
-      const camLat = lat + (orbitMeters / mPerDegLat) * Math.sin(angle);
-
+      const angle    = startRad + (step / totalSteps) * Math.PI * 2 * settings.orbits;
       const altPhase = 0.5 + 0.5 * Math.sin(angle * 2 - Math.PI / 2);
       const camAlt   = minAlt + (maxAlt - minAlt) * altPhase;
-      const pitchDeg = -25 - 30 * altPhase;
-      const headingRad = ((3 * Math.PI / 2) - angle + 4 * Math.PI) % (2 * Math.PI);
+      const range    = Math.sqrt(orbitMeters ** 2 + camAlt ** 2);
+      // Pitch: hedefe geometrik olarak doğru açı — parsel her zaman merkezde
+      const pitch    = -Math.atan2(camAlt, orbitMeters);
 
-      viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(camLon, camLat, camAlt),
-        orientation: { heading: headingRad, pitch: Cesium.Math.toRadians(pitchDeg), roll: 0 },
-      });
+      viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(angle, pitch, range));
     }, interval);
   }
 
