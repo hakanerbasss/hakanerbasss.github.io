@@ -1738,11 +1738,11 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                 return None, f"no id/uri: {r1.text[:300]}"
 
             # Instagram container'ın hazır olması için bekle
-            await asyncio.sleep(3)
+            await asyncio.sleep(12)
 
-            # 2. Video bytes'ı yükle — 3 deneme
+            # 2. Video bytes'ı yükle — 4 deneme, artan bekleme
             r2 = None
-            for attempt in range(3):
+            for attempt in range(4):
                 r2 = await client.post(
                     upload_uri,
                     headers={
@@ -1756,10 +1756,10 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                 )
                 if r2.status_code in (200, 201):
                     break
-                if attempt < 2:
-                    await asyncio.sleep(8)
+                if attempt < 3:
+                    await asyncio.sleep(15 * (attempt + 1))  # 15s, 30s, 45s
             if r2 is None or r2.status_code not in (200, 201):
-                return None, f"upload failed: {r2.status_code} {r2.text[:200]}"
+                return None, f"upload failed: {r2.status_code} {r2.text[:300]}"
 
             # 3. İşlenme tamamlanana kadar bekle (maks 5 dakika)
             for _ in range(30):
