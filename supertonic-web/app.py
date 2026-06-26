@@ -1615,6 +1615,7 @@ OPENAI_CONFIG = Path("openai_config.json")
 IG_CONFIG = Path("ig_config.json")
 IG_LOG = Path("ig_log.json")
 IG_RECENT_FILE = Path("ig_recent_posts.json")  # duplicate prevention
+IG_PENDING_FILE = Path("ig_pending.json")       # doğrulama bekleyen postlar
 
 TELEGRAM_CONFIG = Path("telegram_config.json")
 
@@ -1708,6 +1709,46 @@ def _ig_mark_posted(title: str) -> None:
         IG_RECENT_FILE.write_text(json.dumps(records))
     except Exception:
         pass
+
+
+def _ig_mark_pending(title: str) -> None:
+    """Başlığı 'doğrulama bekliyor' listesine ekle (2 saatlik geçerlilik)."""
+    try:
+        records = json.loads(IG_PENDING_FILE.read_text()) if IG_PENDING_FILE.exists() else []
+        cutoff = time.time() - 2 * 3600
+        records = [r for r in records if r.get("ts", 0) > cutoff]
+        title_lower = title.strip().lower()[:80]
+        if not any(r.get("title", "").lower()[:80] == title_lower for r in records):
+            records.append({"ts": time.time(), "title": title.strip()[:120]})
+        IG_PENDING_FILE.write_text(json.dumps(records))
+    except Exception:
+        pass
+
+
+def _ig_remove_pending(title: str) -> None:
+    """Başlığı pending listesinden çıkar."""
+    try:
+        if not IG_PENDING_FILE.exists():
+            return
+        records = json.loads(IG_PENDING_FILE.read_text())
+        title_lower = title.strip().lower()[:80]
+        records = [r for r in records if r.get("title", "").lower()[:80] != title_lower]
+        IG_PENDING_FILE.write_text(json.dumps(records))
+    except Exception:
+        pass
+
+
+def _ig_is_pending(title: str) -> bool:
+    """Başlık hâlâ doğrulama bekliyorsa True döner."""
+    try:
+        if not IG_PENDING_FILE.exists():
+            return False
+        records = json.loads(IG_PENDING_FILE.read_text())
+        cutoff = time.time() - 2 * 3600
+        title_lower = title.strip().lower()[:80]
+        return any(r.get("title", "").lower()[:80] == title_lower and r.get("ts", 0) > cutoff for r in records)
+    except Exception:
+        return False
 
 
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
@@ -1866,6 +1907,51 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
             return False, f"publish failed: {r4.status_code} {r4.text[:200]}"
     except Exception as e:
         return False, str(e)
+
+
+async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1):
+    """Post'tan 5 dk sonra Instagram API ile reel'i doğrular. Bulunamazsa yeniden dener (maks 3)."""
+    await asyncio.sleep(300)  # 5 dakika bekle
+
+    graph = "https://graph.facebook.com/v21.0"
+    ig_token = ig_cfg["access_token"]
+    ig_user_id = ig_cfg["ig_user_id"]
+    confirmed = False
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(
+                f"{graph}/{reel_id}",
+                params={"fields": "id,timestamp,permalink", "access_token": ig_token},
+            )
+        confirmed = r.status_code == 200 and "id" in r.json()
+    except Exception:
+        pass
+
+    if confirmed:
+        _ig_mark_posted(title)
+        _ig_remove_pending(title)
+        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DOĞRULANDI:{source}] {title[:60]}"}))
+        return
+
+    # Doğrulanamadı
+    if attempt < 3:
+        vpath = Path(video_path)
+        if vpath.exists():
+            reel_id2, reel_err = await post_reel_to_instagram(vpath, caption, ig_user_id, ig_token)
+            if reel_id2:
+                IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[YENİDEN:{source}] Deneme {attempt + 1}: {title[:60]}"}))
+                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1))
+            else:
+                await send_telegram_alert(f"IG Yeniden Deneme [{source}]", f"Deneme {attempt + 1} başarısız: {reel_err}\n{title[:60]}")
+                if attempt + 1 >= 3:
+                    _ig_remove_pending(title)
+        else:
+            await send_telegram_alert(f"IG Doğrulama [{source}]", f"Video dosyası bulunamadı, yeniden denenemedi:\n{title[:60]}")
+            _ig_remove_pending(title)
+    else:
+        await send_telegram_alert(f"IG Kalıcı Hata [{source}]", f"3 denemede Instagram'a yüklenemedi:\n{title[:60]}")
+        _ig_remove_pending(title)
 
 
 def _fetch_wikimedia_image(keyword: str, width: int = 1920) -> bytes | None:
@@ -2825,11 +2911,10 @@ async def auto_shorts_job():
 
 async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = ""):
     """Instagram gönderisi arka planda çalışır — scheduler'ı bloke etmez."""
-    # Aynı başlık son 4 saatte atıldıysa tekrar atma
-    if _ig_recently_posted(title):
-        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP:{source}] Zaten atıldı, atlanıyor: {title[:60]}"}))
+    # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla
+    if _ig_recently_posted(title) or _ig_is_pending(title):
+        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP:{source}] Zaten atıldı/bekliyor, atlanıyor: {title[:60]}"}))
         return
-    _ig_mark_posted(title)
 
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
@@ -2842,11 +2927,18 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
 
     if ig_cfg.get("post_reels", True):
         video_file = OUTPUT_DIR / filename
+        # Pending işaretle — 5 dk doğrulama penceresi boyunca dedup koruması
+        _ig_mark_pending(title)
         reel_id, reel_err = await post_reel_to_instagram(video_file, caption, ig_user_id, ig_token)
-        ig_log = f"Reels hatası: {reel_err}" if reel_err else f"Reels yüklendi: {reel_id}"
-        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
         if reel_err:
+            ig_log = f"Reels hatası: {reel_err}"
+            IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             await send_telegram_alert(f"Instagram Reels [{source}]", reel_err)
+            _ig_remove_pending(title)  # başarısız oldu, bir sonraki çalışmada yeniden denenebilsin
+        else:
+            ig_log = f"Reels yüklendi, doğrulama bekleniyor: {reel_id}"
+            IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
+            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source))
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
