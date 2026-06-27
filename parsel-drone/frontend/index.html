@@ -338,6 +338,29 @@
       </div>
 
       <div class="card">
+        <div class="card-title">🗺️ Harita Kaynağı</div>
+
+        <div class="seg-group" id="map-source-group">
+          <button class="seg-btn active" data-val="cesium" onclick="switchMapSource('cesium')">Cesium</button>
+          <button class="seg-btn" data-val="esri"   onclick="switchMapSource('esri')">ESRI</button>
+          <button class="seg-btn" data-val="google" onclick="switchMapSource('google')">Google</button>
+        </div>
+
+        <div id="google-key-row" style="display:none;margin-top:10px">
+          <input type="text" id="google-api-key" placeholder="Google Maps API Key"
+            style="font-size:12px;padding:8px 10px;margin-bottom:6px" />
+          <button class="btn-primary" onclick="switchMapSource('google')"
+            style="width:100%;padding:9px;font-size:13px">Uygula</button>
+        </div>
+
+        <p class="setting-info" id="map-source-info">Cesium (Bing Maps) aktif</p>
+        <p class="setting-info" style="margin-top:4px;color:#c0b8f0">
+          Google için <a href="https://console.cloud.google.com/" target="_blank"
+          style="color:#5b4fcf">Cloud Console</a>'dan Map Tiles API aktif et
+        </p>
+      </div>
+
+      <div class="card">
         <div class="card-title">🎬 Video Kayıt Ayarları</div>
 
         <span class="setting-label">Video Kalitesi</span>
@@ -398,6 +421,7 @@
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzZTg0MzEyMy1lNjhiLTRjYTMtODJmMC0xNGUwMmYxY2VhMmIiLCJpZCI6NDQzMjk4LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODExOTY0NTR9.T-xpMd4EZDA8Dk39U0eL1xAuJBzDPF7AeU293KiPANw';
 
   let viewer, mediaRecorder, recordedChunks = [], flightInterval = null;
+  let googleTileset = null, cesiumBuildings = null;
   let authMode = 'login';
   let token = localStorage.getItem('token') || null;
 
@@ -411,6 +435,7 @@
     quality: 'hd',        // sd=4M / hd=8M / 4k=16M
     fps: 30,              // 24 / 30 / 60
     renderScale: 1,       // 0.75 / 1 / 1.5
+    mapSource: 'cesium',  // cesium / esri / google
   };
 
   const speedMs    = { slow: 240, normal: 160, fast: 80 };
@@ -461,16 +486,87 @@
     viewer.scene.globe.depthTestAgainstTerrain = true;
     viewer.resolutionScale = settings.renderScale;
 
-    // OSM 3D binalar
+    // OSM 3D binalar — referansı sakla (harita kaynağı değişiminde kaldırılabilsin)
     Cesium.Cesium3DTileset.fromIonAssetId(96188).then(tileset => {
+      cesiumBuildings = tileset;
       viewer.scene.primitives.add(tileset);
     }).catch(() => {
       Cesium.Cesium3DTileset.fromIonAssetId(354307).then(tileset => {
+        cesiumBuildings = tileset;
         viewer.scene.primitives.add(tileset);
       }).catch(e => console.log('3D bina yüklenemedi:', e));
     });
   } catch(e) {
     console.error('Cesium init error:', e);
+  }
+
+  // ── Harita Kaynağı ──────────────────────────────────────
+  async function switchMapSource(source) {
+    if (source === 'google') {
+      const key = document.getElementById('google-api-key').value.trim();
+      if (!key) {
+        document.getElementById('google-key-row').style.display = '';
+        document.getElementById('map-source-info').textContent = '⬆ Google API key girin ve Uygula\'ya tıklayın';
+        return;
+      }
+    }
+    settings.mapSource = source;
+    document.getElementById('map-source-group').querySelectorAll('.seg-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.val === source)
+    );
+    document.getElementById('google-key-row').style.display = source === 'google' ? '' : 'none';
+    const info = document.getElementById('map-source-info');
+    info.textContent = 'Yükleniyor…';
+    try {
+      if (source === 'google') {
+        await applyGoogle(document.getElementById('google-api-key').value.trim());
+      } else if (source === 'esri') {
+        await applyEsri();
+      } else {
+        await applyCesiumDefault();
+      }
+    } catch(e) { info.textContent = '❌ ' + e.message; }
+  }
+
+  async function applyGoogle(key) {
+    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+    if (cesiumBuildings) { viewer.scene.primitives.remove(cesiumBuildings); cesiumBuildings = null; }
+    viewer.imageryLayers.removeAll();
+    googleTileset = await Cesium.Cesium3DTileset.fromUrl(
+      `https://tile.googleapis.com/v1/3dtiles/root.json?key=${key}`,
+      { showCreditsOnScreen: true }
+    );
+    viewer.scene.primitives.add(googleTileset);
+    document.getElementById('map-source-info').textContent = '✅ Google Photorealistic 3D Tiles aktif';
+  }
+
+  async function applyEsri() {
+    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+    viewer.imageryLayers.removeAll();
+    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      maximumLevel: 19,
+      credit: 'ESRI World Imagery',
+    }));
+    if (!cesiumBuildings) {
+      Cesium.Cesium3DTileset.fromIonAssetId(96188).then(t => {
+        cesiumBuildings = t; viewer.scene.primitives.add(t);
+      }).catch(() => {});
+    }
+    document.getElementById('map-source-info').textContent = '✅ ESRI World Imagery aktif';
+  }
+
+  async function applyCesiumDefault() {
+    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+    viewer.imageryLayers.removeAll();
+    const provider = await Cesium.IonImageryProvider.fromAssetId(2);
+    viewer.imageryLayers.addImageryProvider(provider);
+    if (!cesiumBuildings) {
+      Cesium.Cesium3DTileset.fromIonAssetId(96188).then(t => {
+        cesiumBuildings = t; viewer.scene.primitives.add(t);
+      }).catch(() => {});
+    }
+    document.getElementById('map-source-info').textContent = '✅ Cesium (Bing Maps) aktif';
   }
 
   // ── Dropdowns ────────────────────────────────────────────
