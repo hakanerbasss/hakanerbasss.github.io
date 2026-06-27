@@ -621,7 +621,10 @@ Rules:
             if vid_clip_ok:
                 clip_files.append(clip_path)
                 continue
-            # Başarısız → foto fallback'e düş
+            # Video clip başarısız → png yoksa Pexels'tan fotoğraf çek
+            if not png.exists():
+                fb_keyword = scene.get("keyword", topic)
+                fetch_scene_visual(fb_keyword, "portrait", pexels_key, png)
 
         # Ken Burns efekti dene — başarısız olursa statik fallback
         kb_ok = await _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
@@ -2324,7 +2327,8 @@ async def _create_clip_from_video(raw_vid: Path, dur: float, clip_path: Path, te
             ["ffmpeg", "-y", "-i", str(raw_vid),
              "-t", str(dur),
              "-vf", drawtext,
-             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)],
+             "-r", "30", "-vsync", "cfr", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+             "-an", str(clip_path)],
             capture_output=True, timeout=120,
         )
         return result.returncode == 0
