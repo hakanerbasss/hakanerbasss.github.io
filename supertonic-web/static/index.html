@@ -1989,28 +1989,84 @@ async function generateFromTrend() {
   }
 }
 
+let _shortsPollInterval = null;
+let _shortsTimerInterval = null;
+
+function _startShortsPolling() {
+  const timerEl = document.getElementById('shorts-elapsed');
+  const progressEl = document.getElementById('shorts-progress');
+  progressEl.style.display = 'block';
+  setLoading('btn-shorts', 'spin-shorts', true);
+
+  _shortsPollInterval = setInterval(async () => {
+    try {
+      const r = await fetch('/api/manual-shorts/status');
+      if (!r.ok) return;
+      const j = await r.json();
+      timerEl.textContent = j.elapsed ?? 0;
+
+      if (j.status === 'done') {
+        _stopShortsPolling();
+        _showShortsResult(j.result);
+      } else if (j.status === 'error') {
+        _stopShortsPolling();
+        showError('err-shorts', j.error || 'Bilinmeyen hata');
+      }
+    } catch(e) { /* ağ hatası — bir sonraki poll'da tekrar dene */ }
+  }, 3000);
+}
+
+function _stopShortsPolling() {
+  clearInterval(_shortsPollInterval);
+  clearInterval(_shortsTimerInterval);
+  _shortsPollInterval = null;
+  document.getElementById('shorts-progress').style.display = 'none';
+  setLoading('btn-shorts', 'spin-shorts', false);
+}
+
+function _showShortsResult(d) {
+  if (!d) return;
+  document.getElementById('shorts-script').textContent = d.script;
+  document.getElementById('shorts-video').src = d.video;
+  document.getElementById('dl-shorts').href = d.video;
+  currentVideoFilename = d.video.split('/').pop();
+  document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
+  if (d.title) document.getElementById('yt-title').value = d.title;
+  if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
+  if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
+  currentThumbnailFilename = null;
+  if (d.thumbnail) {
+    currentThumbnailFilename = d.thumbnail.split('/').pop();
+    document.getElementById('shorts-thumb').src = d.thumbnail;
+    document.getElementById('dl-shorts-thumb').href = d.thumbnail;
+    document.getElementById('shorts-thumb-wrap').style.display = 'block';
+  } else {
+    document.getElementById('shorts-thumb-wrap').style.display = 'none';
+  }
+  document.getElementById('result-shorts').classList.add('show');
+  checkYTStatus();
+}
+
+// Sayfa yüklenince aktif üretim varsa otomatik bağlan
+(async () => {
+  try {
+    const r = await fetch('/api/manual-shorts/status');
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.status === 'running') {
+      document.getElementById('shorts-elapsed').textContent = j.elapsed ?? 0;
+      _startShortsPolling();
+    }
+  } catch(e) {}
+})();
+
 async function generateShorts(allowEmpty = false) {
   const apiKey = document.getElementById('shorts-apikey').value.trim();
   const topic = document.getElementById('shorts-topic').value.trim();
   if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
   if (!topic && !allowEmpty) return showError('err-shorts', 'Konu boş olamaz.');
   showError('err-shorts', '');
-  setLoading('btn-shorts', 'spin-shorts', true);
   document.getElementById('result-shorts').classList.remove('show');
-
-  // Geçen süre sayacı
-  let elapsed = 0;
-  const timerEl = document.getElementById('shorts-elapsed');
-  const progressEl = document.getElementById('shorts-progress');
-  progressEl.style.display = 'block';
-  timerEl.textContent = '0';
-  const timerInterval = setInterval(() => { timerEl.textContent = ++elapsed; }, 1000);
-
-  const cleanup = () => {
-    clearInterval(timerInterval);
-    progressEl.style.display = 'none';
-    setLoading('btn-shorts', 'spin-shorts', false);
-  };
 
   try {
     const fd = new FormData();
@@ -2021,52 +2077,16 @@ async function generateShorts(allowEmpty = false) {
     fd.append('speed', document.getElementById('shorts-speed').value);
     fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
 
-    // Arka planda başlat — sunucu hemen job_id döner
     const startR = await fetch('/api/generate-shorts-async', { method: 'POST', body: fd });
     if (!startR.ok) {
       const ct = startR.headers.get('content-type') || '';
       throw new Error(ct.includes('json') ? (await startR.json()).detail : await startR.text());
     }
-    const { job_id } = await startR.json();
 
-    // Tamamlanana kadar her 3 saniyede sorgula
-    const d = await new Promise((resolve, reject) => {
-      const poll = setInterval(async () => {
-        try {
-          const r = await fetch(`/api/shorts-job/${job_id}`);
-          if (!r.ok) { clearInterval(poll); reject(new Error('Job sorgulanamadı')); return; }
-          const j = await r.json();
-          if (j.status === 'done') { clearInterval(poll); resolve(j.result); }
-          else if (j.status === 'error') { clearInterval(poll); reject(new Error(j.error || 'Bilinmeyen hata')); }
-        } catch(e) { clearInterval(poll); reject(e); }
-      }, 3000);
-    });
-
-    document.getElementById('shorts-script').textContent = d.script;
-    document.getElementById('shorts-video').src = d.video;
-    document.getElementById('dl-shorts').href = d.video;
-    currentVideoFilename = d.video.split('/').pop();
-    document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
-    if (d.title) document.getElementById('yt-title').value = d.title;
-    if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
-    if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
-
-    currentThumbnailFilename = null;
-    if (d.thumbnail) {
-      currentThumbnailFilename = d.thumbnail.split('/').pop();
-      document.getElementById('shorts-thumb').src = d.thumbnail;
-      document.getElementById('dl-shorts-thumb').href = d.thumbnail;
-      document.getElementById('shorts-thumb-wrap').style.display = 'block';
-    } else {
-      document.getElementById('shorts-thumb-wrap').style.display = 'none';
-    }
-
-    document.getElementById('result-shorts').classList.add('show');
-    checkYTStatus();
+    document.getElementById('shorts-elapsed').textContent = '0';
+    _startShortsPolling();
   } catch(e) {
     showError('err-shorts', e.message);
-  } finally {
-    cleanup();
   }
 }
 

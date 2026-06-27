@@ -744,15 +744,36 @@ async def generate_shorts(
     return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video)
 
 
-_shorts_jobs: dict = {}
+MANUAL_SHORTS_LOG = Path("manual_shorts_log.json")
+_manual_shorts_lock = False
 
 
-async def _shorts_job_runner(job_id: str, topic, api_key, lang, voice, speed, exclude_topics, region, use_video):
+def _save_manual_shorts_log(status: str, result: dict = None, error: str = "", started_at: float = None):
+    existing = {}
+    if MANUAL_SHORTS_LOG.exists():
+        try:
+            existing = json.loads(MANUAL_SHORTS_LOG.read_text())
+        except Exception:
+            pass
+    entry = {
+        "status": status,
+        "started_at": started_at if started_at is not None else existing.get("started_at", time.time()),
+        "result": result,
+        "error": error,
+        "ts": time.time(),
+    }
+    MANUAL_SHORTS_LOG.write_text(json.dumps(entry, ensure_ascii=False))
+
+
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video):
+    global _manual_shorts_lock
     try:
         result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video)
-        _shorts_jobs[job_id].update({"status": "done", "result": result})
+        _save_manual_shorts_log("done", result=result)
     except Exception as e:
-        _shorts_jobs[job_id].update({"status": "error", "error": str(e)})
+        _save_manual_shorts_log("error", error=str(e))
+    finally:
+        _manual_shorts_lock = False
 
 
 @app.post("/api/generate-shorts-async")
@@ -766,25 +787,28 @@ async def generate_shorts_async_endpoint(
     region: str = Form("TR"),
     use_video: str = Form("false"),
 ):
+    global _manual_shorts_lock
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
-    job_id = uuid.uuid4().hex[:12]
-    _shorts_jobs[job_id] = {"status": "running", "created_at": time.time(), "result": None, "error": None}
-    asyncio.create_task(_shorts_job_runner(job_id, topic, api_key, lang, voice, speed, exclude_topics, region, use_video))
-    return {"job_id": job_id}
+    if _manual_shorts_lock:
+        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+    _manual_shorts_lock = True
+    started_at = time.time()
+    _save_manual_shorts_log("running", started_at=started_at)
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video))
+    return {"ok": True}
 
 
-@app.get("/api/shorts-job/{job_id}")
-async def get_shorts_job(job_id: str):
-    job = _shorts_jobs.get(job_id)
-    if not job:
-        raise HTTPException(404, "Job bulunamadı")
-    return {
-        "status": job["status"],
-        "elapsed": int(time.time() - job["created_at"]),
-        "result": job.get("result"),
-        "error": job.get("error"),
-    }
+@app.get("/api/manual-shorts/status")
+async def get_manual_shorts_status():
+    if not MANUAL_SHORTS_LOG.exists():
+        return {"status": "idle"}
+    try:
+        data = json.loads(MANUAL_SHORTS_LOG.read_text())
+    except Exception:
+        return {"status": "idle"}
+    data["elapsed"] = int(time.time() - data.get("started_at", time.time()))
+    return data
 
 
 from trends import get_trends
