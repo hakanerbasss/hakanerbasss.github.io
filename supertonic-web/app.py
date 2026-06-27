@@ -370,16 +370,15 @@ async def voice_video(
     }
 
 
-@app.post("/api/generate-shorts")
-async def generate_shorts(
-    topic: str = Form(...),
-    api_key: str = Form(...),
-    lang: str = Form("tr"),
-    voice: str = Form("M1"),
-    speed: float = Form(1.0),
-    exclude_topics: str = Form(""),
-    region: str = Form("TR"),
-    use_video: str = Form("false"),
+async def _generate_shorts_core(
+    topic: str,
+    api_key: str,
+    lang: str = "tr",
+    voice: str = "M1",
+    speed: float = 1.0,
+    exclude_topics: str = "",
+    region: str = "TR",
+    use_video: str = "false",
 ):
     import json
     import httpx
@@ -728,6 +727,63 @@ Rules:
         "suggested_tags": video_tags,
         "suggested_description": f"{full_script[:200]}...\n\n{video_tags.replace(', ', ' ')}",
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
+    }
+
+
+@app.post("/api/generate-shorts")
+async def generate_shorts(
+    topic: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    exclude_topics: str = Form(""),
+    region: str = Form("TR"),
+    use_video: str = Form("false"),
+):
+    return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video)
+
+
+_shorts_jobs: dict = {}
+
+
+async def _shorts_job_runner(job_id: str, topic, api_key, lang, voice, speed, exclude_topics, region, use_video):
+    try:
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video)
+        _shorts_jobs[job_id].update({"status": "done", "result": result})
+    except Exception as e:
+        _shorts_jobs[job_id].update({"status": "error", "error": str(e)})
+
+
+@app.post("/api/generate-shorts-async")
+async def generate_shorts_async_endpoint(
+    topic: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    exclude_topics: str = Form(""),
+    region: str = Form("TR"),
+    use_video: str = Form("false"),
+):
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    job_id = uuid.uuid4().hex[:12]
+    _shorts_jobs[job_id] = {"status": "running", "created_at": time.time(), "result": None, "error": None}
+    asyncio.create_task(_shorts_job_runner(job_id, topic, api_key, lang, voice, speed, exclude_topics, region, use_video))
+    return {"job_id": job_id}
+
+
+@app.get("/api/shorts-job/{job_id}")
+async def get_shorts_job(job_id: str):
+    job = _shorts_jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job bulunamadı")
+    return {
+        "status": job["status"],
+        "elapsed": int(time.time() - job["created_at"]),
+        "result": job.get("result"),
+        "error": job.get("error"),
     }
 
 

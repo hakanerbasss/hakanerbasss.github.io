@@ -499,6 +499,10 @@
     </button>
   </div>
 
+  <div id="shorts-progress" style="display:none;margin-top:12px;padding:10px 14px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:8px;color:#6dbf6d;font-size:13px;">
+    ⏱ Sunucuda üretiliyor... <span id="shorts-elapsed">0</span>s &nbsp;<span style="color:#555;font-size:11px;">— Sayfayı kapatabilirsiniz</span>
+  </div>
+
   <div class="error" id="err-shorts"></div>
 
   <div class="result" id="result-shorts">
@@ -1994,6 +1998,20 @@ async function generateShorts(allowEmpty = false) {
   setLoading('btn-shorts', 'spin-shorts', true);
   document.getElementById('result-shorts').classList.remove('show');
 
+  // Geçen süre sayacı
+  let elapsed = 0;
+  const timerEl = document.getElementById('shorts-elapsed');
+  const progressEl = document.getElementById('shorts-progress');
+  progressEl.style.display = 'block';
+  timerEl.textContent = '0';
+  const timerInterval = setInterval(() => { timerEl.textContent = ++elapsed; }, 1000);
+
+  const cleanup = () => {
+    clearInterval(timerInterval);
+    progressEl.style.display = 'none';
+    setLoading('btn-shorts', 'spin-shorts', false);
+  };
+
   try {
     const fd = new FormData();
     fd.append('topic', topic);
@@ -2003,13 +2021,26 @@ async function generateShorts(allowEmpty = false) {
     fd.append('speed', document.getElementById('shorts-speed').value);
     fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
 
-    const r = await fetch('/api/generate-shorts', { method: 'POST', body: fd });
-    if (!r.ok) {
-      const ct = r.headers.get('content-type') || '';
-      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
-      throw new Error(err);
+    // Arka planda başlat — sunucu hemen job_id döner
+    const startR = await fetch('/api/generate-shorts-async', { method: 'POST', body: fd });
+    if (!startR.ok) {
+      const ct = startR.headers.get('content-type') || '';
+      throw new Error(ct.includes('json') ? (await startR.json()).detail : await startR.text());
     }
-    const d = await r.json();
+    const { job_id } = await startR.json();
+
+    // Tamamlanana kadar her 3 saniyede sorgula
+    const d = await new Promise((resolve, reject) => {
+      const poll = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/shorts-job/${job_id}`);
+          if (!r.ok) { clearInterval(poll); reject(new Error('Job sorgulanamadı')); return; }
+          const j = await r.json();
+          if (j.status === 'done') { clearInterval(poll); resolve(j.result); }
+          else if (j.status === 'error') { clearInterval(poll); reject(new Error(j.error || 'Bilinmeyen hata')); }
+        } catch(e) { clearInterval(poll); reject(e); }
+      }, 3000);
+    });
 
     document.getElementById('shorts-script').textContent = d.script;
     document.getElementById('shorts-video').src = d.video;
@@ -2035,7 +2066,7 @@ async function generateShorts(allowEmpty = false) {
   } catch(e) {
     showError('err-shorts', e.message);
   } finally {
-    setLoading('btn-shorts', 'spin-shorts', false);
+    cleanup();
   }
 }
 
