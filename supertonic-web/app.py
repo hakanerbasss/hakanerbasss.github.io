@@ -379,6 +379,7 @@ async def generate_shorts(
     speed: float = Form(1.0),
     exclude_topics: str = Form(""),
     region: str = Form("TR"),
+    use_video: str = Form("false"),
 ):
     import json
     import httpx
@@ -387,6 +388,7 @@ async def generate_shorts(
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
 
+    use_video_mode = use_video.lower() in ("true", "1", "yes")
     pexels_key = get_pexels_key()
 
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
@@ -474,6 +476,7 @@ Rules:
     png_files = []
     durations = []
     visual_warnings: set = set()
+    scene_raw_videos = []  # video modunda her sahne için ham video yolu (None = foto kullan)
 
     for i, scene in enumerate(scenes):
         wav, dur = await asyncio.to_thread(tts.synthesize,
@@ -489,6 +492,7 @@ Rules:
         # Son sahne: sabit belmolysoft end card — Pexels'e gitme
         is_last_scene = (i == len(scenes) - 1)
         png_path = scene_dir / f"scene_{i}.jpg"
+        scene_raw_video = None  # video modunda indirilen ham video
 
         if is_last_scene:
             endcard = Path("static/endcard_tr.jpg")
@@ -499,11 +503,26 @@ Rules:
             else:
                 photo_saved, visual_err = False, "endcard yok"
         else:
-            # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
             keyword = scene.get("keyword", topic)
-            photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+            # Video modu: önce Pexels video dene, başarısız olursa görsele düş
+            if use_video_mode and pexels_key:
+                vid_ok, vid_result = await asyncio.to_thread(
+                    fetch_pexels_video, keyword, pexels_key,
+                    scene_dir / f"rawvid_{i}.mp4", durations[i]
+                )
+                if vid_ok:
+                    scene_raw_video = Path(vid_result)
+                    photo_saved, visual_err = True, ""  # video var, PNG fallback gerekmez
+                else:
+                    visual_warnings.add(f"video→fotoğraf: {vid_result}")
+                    photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+            else:
+                # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
+                photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
             if not photo_saved and visual_err:
                 visual_warnings.add(visual_err)
+
+        scene_raw_videos.append(scene_raw_video)
 
         # Fallback: koyu arka plan
         if not photo_saved:
@@ -594,6 +613,15 @@ Rules:
         )
         if font_path:
             drawtext += f":fontfile={font_path}"
+
+        # Video modu: ham video varsa ondan klip oluştur
+        raw_vid = scene_raw_videos[i] if i < len(scene_raw_videos) else None
+        if raw_vid and raw_vid.exists():
+            vid_clip_ok = await _create_clip_from_video(raw_vid, float(dur), clip_path, text_file, font_path)
+            if vid_clip_ok:
+                clip_files.append(clip_path)
+                continue
+            # Başarısız → foto fallback'e düş
 
         # Ken Burns efekti dene — başarısız olursa statik fallback
         kb_ok = await _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
@@ -2212,6 +2240,70 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
 
     print(f"[GÖRSEL] Tüm kaynaklar başarısız — siyah kare: '{keyword}'", file=sys.stderr)
     return False, "tüm kaynaklar başarısız"
+
+
+def fetch_pexels_video(keyword: str, pexels_key: str, raw_path: Path, min_duration: float) -> tuple[bool, str]:
+    """Pexels'tan portrait video klip indir. (True, raw_path_str) | (False, hata)"""
+    if not pexels_key:
+        return False, "Pexels key yok"
+    try:
+        resp = httpx.get(
+            "https://api.pexels.com/videos/search",
+            params={"query": keyword, "orientation": "portrait", "per_page": 5, "size": "medium"},
+            headers={"Authorization": pexels_key},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return False, f"Pexels video HTTP {resp.status_code}"
+        videos = resp.json().get("videos", [])
+        if not videos:
+            return False, "Pexels video sonuç yok"
+
+        # Yeterince uzun video tercih et
+        suitable = [v for v in videos if v.get("duration", 0) >= max(min_duration - 1, 2)]
+        video = (suitable or videos)[0]
+
+        # Portrait (h > w) dosyayı tercih et, yoksa en yüksek çözünürlüklü
+        vfiles = video.get("video_files", [])
+        portrait = [f for f in vfiles if f.get("height", 0) > f.get("width", 0)]
+        candidates = portrait or vfiles
+        if not candidates:
+            return False, "Video dosyası yok"
+        best = max(candidates, key=lambda f: f.get("width", 0) * f.get("height", 0))
+        url = best.get("link", "")
+        if not url:
+            return False, "Video URL yok"
+
+        content = httpx.get(url, timeout=60, follow_redirects=True).content
+        raw_path.write_bytes(content)
+        return True, str(raw_path)
+    except Exception as e:
+        return False, f"Pexels video hata: {e}"
+
+
+async def _create_clip_from_video(raw_vid: Path, dur: float, clip_path: Path, text_file: Path, font_path: str | None) -> bool:
+    """Video klipten sahne oluştur: trim + scale 1080x1920 + metin overlay."""
+    drawtext = (
+        f"scale=1080:1920:force_original_aspect_ratio=increase,"
+        f"crop=1080:1920,"
+        f"drawtext=textfile={text_file.absolute()}"
+        f":fontsize=42:fontcolor=white:bordercolor=black:borderw=2"
+        f":x=(w-text_w)/2:y=h-th-420:line_spacing=12"
+        f":box=1:boxcolor=black@0.55:boxborderw=18"
+    )
+    if font_path:
+        drawtext += f":fontfile={font_path}"
+    try:
+        result = await asyncio.to_thread(subprocess.run,
+            ["ffmpeg", "-y", "-i", str(raw_vid),
+             "-t", str(dur),
+             "-vf", drawtext,
+             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip_path)],
+            capture_output=True, timeout=120,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 @app.post("/api/pexels/config")

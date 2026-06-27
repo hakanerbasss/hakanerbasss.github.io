@@ -477,6 +477,17 @@
     </div>
   </div>
 
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <label class="toggle-switch" style="margin:0;">
+      <input type="checkbox" id="use-video-mode">
+      <span class="toggle-slider"></span>
+    </label>
+    <div>
+      <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎬 Videolu İçerik Üret</div>
+      <div style="font-size:11px;color:#555;margin-top:2px;">Pexels'tan stock video klip kullanır, bulamazsa fotoğrafa döner</div>
+    </div>
+  </div>
+
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
     <button onclick="generateShorts()" id="btn-shorts">
       <div class="spinner" id="spin-shorts"></div>
@@ -1990,6 +2001,7 @@ async function generateShorts(allowEmpty = false) {
     fd.append('lang', document.getElementById('shorts-lang').value);
     fd.append('voice', document.getElementById('shorts-voice').value);
     fd.append('speed', document.getElementById('shorts-speed').value);
+    fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
 
     const r = await fetch('/api/generate-shorts', { method: 'POST', body: fd });
     if (!r.ok) {
