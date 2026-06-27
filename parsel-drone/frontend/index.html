@@ -222,6 +222,26 @@
     #modal-error { color: #d04040; font-size: 12px; margin-bottom: 8px; min-height: 16px; }
     #modal input { margin-bottom: 10px; }
 
+    /* FULLSCREEN MOD */
+    main.fullscreen #panel { display: none; }
+    main.fullscreen #map-container { width: 100%; }
+
+    #back-btn {
+      position: absolute;
+      top: 14px; left: 14px;
+      z-index: 10;
+      display: none;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid #e0e0f0;
+      border-radius: 10px;
+      padding: 9px 16px;
+      font-size: 13px; font-weight: 700;
+      color: #5b4fcf;
+      box-shadow: 0 2px 12px rgba(0,0,0,.12);
+    }
+    #back-btn:hover { background: #f0eeff; }
+
     /* MOBILE */
     @media (max-width: 700px) {
       main { flex-direction: column; height: auto; }
@@ -394,6 +414,7 @@
 
   <div id="map-container">
     <div id="cesiumContainer"></div>
+    <button id="back-btn" onclick="exitFullscreen()">◀ Panele Dön</button>
     <div id="record-bar">
       <div id="rec-dot"></div>
       <span id="rec-label">Kaydediliyor…</span>
@@ -498,6 +519,56 @@
     });
   } catch(e) {
     console.error('Cesium init error:', e);
+  }
+
+  // ── Son Değerleri Kaydet / Yükle ────────────────────────
+  function saveLastValues() {
+    const ilSel  = document.getElementById('il-select');
+    const ilceSel = document.getElementById('ilce-select');
+    const mahSel  = document.getElementById('mahalle-select');
+    localStorage.setItem('pdLast', JSON.stringify({
+      il_id:       ilSel.value,
+      ilce_id:     ilceSel.value,
+      mahalle_id:  mahSel.value,
+      ada:         document.getElementById('ada').value,
+      parsel:      document.getElementById('parsel').value,
+    }));
+  }
+
+  async function restoreLastValues() {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem('pdLast')); } catch { return; }
+    if (!saved) return;
+
+    const ilSel = document.getElementById('il-select');
+    if (saved.il_id && [...ilSel.options].some(o => o.value == saved.il_id)) {
+      ilSel.value = saved.il_id;
+      await loadIlceler();
+      const ilceSel = document.getElementById('ilce-select');
+      if (saved.ilce_id && [...ilceSel.options].some(o => o.value == saved.ilce_id)) {
+        ilceSel.value = saved.ilce_id;
+        await loadMahalleler();
+        const mahSel = document.getElementById('mahalle-select');
+        if (saved.mahalle_id && [...mahSel.options].some(o => o.value == saved.mahalle_id)) {
+          mahSel.value = saved.mahalle_id;
+        }
+      }
+    }
+    if (saved.ada)    document.getElementById('ada').value    = saved.ada;
+    if (saved.parsel) document.getElementById('parsel').value = saved.parsel;
+  }
+
+  // ── Tam Ekran ────────────────────────────────────────────
+  function enterFullscreen() {
+    document.querySelector('main').classList.add('fullscreen');
+    document.getElementById('back-btn').style.display = '';
+    setTimeout(() => viewer && viewer.resize(), 50);
+  }
+
+  function exitFullscreen() {
+    document.querySelector('main').classList.remove('fullscreen');
+    document.getElementById('back-btn').style.display = 'none';
+    setTimeout(() => viewer && viewer.resize(), 50);
   }
 
   // ── Harita Kaynağı ──────────────────────────────────────
@@ -694,6 +765,8 @@
       document.getElementById('credit-count').textContent = data.remaining_credits;
       setStatus('Parsel bulundu — drone uçuşu başladı ✓','success');
       document.getElementById('record-btn').style.display = '';
+      saveLastValues();
+      enterFullscreen();
       flyToParsel(data.lat, data.lon, data.coordinates);
     } catch(e) { setStatus(e.message,'error'); }
     finally { document.getElementById('generate-btn').disabled = false; }
@@ -941,7 +1014,7 @@
   }
 
   checkSession();
-  loadIller();
+  loadIller().then(() => restoreLastValues());
 </script>
 </body>
 </html>
