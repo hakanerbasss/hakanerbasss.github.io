@@ -1,0 +1,13 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+aiosqlite==0.20.0
+aiofiles==24.1.0
+python-multipart==0.0.12
+pydantic-settings==2.4.0
+# Kitap formatları
+pdfplumber==0.11.4
+EbookLib==0.18
+beautifulsoup4==4.12.3
+python-docx==1.1.2
+# TTS — sunucuda kurulu olduğu varsayılır
+# supertonic  (pip install supertonic)

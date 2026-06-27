@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Narrator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-logo">🎧</div>
+  <h1>Book Narrator</h1>
+  <div class="header-sub">Supertonic TTS · PDF / EPUB / TXT / DOCX</div>
+</header>
+
+<main class="layout">
+
+  <!-- ── Yükleme Kartı ── -->
+  <div class="card">
+    <div class="card-title">Kitap Yükle</div>
+
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="dz-icon">📖</div>
+      <div class="dz-label">Dosyayı buraya sürükle veya tıkla</div>
+      <div class="dz-sub">Telif hakkı olmayan / public domain kitaplar için</div>
+      <div class="dz-formats">
+        <span class="fmt-tag">PDF</span>
+        <span class="fmt-tag">EPUB</span>
+        <span class="fmt-tag">TXT</span>
+        <span class="fmt-tag">DOCX</span>
+      </div>
+      <div class="file-selected" id="fileSelectedLabel" style="display:none"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf,.epub,.txt,.docx" onchange="onFileSelect(this)">
+
+    <div class="form-row">
+      <div class="field">
+        <label>Kitap Adı (opsiyonel)</label>
+        <input type="text" id="titleInput" placeholder="Boş bırakılırsa dosya adından alınır">
+      </div>
+      <button class="btn btn-primary" id="btnUpload" onclick="uploadBook()" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Seslendir
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Job Listesi ── -->
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>İşler</span>
+      <button class="btn btn-outline btn-sm" onclick="loadJobs()">↻ Yenile</button>
+    </div>
+    <div id="jobList">
+      <div class="empty">
+        <div class="empty-icon">🎙️</div>
+        <div class="empty-title">Henüz iş yok</div>
+        <div>Kitap yükleyerek başlayın</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

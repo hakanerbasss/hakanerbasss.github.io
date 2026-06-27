@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+uploads/
+outputs/
+jobs.db
+*.wav
+*.mp3

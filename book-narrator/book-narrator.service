@@ -1,0 +1,14 @@
+[Unit]
+Description=Book Narrator — Kitap Seslendirici
+After=network.target tts.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/book-narrator
+ExecStart=/usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8003
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
