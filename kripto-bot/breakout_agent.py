@@ -129,11 +129,14 @@ def _place_stop_order(client, symbol, qty, stop_price):
 
 
 def _cancel_stop_order(client, symbol, order_id):
+    """Binance stop emrini iptal et. Başarılıysa True, aksi halde False döner."""
     try:
         client.cancel_order(symbol=symbol, orderId=int(order_id))
         print(f'[Breakout] {symbol} stop iptal: {order_id}')
+        return True
     except Exception as e:
         print(f'[Breakout] {symbol} stop iptal hatası: {e}')
+        return False
 
 
 def _handle_stop_fill(sym, pos, order):
@@ -616,15 +619,20 @@ class BreakoutAgent:
                         reason = f'STOP (hızlı piyasa) | pnl={pnl_pct:.1f}%'
                 except Exception as e:
                     print(f'[Breakout] {sym} stop kontrol: {e}')
-                    stop_id = None
+                    # Ağ hatası: stop emri hâlâ aktif olabilir → yeni emir açmak yerine
+                    # bir sonraki döngüde tekrar dene (çift stop = çift satış riski)
+                    continue
 
             if not reason:
                 # Stop emri yok veya target_stop anlamlı yükseldi → güncelle
                 needs_update = stop_id is None or target_stop > stop_price * 1.005
                 if needs_update:
                     if stop_id:
-                        _cancel_stop_order(client, sym, stop_id)
+                        # İptal başarısız olursa yeni emir açma — çift stop riski
+                        if not _cancel_stop_order(client, sym, stop_id):
+                            continue
                         stop_id = None
+                        update_position(sym, stop_order_id=None, stop_order_price=0)
                     new_id = _place_stop_order(client, sym, qty, target_stop)
                     if new_id:
                         update_position(sym, stop_order_id=new_id,
