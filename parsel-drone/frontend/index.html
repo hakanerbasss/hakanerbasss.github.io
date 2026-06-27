@@ -350,6 +350,13 @@
           <button class="seg-btn" data-val="3"        onclick="setSetting('orbits',3)">3 tur</button>
         </div>
 
+        <span class="setting-label">Geçiş Efekti</span>
+        <div class="seg-group" id="flythrough-group">
+          <button class="seg-btn active" data-val="off" onclick="setSetting('flythrough','off')">Kapalı</button>
+          <button class="seg-btn" data-val="on" onclick="setSetting('flythrough','on')">🎬 Üzerinden + Kuş Bakışı</button>
+        </div>
+        <p class="setting-info">Orbit bitince parselin üzerinden alçak geçiş yapar, sonra kuş bakışına çıkar</p>
+
         <span class="setting-label">Başlangıç Açısı</span>
         <input type="range" id="start-angle" min="0" max="359" value="0"
           style="width:100%;accent-color:#5b4fcf;margin-bottom:4px"
@@ -457,6 +464,7 @@
     fps: 30,              // 24 / 30 / 60
     renderScale: 1,       // 0.75 / 1 / 1.5
     mapSource: 'cesium',  // cesium / esri / google
+    flythrough: 'off',    // off / on
   };
 
   const speedMs    = { slow: 240, normal: 160, fast: 80 };
@@ -561,7 +569,7 @@
   // ── Tam Ekran ────────────────────────────────────────────
   function enterFullscreen() {
     document.querySelector('main').classList.add('fullscreen');
-    document.getElementById('back-btn').style.display = '';
+    document.getElementById('back-btn').style.display = 'block';
     setTimeout(() => viewer && viewer.resize(), 50);
   }
 
@@ -846,8 +854,12 @@
     flightInterval = setInterval(() => {
       if (!viewer || step >= totalSteps) {
         clearInterval(flightInterval); flightInterval = null;
-        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-        setStatus('Uçuş tamamlandı ✓', 'success');
+        if (settings.flythrough === 'on') {
+          startFlythroughPhase(lat, lon, orbitMeters);
+        } else {
+          viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+          setStatus('Uçuş tamamlandı ✓', 'success');
+        }
         return;
       }
       step++;
@@ -860,6 +872,50 @@
 
       viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(angle, pitch, range));
     }, interval);
+  }
+
+  // ── Flythrough + Kuş Bakışı ─────────────────────────────
+  function startFlythroughPhase(lat, lon, orbitMeters) {
+    setStatus('🚁 Üzerinden geçiş…');
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+
+    const mPerDegLat = 110540;
+    const passAlt    = Math.max(settings.minAltM * 0.35, 20);
+    const passRange  = orbitMeters * 1.1;
+    const steps      = 120;
+    const interval   = Math.max(speedMs[settings.speed], 60);
+    let step = 0;
+
+    flightInterval = setInterval(() => {
+      if (!viewer || step >= steps) {
+        clearInterval(flightInterval); flightInterval = null;
+        startBirdEyePhase(lat, lon);
+        return;
+      }
+      const t      = step / steps;                              // 0 → 1
+      const camLat = (lat - passRange / mPerDegLat) + (2 * passRange / mPerDegLat) * t;
+      // irtifa: yaklaşırken düşer, geçerken alçak, uzaklaşırken hafif yükselir
+      const camAlt = passAlt + passAlt * 0.6 * Math.sin(t * Math.PI);
+      // pitch: parsele yaklaşınca daha dik bakar
+      const pitchDeg = -15 - 20 * Math.sin(t * Math.PI);
+
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(lon, camLat, camAlt),
+        orientation: { heading: 0, pitch: Cesium.Math.toRadians(pitchDeg), roll: 0 },
+      });
+      step++;
+    }, interval);
+  }
+
+  function startBirdEyePhase(lat, lon) {
+    setStatus('🐦 Kuş bakışına çıkılıyor…');
+    const birdAlt = Math.max(settings.minAltM * 4, 400);
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, birdAlt),
+      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
+      duration: 4,
+      complete: () => setStatus('Uçuş tamamlandı ✓', 'success'),
+    });
   }
 
   // ── Recording ────────────────────────────────────────────
