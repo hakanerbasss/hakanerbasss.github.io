@@ -379,6 +379,7 @@ async def _generate_shorts_core(
     exclude_topics: str = "",
     region: str = "TR",
     use_video: str = "false",
+    platform: str = "youtube",
 ):
     import json
     import httpx
@@ -494,7 +495,7 @@ Rules:
         scene_raw_video = None  # video modunda indirilen ham video
 
         if is_last_scene:
-            endcard = Path("static/endcard_tr.jpg")
+            endcard = Path("static/endcard_ig_tr.jpg" if platform == "instagram" else "static/endcard_tr.jpg")
             if endcard.exists():
                 import shutil as _sh
                 _sh.copy2(str(endcard), str(png_path))
@@ -547,11 +548,14 @@ Rules:
         except Exception:
             pass
 
-    # Son sahneye beğen/abone ol bandı ekle (endcard kullanılıyorsa atlıyoruz — zaten içinde var)
-    endcard_used = Path("static/endcard_tr.jpg").exists()
+    # Son sahneye platform bandı ekle (endcard kullanılıyorsa atlıyoruz — zaten içinde var)
+    endcard_used = Path("static/endcard_ig_tr.jpg" if platform == "instagram" else "static/endcard_tr.jpg").exists()
     if png_files and not endcard_used:
         try:
-            overlay_like_subscribe_banner(png_files[-1])
+            if platform == "instagram":
+                overlay_ig_follow_banner(png_files[-1])
+            else:
+                overlay_like_subscribe_banner(png_files[-1])
         except Exception:
             pass
 
@@ -740,8 +744,9 @@ async def generate_shorts(
     exclude_topics: str = Form(""),
     region: str = Form("TR"),
     use_video: str = Form("false"),
+    platform: str = Form("youtube"),
 ):
-    return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video)
+    return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform)
 
 
 MANUAL_SHORTS_LOG = Path("manual_shorts_log.json")
@@ -765,10 +770,10 @@ def _save_manual_shorts_log(status: str, result: dict = None, error: str = "", s
     MANUAL_SHORTS_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform)
         _save_manual_shorts_log("done", result=result)
     except Exception as e:
         _save_manual_shorts_log("error", error=str(e))
@@ -786,6 +791,7 @@ async def generate_shorts_async_endpoint(
     exclude_topics: str = Form(""),
     region: str = Form("TR"),
     use_video: str = Form("false"),
+    platform: str = Form("youtube"),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -795,7 +801,7 @@ async def generate_shorts_async_endpoint(
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform))
     return {"ok": True}
 
 
@@ -1006,6 +1012,52 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
 
     img.save(str(out_path), "JPEG", quality=92)
     return out_path
+
+
+def overlay_ig_follow_banner(photo_path: Path) -> None:
+    """Son sahne fotoğrafına koyu şeffaf alt bant + ❤️ Beğen  👤 Takip Et yazar (Instagram)."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    W, H = 1080, 1920
+    img = Image.open(photo_path).convert("RGBA")
+    img = img.resize((W, H), Image.LANCZOS)
+
+    BAND_H = 260
+    band = Image.new("RGBA", (W, BAND_H), (10, 10, 10, 210))
+    img.paste(band, (0, H - BAND_H), band)
+
+    draw = ImageDraw.Draw(img)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    font_path = next((f for f in font_candidates if Path(f).exists()), None)
+
+    try:
+        font_big   = ImageFont.truetype(font_path, 90) if font_path else ImageFont.load_default()
+        font_small = ImageFont.truetype(font_path, 46) if font_path else ImageFont.load_default()
+    except Exception:
+        font_big = font_small = ImageFont.load_default()
+
+    PINK   = (225, 48, 108)
+    WHITE  = (255, 255, 255)
+    YELLOW = (255, 208, 0)
+
+    lx = W // 4
+    draw.text((lx, H - BAND_H + 28),  "❤️",       font=font_big,   anchor="mt", fill=WHITE)
+    draw.text((lx, H - BAND_H + 128), "Beğen",    font=font_small, anchor="mt", fill=YELLOW)
+
+    sep_x = W // 2
+    draw.line([(sep_x, H - BAND_H + 20), (sep_x, H - 20)], fill=(80, 80, 80), width=2)
+
+    rx = W * 3 // 4
+    draw.text((rx, H - BAND_H + 28),  "👤",        font=font_big,   anchor="mt", fill=WHITE)
+    draw.text((rx, H - BAND_H + 128), "Takip Et", font=font_small, anchor="mt", fill=PINK)
+
+    img.convert("RGB").save(str(photo_path), "JPEG", quality=92)
 
 
 def overlay_like_subscribe_banner(photo_path: Path) -> None:
@@ -3802,7 +3854,7 @@ async def auto_ig_only_tr_job():
             r = await client.post(
                 "http://localhost:8001/api/generate-shorts",
                 data={"topic": "", "api_key": api_key, "lang": "tr", "voice": s_voice,
-                      "speed": "1.0", "exclude_topics": exclude_str, "region": "TR"},
+                      "speed": "1.0", "exclude_topics": exclude_str, "region": "TR", "platform": "instagram"},
             )
             if r.status_code != 200:
                 save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
