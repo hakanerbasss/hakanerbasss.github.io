@@ -1947,7 +1947,10 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                 timeout=30,
             )
             if r4.status_code == 200:
-                return r4.json().get("id"), ""
+                pub_id = r4.json().get("id")
+                if pub_id:
+                    return pub_id, ""
+                return None, f"publish 200 but no id in response: {r4.text[:200]}"
             return None, f"publish failed: {r4.status_code} {r4.text[:200]}"
     except Exception as e:
         return None, str(e)
@@ -2039,14 +2042,36 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
     ig_token = ig_cfg["access_token"]
     ig_user_id = ig_cfg["ig_user_id"]
     confirmed = False
+    post_ts = time.time() - 300  # post yaklaşık 5 dk önce yapıldı
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.get(
+            # Yöntem 1: reel_id ile doğrudan kontrol
+            r1 = await client.get(
                 f"{graph}/{reel_id}",
-                params={"fields": "id,timestamp,permalink", "access_token": ig_token},
+                params={"fields": "id,timestamp", "access_token": ig_token},
             )
-        confirmed = r.status_code == 200 and "id" in r.json()
+            if r1.status_code == 200 and "id" in r1.json():
+                confirmed = True
+
+            # Yöntem 2: reel_id bulunamazsa son medya listesine bak
+            if not confirmed:
+                r2 = await client.get(
+                    f"{graph}/{ig_user_id}/media",
+                    params={"fields": "id,timestamp", "limit": 5, "access_token": ig_token},
+                )
+                if r2.status_code == 200:
+                    for m in r2.json().get("data", []):
+                        ts_str = m.get("timestamp", "")
+                        if ts_str:
+                            try:
+                                import calendar
+                                t = calendar.timegm(time.strptime(ts_str[:19], "%Y-%m-%dT%H:%M:%S"))
+                                if t >= post_ts - 60:  # post zamanından sonra yayınlanmış
+                                    confirmed = True
+                                    break
+                            except Exception:
+                                pass
     except Exception:
         pass
 
@@ -2056,7 +2081,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DOĞRULANDI:{source}] {title[:60]}"}))
         return
 
-    # Doğrulanamadı
+    # Her iki yöntem de bulamadı — gerçekten yüklenmemiş
     if attempt < 3:
         vpath = Path(video_path)
         if vpath.exists():
@@ -2065,11 +2090,12 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
                 IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[YENİDEN:{source}] Deneme {attempt + 1}: {title[:60]}"}))
                 asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1))
             else:
-                await send_telegram_alert(f"IG Yeniden Deneme [{source}]", f"Deneme {attempt + 1} başarısız: {reel_err}\n{title[:60]}")
+                err_msg = reel_err or "Bilinmeyen hata (boş yanıt)"
+                await send_telegram_alert(f"IG Yeniden Deneme [{source}]", f"Deneme {attempt + 1} başarısız: {err_msg}\n{title[:60]}")
                 if attempt + 1 >= 3:
                     _ig_remove_pending(title)
         else:
-            await send_telegram_alert(f"IG Doğrulama [{source}]", f"Video dosyası bulunamadı, yeniden denenemedi:\n{title[:60]}")
+            await send_telegram_alert(f"IG Doğrulama [{source}]", f"Video dosyası bulunamadı:\n{title[:60]}")
             _ig_remove_pending(title)
     else:
         await send_telegram_alert(f"IG Kalıcı Hata [{source}]", f"3 denemede Instagram'a yüklenemedi:\n{title[:60]}")
