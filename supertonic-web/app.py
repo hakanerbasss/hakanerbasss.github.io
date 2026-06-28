@@ -2074,6 +2074,7 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
 
             # 2. Video bytes'ı yükle — 4 deneme, artan bekleme
             r2 = None
+            upload_ok = False
             for attempt in range(4):
                 r2 = await client.post(
                     upload_uri,
@@ -2087,10 +2088,25 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                     timeout=180,
                 )
                 if r2.status_code in (200, 201):
+                    upload_ok = True
                     break
+                # "not in the status to upload" → ilk deneme aslında geçmiş olabilir,
+                # container PROCESSING/FINISHED state'e girmiştir — retry yerine status kontrol et
+                if r2.status_code == 400 and "not in the status" in r2.text:
+                    try:
+                        chk = await client.get(
+                            f"{graph}/{media_id}",
+                            params={"fields": "status_code", "access_token": access_token},
+                            timeout=15,
+                        )
+                        if chk.status_code == 200 and chk.json().get("status_code") in ("FINISHED", "IN_PROGRESS"):
+                            upload_ok = True
+                            break
+                    except Exception:
+                        pass
                 if attempt < 3:
                     await asyncio.sleep(15 * (attempt + 1))  # 15s, 30s, 45s
-            if r2 is None or r2.status_code not in (200, 201):
+            if not upload_ok:
                 return None, f"upload failed: {r2.status_code} {r2.text[:300]}"
 
             # 3. İşlenme tamamlanana kadar bekle (maks 5 dakika)
