@@ -1809,9 +1809,9 @@ async def generate_long_video(
                 if pid:
                     import os as _os
                     try:
-                        _os.kill(pid, 0)  # process hâlâ var mı?
+                        os.kill(int(pid), 0)
                         raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
-                    except ProcessLookupError:
+                    except OSError:
                         pass  # process ölmüş, yenisini başlat
                 else:
                     raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
@@ -1860,14 +1860,38 @@ async def get_manual_lv_status():
     if data.get("status") == "running":
         pid = data.get("pid")
         if pid:
+            alive = False
             try:
-                import os as _os
-                _os.kill(pid, 0)
-            except ProcessLookupError:
+                os.kill(int(pid), 0)
+                alive = True
+            except OSError:
+                alive = False
+            if not alive:
                 data["status"] = "error"
-                data["error"] = "Worker process beklenmedik şekilde durdu (restart?)"
+                data["error"] = "Worker process durdu (muhtemelen restart sonrası). Yeniden üretebilirsiniz."
     data["elapsed"] = int(time.time() - data.get("started_at", time.time()))
     return data
+
+
+@app.post("/api/manual-lv/reset")
+async def reset_manual_lv():
+    """Takılı kalan üretimi sıfırla."""
+    if MANUAL_LV_LOG.exists():
+        try:
+            data = json.loads(MANUAL_LV_LOG.read_text())
+            pid = data.get("pid")
+            if pid:
+                try:
+                    import signal
+                    os.kill(int(pid), signal.SIGTERM)
+                except OSError:
+                    pass
+        except Exception:
+            pass
+        MANUAL_LV_LOG.unlink(missing_ok=True)
+    if LV_JOB_FILE.exists():
+        LV_JOB_FILE.unlink(missing_ok=True)
+    return {"ok": True}
 
 
 @app.post("/api/lv-category-trend")

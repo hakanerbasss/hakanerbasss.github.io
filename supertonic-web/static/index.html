@@ -668,6 +668,7 @@
 
   <div class="error" id="err-lv"></div>
   <div id="lv-progress-msg" style="display:none;margin-top:10px;padding:10px 14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#f5c518;font-size:13px;"></div>
+  <button id="btn-lv-reset" onclick="resetLVGeneration()" style="display:none;margin-top:8px;padding:8px 16px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:8px;color:#f87171;font-size:13px;cursor:pointer;">Sıfırla / İptal Et</button>
 
   <div class="result" id="result-lv">
     <p>Başlık</p>
@@ -1590,19 +1591,28 @@ async function checkLVStatusOnLoad() {
     const s = await fetch('/api/manual-lv/status').then(r => r.json());
     if (s.status === 'running') {
       setLoading('btn-lv', 'spin-lv', true);
-      _showLVProgress(`Üretim devam ediyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz.`);
+      _showLVProgress(`Üretim devam ediyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz.`, true);
       _startLVPolling();
     } else if (s.status === 'done' && s.result) {
-      _showLVProgress('');
+      _showLVProgress('', false);
       _displayLVResult(s.result);
     }
   } catch(e) { /* ignore */ }
 }
 
-function _showLVProgress(msg) {
+function _showLVProgress(msg, isRunning) {
   const el = document.getElementById('lv-progress-msg');
   el.textContent = msg;
   el.style.display = msg ? 'block' : 'none';
+  document.getElementById('btn-lv-reset').style.display = isRunning ? 'block' : 'none';
+}
+
+async function resetLVGeneration() {
+  if (_lvPollTimer) { clearInterval(_lvPollTimer); _lvPollTimer = null; }
+  await fetch('/api/manual-lv/reset', { method: 'POST' });
+  setLoading('btn-lv', 'spin-lv', false);
+  _showLVProgress('', false);
+  showError('err-lv', '');
 }
 
 function _displayLVResult(d) {
@@ -1637,17 +1647,17 @@ function _startLVPolling() {
     try {
       const s = await fetch('/api/manual-lv/status').then(r => r.json());
       if (s.status === 'running') {
-        _showLVProgress(`Üretiliyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz, arka planda devam eder.`);
+        _showLVProgress(`Üretiliyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz, arka planda devam eder.`, true);
       } else if (s.status === 'done' && s.result) {
         clearInterval(_lvPollTimer);
         _lvPollTimer = null;
-        _showLVProgress('');
+        _showLVProgress('', false);
         setLoading('btn-lv', 'spin-lv', false);
         _displayLVResult(s.result);
       } else if (s.status === 'error') {
         clearInterval(_lvPollTimer);
         _lvPollTimer = null;
-        _showLVProgress('');
+        _showLVProgress('', false);
         setLoading('btn-lv', 'spin-lv', false);
         showError('err-lv', s.error || 'Üretim hatası');
       }
@@ -1680,7 +1690,7 @@ async function generateLongVideo() {
       throw new Error(err);
     }
     setLoading('btn-lv', 'spin-lv', true);
-    _showLVProgress('Üretim başladı. Sayfa kapatabilirsiniz, arka planda devam eder.');
+    _showLVProgress('Üretim başladı. Sayfa kapatabilirsiniz, arka planda devam eder.', true);
     _startLVPolling();
   } catch(e) {
     showError('err-lv', e.message);
