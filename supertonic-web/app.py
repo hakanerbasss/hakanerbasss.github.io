@@ -1893,14 +1893,19 @@ async def send_telegram_alert(source: str, message: str) -> None:
     chat_id = cfg.get("chat_id", "").strip()
     if not token or not chat_id:
         return
-    import datetime
+    import datetime, html as _html
     ts = datetime.datetime.now().strftime("%d %B %Y %H:%M")
-    text = f"🚨 *Supertonic Hata*\n─────────────────\n📌 Kaynak: {source}\n❌ {message}\n🕐 {ts}"
+    text = (
+        f"🚨 <b>Supertonic Hata</b>\n─────────────────\n"
+        f"📌 Kaynak: {_html.escape(source)}\n"
+        f"❌ {_html.escape(str(message))}\n"
+        f"🕐 {ts}"
+    )
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             await client.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
             )
     except Exception:
         pass
@@ -1915,6 +1920,19 @@ def _fire_telegram(source: str, message: str) -> None:
         pass  # event loop çalışmıyor
     except Exception:
         pass
+
+
+_generation_lock = None
+
+
+def _get_gen_lock() -> asyncio.Lock:
+    """Tüm video üretim job'ları için ortak sıra kilidi."""
+    global _generation_lock
+    if _generation_lock is None:
+        _generation_lock = asyncio.Lock()
+    return _generation_lock
+
+
 SCHED_CONFIG = Path("scheduler_config.json")
 SCHED_LOG = Path("scheduler_log.json")
 SCOPES = [
@@ -3174,14 +3192,11 @@ def save_sched_log(status: str, message: str, url: str = ""):
         _fire_telegram("TR Shorts", message)
 
 
-_shorts_job_lock = False
-
 async def auto_shorts_job():
-    global _shorts_job_lock
-    if _shorts_job_lock:
-        save_sched_log("error", "Önceki job hâlâ çalışıyor, bu istek atlandı")
-        return
-    _shorts_job_lock = True
+    lock = _get_gen_lock()
+    if lock.locked():
+        save_sched_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
+    await lock.acquire()
     save_sched_log("running", "Video üretiliyor…")
     try:
         api_key = get_deepseek_key()
@@ -3253,9 +3268,8 @@ async def auto_shorts_job():
 
     except Exception as e:
         save_sched_log("error", f"{e}")
-        await send_telegram_alert("TR Shorts", str(e))
     finally:
-        _shorts_job_lock = False
+        lock.release()
 
 
 async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = ""):
@@ -3321,8 +3335,12 @@ def _rebuild_scheduler():
 
 
 async def auto_long_video_job():
-    save_lv_sched_log("running", "Konu seçiliyor…")
+    lock = _get_gen_lock()
+    if lock.locked():
+        save_lv_sched_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
+    await lock.acquire()
     try:
+        save_lv_sched_log("running", "Konu seçiliyor…")
         api_key = get_deepseek_key()
         if not api_key:
             save_lv_sched_log("error", "DeepSeek API key sunucuda kayıtlı değil")
@@ -3398,7 +3416,8 @@ Pick something different and interesting each time."""}],
 
     except Exception as e:
         save_lv_sched_log("error", str(e))
-        await send_telegram_alert("TR Uzun Video", str(e))
+    finally:
+        lock.release()
 
 
 def _rebuild_lv_scheduler():
@@ -3448,8 +3467,12 @@ def save_lv_en_sched_log(status: str, message: str, url: str = ""):
 
 
 async def auto_lv_en_job():
-    save_lv_en_sched_log("running", "Topic selecting…")
+    lock = _get_gen_lock()
+    if lock.locked():
+        save_lv_en_sched_log("running", "⏳ Generation queued, waiting...")
+    await lock.acquire()
     try:
+        save_lv_en_sched_log("running", "Topic selecting…")
         api_key = get_deepseek_key()
         if not api_key:
             save_lv_en_sched_log("error", "DeepSeek API key not configured on server")
@@ -3528,7 +3551,8 @@ Pick something DIFFERENT and interesting each time."""}],
 
     except Exception as e:
         save_lv_en_sched_log("error", str(e))
-        await send_telegram_alert("EN Uzun Video", str(e))
+    finally:
+        lock.release()
 
 
 def _rebuild_lv_en_scheduler():
@@ -3592,8 +3616,12 @@ def add_en_shorts_used_topic(title: str):
 
 
 async def auto_en_shorts_job():
-    save_en_shorts_sched_log("running", "Generating EN short…")
+    lock = _get_gen_lock()
+    if lock.locked():
+        save_en_shorts_sched_log("running", "⏳ Generation queued, waiting...")
+    await lock.acquire()
     try:
+        save_en_shorts_sched_log("running", "Generating EN short…")
         api_key = get_deepseek_key()
         if not api_key:
             save_en_shorts_sched_log("error", "DeepSeek API key not configured on server")
@@ -3666,7 +3694,8 @@ async def auto_en_shorts_job():
 
     except Exception as e:
         save_en_shorts_sched_log("error", str(e))
-        await send_telegram_alert("EN Shorts", str(e))
+    finally:
+        lock.release()
 
 
 def _rebuild_en_shorts_scheduler():
@@ -3715,8 +3744,12 @@ def save_tnlv_sched_log(status: str, message: str, url: str = ""):
 
 
 async def auto_tnlv_job():
-    save_tnlv_sched_log("running", "Trend haberleri getiriliyor…")
+    lock = _get_gen_lock()
+    if lock.locked():
+        save_tnlv_sched_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
+    await lock.acquire()
     try:
+        save_tnlv_sched_log("running", "Trend haberleri getiriliyor…")
         api_key = get_deepseek_key()
         if not api_key:
             save_tnlv_sched_log("error", "DeepSeek API key sunucuda kayıtlı değil")
@@ -3765,7 +3798,8 @@ async def auto_tnlv_job():
 
     except Exception as e:
         save_tnlv_sched_log("error", str(e))
-        await send_telegram_alert("TNLV Video", str(e))
+    finally:
+        lock.release()
 
 
 def _rebuild_tnlv_scheduler():
@@ -3826,15 +3860,11 @@ def add_ig_only_tr_used_topic(title: str):
     IG_ONLY_TR_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
 
 
-_ig_only_tr_job_lock = False
-
-
 async def auto_ig_only_tr_job():
-    global _ig_only_tr_job_lock
-    if _ig_only_tr_job_lock:
-        save_ig_only_tr_log("error", "Önceki job hâlâ çalışıyor, atlandı")
-        return
-    _ig_only_tr_job_lock = True
+    lock = _get_gen_lock()
+    if lock.locked():
+        save_ig_only_tr_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
+    await lock.acquire()
     save_ig_only_tr_log("running", "Video üretiliyor…")
     try:
         api_key = get_deepseek_key()
@@ -3880,9 +3910,8 @@ async def auto_ig_only_tr_job():
 
     except Exception as e:
         save_ig_only_tr_log("error", str(e))
-        await send_telegram_alert("TR Instagram-Only", str(e))
     finally:
-        _ig_only_tr_job_lock = False
+        lock.release()
 
 
 def _rebuild_ig_only_tr_scheduler():
@@ -4189,7 +4218,6 @@ async def test_telegram():
 async def stop_all_jobs():
     """Tüm çalışan FFmpeg proseslerini öldür ve log'ları sıfırla."""
     import signal
-    global _shorts_job_lock
 
     # FFmpeg proseslerini öldür
     killed = 0
@@ -4205,9 +4233,6 @@ async def stop_all_jobs():
                 pass
     except Exception:
         pass
-
-    # Job lock'ları serbest bırak
-    _shorts_job_lock = False
 
     # Tüm log dosyalarını "durduruldu" olarak sıfırla
     stop_payload = json.dumps({"status": "error", "message": "Kullanıcı tarafından durduruldu", "url": "", "ts": time.time()})
