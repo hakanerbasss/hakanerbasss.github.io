@@ -2196,7 +2196,7 @@ async function loadLVSchedulerStatus() {
       document.getElementById('lv-sched-last-status').innerHTML =
         `<span style="color:${colors[log.status]||'#888'}">${labels[log.status]||log.status}</span>` +
         (log.ts ? ` · ${new Date(log.ts*1000).toLocaleString('tr-TR')}` : '');
-      document.getElementById('lv-sched-last-msg').textContent = log.message || '';
+      _setMsg('lv-sched-last-msg', log, '/api/lv-scheduler/run-now', 'loadLVSchedulerStatus');
       document.getElementById('lv-sched-last-url').innerHTML = log.url
         ? `<a href="${log.url}" target="_blank" style="color:#a78bfa;">${log.url}</a>` : '';
     }
@@ -2361,7 +2361,7 @@ async function loadTNLVSchedulerStatus() {
       const color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#facc15';
       const label = log.status === 'success' ? 'Başarılı' : log.status === 'error' ? 'Hata' : 'Çalışıyor';
       document.getElementById('tnlv-sched-last-status').innerHTML = log.status ? `<span style="color:${color}">${label}</span>` : '';
-      document.getElementById('tnlv-sched-last-msg').textContent = log.message || '';
+      _setMsg('tnlv-sched-last-msg', log, '/api/tnlv-scheduler/run-now', 'loadTNLVSchedulerStatus');
       document.getElementById('tnlv-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
     }
     setAccBadge('tr-tnlv', d.log, d.enabled);
@@ -2424,7 +2424,7 @@ async function loadLVENSchedulerStatus() {
       const color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#facc15';
       const label = log.status === 'success' ? 'Başarılı' : log.status === 'error' ? 'Hata' : 'Çalışıyor';
       document.getElementById('lv-en-sched-last-status').innerHTML = log.status ? `<span style="color:${color}">${label}</span>` : '';
-      document.getElementById('lv-en-sched-last-msg').textContent = log.message || '';
+      _setMsg('lv-en-sched-last-msg', log, '/api/lv-en-scheduler/run-now', 'loadLVENSchedulerStatus');
       document.getElementById('lv-en-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
     }
     setAccBadge('en-belgesel', d.log, d.enabled);
@@ -2477,7 +2477,7 @@ async function loadENShortsSchedulerStatus() {
       const statusEl = document.getElementById('en-shorts-sched-last-status');
       statusEl.textContent = log.status ? `Durum: ${log.status}` : '';
       statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
-      document.getElementById('en-shorts-sched-last-msg').textContent = log.message || '';
+      _setMsg('en-shorts-sched-last-msg', log, '/api/en-shorts-scheduler/run-now', 'loadENShortsSchedulerStatus');
       const urlEl = document.getElementById('en-shorts-sched-last-url');
       urlEl.innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
     }
@@ -2513,6 +2513,31 @@ async function runENShortsNow() {
 }
 
 // ── TR Instagram-Only Scheduler ───────────────────────────────────────────────
+// ── Servis Yeniden Başlatma Yardımcıları ─────────────────────────────────────
+let _svcStart = 0;
+
+(async () => {
+  try {
+    const r = await fetch('/api/status/service-start');
+    _svcStart = (await r.json()).ts || 0;
+  } catch(e) {}
+})();
+
+function _restartBtnHTML(runNowUrl, refreshFn) {
+  return `<button onclick="(async function(b){b.disabled=true;b.textContent='⏳...';await fetch('${runNowUrl}',{method:'POST'});setTimeout(${refreshFn},2000);})(this)" style="margin-left:8px;font-size:11px;padding:3px 10px;background:#1a1a2a;border:1px solid #fbbf24;border-radius:4px;color:#fbbf24;cursor:pointer;">↻ Yeniden Başlat</button>`;
+}
+
+function _setMsg(elementId, log, runNowUrl, refreshFn) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const msg = log.message || '';
+  if (log.status === 'error' && msg.includes('kesildi')) {
+    el.innerHTML = msg.replace(/&/g,'&amp;').replace(/</g,'&lt;') + _restartBtnHTML(runNowUrl, refreshFn);
+  } else {
+    el.textContent = msg;
+  }
+}
+
 let _igOnlyTRPolling = null;
 
 async function loadIGOnlyTRStatus() {
@@ -2540,7 +2565,7 @@ async function loadIGOnlyTRStatus() {
       }
       statusEl.textContent = statusText;
       statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
-      document.getElementById('ig-only-tr-last-msg').textContent = log.message || '';
+      _setMsg('ig-only-tr-last-msg', log, '/api/ig-only-tr/run-now', 'loadIGOnlyTRStatus');
       setAccBadge('tr-ig-only', log, d.enabled);
 
       if (log.status === 'running') {
@@ -2878,7 +2903,7 @@ async function loadSchedulerStatus() {
       document.getElementById('sched-last-status').innerHTML =
         `<span style="color:${statusColors[log.status] || '#888'}">${statusLabels[log.status] || log.status}</span>` +
         (log.ts ? ` · ${new Date(log.ts * 1000).toLocaleString('tr-TR')}` : '');
-      document.getElementById('sched-last-msg').textContent = log.message || '';
+      _setMsg('sched-last-msg', log, '/api/scheduler/run-now', 'loadSchedulerStatus');
       document.getElementById('sched-last-url').innerHTML = log.url
         ? `<a href="${log.url}" target="_blank" style="color:#a78bfa;">${log.url}</a>` : '';
     }

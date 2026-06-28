@@ -4068,19 +4068,56 @@ async def delete_ig_failed_upload(filename: str):
 
 
 # ── Startup / Shutdown ────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup_event():
-    # Servis restart olduysa "running" kalan log'u temizle
-    if IG_ONLY_TR_SCHED_LOG.exists():
+_SERVICE_STARTED_AT: float = 0.0
+
+_RESCUE_MAP = None  # startup sonrası doldurulur
+
+
+async def _rescue_interrupted_jobs_task():
+    """Scheduler ayağa kalktıktan 5 sn sonra yarım kalan job'ları yeniden başlatır."""
+    await asyncio.sleep(5)
+    cutoff = time.time() - 2 * 3600
+    for log_file, job_fn, label in _RESCUE_MAP:
+        if not log_file.exists():
+            continue
         try:
-            log = json.loads(IG_ONLY_TR_SCHED_LOG.read_text())
-            if log.get("status") == "running":
-                IG_ONLY_TR_SCHED_LOG.write_text(json.dumps(
+            data = json.loads(log_file.read_text())
+            if data.get("status") != "running":
+                continue
+            job_ts = data.get("ts", 0)
+            if job_ts < cutoff:
+                # 2 saatten eski — sadece log'u düzelt, yeniden başlatma
+                log_file.write_text(json.dumps(
                     {"status": "error", "message": "Servis yeniden başlatıldı, job kesildi", "ts": time.time()},
                     ensure_ascii=False,
                 ))
+            else:
+                # 2 saat içindeydi — log'u güncelle + otomatik yeniden kuyruğa al
+                log_file.write_text(json.dumps(
+                    {"status": "error",
+                     "message": f"⚠️ Servis yeniden başlatıldı — {label} otomatik yeniden sıraya alındı",
+                     "ts": time.time()},
+                    ensure_ascii=False,
+                ))
+                asyncio.create_task(job_fn())
         except Exception:
             pass
+
+
+@app.on_event("startup")
+async def startup_event():
+    global _SERVICE_STARTED_AT, _RESCUE_MAP
+    _SERVICE_STARTED_AT = time.time()
+
+    _RESCUE_MAP = [
+        (SCHED_LOG,            auto_shorts_job,       "TR Shorts"),
+        (LV_SCHED_LOG,         auto_long_video_job,   "TR Uzun Video"),
+        (LV_EN_SCHED_LOG,      auto_lv_en_job,        "EN Uzun Video"),
+        (EN_SHORTS_SCHED_LOG,  auto_en_shorts_job,    "EN Shorts"),
+        (TNLV_SCHED_LOG,       auto_tnlv_job,         "TNLV Video"),
+        (IG_ONLY_TR_SCHED_LOG, auto_ig_only_tr_job,   "TR Instagram-Only"),
+    ]
+
     scheduler.start()
     _rebuild_scheduler()
     _rebuild_lv_scheduler()
@@ -4088,6 +4125,13 @@ async def startup_event():
     _rebuild_en_shorts_scheduler()
     _rebuild_tnlv_scheduler()
     _rebuild_ig_only_tr_scheduler()
+
+    asyncio.create_task(_rescue_interrupted_jobs_task())
+
+
+@app.get("/api/status/service-start")
+async def get_service_start():
+    return {"ts": _SERVICE_STARTED_AT}
 
 
 @app.on_event("shutdown")
