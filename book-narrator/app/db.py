@@ -1,4 +1,4 @@
-"""SQLite job store — aiosqlite ile async, sunucu restart'ta job durumu korunur."""
+"""SQLite job store — aiosqlite ile async."""
 
 import aiosqlite
 from app.config import settings
@@ -19,6 +19,7 @@ async def init():
                 input_path  TEXT,
                 output_path TEXT,
                 file_format TEXT,
+                voice       TEXT NOT NULL DEFAULT 'M1',
                 error       TEXT,
                 created_at  TEXT NOT NULL,
                 updated_at  TEXT NOT NULL
@@ -26,7 +27,16 @@ async def init():
         """)
         await conn.commit()
 
-    # Restart sonrası yarım kalan işleri pending'e al — devam edecek
+    # Sütun migrasyonu — eski DB'ye voice ekle (hata olursa zaten var)
+    async with aiosqlite.connect(DB) as conn:
+        try:
+            await conn.execute("ALTER TABLE jobs ADD COLUMN voice TEXT NOT NULL DEFAULT 'M1'")
+            await conn.commit()
+        except Exception:
+            pass
+
+    # Restart sonrası yarım kalan 'processing' işleri pending'e al → devam eder
+    # 'paused' işler olduğu yerde kalır — kullanıcı elle devam ettirir
     async with aiosqlite.connect(DB) as conn:
         await conn.execute(
             "UPDATE jobs SET status='pending', error=NULL WHERE status='processing'"
@@ -34,13 +44,15 @@ async def init():
         await conn.commit()
 
 
-async def create_job(job_id: str, title: str, input_path: str, file_format: str, now: str):
+async def create_job(job_id: str, title: str, input_path: str,
+                     file_format: str, voice: str, now: str):
     async with aiosqlite.connect(DB) as conn:
         await conn.execute(
-            """INSERT INTO jobs (id, title, status, progress, total, done,
-               input_path, output_path, file_format, created_at, updated_at)
-               VALUES (?, ?, 'pending', 0, 0, 0, ?, NULL, ?, ?, ?)""",
-            (job_id, title, input_path, file_format, now, now),
+            """INSERT INTO jobs
+               (id, title, status, progress, total, done,
+                input_path, output_path, file_format, voice, created_at, updated_at)
+               VALUES (?, ?, 'pending', 0, 0, 0, ?, NULL, ?, ?, ?, ?)""",
+            (job_id, title, input_path, file_format, voice, now, now),
         )
         await conn.commit()
 

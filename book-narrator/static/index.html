@@ -18,14 +18,34 @@
 
 <main class="layout">
 
-  <!-- ── Yükleme Kartı ── -->
+  <!-- ── Ses Seçimi ── -->
+  <div class="card">
+    <div class="card-title">Ses Seçimi & Önizleme</div>
+    <div class="voice-row">
+      <div class="voice-group">
+        <label>Seslendirici</label>
+        <select id="voiceSelect" onchange="onVoiceChange()">
+          <option value="">Yükleniyor...</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost" id="btnPreview" onclick="previewVoice()" style="height:42px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Önizle (~10 sn)
+      </button>
+    </div>
+    <div class="preview-wrap" id="previewWrap" style="display:none">
+      <audio id="previewAudio" controls></audio>
+    </div>
+  </div>
+
+  <!-- ── Kitap Yükleme ── -->
   <div class="card">
     <div class="card-title">Kitap Yükle</div>
 
     <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
       <div class="dz-icon">📖</div>
       <div class="dz-label">Dosyayı buraya sürükle veya tıkla</div>
-      <div class="dz-sub">Telif hakkı olmayan / public domain kitaplar için</div>
+      <div class="dz-sub">Telif hakkı olmayan / public domain kitaplar</div>
       <div class="dz-formats">
         <span class="fmt-tag">PDF</span>
         <span class="fmt-tag">EPUB</span>
@@ -42,7 +62,7 @@
         <input type="text" id="titleInput" placeholder="Boş bırakılırsa dosya adından alınır">
       </div>
       <button class="btn btn-primary" id="btnUpload" onclick="uploadBook()" disabled>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
@@ -51,16 +71,16 @@
     </div>
   </div>
 
-  <!-- ── Job Listesi ── -->
+  <!-- ── Üretim Listesi ── -->
   <div class="card">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>İşler</span>
-      <button class="btn btn-outline btn-sm" onclick="loadJobs()">↻ Yenile</button>
+    <div class="card-title">
+      <span>Sesli Kitaplar</span>
+      <button class="btn btn-ghost btn-xs" onclick="loadJobs()">↻ Yenile</button>
     </div>
     <div id="jobList">
       <div class="empty">
         <div class="empty-icon">🎙️</div>
-        <div class="empty-title">Henüz iş yok</div>
+        <div class="empty-title">Henüz sesli kitap yok</div>
         <div>Kitap yükleyerek başlayın</div>
       </div>
     </div>

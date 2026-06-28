@@ -1,12 +1,11 @@
-"""Supertonic TTS sarmalayıcı.
-
-instube/generator.py'deki aynı pattern: singleton model, WAV çıktı.
-Model ilk çağrıda yüklenir (auto_download=True).
-"""
+"""Supertonic TTS sarmalayıcı — singleton model, WAV çıktı, MP3 birleştirme."""
 
 import asyncio
+import os
+import subprocess
 from pathlib import Path
-from app.config import settings
+
+from app.config import settings, VOICES, PREVIEW_TEXT
 
 _model = None
 
@@ -19,10 +18,11 @@ def _get_model():
     return _model
 
 
-def synthesize_sync(text: str, output_wav: str) -> float:
-    """Metni WAV dosyasına yazar, süreyi (saniye) döner. Sync — thread'de çağırılmalı."""
+def synthesize_sync(text: str, output_wav: str, voice: str | None = None) -> float:
+    """Sync — thread executor'da çağırılmalı."""
     tts = _get_model()
-    style = tts.get_voice_style(voice_name=settings.tts_voice)
+    v = voice or settings.tts_voice
+    style = tts.get_voice_style(voice_name=v)
     wav, dur = tts.synthesize(
         text=text,
         lang=settings.tts_lang,
@@ -35,29 +35,50 @@ def synthesize_sync(text: str, output_wav: str) -> float:
     return dur_val
 
 
-async def synthesize(text: str, output_wav: str) -> float:
-    """Async sarmalayıcı — event loop'u bloklamaz."""
+async def synthesize(text: str, output_wav: str, voice: str | None = None) -> float:
+    """Async sarmalayıcı."""
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, synthesize_sync, text, output_wav)
+    return await loop.run_in_executor(None, synthesize_sync, text, output_wav, voice)
+
+
+async def generate_preview(voice: str) -> str:
+    """Seçili ses için ~10 saniyelik önizleme MP3 üretir. Dosya yolunu döner."""
+    if voice not in VOICES:
+        voice = settings.tts_voice
+
+    out_mp3 = str(settings.previews_dir / f"preview_{voice}.mp3")
+    tmp_wav = out_mp3 + ".tmp.wav"
+
+    await synthesize(PREVIEW_TEXT, tmp_wav, voice=voice)
+
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-i", tmp_wav,
+         "-c:a", "libmp3lame", "-q:a", "3", "-ar", "44100", out_mp3],
+        capture_output=True, timeout=60,
+    )
+    try:
+        os.remove(tmp_wav)
+    except OSError:
+        pass
+
+    if r.returncode != 0:
+        raise RuntimeError(f"Önizleme encode hatası: {r.stderr.decode()[-500:]}")
+
+    return out_mp3
 
 
 def concat_wav_to_mp3(wav_files: list[str], output_mp3: str) -> None:
-    """WAV chunk listesini tek MP3'e birleştirir. FFmpeg gerektirir."""
-    import subprocess
-    import tempfile
-    import os
-
+    """WAV chunk listesini tek MP3'e birleştirir."""
     list_path = output_mp3 + ".list.txt"
     with open(list_path, "w") as f:
         for wav in wav_files:
             f.write(f"file '{os.path.abspath(wav)}'\n")
 
-    # Önce WAV concat, sonra MP3 encode — iki adım daha güvenilir
     tmp_wav = output_mp3 + ".tmp.wav"
     r1 = subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_path,
          "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1", tmp_wav],
-        capture_output=True, timeout=3600
+        capture_output=True, timeout=7200,
     )
     if r1.returncode != 0:
         raise RuntimeError(f"FFmpeg concat hatası: {r1.stderr.decode()[-1000:]}")
@@ -65,14 +86,13 @@ def concat_wav_to_mp3(wav_files: list[str], output_mp3: str) -> None:
     r2 = subprocess.run(
         ["ffmpeg", "-y", "-i", tmp_wav,
          "-c:a", "libmp3lame", "-q:a", "2", "-ar", "44100", output_mp3],
-        capture_output=True, timeout=600
+        capture_output=True, timeout=600,
     )
     if r2.returncode != 0:
         raise RuntimeError(f"FFmpeg MP3 encode hatası: {r2.stderr.decode()[-1000:]}")
 
-    # Temizlik
-    try:
-        os.remove(tmp_wav)
-        os.remove(list_path)
-    except OSError:
-        pass
+    for f in (tmp_wav, list_path):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
