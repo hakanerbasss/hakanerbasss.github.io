@@ -3303,12 +3303,12 @@ async def auto_shorts_job():
         lock.release()
 
 
-async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = ""):
-    """Instagram gönderisi arka planda çalışır — scheduler'ı bloke etmez."""
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "") -> tuple[bool, str]:
+    """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla
     if _ig_recently_posted(title) or _ig_is_pending(title):
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP:{source}] Zaten atıldı/bekliyor, atlanıyor: {title[:60]}"}))
-        return
+        return False, "dedup: zaten atıldı veya bekliyor"
 
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
@@ -3318,6 +3318,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
     caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
     ig_log = ""
+    upload_ok = False
 
     if ig_cfg.get("post_reels", True):
         video_file = OUTPUT_DIR / filename
@@ -3329,10 +3330,12 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             await send_telegram_alert(f"Instagram Reels [{source}]", reel_err)
             _ig_remove_pending(title)  # başarısız oldu, bir sonraki çalışmada yeniden denenebilsin
+            return False, reel_err
         else:
             ig_log = f"Reels yüklendi, doğrulama bekleniyor: {reel_id}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source))
+            upload_ok = True
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
@@ -3342,6 +3345,8 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": combined}))
         if story_err:
             await send_telegram_alert(f"Instagram Story [{source}]", story_err)
+
+    return upload_ok, ""
 
 
 def _rebuild_scheduler():
@@ -3930,14 +3935,17 @@ async def auto_ig_only_tr_job():
         vw = d.get("visual_warning", "")
         log_title = d.get("title", "") + (f" ⚠️ {vw}" if vw else "")
 
-        await _post_to_instagram_bg(
+        ig_ok, ig_err = await _post_to_instagram_bg(
             filename=filename,
             title=d.get("title", ""),
             suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
             ig_cfg=ig_cfg,
             source="IG-Only-TR",
         )
-        save_ig_only_tr_log("success", log_title)
+        if ig_ok:
+            save_ig_only_tr_log("success", log_title)
+        else:
+            save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
 
     except Exception as e:
         save_ig_only_tr_log("error", str(e))
