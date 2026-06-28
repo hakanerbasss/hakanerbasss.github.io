@@ -3977,6 +3977,17 @@ async def auto_ig_only_tr_job():
         lock.release()
 
 
+_IG_WEEKLY_SCHEDULE = {
+    "mon": ["09:22", "12:38", "15:52", "18:18", "21:07", "23:15"],
+    "tue": ["09:15", "12:45", "15:45", "18:25", "21:15", "23:05"],
+    "wed": ["09:28", "12:32", "15:58", "18:12", "21:22", "22:55"],
+    "thu": ["09:18", "12:40", "16:10", "18:50", "21:35", "23:02"],
+    "fri": ["09:12", "12:35", "15:25", "17:45", "21:28", "23:10"],
+    "sat": ["10:45", "14:30", "19:15"],
+    "sun": ["11:30", "15:45", "20:00"],
+}
+
+
 def _rebuild_ig_only_tr_scheduler():
     for job in scheduler.get_jobs():
         if job.id.startswith("ig_only_tr_"):
@@ -3984,18 +3995,19 @@ def _rebuild_ig_only_tr_scheduler():
     cfg = load_ig_only_tr_config()
     if not cfg.get("enabled"):
         return
-    for t in cfg.get("times", []):
-        try:
-            hour, minute = t.strip().split(":")
-            scheduler.add_job(
-                auto_ig_only_tr_job,
-                CronTrigger(hour=int(hour), minute=int(minute), timezone="Europe/Istanbul"),
-                id=f"ig_only_tr_{t.replace(':', '')}",
-                replace_existing=True,
-                max_instances=1,
-            )
-        except Exception:
-            pass
+    for day, times in _IG_WEEKLY_SCHEDULE.items():
+        for t in times:
+            try:
+                hour, minute = t.split(":")
+                scheduler.add_job(
+                    auto_ig_only_tr_job,
+                    CronTrigger(day_of_week=day, hour=int(hour), minute=int(minute), timezone="Europe/Istanbul"),
+                    id=f"ig_only_tr_{day}_{t.replace(':', '')}",
+                    replace_existing=True,
+                    max_instances=1,
+                )
+            except Exception:
+                pass
 
 
 @app.get("/api/ig-only-tr/config")
