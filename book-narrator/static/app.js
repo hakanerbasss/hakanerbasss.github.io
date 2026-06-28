@@ -21,21 +21,53 @@ async function loadSettings() {
     const d = await r.json();
     dsConfigured = d.deepseek_configured;
     pxConfigured = d.pexels_configured;
+
     if (d.deepseek_key) document.getElementById('deepseekKey').placeholder = d.deepseek_key;
     if (d.pexels_key)   document.getElementById('pexelsKey').placeholder   = d.pexels_key;
-    document.getElementById('dsStatus').className = 'api-dot ' + (dsConfigured ? 'dot-on' : 'dot-off');
-    document.getElementById('pxStatus').className = 'api-dot ' + (pxConfigured ? 'dot-on' : 'dot-off');
 
+    const dsDot = document.getElementById('dsStatus');
+    const pxDot = document.getElementById('pxStatus');
+    if (dsDot) dsDot.className = 'api-dot ' + (dsConfigured ? 'dot-on' : 'dot-off');
+    if (pxDot) pxDot.className = 'api-dot ' + (pxConfigured ? 'dot-on' : 'dot-off');
+
+    // Settings badge
+    const badge = document.getElementById('settingsBadge');
+    if (badge) {
+      if (dsConfigured && pxConfigured) {
+        badge.textContent = '✓ Tümü aktif';
+        badge.className = 'settings-badge badge-ok';
+      } else if (dsConfigured || pxConfigured) {
+        badge.textContent = '⚡ Kısmen aktif';
+        badge.className = 'settings-badge badge-warn';
+      } else {
+        badge.textContent = 'API key girilmemiş';
+        badge.className = 'settings-badge';
+      }
+    }
+
+    // API key girilmemişse settings açık kalsın
+    const details = document.getElementById('settingsDetails');
+    if (details && (dsConfigured || pxConfigured)) {
+      details.removeAttribute('open');
+    } else if (details) {
+      details.setAttribute('open', '');
+    }
+
+    // Dil seçenekleri doldur
     languages = d.languages || [];
     const srcSel = document.getElementById('sourceLang');
     const tgtSel = document.getElementById('targetLang');
-    srcSel.innerHTML = languages.map(l =>
-      `<option value="${l.id}">${l.label}</option>`
-    ).join('');
-    tgtSel.innerHTML = languages
-      .filter(l => l.id !== 'auto')
-      .map(l => `<option value="${l.id}"${l.id==='tr'?' selected':''}>${l.label}</option>`)
-      .join('');
+    if (srcSel && languages.length) {
+      srcSel.innerHTML = languages.map(l =>
+        `<option value="${l.id}">${l.label}</option>`
+      ).join('');
+    }
+    if (tgtSel && languages.length) {
+      tgtSel.innerHTML = languages
+        .filter(l => l.id !== 'auto')
+        .map(l => `<option value="${l.id}"${l.id==='tr'?' selected':''}>${l.label}</option>`)
+        .join('');
+    }
     onLangChange();
   } catch {}
 }
@@ -63,13 +95,18 @@ function onLangChange() {
   const src = document.getElementById('sourceLang')?.value || 'auto';
   const tgt = document.getElementById('targetLang')?.value || 'tr';
   const note = document.getElementById('langNote');
+  if (!note) return;
+
   if (src !== 'auto' && src !== tgt) {
     const srcLabel = languages.find(l => l.id === src)?.label || src;
     const tgtLabel = languages.find(l => l.id === tgt)?.label || tgt;
-    note.textContent = dsConfigured
-      ? `✓ DeepSeek ile ${srcLabel} → ${tgtLabel} çevirisi yapılacak`
-      : `⚡ DeepSeek API key girilirse ${srcLabel} → ${tgtLabel} çevirisi yapılır`;
-    note.className = 'lang-note ' + (dsConfigured ? 'note-ok' : 'note-warn');
+    if (dsConfigured) {
+      note.textContent = `✓ DeepSeek ile ${srcLabel} → ${tgtLabel} çevirisi yapılacak`;
+      note.className = 'lang-note note-ok';
+    } else {
+      note.textContent = `⚠ Çeviri için DeepSeek API key gerekli. Şu an ${srcLabel} metni doğrudan seslendirilecek.`;
+      note.className = 'lang-note note-warn';
+    }
     note.style.display = 'block';
   } else {
     note.style.display = 'none';
@@ -100,8 +137,7 @@ async function previewVoice() {
   const voice = document.getElementById('voiceSelect').value;
   if (!voice) return;
   const btn = document.getElementById('btnPreview');
-  btn.disabled = true;
-  btn.textContent = 'Üretiliyor...';
+  btn.disabled = true; btn.textContent = 'Üretiliyor...';
   try {
     const form = new FormData();
     form.append('voice', voice);
@@ -117,7 +153,7 @@ async function previewVoice() {
     toast('Hata: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Önizle (~10 sn)`;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Önizle`;
   }
 }
 
@@ -143,14 +179,13 @@ function applyFile(file) {
 // ── Yükleme ───────────────────────────────────────────────────────────────────
 async function uploadBook() {
   if (!selectedFile) return;
-  const btn   = document.getElementById('btnUpload');
-  const title = document.getElementById('titleInput').value.trim();
-  const voice = document.getElementById('voiceSelect').value || 'M1';
+  const btn     = document.getElementById('btnUpload');
+  const title   = document.getElementById('titleInput').value.trim();
+  const voice   = document.getElementById('voiceSelect').value || 'M1';
   const srcLang = document.getElementById('sourceLang')?.value || 'auto';
   const tgtLang = document.getElementById('targetLang')?.value || 'tr';
 
-  btn.disabled = true;
-  btn.textContent = 'Yükleniyor...';
+  btn.disabled = true; btn.textContent = 'Yükleniyor...';
 
   const form = new FormData();
   form.append('file', selectedFile);
@@ -257,17 +292,14 @@ function jobCard(j) {
 function buildActions(j) {
   let html = '';
   if (j.status === 'completed') {
-    if (j.output_path)
-      html += `<a class="btn btn-dl btn-sm" href="/api/jobs/${j.id}/download" download>⬇ MP3</a>`;
-    if (j.output_video_path)
-      html += `<a class="btn btn-dl-video btn-sm" href="/api/jobs/${j.id}/video" download>🎬 MP4</a>`;
-    if (j.output_srt_path)
-      html += `<a class="btn btn-ghost btn-sm" href="/api/jobs/${j.id}/srt" download>📄 SRT</a>`;
+    if (j.output_path)       html += `<a class="btn btn-dl btn-sm" href="/api/jobs/${j.id}/download" download>⬇ MP3</a>`;
+    if (j.output_video_path) html += `<a class="btn btn-dl-video btn-sm" href="/api/jobs/${j.id}/video" download>🎬 MP4</a>`;
+    if (j.output_srt_path)   html += `<a class="btn btn-ghost btn-sm" href="/api/jobs/${j.id}/srt" download>📄 SRT</a>`;
   }
   if (j.status === 'processing' || j.status === 'pending')
     html += `<button class="btn btn-pause btn-sm" onclick="pauseJob('${j.id}')">⏸ Duraklat</button>`;
   if (j.status === 'paused')
-    html += `<button class="btn btn-resume btn-sm" onclick="resumeJob('${j.id}')">▶ Devam Et</button>`;
+    html += `<button class="btn btn-resume btn-sm" onclick="resumeJob('${j.id}')">▶ Devam</button>`;
   html += `<button class="btn btn-danger btn-sm" onclick="deleteJob('${j.id}')">✕ Sil</button>`;
   return html;
 }
@@ -275,14 +307,12 @@ function buildActions(j) {
 function buildMetaBox(metaJson) {
   try {
     const m = JSON.parse(metaJson);
-    const tags = (m.tags || []).join(', ');
-    const hashtags = (m.hashtags || []).join(' ');
     return `<details class="meta-box">
       <summary>📋 YouTube Metadata</summary>
-      <div class="meta-section"><strong>Başlık:</strong> <span>${esc(m.title||'')}</span></div>
-      <div class="meta-section"><strong>Açıklama:</strong><pre>${esc(m.description||'')}</pre></div>
-      <div class="meta-section"><strong>Etiketler:</strong> <span>${esc(tags)}</span></div>
-      <div class="meta-section"><strong>Hashtag:</strong> <span>${esc(hashtags)}</span></div>
+      <div class="meta-section"><strong>Başlık</strong>${esc(m.title||'')}</div>
+      <div class="meta-section"><strong>Açıklama</strong><pre>${esc(m.description||'')}</pre></div>
+      <div class="meta-section"><strong>Etiketler</strong>${esc((m.tags||[]).join(', '))}</div>
+      <div class="meta-section"><strong>Hashtag</strong>${esc((m.hashtags||[]).join(' '))}</div>
     </details>`;
   } catch { return ''; }
 }
@@ -293,7 +323,7 @@ async function pauseJob(id) {
   catch (e) { toast('Hata: ' + e.message, 'error'); }
 }
 async function resumeJob(id) {
-  try { await fetch(`/api/jobs/${id}/resume`, { method: 'POST' }); toast('Devam ettiriliyor...', 'success'); await loadJobs(); startPoll(); }
+  try { await fetch(`/api/jobs/${id}/resume`, { method: 'POST' }); toast('Devam...', 'success'); await loadJobs(); startPoll(); }
   catch (e) { toast('Hata: ' + e.message, 'error'); }
 }
 async function deleteJob(id) {

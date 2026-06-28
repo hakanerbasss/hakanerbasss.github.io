@@ -33,6 +33,7 @@ def extract(path: str) -> str:
         raise ValueError(f"Bilinmeyen format: {ext}")
 
     text = _clean(text)
+    text = _filter_header(text)
     if len(text) < 200:
         raise ValueError(
             "Metin çıkarılamadı veya çok kısa. "
@@ -112,6 +113,58 @@ def _from_docx(path: str) -> str:
 
     doc = Document(path)
     return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+
+
+# ── İçerik filtresi ─────────────────────────────────────────────────────────
+
+def _filter_header(text: str) -> str:
+    """Project Gutenberg ve benzeri kitap başlık/footer bilgilerini kaldırır."""
+    upper = text.upper()
+
+    # PG başlangıç işaretçisi — gerçek içerik buradan başlar
+    for marker in (
+        "*** START OF THE PROJECT GUTENBERG",
+        "***START OF THE PROJECT GUTENBERG",
+        "*** START OF THIS PROJECT GUTENBERG",
+    ):
+        idx = upper.find(marker)
+        if idx != -1:
+            nl = text.find("\n", idx)
+            if nl != -1:
+                text = text[nl:].strip()
+            upper = text.upper()
+            break
+
+    # PG bitiş işaretçisi — footer kaldır
+    for marker in (
+        "*** END OF THE PROJECT GUTENBERG",
+        "***END OF THE PROJECT GUTENBERG",
+        "*** END OF THIS PROJECT GUTENBERG",
+        "END OF THE PROJECT GUTENBERG",
+    ):
+        idx = upper.find(marker)
+        if idx != -1:
+            text = text[:idx].strip()
+            upper = text.upper()
+            break
+
+    # Genel: ilk 3000 karakter içinde çoğunluğu URL/e-posta/kısa satırsa atla
+    _skip_generic_header(text)
+
+    return text
+
+
+def _skip_generic_header(text: str) -> str:
+    """Çok kısa satırlar, URL'ler, ALL CAPS başlıklardan oluşan baş kısımları atlar."""
+    lines = text.split("\n")
+    # İlk 60 satırı incele — uzun bir düz metin paragrafı bulunca oradan başla
+    for i, line in enumerate(lines[:60]):
+        stripped = line.strip()
+        # 60+ karakterlik düz metin satırı = gerçek içerik başlangıcı
+        if len(stripped) > 60 and not stripped.startswith(("http", "www", "ftp")):
+            if i > 5:  # anlamlı atlama
+                return "\n".join(lines[i:])
+    return text
 
 
 # ── Metin temizleme ──────────────────────────────────────────────────────────

@@ -18,34 +18,36 @@
 
 <main class="layout">
 
-  <!-- API Ayarları -->
-  <div class="card">
-    <div class="card-title">
-      <span>API Ayarları</span>
-      <span id="settingsStatus" class="settings-status"></span>
-    </div>
-    <div class="settings-grid">
-      <div class="field">
-        <label>DeepSeek API Key <span class="feat-tag">Çeviri · Metadata</span></label>
-        <input type="password" id="deepseekKey" placeholder="sk-..." autocomplete="off">
+  <!-- API Ayarları (daraltılabilir) -->
+  <details class="card settings-details" id="settingsDetails">
+    <summary class="settings-summary">
+      <span>⚙ API Ayarları</span>
+      <span id="settingsBadge" class="settings-badge"></span>
+    </summary>
+    <div class="settings-body">
+      <div class="settings-grid">
+        <div class="field">
+          <label>DeepSeek API Key <span class="feat-tag">Çeviri · Metadata</span></label>
+          <input type="password" id="deepseekKey" placeholder="sk-..." autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Pexels API Key <span class="feat-tag">Görseller · MP4</span></label>
+          <input type="password" id="pexelsKey" placeholder="Pexels key..." autocomplete="off">
+        </div>
       </div>
-      <div class="field">
-        <label>Pexels API Key <span class="feat-tag">Görseller · MP4 Video</span></label>
-        <input type="password" id="pexelsKey" placeholder="Pexels API key..." autocomplete="off">
+      <div class="settings-footer">
+        <div class="api-indicators">
+          <span id="dsStatus" class="api-dot dot-off">●</span> DeepSeek
+          <span id="pxStatus" class="api-dot dot-off" style="margin-left:10px">●</span> Pexels
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="saveSettings()">💾 Kaydet</button>
       </div>
     </div>
-    <div class="settings-footer">
-      <div class="settings-info">
-        <span id="dsStatus" class="api-dot dot-off">●</span> DeepSeek
-        <span id="pxStatus" class="api-dot dot-off" style="margin-left:12px">●</span> Pexels
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="saveSettings()">💾 Kaydet</button>
-    </div>
-  </div>
+  </details>
 
   <!-- Ses Seçimi -->
   <div class="card">
-    <div class="card-title">Ses Seçimi & Önizleme</div>
+    <div class="card-title">Ses & Önizleme</div>
     <div class="voice-row">
       <div class="voice-group">
         <label>Seslendirici</label>
@@ -54,8 +56,8 @@
         </select>
       </div>
       <button class="btn btn-ghost" id="btnPreview" onclick="previewVoice()" style="height:42px">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Önizle (~10 sn)
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Önizle
       </button>
     </div>
     <div class="preview-wrap" id="previewWrap" style="display:none">
@@ -68,8 +70,7 @@
     <div class="card-title">Kitap Yükle</div>
     <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
       <div class="dz-icon">📖</div>
-      <div class="dz-label">Dosyayı buraya sürükle veya tıkla</div>
-      <div class="dz-sub">Telif hakkı olmayan / public domain kitaplar</div>
+      <div class="dz-label">Dosyayı sürükle veya tıkla</div>
       <div class="dz-formats">
         <span class="fmt-tag">PDF</span>
         <span class="fmt-tag">EPUB</span>
@@ -80,29 +81,25 @@
     </div>
     <input type="file" id="fileInput" accept=".pdf,.epub,.txt,.docx" onchange="onFileSelect(this)">
 
-    <div class="lang-row">
+    <!-- Dil + Başlık + Buton tek satırda -->
+    <div class="upload-options">
       <div class="field">
-        <label>Kitap Dili (kaynak)</label>
-        <select id="sourceLang" onchange="onLangChange()">
-          <option value="auto">Otomatik (çeviri yok)</option>
-        </select>
+        <label>Kitap Dili → Seslendirme Dili</label>
+        <div class="lang-inline">
+          <select id="sourceLang" onchange="onLangChange()">
+            <option value="auto">Otomatik</option>
+          </select>
+          <span class="lang-sep">→</span>
+          <select id="targetLang" onchange="onLangChange()">
+            <option value="tr">Türkçe</option>
+          </select>
+        </div>
       </div>
-      <div class="lang-arrow">→</div>
       <div class="field">
-        <label>Seslendirme Dili (hedef)</label>
-        <select id="targetLang" onchange="onLangChange()">
-          <option value="tr">Türkçe</option>
-        </select>
+        <label>Kitap Adı <span style="font-weight:400;color:var(--muted)">(opsiyonel)</span></label>
+        <input type="text" id="titleInput" placeholder="Dosya adından alınır">
       </div>
-    </div>
-    <div class="lang-note" id="langNote" style="display:none"></div>
-
-    <div class="form-row">
-      <div class="field">
-        <label>Kitap Adı (opsiyonel)</label>
-        <input type="text" id="titleInput" placeholder="Boş bırakılırsa dosya adından alınır">
-      </div>
-      <button class="btn btn-primary" id="btnUpload" onclick="uploadBook()" disabled>
+      <button class="btn btn-primary" id="btnUpload" onclick="uploadBook()" disabled style="align-self:flex-end">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
@@ -110,6 +107,7 @@
         Seslendir
       </button>
     </div>
+    <div class="lang-note" id="langNote" style="display:none"></div>
   </div>
 
   <!-- Üretim Listesi -->
