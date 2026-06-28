@@ -1577,13 +1577,20 @@ function switchTab(name) {
 
 let _lvPollTimer = null;
 
+function _fmtElapsed(sec) {
+  const s = sec || 0;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m > 0 ? `${m} dakika ${r} saniye` : `${r} saniye`;
+}
+
 async function checkLVStatusOnLoad() {
   if (_lvPollTimer) return; // zaten polling var
   try {
     const s = await fetch('/api/manual-lv/status').then(r => r.json());
     if (s.status === 'running') {
       setLoading('btn-lv', 'spin-lv', true);
-      _showLVProgress(`Üretim devam ediyor... ${s.elapsed || 0}s geçti. Sayfa kapatabilirsiniz.`);
+      _showLVProgress(`Üretim devam ediyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz.`);
       _startLVPolling();
     } else if (s.status === 'done' && s.result) {
       _showLVProgress('');
@@ -1630,7 +1637,7 @@ function _startLVPolling() {
     try {
       const s = await fetch('/api/manual-lv/status').then(r => r.json());
       if (s.status === 'running') {
-        _showLVProgress(`Üretiliyor... ${s.elapsed || 0}s geçti. Sayfa kapatabilirsiniz, arka planda devam eder.`);
+        _showLVProgress(`Üretiliyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz, arka planda devam eder.`);
       } else if (s.status === 'done' && s.result) {
         clearInterval(_lvPollTimer);
         _lvPollTimer = null;
