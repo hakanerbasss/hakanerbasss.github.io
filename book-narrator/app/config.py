@@ -6,6 +6,25 @@ VOICES = {
     "F1": "Kadın 1",  "F2": "Kadın 2",  "F3": "Kadın 3",
 }
 
+LANGUAGES = {
+    "auto": "Otomatik (çeviri yok)",
+    "tr":   "Türkçe",
+    "en":   "English",
+    "de":   "Deutsch",
+    "fr":   "Français",
+    "es":   "Español",
+    "ar":   "العربية",
+    "ru":   "Русский",
+    "ja":   "日本語",
+    "zh":   "中文",
+}
+
+LANG_NAMES_EN = {
+    "tr": "Turkish", "en": "English", "de": "German",
+    "fr": "French",  "es": "Spanish", "ar": "Arabic",
+    "ru": "Russian", "ja": "Japanese", "zh": "Chinese",
+}
+
 PREVIEW_TEXT = (
     "Merhaba! Bu ses ile kitabınızı seslendirebilirim. "
     "Sesin kalitesini ve akıcılığını bu kısa örnekten değerlendirebilirsiniz."

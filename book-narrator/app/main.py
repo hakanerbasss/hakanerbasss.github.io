@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import db, worker
-from app.routers import jobs
+from app.routers import jobs, settings as settings_router
 
 _worker_task: asyncio.Task | None = None
 
@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Book Narrator", version="1.0.0", lifespan=lifespan)
 app.include_router(jobs.router)
+app.include_router(settings_router.router)
 
 _static = Path(__file__).parent.parent / "static"
 if _static.exists():

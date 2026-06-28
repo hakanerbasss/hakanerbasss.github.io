@@ -186,3 +186,73 @@ input[type="text"]:focus { border-color: var(--primary); }
   .header-sub { display: none; }
   .layout { padding: 16px 12px; }
 }
+
+/* ── Settings card ── */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .settings-grid { grid-template-columns: 1fr; } }
+
+.settings-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.settings-info { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.settings-status { font-size: 11px; color: var(--success); }
+
+.api-dot { font-size: 10px; }
+.dot-on  { color: var(--success); }
+.dot-off { color: var(--muted); }
+
+.feat-tag {
+  background: var(--primary-bg); color: var(--primary);
+  border-radius: 4px; font-size: 10px; font-weight: 600;
+  padding: 1px 6px; margin-left: 4px; white-space: nowrap;
+}
+
+/* ── Language selectors ── */
+.lang-row {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px;
+  align-items: end; margin-top: 16px;
+}
+.lang-arrow {
+  font-size: 18px; color: var(--muted); padding-bottom: 10px; text-align: center;
+}
+.lang-note {
+  font-size: 12px; font-weight: 500; padding: 8px 12px;
+  border-radius: 6px; margin-top: 8px;
+}
+.note-ok   { background: var(--success-bg); color: var(--success); }
+.note-warn { background: var(--warn-bg); color: var(--warn); }
+
+/* ── Job lang badge ── */
+.job-lang {
+  background: #e0f2fe; border-radius: 4px; color: #0369a1;
+  font-size: 10px; font-weight: 700; padding: 2px 6px;
+}
+
+/* ── Video download button ── */
+.btn-dl-video { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+.btn-dl-video:hover { background: #dcfce7; }
+
+/* ── YouTube metadata box ── */
+.meta-box {
+  margin-top: 8px; border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden;
+}
+.meta-box summary {
+  padding: 10px 14px; cursor: pointer; font-size: 12px; font-weight: 600;
+  color: var(--text2); background: var(--surface2); user-select: none;
+  list-style: none;
+}
+.meta-box summary::-webkit-details-marker { display: none; }
+.meta-box[open] summary { border-bottom: 1px solid var(--border); }
+.meta-section {
+  padding: 8px 14px; font-size: 12px; border-bottom: 1px solid var(--border);
+}
+.meta-section:last-child { border-bottom: none; }
+.meta-section strong { color: var(--muted); display: block; margin-bottom: 4px; }
+.meta-section pre {
+  white-space: pre-wrap; font-family: var(--font); font-size: 11px;
+  color: var(--text); margin: 0; max-height: 120px; overflow-y: auto;
+}
+
+@media (max-width: 600px) { .lang-row { grid-template-columns: 1fr; } .lang-arrow { display: none; } }

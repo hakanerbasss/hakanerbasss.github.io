@@ -18,14 +18,17 @@ def _get_model():
     return _model
 
 
-def synthesize_sync(text: str, output_wav: str, voice: str | None = None) -> float:
+def synthesize_sync(text: str, output_wav: str,
+                    voice: str | None = None, lang: str | None = None) -> float:
     """Sync — thread executor'da çağırılmalı."""
+    import functools
     tts = _get_model()
     v = voice or settings.tts_voice
+    l = lang or settings.tts_lang
     style = tts.get_voice_style(voice_name=v)
     wav, dur = tts.synthesize(
         text=text,
-        lang=settings.tts_lang,
+        lang=l,
         voice_style=style,
         total_steps=settings.tts_steps,
         speed=settings.tts_speed,
@@ -35,10 +38,13 @@ def synthesize_sync(text: str, output_wav: str, voice: str | None = None) -> flo
     return dur_val
 
 
-async def synthesize(text: str, output_wav: str, voice: str | None = None) -> float:
+async def synthesize(text: str, output_wav: str,
+                     voice: str | None = None, lang: str | None = None) -> float:
     """Async sarmalayıcı."""
+    import functools
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, synthesize_sync, text, output_wav, voice)
+    fn = functools.partial(synthesize_sync, text, output_wav, voice, lang)
+    return await loop.run_in_executor(None, fn)
 
 
 async def generate_preview(voice: str) -> str:

@@ -18,7 +18,32 @@
 
 <main class="layout">
 
-  <!-- ── Ses Seçimi ── -->
+  <!-- API Ayarları -->
+  <div class="card">
+    <div class="card-title">
+      <span>API Ayarları</span>
+      <span id="settingsStatus" class="settings-status"></span>
+    </div>
+    <div class="settings-grid">
+      <div class="field">
+        <label>DeepSeek API Key <span class="feat-tag">Çeviri · Metadata</span></label>
+        <input type="password" id="deepseekKey" placeholder="sk-..." autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Pexels API Key <span class="feat-tag">Görseller · MP4 Video</span></label>
+        <input type="password" id="pexelsKey" placeholder="Pexels API key..." autocomplete="off">
+      </div>
+    </div>
+    <div class="settings-footer">
+      <div class="settings-info">
+        <span id="dsStatus" class="api-dot dot-off">●</span> DeepSeek
+        <span id="pxStatus" class="api-dot dot-off" style="margin-left:12px">●</span> Pexels
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="saveSettings()">💾 Kaydet</button>
+    </div>
+  </div>
+
+  <!-- Ses Seçimi -->
   <div class="card">
     <div class="card-title">Ses Seçimi & Önizleme</div>
     <div class="voice-row">
@@ -38,10 +63,9 @@
     </div>
   </div>
 
-  <!-- ── Kitap Yükleme ── -->
+  <!-- Kitap Yükleme -->
   <div class="card">
     <div class="card-title">Kitap Yükle</div>
-
     <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
       <div class="dz-icon">📖</div>
       <div class="dz-label">Dosyayı buraya sürükle veya tıkla</div>
@@ -55,6 +79,23 @@
       <div class="file-selected" id="fileSelectedLabel" style="display:none"></div>
     </div>
     <input type="file" id="fileInput" accept=".pdf,.epub,.txt,.docx" onchange="onFileSelect(this)">
+
+    <div class="lang-row">
+      <div class="field">
+        <label>Kitap Dili (kaynak)</label>
+        <select id="sourceLang" onchange="onLangChange()">
+          <option value="auto">Otomatik (çeviri yok)</option>
+        </select>
+      </div>
+      <div class="lang-arrow">→</div>
+      <div class="field">
+        <label>Seslendirme Dili (hedef)</label>
+        <select id="targetLang" onchange="onLangChange()">
+          <option value="tr">Türkçe</option>
+        </select>
+      </div>
+    </div>
+    <div class="lang-note" id="langNote" style="display:none"></div>
 
     <div class="form-row">
       <div class="field">
@@ -71,7 +112,7 @@
     </div>
   </div>
 
-  <!-- ── Üretim Listesi ── -->
+  <!-- Üretim Listesi -->
   <div class="card">
     <div class="card-title">
       <span>Sesli Kitaplar</span>
@@ -87,7 +128,6 @@
   </div>
 
 </main>
-
 <script src="/static/app.js"></script>
 </body>
 </html>
