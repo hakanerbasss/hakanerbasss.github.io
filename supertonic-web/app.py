@@ -443,7 +443,7 @@ Rules:
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly. Example: write "Yükseköğretim Kurumları Sınavı" not "YKS", "Amerika Birleşik Devletleri" not "ABD".
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - FIRST scene text MUST use a CURIOSITY-GAP hook — never state the answer directly in the first sentence. Create suspense or partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Herkes bunu merak ediyordu — cevap şoke etti.", "Tarihin en büyük...", "Peki gerçekte ne oldu?". NEVER open with a plain news statement. The viewer must NEED to keep watching to get the answer. Do NOT repeat the same opener across videos.
-- LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — make it feel urgent and personal, not generic.
+- LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
 - hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), ALWAYS include "Shorts", "sondakika", "gündem", "keşfet", "haberler" — then add topic-specific tags. No # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")
@@ -464,6 +464,21 @@ Rules:
                 raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
 
     scenes = data["scenes"]
+
+    # Son sahne TTS metnini platforma göre sabit CTA ile değiştir
+    if scenes:
+        _cta = {
+            "tr": {
+                "youtube": "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
+                "instagram": "Takip et ve beğen! Her haberi ilk sen gör! İki saniye yeterli!",
+            },
+            "en": {
+                "youtube": "Like, subscribe and drop a comment! Just 2 seconds!",
+                "instagram": "Follow and like! Be the first to see every update!",
+            },
+        }
+        _lang_cta = _cta.get(lang, _cta["tr"])
+        scenes[-1]["text"] = _lang_cta.get(platform, _lang_cta["youtube"])
 
     uid = uuid.uuid4().hex
     scene_dir = UPLOAD_DIR / uid
