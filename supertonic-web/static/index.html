@@ -1265,8 +1265,16 @@
           </label>
         </div>
         <div class="field" style="margin-bottom:12px;">
-          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-          <input type="text" id="ig-only-tr-times" value="09:00,14:00,19:00,22:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:#555;font-size:11px;">(virgülle ayır — örn: 09:22,12:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="ig-times-mon" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="ig-times-tue" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="ig-times-wed" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="ig-times-thu" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="ig-times-fri" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="ig-times-sat" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="ig-times-sun" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
         </div>
         <div class="field" style="margin-bottom:14px;">
           <label>Ses</label>
@@ -2545,7 +2553,11 @@ async function loadIGOnlyTRStatus() {
     const r = await fetch('/api/ig-only-tr/config');
     const d = await r.json();
     document.getElementById('ig-only-tr-enabled').checked = d.enabled;
-    document.getElementById('ig-only-tr-times').value = (d.times || ['09:00','14:00','19:00','22:00']).join(',');
+    const weekly = d.weekly || {};
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+      const el = document.getElementById(`ig-times-${day}`);
+      if (el) el.value = (weekly[day] || []).join(',');
+    });
     if (d.voice) document.getElementById('ig-only-tr-voice').value = d.voice;
 
     const st = document.getElementById('ig-only-tr-status');
@@ -2588,8 +2600,10 @@ async function loadIGOnlyTRStatus() {
 async function saveIGOnlyTRScheduler() {
   const fd = new FormData();
   fd.append('enabled', document.getElementById('ig-only-tr-enabled').checked ? 'true' : 'false');
-  fd.append('times', document.getElementById('ig-only-tr-times').value);
   fd.append('voice', document.getElementById('ig-only-tr-voice').value);
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+    fd.append(day, document.getElementById(`ig-times-${day}`).value);
+  });
   await fetch('/api/ig-only-tr/config', { method: 'POST', body: fd });
   await loadIGOnlyTRStatus();
 }

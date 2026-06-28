@@ -3891,8 +3891,11 @@ IG_ONLY_TR_DAILY_TOPICS = Path("ig_only_tr_daily_topics.json")
 
 def load_ig_only_tr_config():
     if IG_ONLY_TR_SCHED_CONFIG.exists():
-        return json.loads(IG_ONLY_TR_SCHED_CONFIG.read_text())
-    return {"enabled": False, "times": ["09:00", "14:00", "19:00", "22:00"], "voice": "F1"}
+        cfg = json.loads(IG_ONLY_TR_SCHED_CONFIG.read_text())
+        if "weekly" not in cfg:
+            cfg["weekly"] = _IG_WEEKLY_SCHEDULE
+        return cfg
+    return {"enabled": False, "voice": "F1", "weekly": _IG_WEEKLY_SCHEDULE}
 
 
 def save_ig_only_tr_log(status: str, message: str):
@@ -3995,7 +3998,7 @@ def _rebuild_ig_only_tr_scheduler():
     cfg = load_ig_only_tr_config()
     if not cfg.get("enabled"):
         return
-    for day, times in _IG_WEEKLY_SCHEDULE.items():
+    for day, times in cfg.get("weekly", _IG_WEEKLY_SCHEDULE).items():
         for t in times:
             try:
                 hour, minute = t.split(":")
@@ -4024,11 +4027,19 @@ async def get_ig_only_tr_sched_config():
 @app.post("/api/ig-only-tr/config")
 async def save_ig_only_tr_sched_config(
     enabled: str = Form("false"),
-    times: str = Form(""),
     voice: str = Form("F1"),
+    mon: str = Form(""),
+    tue: str = Form(""),
+    wed: str = Form(""),
+    thu: str = Form(""),
+    fri: str = Form(""),
+    sat: str = Form(""),
+    sun: str = Form(""),
 ):
-    times_list = [t.strip() for t in times.split(",") if t.strip()]
-    cfg = {"enabled": enabled == "true", "times": times_list, "voice": voice}
+    weekly = {}
+    for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
+        weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
+    cfg = {"enabled": enabled == "true", "voice": voice, "weekly": weekly}
     IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_ig_only_tr_scheduler()
     return {"ok": True}
