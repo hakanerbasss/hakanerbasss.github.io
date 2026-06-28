@@ -495,15 +495,14 @@ Rules:
         scene_raw_video = None  # video modunda indirilen ham video
 
         if is_last_scene:
-            endcard = Path("static/endcard_ig_tr.jpg" if platform == "instagram" else "static/endcard_tr.jpg")
+            endcard = Path("static/endcard_tr.jpg")
             if endcard.exists():
                 import shutil as _sh
                 _sh.copy2(str(endcard), str(png_path))
                 photo_saved, visual_err = True, ""
             else:
                 # Endcard dosyası yok — son sahne için Pexels'tan gerçek fotoğraf çek
-                ec_keyword = "takip et sosyal medya" if platform == "instagram" else "abone ol youtube"
-                photo_saved, visual_err = fetch_scene_visual(ec_keyword, "portrait", pexels_key, png_path)
+                photo_saved, visual_err = fetch_scene_visual("social media news channel", "portrait", pexels_key, png_path)
         else:
             keyword = scene.get("keyword", topic)
             # Video modu: önce Pexels video dene, başarısız olursa görsele düş
@@ -551,7 +550,7 @@ Rules:
             pass
 
     # Son sahneye platform bandı ekle (endcard kullanılıyorsa atlıyoruz — zaten içinde var)
-    endcard_used = Path("static/endcard_ig_tr.jpg" if platform == "instagram" else "static/endcard_tr.jpg").exists()
+    endcard_used = Path("static/endcard_tr.jpg").exists()
     if png_files and not endcard_used:
         try:
             if platform == "instagram":
