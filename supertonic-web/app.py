@@ -405,8 +405,8 @@ async def _generate_shorts_core(
         exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
     if topic.strip():
         topic_instruction = (
-            f"Topic: {topic}\n"
-            f"Use these TODAY'S real trending news to make the content timely and relevant:\n{trend_topics}"
+            f"Make a Short video ONLY about this specific topic: {topic}\n"
+            f"IMPORTANT: Cover ONLY this topic in depth. Do NOT include or mention other news stories."
         )
     elif lang == "en":
         topic_instruction = (
@@ -521,7 +521,8 @@ Rules:
         else:
             keyword = scene.get("keyword", topic)
             # Video modu: önce Pexels video dene, başarısız olursa görsele düş
-            if use_video_mode and pexels_key:
+            # İlk sahne (i==0) her zaman görsel — banner overlay için PNG şart
+            if use_video_mode and pexels_key and i > 0:
                 vid_ok, vid_result = await asyncio.to_thread(
                     fetch_pexels_video, keyword, pexels_key,
                     scene_dir / f"rawvid_{i}.mp4", durations[i]
