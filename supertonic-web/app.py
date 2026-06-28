@@ -768,6 +768,8 @@ async def generate_shorts(
 
 MANUAL_SHORTS_LOG = Path("manual_shorts_log.json")
 _manual_shorts_lock = False
+MANUAL_LV_LOG = Path("manual_lv_log.json")
+_manual_lv_lock = False
 
 
 def _save_manual_shorts_log(status: str, result: dict = None, error: str = "", started_at: float = None):
@@ -785,6 +787,23 @@ def _save_manual_shorts_log(status: str, result: dict = None, error: str = "", s
         "ts": time.time(),
     }
     MANUAL_SHORTS_LOG.write_text(json.dumps(entry, ensure_ascii=False))
+
+
+def _save_manual_lv_log(status: str, result: dict = None, error: str = "", started_at: float = None):
+    existing = {}
+    if MANUAL_LV_LOG.exists():
+        try:
+            existing = json.loads(MANUAL_LV_LOG.read_text())
+        except Exception:
+            pass
+    entry = {
+        "status": status,
+        "started_at": started_at if started_at is not None else existing.get("started_at", time.time()),
+        "result": result,
+        "error": error,
+        "ts": time.time(),
+    }
+    MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
 async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform):
@@ -1457,28 +1476,83 @@ def create_shorts_thumbnail(thumb_vars: dict, out_path: Path, size=(1080, 1920),
     return out_path
 
 
-@app.post("/api/generate-long-video")
-async def generate_long_video(
-    topic: str = Form(...),
-    api_key: str = Form(...),
-    lang: str = Form("tr"),
-    voice: str = Form("M1"),
-    speed: float = Form(1.0),
-    duration_min: int = Form(3),
-):
-    import json
-    import httpx
+def overlay_lv_title_banner(photo_path: Path, title: str) -> None:
+    """Landscape (1920x1080) ilk sahne için başlık banner'ı."""
+    try:
+        from PIL import Image as PILImage, ImageDraw, ImageFont
+        img = PILImage.open(str(photo_path)).convert("RGB").resize((1920, 1080))
+        draw = ImageDraw.Draw(img)
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+            "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+        ]
+        fp = next((f for f in font_candidates if Path(f).exists()), None)
+        font_big = ImageFont.truetype(fp, 56) if fp else ImageFont.load_default()
+        font_sm = ImageFont.truetype(fp, 32) if fp else ImageFont.load_default()
+        # Üst koyu bant
+        overlay = PILImage.new("RGBA", (1920, 200), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        od.rectangle([(0, 0), (1920, 200)], fill=(10, 10, 20, 210))
+        img.paste(PILImage.new("RGB", (1920, 200), (10, 10, 20)),
+                  (0, 0), mask=overlay.split()[3])
+        # SON DAKİKA rozeti
+        draw.rectangle([(40, 20), (240, 60)], fill=(200, 0, 0))
+        draw.text((50, 22), "SON DAKİKA", fill=(255, 255, 255), font=font_sm)
+        # Başlık (max 2 satır)
+        words = title.split()
+        line1, line2 = [], []
+        for w in words:
+            if draw.textlength(" ".join(line1 + [w]), font=font_big) < 1700:
+                line1.append(w)
+            else:
+                line2.append(w)
+        draw.text((40, 70), " ".join(line1), fill=(255, 220, 0), font=font_big,
+                  stroke_width=2, stroke_fill=(0, 0, 0))
+        if line2:
+            draw.text((40, 135), " ".join(line2[:8]), fill=(255, 220, 0), font=font_big,
+                      stroke_width=2, stroke_fill=(0, 0, 0))
+        img.save(str(photo_path), "JPEG", quality=90)
+    except Exception:
+        pass
+
+
+def overlay_lv_subscribe_banner(photo_path: Path) -> None:
+    """Landscape (1920x1080) son sahne için abone ol banner'ı."""
+    try:
+        from PIL import Image as PILImage, ImageDraw, ImageFont
+        img = PILImage.open(str(photo_path)).convert("RGB").resize((1920, 1080))
+        draw = ImageDraw.Draw(img)
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        ]
+        fp = next((f for f in font_candidates if Path(f).exists()), None)
+        font = ImageFont.truetype(fp, 58) if fp else ImageFont.load_default()
+        # Alt koyu bant
+        overlay = PILImage.new("RGBA", (1920, 160), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        od.rectangle([(0, 0), (1920, 160)], fill=(10, 10, 20, 220))
+        img.paste(PILImage.new("RGB", (1920, 160), (10, 10, 20)),
+                  (0, 920), mask=overlay.split()[3])
+        text = "👍  Beğen         🔔  Abone Ol"
+        tw = draw.textlength(text, font=font)
+        draw.text(((1920 - tw) // 2, 940), text, fill=(255, 255, 255), font=font,
+                  stroke_width=2, stroke_fill=(0, 0, 0))
+        img.save(str(photo_path), "JPEG", quality=90)
+    except Exception:
+        pass
+
+
+async def _generate_long_video_core(topic: str, api_key: str, lang: str, voice: str, speed: float, duration_min: int, use_video: str = "false") -> dict:
+    import json as _json
     from openai import OpenAI
 
-    if not topic.strip():
-        raise HTTPException(400, "Konu boş olamaz")
-    if not api_key.strip():
-        raise HTTPException(400, "API key eksik")
-
+    use_video_mode = use_video == "true"
     pexels_key = get_pexels_key()
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
     lang_name = LANG_MAP.get(lang, "Turkish")
-
     scene_count = max(6, duration_min * 2)
 
     prompt = f"""Create a detailed educational/documentary YouTube video about: {topic}
@@ -1539,7 +1613,6 @@ Rules:
     durations = []
 
     for i, scene in enumerate(scenes):
-        # TTS
         wav, dur = await asyncio.to_thread(tts.synthesize,
             _clean_tts_text(scene["text"], lang), lang=lang,
             voice_style=style, total_steps=8, speed=speed,
@@ -1550,17 +1623,37 @@ Rules:
         audio_files.append(audio_path)
         durations.append(dur_val)
 
-        # Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels
         img_path = scene_dir / f"scene_{i}.jpg"
-        photo_saved = fetch_scene_visual(scene.get("keyword", topic), "landscape", pexels_key, img_path)
+        raw_vid = None
 
-        if not photo_saved:
+        # İlk sahne (i==0) her zaman görsel — banner için; diğerleri video modunda olabilir
+        if use_video_mode and pexels_key and i > 0:
+            vid_ok, vid_result = await asyncio.to_thread(
+                fetch_pexels_video, scene.get("keyword", topic), pexels_key,
+                scene_dir / f"rawvid_{i}.mp4", dur_val,
+            )
+            if vid_ok:
+                raw_vid = Path(vid_result)
+                photo_saved = True
+            else:
+                photo_saved = fetch_scene_visual(scene.get("keyword", topic), "landscape", pexels_key, img_path)
+        else:
+            photo_saved = fetch_scene_visual(scene.get("keyword", topic), "landscape", pexels_key, img_path)
+
+        if not photo_saved and not raw_vid:
             await asyncio.to_thread(subprocess.run,
                 ["ffmpeg", "-y", "-f", "lavfi",
                  "-i", "color=black:size=1920x1080:rate=1",
                  "-frames:v", "1", str(img_path)],
                 capture_output=True, timeout=90,
             )
+
+        # Banner overlay'leri (sadece görsel sahnesinde çalışır)
+        if img_path.exists():
+            if i == 0:
+                overlay_lv_title_banner(img_path, data.get("title", topic))
+            elif i == len(scenes) - 1:
+                overlay_lv_subscribe_banner(img_path)
 
         # Clip oluştur (yatay 1920x1080)
         clip_path = scene_dir / f"clip_{i}.mp4"
@@ -1588,14 +1681,24 @@ Rules:
         if font_path:
             drawtext += f":fontfile={font_path}"
 
-        await asyncio.to_thread(subprocess.run,
-            ["ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
-             "-t", str(dur_val),
-             "-vf", drawtext,
-             "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-             "-pix_fmt", "yuv420p", str(clip_path)],
-            check=True, capture_output=True, timeout=180,
-        )
+        if raw_vid:
+            await asyncio.to_thread(subprocess.run,
+                ["ffmpeg", "-y", "-i", str(raw_vid),
+                 "-t", str(dur_val),
+                 "-vf", drawtext,
+                 "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                 "-pix_fmt", "yuv420p", str(clip_path)],
+                check=True, capture_output=True, timeout=180,
+            )
+        else:
+            await asyncio.to_thread(subprocess.run,
+                ["ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+                 "-t", str(dur_val),
+                 "-vf", drawtext,
+                 "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                 "-pix_fmt", "yuv420p", str(clip_path)],
+                check=True, capture_output=True, timeout=180,
+            )
         clip_files.append(clip_path)
 
     # Sesleri birleştir
@@ -1633,15 +1736,12 @@ Rules:
     total_dur = round(sum(durations), 1)
     lv_title = data.get("title", topic)
 
-    # Hashtag'leri oluştur
     raw_tags = data.get("hashtags", [])
     suggested_tags = ", ".join(f"#{t.lstrip('#').replace(' ', '')}" for t in raw_tags[:12] if t)
     if not suggested_tags:
         suggested_tags = f"#{topic.split()[0]}, #belgesel, #eğitim, #keşfet, #teknoloji"
 
-    # Thumbnail
     thumb_path = None
-    thumb_out = None
     try:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
@@ -1663,6 +1763,103 @@ Rules:
         "duration_sec": total_dur,
         "scene_count": len(scenes),
     }
+
+
+async def _long_video_runner(topic, api_key, lang, voice, speed, duration_min, use_video):
+    global _manual_lv_lock
+    try:
+        result = await _generate_long_video_core(topic, api_key, lang, voice, speed, duration_min, use_video)
+        _save_manual_lv_log("done", result=result)
+        # Send to Telegram automatically
+        video_file = OUTPUT_DIR / result["video"].split("/")[-1]
+        await send_telegram_video(
+            video_file,
+            result.get("title", topic),
+            result.get("description", ""),
+            result.get("suggested_tags", ""),
+        )
+    except Exception as e:
+        _save_manual_lv_log("error", error=str(e))
+    finally:
+        _manual_lv_lock = False
+
+
+@app.post("/api/generate-long-video")
+async def generate_long_video(
+    topic: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    duration_min: int = Form(3),
+    use_video: str = Form("false"),
+):
+    global _manual_lv_lock
+    if not topic.strip():
+        raise HTTPException(400, "Konu boş olamaz")
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    if _manual_lv_lock:
+        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+    _manual_lv_lock = True
+    started_at = time.time()
+    _save_manual_lv_log("running", started_at=started_at)
+    asyncio.create_task(_long_video_runner(topic, api_key, lang, voice, speed, duration_min, use_video))
+    return {"ok": True}
+
+
+@app.get("/api/manual-lv/status")
+async def get_manual_lv_status():
+    if not MANUAL_LV_LOG.exists():
+        return {"status": "idle"}
+    try:
+        data = json.loads(MANUAL_LV_LOG.read_text())
+    except Exception:
+        return {"status": "idle"}
+    data["elapsed"] = int(time.time() - data.get("started_at", time.time()))
+    return data
+
+
+@app.post("/api/lv-category-trend")
+async def lv_category_trend(
+    category: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+):
+    """Seçilen kategori için günün trend konusunu bul."""
+    from openai import OpenAI
+    from datetime import datetime
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    if not category.strip():
+        raise HTTPException(400, "Kategori boş olamaz")
+    lang_name = LANG_MAP.get(lang, "Turkish")
+    today = datetime.now().strftime("%d.%m.%Y")
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    prompt = f"""Today is {today}. You are helping create a YouTube documentary video in {lang_name}.
+
+Category: {category}
+
+Suggest ONE compelling documentary topic in this category that:
+- Is currently relevant or timeless/fascinating
+- Works great as a 5-10 minute educational documentary
+- Has a curiosity-gap angle (e.g. "How did X really happen?", "The secret behind Y", "Why Z changed everything")
+- Is specific, not generic
+
+Return ONLY a JSON object, no markdown:
+{{"topic": "the specific topic in {lang_name}", "hook": "one sentence curiosity-gap description in {lang_name}"}}"""
+    try:
+        resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.9,
+            max_tokens=200,
+        )
+        data = _parse_llm_json(resp.choices[0].message.content)
+        return {"topic": data.get("topic", ""), "hook": data.get("hook", "")}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 
 @app.post("/api/generate-trend-long-video")
 async def generate_trend_long_video(
@@ -1935,6 +2132,34 @@ def _fire_telegram(source: str, message: str) -> None:
         loop.create_task(send_telegram_alert(source, message))
     except RuntimeError:
         pass  # event loop çalışmıyor
+    except Exception:
+        pass
+
+
+async def send_telegram_video(video_path: Path, title: str, description: str, tags: str) -> None:
+    """Üretilen uzun videoyu Telegram'a gönder."""
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    chat_id = cfg.get("chat_id", "").strip()
+    if not token or not chat_id:
+        return
+    import html as _html
+    caption_parts = []
+    if title:
+        caption_parts.append(f"<b>{_html.escape(title)}</b>")
+    if description:
+        caption_parts.append(_html.escape(description[:800]))
+    if tags:
+        caption_parts.append(_html.escape(tags[:300]))
+    caption = "\n\n".join(caption_parts)[:1024]
+    try:
+        async with httpx.AsyncClient(timeout=300) as client:
+            with open(video_path, "rb") as vf:
+                await client.post(
+                    f"https://api.telegram.org/bot{token}/sendVideo",
+                    data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML", "supports_streaming": "true"},
+                    files={"video": (video_path.name, vf, "video/mp4")},
+                )
     except Exception:
         pass
 

@@ -593,6 +593,30 @@
 <div class="panel" id="tab-longvideo">
 
   <div class="field">
+    <label>Kategori (opsiyonel — trend konu bulmak için)</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="lv-category" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:10px 12px;">
+        <option value="">— Kategori seç —</option>
+        <option value="Teknoloji">Teknoloji</option>
+        <option value="Yapay Zeka">Yapay Zeka</option>
+        <option value="Uzay ve Astronomi">Uzay &amp; Astronomi</option>
+        <option value="Tarih">Tarih</option>
+        <option value="Bilim">Bilim</option>
+        <option value="Doğa ve Çevre">Doğa &amp; Çevre</option>
+        <option value="Sağlık ve Tıp">Sağlık &amp; Tıp</option>
+        <option value="Ekonomi ve Finans">Ekonomi &amp; Finans</option>
+        <option value="Spor">Spor</option>
+        <option value="Sinema ve Kültür">Sinema &amp; Kültür</option>
+      </select>
+      <button onclick="fetchLVCategoryTrend()" id="btn-lv-trend" style="padding:10px 16px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:8px;color:#f5c518;font-size:13px;cursor:pointer;white-space:nowrap;">
+        <div class="spinner" id="spin-lv-trend"></div>
+        Trend Konu Bul
+      </button>
+    </div>
+    <div id="lv-trend-hook" style="display:none;margin-top:6px;padding:8px 12px;background:#1a1a1a;border:1px solid #2a4a1a;border-radius:8px;color:#4ade80;font-size:12px;"></div>
+  </div>
+
+  <div class="field">
     <label>Konu</label>
     <textarea id="lv-topic" placeholder="Örn: Pamukkale travertenleri nasıl oluşur, Kuantum bilgisayarlar nedir, Osmanlı İmparatorluğu'nun çöküşü..." style="min-height:90px;"></textarea>
   </div>
@@ -632,12 +656,18 @@
     </div>
   </div>
 
+  <div class="field" style="display:flex;align-items:center;gap:10px;">
+    <input type="checkbox" id="lv-use-video" style="width:18px;height:18px;accent-color:#f5c518;cursor:pointer;">
+    <label for="lv-use-video" style="cursor:pointer;margin:0;">Pexels video klipleri kullan (görseller yerine)</label>
+  </div>
+
   <button onclick="generateLongVideo()" id="btn-lv">
     <div class="spinner" id="spin-lv"></div>
     Video Üret
   </button>
 
   <div class="error" id="err-lv"></div>
+  <div id="lv-progress-msg" style="display:none;margin-top:10px;padding:10px 14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#f5c518;font-size:13px;"></div>
 
   <div class="result" id="result-lv">
     <p>Başlık</p>
@@ -1545,62 +1575,122 @@ function switchTab(name) {
   if (name === 'iganalytics') loadIGAnalytics();
 }
 
+let _lvPollTimer = null;
+
+function _showLVProgress(msg) {
+  const el = document.getElementById('lv-progress-msg');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function _displayLVResult(d) {
+  document.getElementById('lv-title-out').textContent = d.title;
+  document.getElementById('lv-video').src = d.video;
+  document.getElementById('dl-lv').href = d.video;
+  document.getElementById('dl-lv').download = `${d.title || 'video'}.mp4`;
+  const mins = Math.floor(d.duration_sec / 60);
+  const secs = Math.round(d.duration_sec % 60);
+  document.getElementById('lv-duration-out').textContent = `Süre: ${mins}:${secs.toString().padStart(2,'0')} · ${d.scene_count} sahne`;
+  currentLVFilename = d.video.split('/').pop();
+  currentLVThumbnailFilename = null;
+  if (d.thumbnail) {
+    currentLVThumbnailFilename = d.thumbnail.split('/').pop();
+    document.getElementById('lv-thumb').src = d.thumbnail;
+    document.getElementById('dl-lv-thumb').href = d.thumbnail;
+    document.getElementById('lv-thumb-wrap').style.display = 'block';
+  } else {
+    document.getElementById('lv-thumb-wrap').style.display = 'none';
+  }
+  document.getElementById('lv-yt-title').value = d.title || '';
+  document.getElementById('lv-yt-desc').value = d.description || '';
+  document.getElementById('lv-yt-tags').value = d.suggested_tags || '';
+  document.getElementById('lv-yt-upload-section').style.display = 'block';
+  document.getElementById('result-lv').classList.add('show');
+  checkYTStatus();
+}
+
+function _startLVPolling() {
+  if (_lvPollTimer) clearInterval(_lvPollTimer);
+  _lvPollTimer = setInterval(async () => {
+    try {
+      const s = await fetch('/api/manual-lv/status').then(r => r.json());
+      if (s.status === 'running') {
+        _showLVProgress(`Üretiliyor... ${s.elapsed || 0}s geçti. Sayfa kapatabilirsiniz, arka planda devam eder.`);
+      } else if (s.status === 'done' && s.result) {
+        clearInterval(_lvPollTimer);
+        _lvPollTimer = null;
+        _showLVProgress('');
+        setLoading('btn-lv', 'spin-lv', false);
+        _displayLVResult(s.result);
+      } else if (s.status === 'error') {
+        clearInterval(_lvPollTimer);
+        _lvPollTimer = null;
+        _showLVProgress('');
+        setLoading('btn-lv', 'spin-lv', false);
+        showError('err-lv', s.error || 'Üretim hatası');
+      }
+    } catch(e) { /* network blip, keep polling */ }
+  }, 4000);
+}
+
 async function generateLongVideo() {
   const apiKey = localStorage.getItem('ds_api_key') || document.getElementById('shorts-apikey').value.trim();
   const topic = document.getElementById('lv-topic').value.trim();
   if (!apiKey) return showError('err-lv', 'Önce "Shorts Üret" sekmesinden DeepSeek API key kaydedin.');
   if (!topic) return showError('err-lv', 'Konu boş olamaz.');
   showError('err-lv', '');
-  setLoading('btn-lv', 'spin-lv', true);
   document.getElementById('result-lv').classList.remove('show');
 
-  try {
-    const fd = new FormData();
-    fd.append('topic', topic);
-    fd.append('api_key', apiKey);
-    fd.append('lang', document.getElementById('lv-lang').value);
-    fd.append('voice', document.getElementById('lv-voice').value);
-    fd.append('speed', document.getElementById('lv-speed').value);
-    fd.append('duration_min', document.getElementById('lv-duration').value);
+  const fd = new FormData();
+  fd.append('topic', topic);
+  fd.append('api_key', apiKey);
+  fd.append('lang', document.getElementById('lv-lang').value);
+  fd.append('voice', document.getElementById('lv-voice').value);
+  fd.append('speed', document.getElementById('lv-speed').value);
+  fd.append('duration_min', document.getElementById('lv-duration').value);
+  fd.append('use_video', document.getElementById('lv-use-video').checked ? 'true' : 'false');
 
+  try {
     const r = await fetch('/api/generate-long-video', { method: 'POST', body: fd });
     if (!r.ok) {
       const ct = r.headers.get('content-type') || '';
       const err = ct.includes('json') ? (await r.json()).detail : await r.text();
       throw new Error(err);
     }
+    setLoading('btn-lv', 'spin-lv', true);
+    _showLVProgress('Üretim başladı. Sayfa kapatabilirsiniz, arka planda devam eder.');
+    _startLVPolling();
+  } catch(e) {
+    showError('err-lv', e.message);
+  }
+}
+
+async function fetchLVCategoryTrend() {
+  const apiKey = localStorage.getItem('ds_api_key') || document.getElementById('shorts-apikey').value.trim();
+  const category = document.getElementById('lv-category').value;
+  if (!apiKey) return showError('err-lv', 'Önce API key kaydedin.');
+  if (!category) return showError('err-lv', 'Önce bir kategori seçin.');
+  setLoading('btn-lv-trend', 'spin-lv-trend', true);
+  document.getElementById('lv-trend-hook').style.display = 'none';
+  try {
+    const fd = new FormData();
+    fd.append('category', category);
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('lv-lang').value);
+    const r = await fetch('/api/lv-category-trend', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || 'Hata');
     const d = await r.json();
-
-    document.getElementById('lv-title-out').textContent = d.title;
-    document.getElementById('lv-video').src = d.video;
-    document.getElementById('dl-lv').href = d.video;
-    document.getElementById('dl-lv').download = `${d.title || 'video'}.mp4`;
-    const mins = Math.floor(d.duration_sec / 60);
-    const secs = Math.round(d.duration_sec % 60);
-    document.getElementById('lv-duration-out').textContent = `Süre: ${mins}:${secs.toString().padStart(2,'0')} · ${d.scene_count} sahne`;
-
-    currentLVFilename = d.video.split('/').pop();
-    currentLVThumbnailFilename = null;
-    if (d.thumbnail) {
-      currentLVThumbnailFilename = d.thumbnail.split('/').pop();
-      document.getElementById('lv-thumb').src = d.thumbnail;
-      document.getElementById('dl-lv-thumb').href = d.thumbnail;
-      document.getElementById('lv-thumb-wrap').style.display = 'block';
-    } else {
-      document.getElementById('lv-thumb-wrap').style.display = 'none';
+    if (d.topic) {
+      document.getElementById('lv-topic').value = d.topic;
+      if (d.hook) {
+        document.getElementById('lv-trend-hook').textContent = d.hook;
+        document.getElementById('lv-trend-hook').style.display = 'block';
+      }
     }
-
-    document.getElementById('lv-yt-title').value = d.title || '';
-    document.getElementById('lv-yt-desc').value = d.description || '';
-    document.getElementById('lv-yt-tags').value = d.suggested_tags || '';
-    document.getElementById('lv-yt-upload-section').style.display = 'block';
-
-    document.getElementById('result-lv').classList.add('show');
-    checkYTStatus();
   } catch(e) {
     showError('err-lv', e.message);
   } finally {
-    setLoading('btn-lv', 'spin-lv', false);
+    setLoading('btn-lv-trend', 'spin-lv-trend', false);
   }
 }
 
