@@ -501,7 +501,9 @@ Rules:
                 _sh.copy2(str(endcard), str(png_path))
                 photo_saved, visual_err = True, ""
             else:
-                photo_saved, visual_err = False, "endcard yok"
+                # Endcard dosyası yok — son sahne için Pexels'tan gerçek fotoğraf çek
+                ec_keyword = "takip et sosyal medya" if platform == "instagram" else "abone ol youtube"
+                photo_saved, visual_err = fetch_scene_visual(ec_keyword, "portrait", pexels_key, png_path)
         else:
             keyword = scene.get("keyword", topic)
             # Video modu: önce Pexels video dene, başarısız olursa görsele düş
