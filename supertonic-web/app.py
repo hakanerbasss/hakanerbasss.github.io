@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import asyncio
 import subprocess
@@ -769,6 +770,7 @@ async def generate_shorts(
 MANUAL_SHORTS_LOG = Path("manual_shorts_log.json")
 _manual_shorts_lock = False
 MANUAL_LV_LOG = Path("manual_lv_log.json")
+LV_JOB_FILE   = Path("lv_job.json")
 _manual_lv_lock = False
 
 
@@ -1794,17 +1796,55 @@ async def generate_long_video(
     duration_min: int = Form(3),
     use_video: str = Form("false"),
 ):
-    global _manual_lv_lock
     if not topic.strip():
         raise HTTPException(400, "Konu boş olamaz")
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
-    if _manual_lv_lock:
-        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
-    _manual_lv_lock = True
+    # Zaten çalışan worker var mı kontrol et (PID dosyası)
+    if MANUAL_LV_LOG.exists():
+        try:
+            existing = json.loads(MANUAL_LV_LOG.read_text())
+            if existing.get("status") == "running":
+                pid = existing.get("pid")
+                if pid:
+                    import os as _os
+                    try:
+                        _os.kill(pid, 0)  # process hâlâ var mı?
+                        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+                    except ProcessLookupError:
+                        pass  # process ölmüş, yenisini başlat
+                else:
+                    raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
     started_at = time.time()
+    job = {
+        "topic": topic, "api_key": api_key, "lang": lang,
+        "voice": voice, "speed": speed, "duration_min": duration_min,
+        "use_video": use_video, "started_at": started_at,
+    }
+    LV_JOB_FILE.write_text(json.dumps(job, ensure_ascii=False))
+
+    worker_path = Path(__file__).parent / "lv_worker.py"
+    proc = subprocess.Popen(
+        [sys.executable, str(worker_path)],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=open(Path(__file__).parent / "lv_worker.log", "a"),
+        cwd=str(Path(__file__).parent),
+    )
     _save_manual_lv_log("running", started_at=started_at)
-    asyncio.create_task(_long_video_runner(topic, api_key, lang, voice, speed, duration_min, use_video))
+    # PID'i log'a kaydet (canlı kontrol için)
+    try:
+        existing = json.loads(MANUAL_LV_LOG.read_text())
+        existing["pid"] = proc.pid
+        MANUAL_LV_LOG.write_text(json.dumps(existing, ensure_ascii=False))
+    except Exception:
+        pass
+
     return {"ok": True}
 
 
@@ -1816,6 +1856,16 @@ async def get_manual_lv_status():
         data = json.loads(MANUAL_LV_LOG.read_text())
     except Exception:
         return {"status": "idle"}
+    # "running" ama process ölmüşse → error olarak göster
+    if data.get("status") == "running":
+        pid = data.get("pid")
+        if pid:
+            try:
+                import os as _os
+                _os.kill(pid, 0)
+            except ProcessLookupError:
+                data["status"] = "error"
+                data["error"] = "Worker process beklenmedik şekilde durdu (restart?)"
     data["elapsed"] = int(time.time() - data.get("started_at", time.time()))
     return data
 
