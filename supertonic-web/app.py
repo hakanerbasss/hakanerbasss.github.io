@@ -1889,6 +1889,7 @@ IG_CONFIG = Path("ig_config.json")
 IG_LOG = Path("ig_log.json")
 IG_RECENT_FILE = Path("ig_recent_posts.json")  # duplicate prevention
 IG_PENDING_FILE = Path("ig_pending.json")       # doğrulama bekleyen postlar
+IG_FAILED_FILE = Path("ig_failed_uploads.json") # başarısız yüklemeler kuyruğu
 
 TELEGRAM_CONFIG = Path("telegram_config.json")
 
@@ -2040,6 +2041,27 @@ def _ig_is_pending(title: str) -> bool:
         return any(r.get("title", "").lower()[:80] == title_lower and r.get("ts", 0) > cutoff for r in records)
     except Exception:
         return False
+
+
+def _load_failed_ig_uploads() -> list:
+    if IG_FAILED_FILE.exists():
+        try:
+            return json.loads(IG_FAILED_FILE.read_text())
+        except Exception:
+            pass
+    return []
+
+
+def _save_failed_ig_upload(filename: str, title: str, caption: str, error: str = "") -> None:
+    items = _load_failed_ig_uploads()
+    items = [x for x in items if x.get("filename") != filename]  # duplicate önle
+    items.append({"filename": filename, "title": title, "caption": caption, "error": error, "ts": time.time()})
+    IG_FAILED_FILE.write_text(json.dumps(items, ensure_ascii=False))
+
+
+def _remove_failed_ig_upload(filename: str) -> None:
+    items = [x for x in _load_failed_ig_uploads() if x.get("filename") != filename]
+    IG_FAILED_FILE.write_text(json.dumps(items, ensure_ascii=False))
 
 
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
@@ -3329,7 +3351,9 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
             ig_log = f"Reels hatası: {reel_err}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             await send_telegram_alert(f"Instagram Reels [{source}]", reel_err)
-            _ig_remove_pending(title)  # başarısız oldu, bir sonraki çalışmada yeniden denenebilsin
+            _ig_remove_pending(title)
+            # Başarısız yüklemeyi kuyruğa al — kullanıcı manuel olarak yeniden deneyebilir
+            _save_failed_ig_upload(filename, title, caption, reel_err)
             return False, reel_err
         else:
             ig_log = f"Reels yüklendi, doğrulama bekleniyor: {reel_id}"
@@ -4001,6 +4025,45 @@ async def save_ig_only_tr_sched_config(
 @app.post("/api/ig-only-tr/run-now")
 async def run_ig_only_tr_now():
     asyncio.create_task(auto_ig_only_tr_job())
+    return {"ok": True}
+
+
+@app.get("/api/ig/failed-uploads")
+async def get_ig_failed_uploads():
+    return {"items": _load_failed_ig_uploads()}
+
+
+@app.post("/api/ig/retry-upload")
+async def retry_ig_upload(filename: str = Form(...)):
+    ig_cfg = get_ig_config()
+    if not ig_cfg.get("ig_user_id") or not ig_cfg.get("access_token"):
+        raise HTTPException(400, "Instagram yapılandırılmamış")
+    items = _load_failed_ig_uploads()
+    item = next((x for x in items if x.get("filename") == filename), None)
+    if not item:
+        raise HTTPException(404, "Kayıt bulunamadı")
+    video_file = OUTPUT_DIR / filename
+    if not video_file.exists():
+        raise HTTPException(404, "Video dosyası bulunamadı")
+    reel_id, reel_err = await post_reel_to_instagram(
+        video_file, item["caption"], ig_cfg["ig_user_id"], ig_cfg["access_token"]
+    )
+    if reel_err:
+        # Hata mesajını güncelle ama listeden çıkarma
+        updated = [{**x, "error": reel_err, "ts": time.time()} if x.get("filename") == filename else x for x in items]
+        IG_FAILED_FILE.write_text(json.dumps(updated, ensure_ascii=False))
+        raise HTTPException(500, reel_err)
+    _remove_failed_ig_upload(filename)
+    asyncio.create_task(_verify_reel_published(reel_id, item["title"], str(video_file), item["caption"], ig_cfg, "manual-retry"))
+    return {"ok": True, "reel_id": reel_id}
+
+
+@app.delete("/api/ig/failed-upload/{filename}")
+async def delete_ig_failed_upload(filename: str):
+    _remove_failed_ig_upload(filename)
+    video_file = OUTPUT_DIR / filename
+    if video_file.exists():
+        video_file.unlink()
     return {"ok": True}
 
 
