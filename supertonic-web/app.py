@@ -3230,10 +3230,24 @@ def add_shorts_used_topic(title: str):
     SHORTS_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
 
 
+_TR_SHORTS_WEEKLY_SCHEDULE = {
+    "mon": ["09:22", "14:38", "20:07"],
+    "tue": ["09:15", "14:45", "20:15"],
+    "wed": ["09:28", "14:32", "20:22"],
+    "thu": ["09:18", "14:40", "20:35"],
+    "fri": ["09:12", "14:35", "20:28"],
+    "sat": ["10:45", "19:15"],
+    "sun": ["11:30", "20:00"],
+}
+
+
 def load_sched_config():
     if SCHED_CONFIG.exists():
-        return json.loads(SCHED_CONFIG.read_text())
-    return {"enabled": False, "times": ["07:00", "10:00", "13:00", "17:00", "21:00"]}
+        cfg = json.loads(SCHED_CONFIG.read_text())
+        if "weekly" not in cfg:
+            cfg["weekly"] = _TR_SHORTS_WEEKLY_SCHEDULE
+        return cfg
+    return {"enabled": False, "voice": "F1", "weekly": _TR_SHORTS_WEEKLY_SCHEDULE}
 
 
 def save_sched_log(status: str, message: str, url: str = ""):
@@ -3380,18 +3394,19 @@ def _rebuild_scheduler():
     cfg = load_sched_config()
     if not cfg.get("enabled"):
         return
-    for t in cfg.get("times", []):
-        try:
-            hour, minute = t.strip().split(":")
-            scheduler.add_job(
-                auto_shorts_job,
-                CronTrigger(hour=int(hour), minute=int(minute)),
-                id=f"auto_{t.replace(':', '')}",
-                replace_existing=True,
-                max_instances=1,
-            )
-        except Exception:
-            pass
+    for day, times in cfg.get("weekly", _TR_SHORTS_WEEKLY_SCHEDULE).items():
+        for t in times:
+            try:
+                hour, minute = t.split(":")
+                scheduler.add_job(
+                    auto_shorts_job,
+                    CronTrigger(day_of_week=day, hour=int(hour), minute=int(minute), timezone="Europe/Istanbul"),
+                    id=f"auto_{day}_{t.replace(':', '')}",
+                    replace_existing=True,
+                    max_instances=1,
+                )
+            except Exception:
+                pass
 
 
 async def auto_long_video_job():
@@ -3641,10 +3656,24 @@ EN_SHORTS_SCHED_LOG     = Path("en_shorts_scheduler_log.json")
 EN_SHORTS_DAILY_TOPICS  = Path("en_shorts_daily_topics.json")
 
 
+_EN_SHORTS_WEEKLY_SCHEDULE = {
+    "mon": ["10:22", "15:38", "21:07"],
+    "tue": ["10:15", "15:45", "21:15"],
+    "wed": ["10:28", "15:32", "21:22"],
+    "thu": ["10:18", "15:40", "21:35"],
+    "fri": ["10:12", "15:25", "21:28"],
+    "sat": ["11:45", "20:15"],
+    "sun": ["12:30", "21:00"],
+}
+
+
 def load_en_shorts_sched_config():
     if EN_SHORTS_SCHED_CONFIG.exists():
-        return json.loads(EN_SHORTS_SCHED_CONFIG.read_text())
-    return {"enabled": False, "times": ["08:00", "14:00", "20:00"], "voice": "M1", "ig_enabled": False}
+        cfg = json.loads(EN_SHORTS_SCHED_CONFIG.read_text())
+        if "weekly" not in cfg:
+            cfg["weekly"] = _EN_SHORTS_WEEKLY_SCHEDULE
+        return cfg
+    return {"enabled": False, "voice": "M1", "ig_enabled": False, "weekly": _EN_SHORTS_WEEKLY_SCHEDULE}
 
 
 def save_en_shorts_sched_log(status: str, message: str, url: str = ""):
@@ -3765,18 +3794,19 @@ def _rebuild_en_shorts_scheduler():
     cfg = load_en_shorts_sched_config()
     if not cfg.get("enabled"):
         return
-    for t in cfg.get("times", []):
-        try:
-            hour, minute = t.strip().split(":")
-            scheduler.add_job(
-                auto_en_shorts_job,
-                CronTrigger(hour=int(hour), minute=int(minute)),
-                id=f"en_shorts_{t.replace(':', '')}",
-                replace_existing=True,
-                max_instances=1,
-            )
-        except Exception:
-            pass
+    for day, times in cfg.get("weekly", _EN_SHORTS_WEEKLY_SCHEDULE).items():
+        for t in times:
+            try:
+                hour, minute = t.split(":")
+                scheduler.add_job(
+                    auto_en_shorts_job,
+                    CronTrigger(day_of_week=day, hour=int(hour), minute=int(minute), timezone="Europe/Istanbul"),
+                    id=f"en_shorts_{day}_{t.replace(':', '')}",
+                    replace_existing=True,
+                    max_instances=1,
+                )
+            except Exception:
+                pass
 
 
 TNLV_SCHED_CONFIG = Path("tnlv_scheduler_config.json")
@@ -4180,12 +4210,20 @@ async def get_scheduler_config():
 @app.post("/api/scheduler/config")
 async def save_scheduler_config(
     enabled: str = Form("false"),
-    times: str = Form("07:00,10:00,13:00,17:00,21:00"),
     lang: str = Form("tr"),
     voice: str = Form("F1"),
+    mon: str = Form(""),
+    tue: str = Form(""),
+    wed: str = Form(""),
+    thu: str = Form(""),
+    fri: str = Form(""),
+    sat: str = Form(""),
+    sun: str = Form(""),
 ):
-    time_list = [t.strip() for t in times.split(",") if t.strip()]
-    cfg = {"enabled": enabled == "true", "times": time_list, "lang": lang, "voice": voice}
+    weekly = {}
+    for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
+        weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
+    cfg = {"enabled": enabled == "true", "lang": lang, "voice": voice, "weekly": weekly}
     SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_scheduler()
     return cfg
@@ -4295,12 +4333,20 @@ async def get_en_shorts_scheduler_config():
 @app.post("/api/en-shorts-scheduler/config")
 async def save_en_shorts_scheduler_config(
     enabled: str = Form("false"),
-    times: str = Form("08:00,14:00,20:00"),
     voice: str = Form("M1"),
     ig_enabled: str = Form("false"),
+    mon: str = Form(""),
+    tue: str = Form(""),
+    wed: str = Form(""),
+    thu: str = Form(""),
+    fri: str = Form(""),
+    sat: str = Form(""),
+    sun: str = Form(""),
 ):
-    time_list = [t.strip() for t in times.split(",") if t.strip()]
-    cfg = {"enabled": enabled == "true", "times": time_list, "voice": voice, "ig_enabled": ig_enabled == "true"}
+    weekly = {}
+    for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
+        weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
+    cfg = {"enabled": enabled == "true", "voice": voice, "ig_enabled": ig_enabled == "true", "weekly": weekly}
     EN_SHORTS_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_en_shorts_scheduler()
     return cfg

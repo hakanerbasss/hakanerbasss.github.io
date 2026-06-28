@@ -965,8 +965,16 @@
           </label>
         </div>
         <div class="field" style="margin-bottom:12px;">
-          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-          <input type="text" id="sched-times" value="07:00,10:00,13:00,17:00,21:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:#555;font-size:11px;">(virgülle ayır — örn: 09:22,14:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="sched-times-mon" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="sched-times-tue" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="sched-times-wed" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="sched-times-thu" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="sched-times-fri" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="sched-times-sat" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="sched-times-sun" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
           <div class="field">
@@ -1215,8 +1223,16 @@
           </label>
         </div>
         <div class="field" style="margin-bottom:12px;">
-          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-          <input type="text" id="en-shorts-sched-times" value="08:00,14:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:#555;font-size:11px;">(virgülle ayır — örn: 10:22,15:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="en-shorts-times-mon" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="en-shorts-times-tue" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="en-shorts-times-wed" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="en-shorts-times-thu" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="en-shorts-times-fri" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="en-shorts-times-sat" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="en-shorts-times-sun" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
         </div>
         <div class="field" style="margin-bottom:14px;">
           <label>Ses</label>
@@ -2473,7 +2489,11 @@ async function loadENShortsSchedulerStatus() {
     const r = await fetch('/api/en-shorts-scheduler/config');
     const d = await r.json();
     document.getElementById('en-shorts-sched-enabled').checked = d.enabled;
-    document.getElementById('en-shorts-sched-times').value = (d.times || ['08:00','14:00','20:00']).join(',');
+    const enWeekly = d.weekly || {};
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+      const el = document.getElementById(`en-shorts-times-${day}`);
+      if (el) el.value = (enWeekly[day] || []).join(',');
+    });
     if (d.voice) document.getElementById('en-shorts-sched-voice').value = d.voice;
     document.getElementById('en-shorts-ig-enabled').checked = !!d.ig_enabled;
 
@@ -2496,9 +2516,11 @@ async function loadENShortsSchedulerStatus() {
 async function saveENShortsScheduler() {
   const fd = new FormData();
   fd.append('enabled', document.getElementById('en-shorts-sched-enabled').checked ? 'true' : 'false');
-  fd.append('times', document.getElementById('en-shorts-sched-times').value);
   fd.append('voice', document.getElementById('en-shorts-sched-voice').value);
   fd.append('ig_enabled', document.getElementById('en-shorts-ig-enabled').checked ? 'true' : 'false');
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+    fd.append(day, document.getElementById(`en-shorts-times-${day}`).value);
+  });
   await fetch('/api/en-shorts-scheduler/config', { method: 'POST', body: fd });
   await loadENShortsSchedulerStatus();
 }
@@ -2900,7 +2922,11 @@ async function loadSchedulerStatus() {
     const d = await r.json();
 
     document.getElementById('sched-enabled').checked = d.enabled || false;
-    if (d.times)  document.getElementById('sched-times').value  = d.times.join(',');
+    const schedWeekly = d.weekly || {};
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+      const el = document.getElementById(`sched-times-${day}`);
+      if (el) el.value = (schedWeekly[day] || []).join(',');
+    });
     if (d.lang)   document.getElementById('sched-lang').value   = d.lang;
     if (d.voice)  document.getElementById('sched-voice').value  = d.voice;
 
@@ -2928,9 +2954,11 @@ async function loadSchedulerStatus() {
 async function saveScheduler() {
   const fd = new FormData();
   fd.append('enabled', document.getElementById('sched-enabled').checked ? 'true' : 'false');
-  fd.append('times',   document.getElementById('sched-times').value.trim());
   fd.append('lang',    document.getElementById('sched-lang').value);
   fd.append('voice',   document.getElementById('sched-voice').value);
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+    fd.append(day, document.getElementById(`sched-times-${day}`).value);
+  });
   const r = await fetch('/api/scheduler/config', { method: 'POST', body: fd });
   if (r.ok) { await loadSchedulerStatus(); showError('err-cfg', ''); }
   else showError('err-cfg', 'Kaydedilemedi.');
