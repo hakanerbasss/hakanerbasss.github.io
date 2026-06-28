@@ -1570,12 +1570,27 @@ function switchTab(name) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'tnlv') updateTNLVApiKeyStatus();
-  if (name === 'longvideo') updateLVApiKeyStatus();
+  if (name === 'longvideo') { updateLVApiKeyStatus(); checkLVStatusOnLoad(); }
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
 }
 
 let _lvPollTimer = null;
+
+async function checkLVStatusOnLoad() {
+  if (_lvPollTimer) return; // zaten polling var
+  try {
+    const s = await fetch('/api/manual-lv/status').then(r => r.json());
+    if (s.status === 'running') {
+      setLoading('btn-lv', 'spin-lv', true);
+      _showLVProgress(`Üretim devam ediyor... ${s.elapsed || 0}s geçti. Sayfa kapatabilirsiniz.`);
+      _startLVPolling();
+    } else if (s.status === 'done' && s.result) {
+      _showLVProgress('');
+      _displayLVResult(s.result);
+    }
+  } catch(e) { /* ignore */ }
+}
 
 function _showLVProgress(msg) {
   const el = document.getElementById('lv-progress-msg');
