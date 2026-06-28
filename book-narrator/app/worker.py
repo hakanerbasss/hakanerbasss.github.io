@@ -65,10 +65,18 @@ async def _process(job_id: str):
 
         need_translation = (
             bool(deepseek_key)
-            and source_lang not in ("auto", target_lang)
+            and source_lang not in ("auto", "none", target_lang)
         )
         use_images = bool(pexels_key)
         use_meta   = bool(deepseek_key)
+
+        # TTS dili: çeviri varsa hedef dil, yoksa kaynak dil (biliniyorsa)
+        if need_translation:
+            tts_lang = target_lang
+        elif source_lang not in ("auto", "none"):
+            tts_lang = source_lang   # orijinal dilde seslendir
+        else:
+            tts_lang = target_lang   # bilinmiyorsa hedef dil
 
         # ── 1. Metin çıkar ──────────────────────────────────────────────────
         await db.update(job_id, _now(), progress=2)
@@ -107,10 +115,10 @@ async def _process(job_id: str):
             wav_path = str(wav_dir / f"{i:05d}.wav")
 
             if Path(wav_path).exists():
-                dur = len(chunk_text) / 15.0  # mevcut WAV için tahmin
+                dur = len(chunk_text) / 15.0
             else:
                 dur = await tts_svc.synthesize(
-                    chunk_text, wav_path, voice=voice, lang=target_lang
+                    chunk_text, wav_path, voice=voice, lang=tts_lang
                 )
 
             wav_files.append(wav_path)

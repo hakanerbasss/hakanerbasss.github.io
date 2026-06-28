@@ -7,7 +7,7 @@ VOICES = {
 }
 
 LANGUAGES = {
-    "auto": "Otomatik (çeviri yok)",
+    "auto": "Bilinmiyor (çeviri yapma)",
     "tr":   "Türkçe",
     "en":   "English",
     "de":   "Deutsch",

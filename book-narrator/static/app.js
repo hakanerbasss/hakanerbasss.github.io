@@ -97,19 +97,25 @@ function onLangChange() {
   const note = document.getElementById('langNote');
   if (!note) return;
 
-  if (src !== 'auto' && src !== tgt) {
-    const srcLabel = languages.find(l => l.id === src)?.label || src;
-    const tgtLabel = languages.find(l => l.id === tgt)?.label || tgt;
-    if (dsConfigured) {
-      note.textContent = `✓ DeepSeek ile ${srcLabel} → ${tgtLabel} çevirisi yapılacak`;
-      note.className = 'lang-note note-ok';
-    } else {
-      note.textContent = `⚠ Çeviri için DeepSeek API key gerekli. Şu an ${srcLabel} metni doğrudan seslendirilecek.`;
-      note.className = 'lang-note note-warn';
-    }
+  const srcLabel = languages.find(l => l.id === src)?.label || src;
+  const tgtLabel = languages.find(l => l.id === tgt)?.label || tgt;
+
+  if (src === tgt) {
+    note.textContent = `✓ Kitap ${tgtLabel} dilinde — doğrudan seslendirilecek`;
+    note.className = 'lang-note note-ok';
+    note.style.display = 'block';
+  } else if (src === 'auto') {
+    note.textContent = `⚠ Kaynak dil seçilmedi. Türkçe ses için soldaki listeden kitabın dilini seçin (örn: English) ve DeepSeek key girin.`;
+    note.className = 'lang-note note-warn';
+    note.style.display = 'block';
+  } else if (!dsConfigured) {
+    note.textContent = `⚠ ${srcLabel} → ${tgtLabel} çevirisi için DeepSeek API key gerekli (üstteki Ayarlar'dan girin). Şu an kitap ${srcLabel} dilinde seslendirilecek.`;
+    note.className = 'lang-note note-warn';
     note.style.display = 'block';
   } else {
-    note.style.display = 'none';
+    note.textContent = `✓ DeepSeek ile ${srcLabel} → ${tgtLabel} çevirisi yapılacak`;
+    note.className = 'lang-note note-ok';
+    note.style.display = 'block';
   }
 }
 
