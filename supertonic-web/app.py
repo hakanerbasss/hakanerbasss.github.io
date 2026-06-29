@@ -2248,13 +2248,26 @@ async def send_telegram_video(video_path: Path, title: str, description: str, ta
         print(f"[TELEGRAM] Video dosyası bulunamadı: {video_path}", flush=True)
         return
     import html as _html
+    # YouTube taglerini kaldır, Instagram taglerini bırak/ekle
+    yt_tags = {"shorts", "youtubeshorts", "youtube", "ytshorts", "youtubevideos", "youtubetr"}
+    ig_base = ["#reels", "#keşfet", "#instareels"]
+    filtered = []
+    for t in tags.replace(",", " ").split():
+        clean = t.lstrip("#").lower().replace(" ", "")
+        if clean not in yt_tags:
+            filtered.append(t if t.startswith("#") else f"#{t}")
+    for ig in ig_base:
+        if ig not in filtered:
+            filtered.append(ig)
+    ig_tags_str = " ".join(filtered[:20])
+
     caption_parts = []
     if title:
         caption_parts.append(f"<b>{_html.escape(title)}</b>")
     if description:
         caption_parts.append(_html.escape(description[:800]))
-    if tags:
-        caption_parts.append(_html.escape(tags[:300]))
+    if ig_tags_str:
+        caption_parts.append(_html.escape(ig_tags_str))
     caption = "\n\n".join(caption_parts)[:1024]
     try:
         print(f"[TELEGRAM] Gönderiliyor: {video_path.name} ({video_path.stat().st_size // 1024}KB)", flush=True)
