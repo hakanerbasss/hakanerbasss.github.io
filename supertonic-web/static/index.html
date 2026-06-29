@@ -1498,7 +1498,8 @@
         <!-- Yedek -->
         <p style="color:#666;font-size:12px;margin-bottom:12px;">Tüm API key'leri ve ayarları ZIP olarak indir. Sunucu değişirse geri yükle.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-          <a href="/api/backup/download" download style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">⬇ Yedek İndir</a>
+          <button onclick="downloadBackup()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">⬇ Yedek İndir</button>
+          <button onclick="sendBackupTelegram(this)" style="background:#1a2a1e;color:#4ade80;border:1px solid #1a4a2e;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">📨 Telegrama Gönder</button>
           <label style="background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
             ⬆ Yedek Yükle
             <input type="file" accept=".zip" style="display:none;" onchange="restoreBackup(this)">
@@ -2854,6 +2855,55 @@ async function changePassword() {
     const d = await r.json();
     st.style.color='#f87171'; st.textContent = d.detail || 'Hata';
   }
+}
+
+async function downloadBackup() {
+  const status = document.getElementById('backup-status');
+  // Try File System Access API (Android Chrome 86+) to let user pick folder
+  if (window.showSaveFilePicker) {
+    try {
+      const today = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
+      const fname = `supertonic_backup_${today}.zip`;
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fname,
+        types: [{ description: 'ZIP Yedek', accept: { 'application/zip': ['.zip'] } }],
+      });
+      status.style.color = '#888'; status.textContent = 'İndiriliyor...';
+      const resp = await fetch('/api/backup/download');
+      const blob = await resp.blob();
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      status.style.color = '#4ade80'; status.textContent = '✓ Kaydedildi';
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // user cancelled picker
+      // fall through to normal download
+    }
+  }
+  // Fallback: normal browser download
+  const a = document.createElement('a');
+  a.href = '/api/backup/download';
+  a.download = '';
+  a.click();
+}
+
+async function sendBackupTelegram(btn) {
+  const status = document.getElementById('backup-status');
+  btn.disabled = true;
+  status.style.color = '#888'; status.textContent = '📨 Telegram\'a gönderiliyor...';
+  try {
+    const r = await fetch('/api/backup/send-telegram', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = '#4ade80'; status.textContent = `✓ Telegram\'a gönderildi: ${d.filename}`;
+    } else {
+      status.style.color = '#f87171'; status.textContent = d.detail || 'Hata';
+    }
+  } catch(e) {
+    status.style.color = '#f87171'; status.textContent = 'Bağlantı hatası';
+  }
+  btn.disabled = false;
 }
 
 async function restoreBackup(input) {

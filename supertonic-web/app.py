@@ -5142,6 +5142,41 @@ async def backup_download():
     )
 
 
+@app.post("/api/backup/send-telegram")
+async def backup_send_telegram():
+    """Backup ZIP'i Telegram botuna gönder."""
+    import zipfile, io, datetime
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    chat_id = cfg.get("chat_id", "").strip()
+    if not token or not chat_id:
+        raise HTTPException(400, "Telegram bot token veya chat_id ayarlı değil")
+    buf = io.BytesIO()
+    today = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    fname = f"supertonic_backup_{today}.zip"
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in _BACKUP_FILES:
+            if p.exists():
+                zf.write(str(p), p.name)
+    buf.seek(0)
+    data = buf.read()
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                f"https://api.telegram.org/bot{token}/sendDocument",
+                data={"chat_id": chat_id, "caption": f"📦 Supertonic Yedek — {today}"},
+                files={"document": (fname, data, "application/zip")},
+            )
+        if resp.status_code == 200:
+            return {"ok": True, "filename": fname}
+        else:
+            raise HTTPException(500, f"Telegram hatası: {resp.text[:200]}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.post("/api/backup/restore")
 async def backup_restore(file: UploadFile = File(...)):
     """Yedek ZIP dosyasından config dosyalarını geri yükle."""
