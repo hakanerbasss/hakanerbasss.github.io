@@ -1856,19 +1856,24 @@ async def get_manual_lv_status():
         data = json.loads(MANUAL_LV_LOG.read_text())
     except Exception:
         return {"status": "idle"}
-    # "running" ama process ölmüşse → error olarak göster
+    # "running" ama process ölmüş veya zaman aşımı → error olarak göster
     if data.get("status") == "running":
-        pid = data.get("pid")
-        if pid:
-            alive = False
-            try:
-                os.kill(int(pid), 0)
-                alive = True
-            except OSError:
+        elapsed = int(time.time() - data.get("started_at", time.time()))
+        if elapsed > 90 * 60:  # 90 dakika aşıldıysa
+            data["status"] = "error"
+            data["error"] = f"Zaman aşımı ({elapsed // 60} dakika). Sıfırlayıp tekrar deneyin."
+        else:
+            pid = data.get("pid")
+            if pid:
                 alive = False
-            if not alive:
-                data["status"] = "error"
-                data["error"] = "Worker process durdu (muhtemelen restart sonrası). Yeniden üretebilirsiniz."
+                try:
+                    os.kill(int(pid), 0)
+                    alive = True
+                except OSError:
+                    alive = False
+                if not alive:
+                    data["status"] = "error"
+                    data["error"] = "Worker process durdu (muhtemelen restart sonrası). Yeniden üretebilirsiniz."
     data["elapsed"] = int(time.time() - data.get("started_at", time.time()))
     return data
 
