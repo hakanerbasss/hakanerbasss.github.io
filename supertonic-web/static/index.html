@@ -500,7 +500,8 @@
   </div>
 
   <div id="shorts-progress" style="display:none;margin-top:12px;padding:10px 14px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:8px;color:#6dbf6d;font-size:13px;">
-    ⏱ Sunucuda üretiliyor... <span id="shorts-elapsed">0</span>s &nbsp;<span style="color:#555;font-size:11px;">— Sayfayı kapatabilirsiniz</span>
+    ⏱ Sunucuda üretiliyor... <span id="shorts-elapsed">0</span> &nbsp;<span style="color:#555;font-size:11px;">— Sayfayı kapatabilirsiniz</span>
+    <button onclick="resetShortsGeneration()" style="margin-left:12px;padding:4px 10px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:6px;color:#f87171;font-size:12px;cursor:pointer;">Sıfırla</button>
   </div>
 
   <div class="error" id="err-shorts"></div>
@@ -2156,7 +2157,7 @@ function _startShortsPolling() {
       const r = await fetch('/api/manual-shorts/status');
       if (!r.ok) return;
       const j = await r.json();
-      timerEl.textContent = j.elapsed ?? 0;
+      timerEl.textContent = _fmtElapsed(j.elapsed ?? 0);
 
       if (j.status === 'done') {
         _stopShortsPolling();
@@ -2175,6 +2176,12 @@ function _stopShortsPolling() {
   _shortsPollInterval = null;
   document.getElementById('shorts-progress').style.display = 'none';
   setLoading('btn-shorts', 'spin-shorts', false);
+}
+
+async function resetShortsGeneration() {
+  _stopShortsPolling();
+  await fetch('/api/manual-shorts/reset', { method: 'POST' });
+  showError('err-shorts', '');
 }
 
 function _showShortsResult(d) {
@@ -2207,8 +2214,10 @@ function _showShortsResult(d) {
     if (!r.ok) return;
     const j = await r.json();
     if (j.status === 'running') {
-      document.getElementById('shorts-elapsed').textContent = j.elapsed ?? 0;
+      document.getElementById('shorts-elapsed').textContent = _fmtElapsed(j.elapsed ?? 0);
       _startShortsPolling();
+    } else if (j.status === 'error') {
+      showError('err-shorts', j.error || 'Üretim hatası — sıfırlayıp tekrar deneyin.');
     }
   } catch(e) {}
 })();

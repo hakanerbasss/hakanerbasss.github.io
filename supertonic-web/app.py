@@ -851,8 +851,22 @@ async def get_manual_shorts_status():
         data = json.loads(MANUAL_SHORTS_LOG.read_text())
     except Exception:
         return {"status": "idle"}
+    if data.get("status") == "running":
+        elapsed = int(time.time() - data.get("started_at", time.time()))
+        if elapsed > 45 * 60:  # 45 dakika aşıldıysa takılmış demek
+            data["status"] = "error"
+            data["error"] = f"Zaman aşımı ({elapsed // 60} dakika). Sıfırlayıp tekrar deneyin."
     data["elapsed"] = int(time.time() - data.get("started_at", time.time()))
     return data
+
+
+@app.post("/api/manual-shorts/reset")
+async def reset_manual_shorts():
+    global _manual_shorts_lock
+    _manual_shorts_lock = False
+    if MANUAL_SHORTS_LOG.exists():
+        MANUAL_SHORTS_LOG.unlink(missing_ok=True)
+    return {"ok": True}
 
 
 from trends import get_trends
