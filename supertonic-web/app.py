@@ -28,10 +28,10 @@ import whisper
 app = FastAPI()
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-AUTH_CONFIG = Path("auth_config.json")
-_sessions: dict = {}  # token -> expiry (time.time() + 24h)
-_SESSION_TTL = 24 * 3600
-_COOKIE = "instube_session"
+AUTH_CONFIG   = Path("auth_config.json")
+SESSIONS_FILE = Path("sessions.json")
+_SESSION_TTL  = 7 * 24 * 3600  # 7 gün
+_COOKIE       = "instube_session"
 
 
 def _hash_pw(pw: str) -> str:
@@ -44,12 +44,34 @@ def _get_auth_cfg() -> dict:
     return json.loads(AUTH_CONFIG.read_text())
 
 
+def _load_sessions() -> dict:
+    if SESSIONS_FILE.exists():
+        try:
+            data = json.loads(SESSIONS_FILE.read_text())
+            now = time.time()
+            return {t: exp for t, exp in data.items() if exp > now}
+        except Exception:
+            pass
+    return {}
+
+
+def _save_sessions(sessions: dict) -> None:
+    try:
+        SESSIONS_FILE.write_text(json.dumps(sessions))
+    except Exception:
+        pass
+
+
+_sessions: dict = _load_sessions()  # restart'ta diskten yükle
+
+
 def _valid_session(token: str | None) -> bool:
     if not token:
         return False
     exp = _sessions.get(token)
     if not exp or time.time() > exp:
         _sessions.pop(token, None)
+        _save_sessions(_sessions)
         return False
     return True
 
@@ -86,6 +108,7 @@ async def login(request: Request, response: Response):
         return FileResponse("static/login.html", status_code=401, headers={"X-Login-Error": "1"})
     token = secrets.token_hex(32)
     _sessions[token] = time.time() + _SESSION_TTL
+    _save_sessions(_sessions)
     resp = RedirectResponse("/", status_code=302)
     resp.set_cookie(_COOKIE, token, httponly=True, samesite="lax", max_age=_SESSION_TTL)
     return resp
@@ -95,6 +118,7 @@ async def login(request: Request, response: Response):
 async def logout(request: Request):
     token = request.cookies.get(_COOKIE)
     _sessions.pop(token, None)
+    _save_sessions(_sessions)
     resp = RedirectResponse("/login", status_code=302)
     resp.delete_cookie(_COOKIE)
     return resp
