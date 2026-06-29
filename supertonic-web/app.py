@@ -1730,7 +1730,7 @@ Rules:
     await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
          "-map", "0:v:0", "-map", "1:a:0",
-         "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)],
+         "-c:v", "copy", "-c:a", "aac", str(output_file)],
         check=True, capture_output=True, timeout=120,
     )
 
@@ -2117,7 +2117,7 @@ Rules:
     await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
          "-map", "0:v:0", "-map", "1:a:0",
-         "-c:v", "copy", "-c:a", "aac", "-shortest", str(output_file)],
+         "-c:v", "copy", "-c:a", "aac", str(output_file)],
         check=True, capture_output=True, timeout=120,
     )
 
