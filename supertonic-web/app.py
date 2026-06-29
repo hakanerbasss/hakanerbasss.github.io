@@ -813,6 +813,13 @@ async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics,
     try:
         result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform)
         _save_manual_shorts_log("done", result=result)
+        video_file = OUTPUT_DIR / result["video"].split("/")[-1]
+        await send_telegram_video(
+            video_file,
+            result.get("title", topic or "Manuel Shorts"),
+            result.get("suggested_description", ""),
+            result.get("suggested_tags", ""),
+        )
     except Exception as e:
         _save_manual_shorts_log("error", error=str(e))
     finally:
@@ -2230,11 +2237,15 @@ def _fire_telegram(source: str, message: str) -> None:
 
 
 async def send_telegram_video(video_path: Path, title: str, description: str, tags: str) -> None:
-    """Üretilen uzun videoyu Telegram'a gönder."""
+    """Üretilen videoyu Telegram'a gönder."""
     cfg = get_telegram_config()
     token = cfg.get("bot_token", "").strip()
     chat_id = cfg.get("chat_id", "").strip()
     if not token or not chat_id:
+        print("[TELEGRAM] Bot token veya chat_id eksik — gönderim atlandı", flush=True)
+        return
+    if not video_path.exists():
+        print(f"[TELEGRAM] Video dosyası bulunamadı: {video_path}", flush=True)
         return
     import html as _html
     caption_parts = []
@@ -2246,15 +2257,20 @@ async def send_telegram_video(video_path: Path, title: str, description: str, ta
         caption_parts.append(_html.escape(tags[:300]))
     caption = "\n\n".join(caption_parts)[:1024]
     try:
+        print(f"[TELEGRAM] Gönderiliyor: {video_path.name} ({video_path.stat().st_size // 1024}KB)", flush=True)
         async with httpx.AsyncClient(timeout=300) as client:
             with open(video_path, "rb") as vf:
-                await client.post(
+                resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendVideo",
                     data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML", "supports_streaming": "true"},
                     files={"video": (video_path.name, vf, "video/mp4")},
                 )
-    except Exception:
-        pass
+        if resp.status_code == 200:
+            print("[TELEGRAM] Gönderim başarılı", flush=True)
+        else:
+            print(f"[TELEGRAM] Hata {resp.status_code}: {resp.text[:300]}", flush=True)
+    except Exception as e:
+        print(f"[TELEGRAM] Exception: {e}", flush=True)
 
 
 _generation_lock = None
