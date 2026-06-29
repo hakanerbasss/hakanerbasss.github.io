@@ -4302,6 +4302,11 @@ def load_ig_only_tr_config():
         cfg = json.loads(IG_ONLY_TR_SCHED_CONFIG.read_text())
         if "weekly" not in cfg:
             cfg["weekly"] = _IG_WEEKLY_SCHEDULE
+            IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
+        elif len(cfg["weekly"].get("mon", [])) < 10:
+            # Eski az-slot schedule → yeni 12-slot schedule'a geç
+            cfg["weekly"] = _IG_WEEKLY_SCHEDULE
+            IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
         return cfg
     return {"enabled": False, "voice": "F1", "weekly": _IG_WEEKLY_SCHEDULE}
 
