@@ -447,7 +447,7 @@ Rules:
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
-- hashtags: 8-12 tags specific to THIS video's topic (mix of {lang_name} and English), ALWAYS include "Shorts", "sondakika", "gündem", "keşfet", "haberler" — then add topic-specific tags. No # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika", "breaking news" → "breakingnews")
+- hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
 """
 
     data = None
@@ -747,7 +747,7 @@ Rules:
         "title": generated_title,
         "scene_count": len(scenes),
         "suggested_tags": video_tags,
-        "suggested_description": f"{full_script[:200]}...\n\n{video_tags.replace(', ', ' ')}",
+        "suggested_description": f"{full_script[:200]}...",
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
     }
 
@@ -2248,24 +2248,30 @@ async def send_telegram_video(video_path: Path, title: str, description: str, ta
         print(f"[TELEGRAM] Video dosyası bulunamadı: {video_path}", flush=True)
         return
     import html as _html
-    # YouTube taglerini kaldır, Instagram taglerini bırak/ekle
-    yt_tags = {"shorts", "youtubeshorts", "youtube", "ytshorts", "youtubevideos", "youtubetr"}
-    ig_base = ["#reels", "#keşfet", "#instareels"]
-    filtered = []
+    # Description'dan hashtag satırlarını temizle (sadece metin kalsın)
+    clean_desc = ""
+    if description:
+        lines = [ln for ln in description.splitlines() if not ln.strip().startswith("#")]
+        clean_desc = " ".join(lines).strip()[:400]
+
+    # Tagleri parse et: virgül/boşluk ayır, YouTube olanlari at, Instagram ekle
+    yt_remove = {"shorts", "youtubeshorts", "youtube", "ytshorts", "youtubevideos", "youtubetr", "yttr"}
+    ig_base   = ["#reels", "#keşfet", "#instareels"]
+    filtered  = []
     for t in tags.replace(",", " ").split():
-        clean = t.lstrip("#").lower().replace(" ", "")
-        if clean not in yt_tags:
-            filtered.append(t if t.startswith("#") else f"#{t}")
+        clean = t.lstrip("#").lower().strip()
+        if clean and clean not in yt_remove:
+            filtered.append(f"#{clean}" if not t.startswith("#") else f"#{t.lstrip('#')}")
     for ig in ig_base:
         if ig not in filtered:
             filtered.append(ig)
-    ig_tags_str = " ".join(filtered[:20])
+    ig_tags_str = " ".join(filtered[:30])  # Instagram max 30 hashtag
 
     caption_parts = []
     if title:
         caption_parts.append(f"<b>{_html.escape(title)}</b>")
-    if description:
-        caption_parts.append(_html.escape(description[:800]))
+    if clean_desc:
+        caption_parts.append(_html.escape(clean_desc))
     if ig_tags_str:
         caption_parts.append(_html.escape(ig_tags_str))
     caption = "\n\n".join(caption_parts)[:1024]
