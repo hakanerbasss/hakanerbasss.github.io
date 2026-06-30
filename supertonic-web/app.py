@@ -1264,7 +1264,8 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
             cat_text = _label
             _band_txt_dark = False
             break
-    YELLOW = _accent
+    BAND_COLOR = _accent          # bant arka planı → kategori rengi
+    YELLOW     = (255, 208, 0)    # başlık metni her zaman sarı (okunabilirlik)
     RED    = (213,   0,   0)
     BLACK  = ( 17,  17,  17)
     WHITE  = (255, 255, 255)
@@ -1286,9 +1287,9 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
         part_b = " ".join(words[2:-2])
         part_c = " ".join(words[-2:])
 
-    # ① Üst kategori bandı — tek tam genişlik sarı bant
+    # ① Üst kategori bandı — renk kategoriye göre değişir, başlık metni her zaman sarı
     y1, h1 = 150, 120
-    draw.rectangle([(0, y1), (W, y1 + h1)], fill=YELLOW)
+    draw.rectangle([(0, y1), (W, y1 + h1)], fill=BAND_COLOR)
     draw.rectangle([(0, y1), (W, y1 + 7)], fill=BLACK)
     draw.rectangle([(0, y1 + h1 - 7), (W, y1 + h1)], fill=BLACK)
     cf = lf(52); af = lf(62)
