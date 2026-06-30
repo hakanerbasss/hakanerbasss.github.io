@@ -1241,13 +1241,35 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
             sz -= 10
         return lf(sz), sz
 
-    YELLOW = (255, 208,   0)
+    # Başlık anahtar kelimesinden kategori rengi tespiti
+    _tl = title.lower()
+    _CATS = [
+        (["ekonomi","borsa","döviz","faiz","enflasyon","dolar","euro","piyasa","merkez ban","bütçe","liret"],
+         (30, 130, 220), "EKONOMİ"),
+        (["deprem","sel","yangın","afet","fırtına","kasırga","tsunami","volkan","heyelan"],
+         (230, 105, 0), "AFET"),
+        (["futbol","basketbol","spor","şampiyona","lig","maç","gol","transfer","milli takım","teniz","formula"],
+         (0, 170, 55), "SPOR"),
+        (["dünya","nato","avrupa","ukrayna","rusya","gazze","suriye","savaş","uluslararası","filistin","İsrail"],
+         (140, 50, 215), "DÜNYA"),
+        (["teknoloji","yapay zeka","nasa","uzay","bilim","robot","chatgpt","iphone","android","yapay","ai"],
+         (0, 175, 195), "TEKNOLOJİ"),
+    ]
+    _accent = (255, 208, 0)
+    cat_text = "GÜNDEM" if lang == "tr" else "BREAKING"
+    _band_txt_dark = True
+    for _kws, _color, _label in _CATS:
+        if any(k in _tl for k in _kws):
+            _accent = _color
+            cat_text = _label
+            _band_txt_dark = False
+            break
+    YELLOW = _accent
     RED    = (213,   0,   0)
     BLACK  = ( 17,  17,  17)
     WHITE  = (255, 255, 255)
+    BAND_TXT = BLACK if _band_txt_dark else WHITE
     CX     = W // 2
-
-    cat_text   = "GÜNDEM"     if lang == "tr" else "BREAKING"
     badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
 
     # Başlığı 3 parçaya böl
@@ -1270,10 +1292,10 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
     draw.rectangle([(0, y1), (W, y1 + 7)], fill=BLACK)
     draw.rectangle([(0, y1 + h1 - 7), (W, y1 + h1)], fill=BLACK)
     cf = lf(52); af = lf(62)
-    draw.text((60, y1 + (h1 - 52) // 2), "»»", font=af, fill=BLACK)
+    draw.text((60, y1 + (h1 - 52) // 2), "»»", font=af, fill=BAND_TXT)
     cw = tw(cat_text, cf)
-    draw.text((CX - cw // 2, y1 + (h1 - 52) // 2), cat_text, font=cf, fill=BLACK)
-    draw.text((W - 60 - int(tw("««", af)), y1 + (h1 - 52) // 2), "««", font=af, fill=BLACK)
+    draw.text((CX - cw // 2, y1 + (h1 - 52) // 2), cat_text, font=cf, fill=BAND_TXT)
+    draw.text((W - 60 - int(tw("««", af)), y1 + (h1 - 52) // 2), "««", font=af, fill=BAND_TXT)
 
     # ② part_a — bantsız büyük sarı yazı
     if part_a:
