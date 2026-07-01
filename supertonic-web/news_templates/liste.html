@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+{% block title %}Güncel Haberler | Hakan Erbaş{% endblock %}
+{% block content %}
+<h1 style="font-size:22px;font-weight:800;margin:0;">Güncel Haberler</h1>
+<p style="color:#6b7280;font-size:14px;margin:6px 0 0;">Seni doğrudan ilgilendiren gündem, kısa videolarla.</p>
+
+{% if articles %}
+<div class="grid">
+  {% for a in articles %}
+  <a class="card" href="/haber/{{ a['id'] }}">
+    {% if a['thumbnail'] %}
+      <img class="thumb" src="/api/thumbnail/{{ a['thumbnail'] }}" alt="{{ a['title'] }}" loading="lazy">
+    {% else %}
+      <div class="thumb"></div>
+    {% endif %}
+    <div class="body">
+      <span class="badge" style="background:{{ a['category_color'] }};">{{ a['category'] }}</span>
+      <h3>{{ a['title'] }}</h3>
+      <div class="meta">{{ a['created_at'] | int | timesince }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="pager">
+  {% if page > 1 %}<a href="/haberler?sayfa={{ page - 1 }}">‹ Önceki</a>{% endif %}
+  <span class="active">{{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="/haberler?sayfa={{ page + 1 }}">Sonraki ›</a>{% endif %}
+</div>
+{% else %}
+<div class="empty">Henüz haber yayınlanmadı. Yakında burada olacak.</div>
+{% endif %}
+{% endblock %}

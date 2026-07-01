@@ -25,7 +25,10 @@ from supertonic import TTS
 from deep_translator import GoogleTranslator
 import whisper
 
+import news_site
+
 app = FastAPI()
+app.include_router(news_site.router)
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 AUTH_CONFIG   = Path("auth_config.json")
@@ -79,8 +82,12 @@ def _valid_session(token: str | None) -> bool:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    # Login sayfası ve statik dosyalar serbest
-    if path in ("/login", "/logout") or path.startswith("/static/"):
+    # Login sayfası, statik dosyalar ve genel haber sitesi serbest (anonim erişim)
+    if (path in ("/login", "/logout")
+            or path.startswith("/static/")
+            or path.startswith("/haberler")
+            or path.startswith("/haber/")
+            or path.startswith("/api/thumbnail/")):
         return await call_next(request)
     # Localhost'tan gelen scheduler iç çağrıları serbest
     client_host = request.client.host if request.client else ""
@@ -2642,7 +2649,7 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
         return False, str(e)
 
 
-async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1):
+async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1, description: str = "", thumbnail: str = ""):
     """Post'tan 5 dk sonra Instagram API ile reel'i doğrular. Bulunamazsa yeniden dener (maks 3)."""
     await asyncio.sleep(300)  # 5 dakika bekle
 
@@ -2687,6 +2694,18 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
         _ig_mark_posted(title)
         _ig_remove_pending(title)
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DOĞRULANDI:{source}] {title[:60]}"}))
+        try:
+            permalink = ""
+            async with httpx.AsyncClient(timeout=15) as client:
+                rp = await client.get(
+                    f"{graph}/{reel_id}",
+                    params={"fields": "permalink", "access_token": ig_token},
+                )
+                if rp.status_code == 200:
+                    permalink = rp.json().get("permalink", "")
+            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink)
+        except Exception:
+            pass
         return
 
     # Her iki yöntem de bulamadı — gerçekten yüklenmemiş
@@ -2696,7 +2715,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
             reel_id2, reel_err = await post_reel_to_instagram(vpath, caption, ig_user_id, ig_token)
             if reel_id2:
                 IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[YENİDEN:{source}] Deneme {attempt + 1}: {title[:60]}"}))
-                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1))
+                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1, description, thumbnail))
             else:
                 err_msg = reel_err or "Bilinmeyen hata (boş yanıt)"
                 await send_telegram_alert(f"IG Yeniden Deneme [{source}]", f"Deneme {attempt + 1} başarısız: {err_msg}\n{title[:60]}")
@@ -3731,6 +3750,8 @@ async def auto_shorts_job():
                     title=d.get("title", ""),
                     suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
                     ig_cfg=ig_cfg,
+                    description=d.get("suggested_description", ""),
+                    thumbnail=thumbnail,
                     source="TR-Shorts",
                 ))
 
@@ -3740,7 +3761,7 @@ async def auto_shorts_job():
         lock.release()
 
 
-async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "") -> tuple[bool, str]:
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "") -> tuple[bool, str]:
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla
     if _ig_recently_posted(title) or _ig_is_pending(title):
@@ -3773,7 +3794,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         else:
             ig_log = f"Reels yüklendi, doğrulama bekleniyor: {reel_id}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
-            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source))
+            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail))
             upload_ok = True
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
@@ -4392,6 +4413,7 @@ async def auto_ig_only_tr_job():
             d = r.json()
             add_ig_only_tr_used_topic(d.get("title", ""))
             filename = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
 
         # Sadece Instagram — YouTube'a gönderilmez
         ig_cfg["post_reels"] = True
@@ -4403,6 +4425,8 @@ async def auto_ig_only_tr_job():
             title=d.get("title", ""),
             suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
             ig_cfg=ig_cfg,
+            description=d.get("suggested_description", ""),
+            thumbnail=thumbnail,
             source="IG-Only-TR",
         )
         if ig_ok:
