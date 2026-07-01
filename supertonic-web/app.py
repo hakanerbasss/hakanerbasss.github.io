@@ -82,12 +82,14 @@ def _valid_session(token: str | None) -> bool:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
+    host = (request.headers.get("host") or "").split(":")[0]
     # Login sayfası, statik dosyalar ve genel haber sitesi serbest (anonim erişim)
     if (path in ("/login", "/logout")
             or path.startswith("/static/")
             or path.startswith("/haberler")
             or path.startswith("/haber/")
-            or path.startswith("/api/thumbnail/")):
+            or path.startswith("/api/thumbnail/")
+            or host == news_site.NEWS_SUBDOMAIN):
         return await call_next(request)
     # Localhost'tan gelen scheduler iç çağrıları serbest
     client_host = request.client.host if request.client else ""
@@ -286,7 +288,10 @@ def get_whisper():
 
 
 @app.get("/")
-async def index():
+async def index(request: Request):
+    host = (request.headers.get("host") or "").split(":")[0]
+    if host == news_site.NEWS_SUBDOMAIN:
+        return await news_site.haberler_list(request, sayfa=1)
     return FileResponse("static/index.html")
 
 

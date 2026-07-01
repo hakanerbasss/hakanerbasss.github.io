@@ -17,6 +17,9 @@ BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "news_site.db"
 templates = Jinja2Templates(directory=str(BASE_DIR / "news_templates"))
 
+# Haber sitesi bu alt alan adından herkese açık servis edilir (bkz. auth_middleware, index())
+NEWS_SUBDOMAIN = "hakanerbas.wizaicorp.com"
+
 
 def _timesince(ts: int) -> str:
     diff = time.time() - ts
