@@ -74,10 +74,23 @@
   <div class="meta">{{ a['created_at'] | int | timesince }}</div>
 
   {% if a['ig_permalink'] %}
-  <div class="embed-box">
+  <div class="embed-box" id="embed-box">
     <blockquote class="instagram-media" data-instgrm-permalink="{{ a['ig_permalink'] }}" data-instgrm-version="14" style="margin:0;"></blockquote>
   </div>
   <script async src="//www.instagram.com/embed.js"></script>
+  <script>
+  setTimeout(function () {
+    var box = document.getElementById('embed-box');
+    if (box && !box.querySelector('iframe')) {
+      {% if a['thumbnail'] %}
+      box.innerHTML = '<img src="/api/thumbnail/{{ a["thumbnail"] }}" alt="{{ a["title"] | e }}" style="max-width:100%;border-radius:10px;">'
+        + '<p style="font-size:12px;color:#9aa0a6;text-align:center;margin-top:10px;">Orijinal Instagram gönderisi artık görüntülenemiyor.</p>';
+      {% else %}
+      box.innerHTML = '<p style="font-size:13px;color:#9aa0a6;text-align:center;padding:30px 0;">Bu içerik artık görüntülenemiyor.</p>';
+      {% endif %}
+    }
+  }, 5000);
+  </script>
   {% elif a['thumbnail'] %}
   <div class="embed-box">
     <img src="/api/thumbnail/{{ a['thumbnail'] }}" alt="{{ a['title'] }}" style="max-width:100%;border-radius:10px;">
