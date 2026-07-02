@@ -10,7 +10,7 @@ import hashlib
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse, Response
 from fastapi.templating import Jinja2Templates
 
 BASE_DIR = Path(__file__).parent
@@ -19,6 +19,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "news_templates"))
 
 # Haber sitesi bu alt alan adından herkese açık servis edilir (bkz. auth_middleware, index())
 NEWS_SUBDOMAIN = "hakanerbas.wizaicorp.com"
+SITE_URL = f"https://{NEWS_SUBDOMAIN}"
 
 
 def _timesince(ts: int) -> str:
@@ -35,7 +36,13 @@ def _timesince(ts: int) -> str:
     return time.strftime("%d.%m.%Y", time.localtime(ts))
 
 
+def _isoformat(ts: int) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(ts))
+
+
 templates.env.filters["timesince"] = _timesince
+templates.env.filters["isoformat"] = _isoformat
+templates.env.globals["SITE_URL"] = SITE_URL
 
 PER_PAGE = 12
 COMMENT_COOLDOWN = 30  # saniye, IP başına
@@ -148,7 +155,39 @@ def get_article(article_id: int):
     return row, comments, likes
 
 
+def get_all_ids_and_dates():
+    with _conn() as c:
+        return c.execute("SELECT id, created_at FROM articles ORDER BY id DESC").fetchall()
+
+
 router = APIRouter()
+
+
+@router.get("/robots.txt", response_class=PlainTextResponse)
+async def robots_txt():
+    return (
+        "User-agent: *\n"
+        "Allow: /haberler\n"
+        "Allow: /haber/\n"
+        f"Sitemap: {SITE_URL}/sitemap.xml\n"
+    )
+
+
+@router.get("/sitemap.xml")
+async def sitemap_xml():
+    rows = get_all_ids_and_dates()
+    urls = [f"<url><loc>{SITE_URL}/haberler</loc><changefreq>hourly</changefreq></url>"]
+    for r in rows:
+        urls.append(
+            f"<url><loc>{SITE_URL}/haber/{r['id']}</loc>"
+            f"<lastmod>{_isoformat(int(r['created_at']))}</lastmod></url>"
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        + "".join(urls) + "</urlset>"
+    )
+    return Response(content=xml, media_type="application/xml")
 
 
 @router.get("/haberler", response_class=HTMLResponse)

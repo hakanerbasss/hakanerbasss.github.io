@@ -3,8 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Hakan Erbaş | Güncel Haberler{% endblock %}</title>
-<meta name="description" content="Türkiye ve dünyadan seni doğrudan ilgilendiren güncel haberler, günlük kısa videolarla.">
+{% block titletag %}<title>{% block title %}Hakan Erbaş | Güncel Haberler{% endblock %}</title>{% endblock %}
+{% block metadesc %}<meta name="description" content="Türkiye ve dünyadan seni doğrudan ilgilendiren güncel haberler, günlük kısa videolarla.">{% endblock %}
+<link rel="canonical" href="{{ SITE_URL }}{{ request.url.path }}">
+<meta property="og:site_name" content="Hakan Erbaş | Güncel Haberler">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:url" content="{{ SITE_URL }}{{ request.url.path }}">
+{% block og_title %}<meta property="og:title" content="Hakan Erbaş | Güncel Haberler">{% endblock %}
+{% block og_desc %}<meta property="og:description" content="Türkiye ve dünyadan seni doğrudan ilgilendiren güncel haberler, günlük kısa videolarla.">{% endblock %}
+{% block og_image %}{% endblock %}
+<meta name="twitter:card" content="summary_large_image">
+{% block jsonld %}{% endblock %}
 <style>
   :root{
     --red:#d5000a; --ink:#14151a; --sub:#6b7280; --line:#e8e9ec; --bg:#f6f7f9;

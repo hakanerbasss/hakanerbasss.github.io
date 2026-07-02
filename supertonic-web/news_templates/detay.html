@@ -1,5 +1,26 @@
 {% extends "layout.html" %}
 {% block title %}{{ a['title'] }} | Hakan Erbaş{% endblock %}
+{% block metadesc %}<meta name="description" content="{{ (a['description'] or a['title'])[:160] }}">{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_title %}<meta property="og:title" content="{{ a['title'] }}">{% endblock %}
+{% block og_desc %}<meta property="og:description" content="{{ (a['description'] or a['title'])[:200] }}">{% endblock %}
+{% block og_image %}{% if a['thumbnail'] %}<meta property="og:image" content="{{ SITE_URL }}/api/thumbnail/{{ a['thumbnail'] }}">
+<meta name="twitter:image" content="{{ SITE_URL }}/api/thumbnail/{{ a['thumbnail'] }}">{% endif %}{% endblock %}
+{% block jsonld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "NewsArticle",
+  "headline": {{ a['title'] | tojson }},
+  "description": {{ (a['description'] or a['title'])[:200] | tojson }},
+  "datePublished": {{ (a['created_at'] | int | isoformat) | tojson }},
+  {% if a['thumbnail'] %}"image": [{{ (SITE_URL ~ '/api/thumbnail/' ~ a['thumbnail']) | tojson }}],{% endif %}
+  "author": {"@type": "Person", "name": "Hakan Erbaş"},
+  "publisher": {"@type": "Organization", "name": "Hakan Erbaş"},
+  "mainEntityOfPage": {{ (SITE_URL ~ '/haber/' ~ a['id']) | tojson }}
+}
+</script>
+{% endblock %}
 {% block content %}
 <style>
   .detail-wrap{ max-width:640px; margin:0 auto; }
