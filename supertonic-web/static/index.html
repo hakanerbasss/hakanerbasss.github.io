@@ -1495,6 +1495,17 @@
 
         <div style="height:1px;background:#1e1e1e;margin-bottom:16px;"></div>
 
+        <!-- Script Hook Stili -->
+        <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🎣 Script Hook Stili</p>
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Yeni videoların ilk sahnesi nasıl yazılsın. Performans düşerse tek tıkla eskiye dön.</p>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="hook-btn-eski" onclick="setHookStyle('eski')" style="background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">Eski</button>
+          <button id="hook-btn-yeni" onclick="setHookStyle('yeni')" style="background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">Yeni (kısa kanca + kişisel etki)</button>
+          <span id="hook-style-status" style="font-size:12px;color:#888;"></span>
+        </div>
+
+        <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
+
         <!-- Yedek -->
         <p style="color:#666;font-size:12px;margin-bottom:12px;">Tüm API key'leri ve ayarları ZIP olarak indir. Sunucu değişirse geri yükle.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
@@ -2887,6 +2898,45 @@ async function downloadBackup() {
   a.download = '';
   a.click();
 }
+
+function _renderHookStyle(style) {
+  const eskiBtn = document.getElementById('hook-btn-eski');
+  const yeniBtn = document.getElementById('hook-btn-yeni');
+  if (!eskiBtn || !yeniBtn) return;
+  const active = '#e1306c', activeBorder = '#e1306c', inactive = '#1a1a1a', inactiveBorder = '#2a2a2a';
+  eskiBtn.style.background = style === 'eski' ? active : inactive;
+  eskiBtn.style.borderColor = style === 'eski' ? activeBorder : inactiveBorder;
+  yeniBtn.style.background = style === 'yeni' ? active : inactive;
+  yeniBtn.style.borderColor = style === 'yeni' ? activeBorder : inactiveBorder;
+}
+
+async function loadHookStyle() {
+  try {
+    const r = await fetch('/api/hook-style');
+    const d = await r.json();
+    _renderHookStyle(d.style);
+  } catch(e) {}
+}
+
+async function setHookStyle(style) {
+  const status = document.getElementById('hook-style-status');
+  status.style.color = '#888'; status.textContent = 'Kaydediliyor...';
+  try {
+    const fd = new FormData(); fd.append('style', style);
+    const r = await fetch('/api/hook-style', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.ok) {
+      _renderHookStyle(d.style);
+      status.style.color = '#4ade80';
+      status.textContent = `✓ ${style === 'eski' ? 'Eski' : 'Yeni'} stil aktif`;
+    } else {
+      status.style.color = '#f87171'; status.textContent = 'Hata';
+    }
+  } catch(e) {
+    status.style.color = '#f87171'; status.textContent = 'Bağlantı hatası';
+  }
+}
+loadHookStyle();
 
 async function sendBackupTelegram(btn) {
   const status = document.getElementById('backup-status');
