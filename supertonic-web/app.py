@@ -2665,17 +2665,24 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                     if code == "ERROR":
                         return None, f"processing error: {st.get('status', '')}"
 
-            # 4. Yayınla
-            r4 = await client.post(
-                f"{graph}/{ig_user_id}/media_publish",
-                params={"creation_id": media_id, "access_token": access_token},
-                timeout=30,
-            )
-            if r4.status_code == 200:
-                pub_id = r4.json().get("id")
-                if pub_id:
-                    return pub_id, ""
-                return None, f"publish 200 but no id in response: {r4.text[:200]}"
+            # 4. Yayınla — Meta'nın geçici (is_transient) sunucu hatalarına karşı birkaç kez dene
+            r4 = None
+            for pub_attempt in range(3):
+                r4 = await client.post(
+                    f"{graph}/{ig_user_id}/media_publish",
+                    params={"creation_id": media_id, "access_token": access_token},
+                    timeout=30,
+                )
+                if r4.status_code == 200:
+                    pub_id = r4.json().get("id")
+                    if pub_id:
+                        return pub_id, ""
+                    return None, f"publish 200 but no id in response: {r4.text[:200]}"
+                is_transient = r4.status_code >= 500 or '"is_transient":true' in r4.text
+                if is_transient and pub_attempt < 2:
+                    await asyncio.sleep(10 * (pub_attempt + 1))  # 10s, 20s
+                    continue
+                break
             return None, f"publish failed: {r4.status_code} {r4.text[:200]}"
     except Exception as e:
         return None, str(e)
