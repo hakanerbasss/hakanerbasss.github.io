@@ -62,7 +62,8 @@ _CATS = [
 _DEFAULT_CAT, _DEFAULT_COLOR = "GÜNDEM", "#d50000"
 ALL_CATEGORIES = [(_DEFAULT_CAT, _DEFAULT_COLOR)] + [(label, color) for _, label, color in _CATS]
 
-CONTACT_EMAIL = "iletisim@wizaicorp.com"
+CONTACT_EMAIL = "hakanerbasss@gmail.com"
+CONTACT_WHATSAPP = "905530930325"
 
 templates.env.globals["CATEGORIES"] = ALL_CATEGORIES
 templates.env.globals["CURRENT_YEAR"] = time.strftime("%Y")
@@ -234,7 +235,9 @@ async def hakkinda(request: Request):
 
 @router.get("/iletisim", response_class=HTMLResponse)
 async def iletisim(request: Request):
-    return templates.TemplateResponse("iletisim.html", {"request": request, "contact_email": CONTACT_EMAIL})
+    return templates.TemplateResponse("iletisim.html", {
+        "request": request, "contact_email": CONTACT_EMAIL, "contact_whatsapp": CONTACT_WHATSAPP,
+    })
 
 
 @router.get("/haber/{article_id}", response_class=HTMLResponse)
