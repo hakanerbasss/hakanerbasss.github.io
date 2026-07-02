@@ -94,6 +94,8 @@
   </div>
   <div class="no-server-note">Video Instagram üzerinden oynatılır, arşiv orijinal gönderide tutulur.</div>
 
+  {% include "_app_promo.html" %}
+
   <div id="yorumlar">
     <h2>Yorumlar ({{ comments | length }})</h2>
     <form class="comment-form" method="post" action="/haber/{{ a['id'] }}/yorum">
