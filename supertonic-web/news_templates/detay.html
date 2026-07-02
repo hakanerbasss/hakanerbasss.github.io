@@ -31,6 +31,28 @@
     background:#fff; border:1px solid var(--line); border-radius:14px;
     padding:8px; display:flex; justify-content:center; overflow:hidden;
   }
+  .hero{
+    position:relative; background:#0b0b0f; border-radius:16px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    min-height:78vh; margin:0 -20px; touch-action:pan-y;
+  }
+  @media (min-width:700px){ .hero{ margin:0; } }
+  .hero .embed-box{ background:transparent; border:none; padding:0; width:100%; }
+  .hero .embed-box img{ max-height:78vh; }
+  .hero-nav{
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:10px; z-index:5;
+  }
+  .hero-nav a{
+    width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.12);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:18px; backdrop-filter:blur(4px);
+  }
+  .hero-nav a.disabled{ opacity:.25; pointer-events:none; }
+  .hero-hint{
+    position:absolute; bottom:10px; left:0; right:0; text-align:center;
+    color:rgba(255,255,255,.55); font-size:11px; letter-spacing:.3px;
+  }
   .desc{ font-size:15px; line-height:1.7; margin:20px 0; color:#26272c; }
   .actions{ display:flex; align-items:center; gap:14px; margin:22px 0 10px; }
   .like-btn{
@@ -73,29 +95,37 @@
   <h1>{{ a['title'] }}</h1>
   <div class="meta">{{ a['created_at'] | int | timesince }}</div>
 
-  {% if a['ig_permalink'] %}
-  <div class="embed-box" id="embed-box">
-    <blockquote class="instagram-media" data-instgrm-permalink="{{ a['ig_permalink'] }}" data-instgrm-version="14" style="margin:0;"></blockquote>
+  <div class="hero" id="hero">
+    {% if a['ig_permalink'] %}
+    <div class="embed-box" id="embed-box">
+      <blockquote class="instagram-media" data-instgrm-permalink="{{ a['ig_permalink'] }}" data-instgrm-version="14" style="margin:0;"></blockquote>
+    </div>
+    <script async src="//www.instagram.com/embed.js"></script>
+    <script>
+    setTimeout(function () {
+      var box = document.getElementById('embed-box');
+      if (box && !box.querySelector('iframe')) {
+        {% if a['thumbnail'] %}
+        box.innerHTML = '<img src="/api/thumbnail/{{ a["thumbnail"] }}" alt="{{ a["title"] | e }}" style="max-width:100%;max-height:78vh;border-radius:10px;">'
+          + '<p style="font-size:12px;color:#9aa0a6;text-align:center;margin-top:10px;">Orijinal Instagram gönderisi artık görüntülenemiyor.</p>';
+        {% else %}
+        box.innerHTML = '<p style="font-size:13px;color:#9aa0a6;text-align:center;padding:30px 0;">Bu içerik artık görüntülenemiyor.</p>';
+        {% endif %}
+      }
+    }, 5000);
+    </script>
+    {% elif a['thumbnail'] %}
+    <div class="embed-box">
+      <img src="/api/thumbnail/{{ a['thumbnail'] }}" alt="{{ a['title'] }}" style="max-width:100%;max-height:78vh;border-radius:10px;">
+    </div>
+    {% endif %}
+
+    <div class="hero-nav">
+      <a href="{{ '/haber/' ~ newer_id if newer_id else '#' }}" class="{{ '' if newer_id else 'disabled' }}" aria-label="Önceki haber">↑</a>
+      <a href="{{ '/haber/' ~ older_id if older_id else '#' }}" class="{{ '' if older_id else 'disabled' }}" aria-label="Sonraki haber">↓</a>
+    </div>
+    <div class="hero-hint">yukarı/aşağı kaydır</div>
   </div>
-  <script async src="//www.instagram.com/embed.js"></script>
-  <script>
-  setTimeout(function () {
-    var box = document.getElementById('embed-box');
-    if (box && !box.querySelector('iframe')) {
-      {% if a['thumbnail'] %}
-      box.innerHTML = '<img src="/api/thumbnail/{{ a["thumbnail"] }}" alt="{{ a["title"] | e }}" style="max-width:100%;border-radius:10px;">'
-        + '<p style="font-size:12px;color:#9aa0a6;text-align:center;margin-top:10px;">Orijinal Instagram gönderisi artık görüntülenemiyor.</p>';
-      {% else %}
-      box.innerHTML = '<p style="font-size:13px;color:#9aa0a6;text-align:center;padding:30px 0;">Bu içerik artık görüntülenemiyor.</p>';
-      {% endif %}
-    }
-  }, 5000);
-  </script>
-  {% elif a['thumbnail'] %}
-  <div class="embed-box">
-    <img src="/api/thumbnail/{{ a['thumbnail'] }}" alt="{{ a['title'] }}" style="max-width:100%;border-radius:10px;">
-  </div>
-  {% endif %}
 
   {% if a['description'] %}<p class="desc">{{ a['description'] }}</p>{% endif %}
 
@@ -146,5 +176,24 @@ document.getElementById('like-btn').addEventListener('click', async function() {
   } catch (e) {}
   btn.disabled = false;
 });
+
+(function() {
+  var hero = document.getElementById('hero');
+  if (!hero) return;
+  var newerUrl = {{ ('/haber/' ~ newer_id) | tojson if newer_id else 'null' }};
+  var olderUrl = {{ ('/haber/' ~ older_id) | tojson if older_id else 'null' }};
+  var startY = null;
+  hero.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  hero.addEventListener('touchend', function(e) {
+    if (startY === null) return;
+    var deltaY = e.changedTouches[0].clientY - startY;
+    startY = null;
+    if (Math.abs(deltaY) < 60) return;
+    if (deltaY < 0 && olderUrl) window.location.href = olderUrl;      // yukarı kaydır -> sonraki
+    else if (deltaY > 0 && newerUrl) window.location.href = newerUrl; // aşağı kaydır -> önceki
+  }, { passive: true });
+})();
 </script>
 {% endblock %}

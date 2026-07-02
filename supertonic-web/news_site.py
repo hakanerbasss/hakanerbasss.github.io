@@ -169,6 +169,18 @@ def get_article(article_id: int):
     return row, comments, likes
 
 
+def get_adjacent_ids(article_id: int):
+    """Liste sırasına göre (en yeni önce) bir önceki/sonraki haber id'si — swipe navigasyonu için."""
+    with _conn() as c:
+        newer = c.execute(
+            "SELECT id FROM articles WHERE id > ? ORDER BY id ASC LIMIT 1", (article_id,)
+        ).fetchone()
+        older = c.execute(
+            "SELECT id FROM articles WHERE id < ? ORDER BY id DESC LIMIT 1", (article_id,)
+        ).fetchone()
+    return (newer["id"] if newer else None, older["id"] if older else None)
+
+
 def get_all_ids_and_dates():
     with _conn() as c:
         return c.execute("SELECT id, created_at FROM articles ORDER BY id DESC").fetchall()
@@ -250,8 +262,10 @@ async def haber_detay(request: Request, article_id: int):
         liked = c.execute(
             "SELECT 1 FROM likes WHERE article_id=? AND ip_hash=?", (article_id, _ip_hash(ip))
         ).fetchone() is not None
+    newer_id, older_id = get_adjacent_ids(article_id)
     return templates.TemplateResponse("detay.html", {
         "request": request, "a": row, "comments": comments, "likes": likes, "liked": liked,
+        "newer_id": newer_id, "older_id": older_id,
     })
 
 
