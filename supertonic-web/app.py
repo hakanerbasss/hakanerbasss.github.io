@@ -2959,11 +2959,13 @@ async def _try_ken_burns_clip(
 
 def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path: Path) -> tuple[bool, str]:
     """
-    Görsel hiyerarşisi: DALL-E → Wikimedia Commons → Pexels.
+    Görsel hiyerarşisi: DALL-E → Pexels → Wikimedia Commons (son çare).
+    Wikimedia bir ansiklopedi görsel deposu — soyut anahtar kelimeler için harita/logo/
+    diyagram gibi boşluklu, alakasız sonuçlar dönebiliyor. Pexels gerçek stok fotoğraf
+    kaynağı olduğu için önceliklendirildi.
     (başarı: True,"") | (başarısız: False, "hata nedeni")
     """
     import sys
-    width = 1080 if orientation == "portrait" else 1920
     size_key = "portrait" if orientation == "portrait" else "large2x"
 
     openai_key = get_openai_key()
@@ -2972,10 +2974,7 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
         if data and _save_as_jpeg(data, img_path):
             return True, ""
 
-    data = _fetch_wikimedia_image(keyword, width=width)
-    if data and _save_as_jpeg(data, img_path):
-        return True, ""
-
+    pexels_err = ""
     if pexels_key:
         try:
             resp = httpx.get(
@@ -2987,29 +2986,34 @@ def fetch_scene_visual(keyword: str, orientation: str, pexels_key: str, img_path
             if resp.status_code == 401:
                 print(f"[GÖRSEL] Pexels key geçersiz (401): '{keyword}'", file=sys.stderr)
                 _fire_telegram("Pexels", "API key geçersiz (401) — yeni key gerekiyor")
-                return False, "Pexels 401 key geçersiz"
-            if resp.status_code == 429:
+                pexels_err = "Pexels 401 key geçersiz"
+            elif resp.status_code == 429:
                 print(f"[GÖRSEL] Pexels kota doldu (429): '{keyword}'", file=sys.stderr)
                 _fire_telegram("Pexels", "Aylık kota doldu (429) — limit: 20.000 istek/ay")
-                return False, "Pexels 429 kota doldu"
-            photos = resp.json().get("photos", [])
-            if photos:
-                img_url = photos[0]["src"].get(size_key) or photos[0]["src"]["large"]
-                data = httpx.get(img_url, timeout=15).content
-                if _save_as_jpeg(data, img_path):
-                    return True, ""
+                pexels_err = "Pexels 429 kota doldu"
             else:
-                print(f"[GÖRSEL] Pexels sonuç yok: '{keyword}' HTTP={resp.status_code}", file=sys.stderr)
-                return False, f"Pexels sonuç yok ({resp.status_code})"
+                photos = resp.json().get("photos", [])
+                if photos:
+                    img_url = photos[0]["src"].get(size_key) or photos[0]["src"]["large"]
+                    data = httpx.get(img_url, timeout=15).content
+                    if _save_as_jpeg(data, img_path):
+                        return True, ""
+                else:
+                    print(f"[GÖRSEL] Pexels sonuç yok: '{keyword}'", file=sys.stderr)
+                    pexels_err = "Pexels sonuç yok"
         except Exception as e:
             print(f"[GÖRSEL] Pexels hata: '{keyword}' {e}", file=sys.stderr)
-            return False, f"Pexels hata: {e}"
+            pexels_err = f"Pexels hata: {e}"
     else:
-        print(f"[GÖRSEL] Pexels key yok, Wikimedia de bulunamadı: '{keyword}'", file=sys.stderr)
-        return False, "Pexels key yok"
+        pexels_err = "Pexels key yok"
 
-    print(f"[GÖRSEL] Tüm kaynaklar başarısız — siyah kare: '{keyword}'", file=sys.stderr)
-    return False, "tüm kaynaklar başarısız"
+    width = 1080 if orientation == "portrait" else 1920
+    data = _fetch_wikimedia_image(keyword, width=width)
+    if data and _save_as_jpeg(data, img_path):
+        return True, ""
+
+    print(f"[GÖRSEL] Tüm kaynaklar başarısız — siyah kare: '{keyword}' ({pexels_err})", file=sys.stderr)
+    return False, f"tüm kaynaklar başarısız ({pexels_err})"
 
 
 def fetch_pexels_video(keyword: str, pexels_key: str, raw_path: Path, min_duration: float) -> tuple[bool, str]:
