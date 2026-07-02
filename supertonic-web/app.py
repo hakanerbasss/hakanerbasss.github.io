@@ -466,6 +466,45 @@ async def api_set_hook_style(style: str = Form(...)):
     return {"ok": True, "style": style}
 
 
+# ── Kategori çeşitliliği takibi ─────────────────────────────────────────────
+# Aynı kategori (ör. EKONOMİ) art arda tekrar etmesin diye son üretilenler izlenir
+RECENT_CATEGORIES_FILE = Path("recent_categories.json")
+_RECENT_WINDOW = 6       # son kaç video izlensin
+_REPEAT_THRESHOLD = 3    # aynı kategori bu kadar veya fazla tekrar ederse uyar
+
+
+def get_recent_categories() -> list[str]:
+    if RECENT_CATEGORIES_FILE.exists():
+        try:
+            return json.loads(RECENT_CATEGORIES_FILE.read_text())[-_RECENT_WINDOW:]
+        except Exception:
+            pass
+    return []
+
+
+def add_recent_category(category: str):
+    cats = get_recent_categories()
+    cats.append(category)
+    cats = cats[-_RECENT_WINDOW:]
+    RECENT_CATEGORIES_FILE.write_text(json.dumps(cats, ensure_ascii=False))
+
+
+def get_diversity_instruction() -> str:
+    cats = get_recent_categories()
+    if not cats:
+        return ""
+    from collections import Counter
+    top_cat, count = Counter(cats).most_common(1)[0]
+    if count >= _REPEAT_THRESHOLD:
+        return (
+            f"\nTOPIC DIVERSITY: Your last {len(cats)} videos were heavily {top_cat} "
+            f"({count}/{len(cats)}). If the trending list has a topic from a DIFFERENT "
+            f"category (economy/disaster/sports/world/tech/general), STRONGLY prefer that "
+            f"one instead — do not pick another {top_cat} topic unless nothing else is available.\n"
+        )
+    return ""
+
+
 async def _generate_shorts_core(
     topic: str,
     api_key: str,
@@ -515,6 +554,7 @@ async def _generate_shorts_core(
     else:
         topic_instruction = (
             f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}"
+            f"{get_diversity_instruction()}"
         )
     yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
     prompt = f"""Create a YouTube Shorts video.
@@ -560,6 +600,12 @@ Rules:
                 raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
 
     scenes = data["scenes"]
+
+    if lang == "tr":
+        try:
+            add_recent_category(news_site.guess_category(data.get("title", ""))[0])
+        except Exception:
+            pass
 
     # Son sahne TTS metnini platforma göre sabit CTA ile değiştir
     if scenes:
