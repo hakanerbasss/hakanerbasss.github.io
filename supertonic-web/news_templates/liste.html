@@ -1,8 +1,15 @@
 {% extends "layout.html" %}
-{% block title %}Güncel Haberler | Hakan Erbaş{% endblock %}
+{% block title %}{% if active_category %}{{ active_category }} Haberleri | Hakan Erbaş{% else %}Güncel Haberler | Hakan Erbaş{% endif %}{% endblock %}
 {% block content %}
-<h1 style="font-size:22px;font-weight:800;margin:0;">Güncel Haberler</h1>
+<h1 style="font-size:22px;font-weight:800;margin:0;">{% if active_category %}{{ active_category }} Haberleri{% else %}Güncel Haberler{% endif %}</h1>
 <p style="color:#6b7280;font-size:14px;margin:6px 0 0;">Seni doğrudan ilgilendiren gündem, kısa videolarla.</p>
+
+<div class="cat-filters">
+  <a href="/haberler" class="{{ 'active' if not active_category }}">Tümü</a>
+  {% for label, color in CATEGORIES %}
+  <a href="/haberler?kategori={{ label }}" class="{{ 'active' if active_category == label }}" style="--chip-color:{{ color }}">{{ label }}</a>
+  {% endfor %}
+</div>
 
 {% if articles %}
 <div class="grid">
@@ -22,12 +29,13 @@
   {% endfor %}
 </div>
 
+{% set catq = ('&kategori=' ~ active_category) if active_category else '' %}
 <div class="pager">
-  {% if page > 1 %}<a href="/haberler?sayfa={{ page - 1 }}">‹ Önceki</a>{% endif %}
+  {% if page > 1 %}<a href="/haberler?sayfa={{ page - 1 }}{{ catq }}">‹ Önceki</a>{% endif %}
   <span class="active">{{ page }} / {{ total_pages }}</span>
-  {% if page < total_pages %}<a href="/haberler?sayfa={{ page + 1 }}">Sonraki ›</a>{% endif %}
+  {% if page < total_pages %}<a href="/haberler?sayfa={{ page + 1 }}{{ catq }}">Sonraki ›</a>{% endif %}
 </div>
 {% else %}
-<div class="empty">Henüz haber yayınlanmadı. Yakında burada olacak.</div>
+<div class="empty">{% if active_category %}{{ active_category }} kategorisinde henüz haber yok.{% else %}Henüz haber yayınlanmadı. Yakında burada olacak.{% endif %}</div>
 {% endif %}
 {% endblock %}

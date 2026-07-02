@@ -60,6 +60,12 @@ _CATS = [
       "iphone", "android"], "TEKNOLOJİ", "#00afc3"),
 ]
 _DEFAULT_CAT, _DEFAULT_COLOR = "GÜNDEM", "#d50000"
+ALL_CATEGORIES = [(_DEFAULT_CAT, _DEFAULT_COLOR)] + [(label, color) for _, label, color in _CATS]
+
+CONTACT_EMAIL = "iletisim@wizaicorp.com"
+
+templates.env.globals["CATEGORIES"] = ALL_CATEGORIES
+templates.env.globals["CURRENT_YEAR"] = time.strftime("%Y")
 
 
 def guess_category(title: str) -> tuple[str, str]:
@@ -131,13 +137,20 @@ def add_article(title: str, description: str, thumbnail: str, ig_permalink: str)
         return cur.lastrowid
 
 
-def get_articles(page: int = 1):
+def get_articles(page: int = 1, category: str | None = None):
     offset = (page - 1) * PER_PAGE
     with _conn() as c:
-        rows = c.execute(
-            "SELECT * FROM articles ORDER BY id DESC LIMIT ? OFFSET ?", (PER_PAGE, offset)
-        ).fetchall()
-        total = c.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+        if category:
+            rows = c.execute(
+                "SELECT * FROM articles WHERE category=? ORDER BY id DESC LIMIT ? OFFSET ?",
+                (category, PER_PAGE, offset),
+            ).fetchall()
+            total = c.execute("SELECT COUNT(*) FROM articles WHERE category=?", (category,)).fetchone()[0]
+        else:
+            rows = c.execute(
+                "SELECT * FROM articles ORDER BY id DESC LIMIT ? OFFSET ?", (PER_PAGE, offset)
+            ).fetchall()
+            total = c.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
     return rows, total
 
 
@@ -175,7 +188,7 @@ _AI_CRAWLERS = [
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
-    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", ""]
+    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", ""]
     for ua in _AI_CRAWLERS:
         lines += [f"User-agent: {ua}", "Allow: /", ""]
     lines.append(f"Sitemap: {SITE_URL}/sitemap.xml")
@@ -185,7 +198,11 @@ async def robots_txt():
 @router.get("/sitemap.xml")
 async def sitemap_xml():
     rows = get_all_ids_and_dates()
-    urls = [f"<url><loc>{SITE_URL}/haberler</loc><changefreq>hourly</changefreq></url>"]
+    urls = [
+        f"<url><loc>{SITE_URL}/haberler</loc><changefreq>hourly</changefreq></url>",
+        f"<url><loc>{SITE_URL}/hakkinda</loc><changefreq>monthly</changefreq></url>",
+        f"<url><loc>{SITE_URL}/iletisim</loc><changefreq>monthly</changefreq></url>",
+    ]
     for r in rows:
         urls.append(
             f"<url><loc>{SITE_URL}/haber/{r['id']}</loc>"
@@ -200,13 +217,24 @@ async def sitemap_xml():
 
 
 @router.get("/haberler", response_class=HTMLResponse)
-async def haberler_list(request: Request, sayfa: int = 1):
+async def haberler_list(request: Request, sayfa: int = 1, kategori: str | None = None):
     sayfa = max(1, sayfa)
-    rows, total = get_articles(page=sayfa)
+    rows, total = get_articles(page=sayfa, category=kategori)
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
     return templates.TemplateResponse("liste.html", {
         "request": request, "articles": rows, "page": sayfa, "total_pages": total_pages,
+        "active_category": kategori,
     })
+
+
+@router.get("/hakkinda", response_class=HTMLResponse)
+async def hakkinda(request: Request):
+    return templates.TemplateResponse("hakkinda.html", {"request": request})
+
+
+@router.get("/iletisim", response_class=HTMLResponse)
+async def iletisim(request: Request):
+    return templates.TemplateResponse("iletisim.html", {"request": request, "contact_email": CONTACT_EMAIL})
 
 
 @router.get("/haber/{article_id}", response_class=HTMLResponse)
