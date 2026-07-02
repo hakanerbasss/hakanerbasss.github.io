@@ -163,14 +163,23 @@ def get_all_ids_and_dates():
 router = APIRouter()
 
 
+_AI_CRAWLERS = [
+    "GPTBot", "ChatGPT-User", "OAI-SearchBot",  # OpenAI
+    "ClaudeBot", "Claude-Web", "anthropic-ai",  # Anthropic
+    "PerplexityBot", "Perplexity-User",         # Perplexity
+    "Google-Extended",                          # Google Gemini / AI Overviews eğitim verisi
+    "Bingbot",                                  # Bing / Copilot
+    "Applebot-Extended",                        # Apple Intelligence
+]
+
+
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
-    return (
-        "User-agent: *\n"
-        "Allow: /haberler\n"
-        "Allow: /haber/\n"
-        f"Sitemap: {SITE_URL}/sitemap.xml\n"
-    )
+    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", ""]
+    for ua in _AI_CRAWLERS:
+        lines += [f"User-agent: {ua}", "Allow: /", ""]
+    lines.append(f"Sitemap: {SITE_URL}/sitemap.xml")
+    return "\n".join(lines) + "\n"
 
 
 @router.get("/sitemap.xml")
