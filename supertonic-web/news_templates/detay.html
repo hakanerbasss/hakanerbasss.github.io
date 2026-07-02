@@ -30,29 +30,14 @@
   .embed-box{
     background:#fff; border:1px solid var(--line); border-radius:14px;
     padding:8px; display:flex; justify-content:center; overflow:hidden;
+    touch-action:pan-y;
   }
-  .hero{
-    position:relative; background:#0b0b0f; border-radius:16px; overflow:hidden;
-    display:flex; align-items:center; justify-content:center;
-    min-height:78vh; margin:0 -20px; touch-action:pan-y;
-  }
-  @media (min-width:700px){ .hero{ margin:0; } }
-  .hero .embed-box{ background:transparent; border:none; padding:0; width:100%; }
-  .hero .embed-box img{ max-height:78vh; }
-  .hero-nav{
-    position:absolute; right:10px; top:50%; transform:translateY(-50%);
-    display:flex; flex-direction:column; gap:10px; z-index:5;
-  }
+  .hero-nav{ display:flex; justify-content:center; gap:8px; margin-top:10px; }
   .hero-nav a{
-    width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.12);
-    color:#fff; display:flex; align-items:center; justify-content:center;
-    font-size:18px; backdrop-filter:blur(4px);
+    padding:7px 16px; border-radius:999px; border:1px solid var(--line);
+    font-size:12px; font-weight:700; color:var(--sub); background:var(--card);
   }
-  .hero-nav a.disabled{ opacity:.25; pointer-events:none; }
-  .hero-hint{
-    position:absolute; bottom:10px; left:0; right:0; text-align:center;
-    color:rgba(255,255,255,.55); font-size:11px; letter-spacing:.3px;
-  }
+  .hero-nav a.disabled{ opacity:.35; pointer-events:none; }
   .desc{ font-size:15px; line-height:1.7; margin:20px 0; color:#26272c; }
   .actions{ display:flex; align-items:center; gap:14px; margin:22px 0 10px; }
   .like-btn{
@@ -95,7 +80,7 @@
   <h1>{{ a['title'] }}</h1>
   <div class="meta">{{ a['created_at'] | int | timesince }}</div>
 
-  <div class="hero" id="hero">
+  <div id="hero">
     {% if a['ig_permalink'] %}
     <div class="embed-box" id="embed-box">
       <blockquote class="instagram-media" data-instgrm-permalink="{{ a['ig_permalink'] }}" data-instgrm-version="14" style="margin:0;"></blockquote>
@@ -106,7 +91,7 @@
       var box = document.getElementById('embed-box');
       if (box && !box.querySelector('iframe')) {
         {% if a['thumbnail'] %}
-        box.innerHTML = '<img src="/api/thumbnail/{{ a["thumbnail"] }}" alt="{{ a["title"] | e }}" style="max-width:100%;max-height:78vh;border-radius:10px;">'
+        box.innerHTML = '<img src="/api/thumbnail/{{ a["thumbnail"] }}" alt="{{ a["title"] | e }}" style="max-width:100%;border-radius:10px;">'
           + '<p style="font-size:12px;color:#9aa0a6;text-align:center;margin-top:10px;">Orijinal Instagram gönderisi artık görüntülenemiyor.</p>';
         {% else %}
         box.innerHTML = '<p style="font-size:13px;color:#9aa0a6;text-align:center;padding:30px 0;">Bu içerik artık görüntülenemiyor.</p>';
@@ -116,15 +101,14 @@
     </script>
     {% elif a['thumbnail'] %}
     <div class="embed-box">
-      <img src="/api/thumbnail/{{ a['thumbnail'] }}" alt="{{ a['title'] }}" style="max-width:100%;max-height:78vh;border-radius:10px;">
+      <img src="/api/thumbnail/{{ a['thumbnail'] }}" alt="{{ a['title'] }}" style="max-width:100%;border-radius:10px;">
     </div>
     {% endif %}
+  </div>
 
-    <div class="hero-nav">
-      <a href="{{ '/haber/' ~ newer_id if newer_id else '#' }}" class="{{ '' if newer_id else 'disabled' }}" aria-label="Önceki haber">↑</a>
-      <a href="{{ '/haber/' ~ older_id if older_id else '#' }}" class="{{ '' if older_id else 'disabled' }}" aria-label="Sonraki haber">↓</a>
-    </div>
-    <div class="hero-hint">yukarı/aşağı kaydır</div>
+  <div class="hero-nav">
+    <a href="{{ '/haber/' ~ newer_id if newer_id else '#' }}" class="{{ '' if newer_id else 'disabled' }}">‹ Önceki haber</a>
+    <a href="{{ '/haber/' ~ older_id if older_id else '#' }}" class="{{ '' if older_id else 'disabled' }}">Sonraki haber ›</a>
   </div>
 
   {% if a['description'] %}<p class="desc">{{ a['description'] }}</p>{% endif %}
