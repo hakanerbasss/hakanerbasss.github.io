@@ -280,6 +280,27 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
     return text
 
 
+def _format_hashtags(raw_tags: list, limit: int = 5) -> str:
+    """Hashtag'leri boşlukla ayırır (virgül Instagram'da hatalı görünüyor), sayıyı sınırlar."""
+    tags = []
+    for t in raw_tags:
+        t = t.lstrip("#").replace(" ", "").strip()
+        if t and t not in tags:
+            tags.append(t)
+        if len(tags) >= limit:
+            break
+    return " ".join(f"#{t}" for t in tags)
+
+
+def _smart_truncate(text: str, limit: int = 300) -> str:
+    """Metni kelime sınırında keser, sadece gerçekten kesildiyse '...' ekler."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return f"{cut}..."
+
+
 def get_whisper():
     global whisper_model
     if whisper_model is None:
@@ -860,11 +881,11 @@ Rules:
     # Videoya özel hashtag'ler (DeepSeek'ten) + genel engagement tag'leri
     raw_tags = data.get("hashtags", [])
     if raw_tags:
-        video_tags = ", ".join(f"#{t.lstrip('#').replace(' ', '')}" for t in raw_tags[:12] if t.strip())
+        video_tags = _format_hashtags(raw_tags, limit=5)
     else:
         # Fallback: trend hashtag'leri + başlık kelimelerinden üret
-        title_tags = [f"#{w.lower()}" for w in generated_title.split()[:3] if len(w) > 3]
-        video_tags = ", ".join(["#Shorts"] + title_tags + trend_data["hashtags"][1:6])
+        title_tags = [w.lower() for w in generated_title.split()[:3] if len(w) > 3]
+        video_tags = _format_hashtags(["Shorts"] + title_tags + trend_data["hashtags"][1:6], limit=5)
 
     # Thumbnail — overlay'li ilk sahneyi kopyala (ayrıca create_thumbnail gerekmez)
     thumb_path = None
@@ -888,7 +909,7 @@ Rules:
         "title": generated_title,
         "scene_count": len(scenes),
         "suggested_tags": video_tags,
-        "suggested_description": f"{full_script[:200]}...",
+        "suggested_description": _smart_truncate(full_script, limit=300),
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
     }
 
@@ -1924,9 +1945,9 @@ Rules:
     lv_title = data.get("title", topic)
 
     raw_tags = data.get("hashtags", [])
-    suggested_tags = ", ".join(f"#{t.lstrip('#').replace(' ', '')}" for t in raw_tags[:12] if t)
+    suggested_tags = _format_hashtags(raw_tags, limit=5)
     if not suggested_tags:
-        suggested_tags = f"#{topic.split()[0]}, #belgesel, #eğitim, #keşfet, #teknoloji"
+        suggested_tags = _format_hashtags([topic.split()[0], "belgesel", "eğitim", "keşfet", "teknoloji"], limit=5)
 
     thumb_path = None
     try:
@@ -2311,9 +2332,9 @@ Rules:
     tnlv_title = data.get("title", f"Günün Trend Haberleri - {today}")
 
     raw_tags = data.get("hashtags", [])
-    suggested_tags = ", ".join(f"#{t.lstrip('#').replace(' ', '')}" for t in raw_tags[:15] if t)
+    suggested_tags = _format_hashtags(raw_tags, limit=5)
     if not suggested_tags:
-        suggested_tags = "#gündem, #haberler, #trendler, #güncel, #viral"
+        suggested_tags = _format_hashtags(["gündem", "haberler", "trendler", "güncel", "viral"], limit=5)
 
     thumb_path = None
     thumb_out = None
