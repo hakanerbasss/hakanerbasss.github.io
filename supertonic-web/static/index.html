@@ -488,6 +488,23 @@
     </div>
   </div>
 
+  <div style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch" style="margin:0;">
+        <input type="checkbox" id="use-custom-images" onchange="document.getElementById('custom-images-wrap').style.display = this.checked ? 'block' : 'none';">
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🖼️ Kendi Görsellerimi Kullan</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">Ör. kendi uygulamanın/ürününün tanıtımı — stok fotoğraf yerine yüklediğin görseller sahnelerde sırayla kullanılır</div>
+      </div>
+    </div>
+    <div id="custom-images-wrap" style="display:none;margin-top:10px;">
+      <input type="file" id="custom-images-input" accept="image/*" multiple style="font-size:12px;color:#999;">
+      <div style="font-size:11px;color:#555;margin-top:6px;">Sahne sayısından az görsel yüklersen, kalan sahnelerde baştan tekrarlanır.</div>
+    </div>
+  </div>
+
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
     <button onclick="generateShorts()" id="btn-shorts">
       <div class="spinner" id="spin-shorts"></div>
@@ -2265,6 +2282,11 @@ async function generateShorts(allowEmpty = false) {
     fd.append('voice', document.getElementById('shorts-voice').value);
     fd.append('speed', document.getElementById('shorts-speed').value);
     fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
+
+    if (document.getElementById('use-custom-images').checked) {
+      const files = document.getElementById('custom-images-input').files;
+      for (let i = 0; i < files.length; i++) fd.append('custom_images', files[i]);
+    }
 
     const startR = await fetch('/api/generate-shorts-async', { method: 'POST', body: fd });
     if (!startR.ok) {

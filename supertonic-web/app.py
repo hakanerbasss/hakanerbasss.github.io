@@ -536,6 +536,7 @@ async def _generate_shorts_core(
     region: str = "TR",
     use_video: str = "false",
     platform: str = "youtube",
+    custom_image_paths: list = None,
 ):
     import json
     import httpx
@@ -683,9 +684,18 @@ Rules:
                 photo_saved, visual_err = fetch_scene_visual("social media news channel", "portrait", pexels_key, png_path)
         else:
             keyword = scene.get("keyword", topic)
+            if custom_image_paths:
+                # Kullanıcının kendi yüklediği görseller (ör. uygulama ekran görüntüleri)
+                try:
+                    import shutil as _sh
+                    src_img = custom_image_paths[i % len(custom_image_paths)]
+                    _sh.copy2(str(src_img), str(png_path))
+                    photo_saved, visual_err = True, ""
+                except Exception:
+                    photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
             # Video modu: önce Pexels video dene, başarısız olursa görsele düş
             # İlk sahne (i==0) her zaman görsel — banner overlay için PNG şart
-            if use_video_mode and pexels_key and i > 0:
+            elif use_video_mode and pexels_key and i > 0:
                 vid_ok, vid_result = await asyncio.to_thread(
                     fetch_pexels_video, keyword, pexels_key,
                     scene_dir / f"rawvid_{i}.mp4", durations[i]
@@ -970,10 +980,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -986,6 +996,11 @@ async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics,
         _save_manual_shorts_log("error", error=str(e))
     finally:
         _manual_shorts_lock = False
+        for p in (custom_image_paths or []):
+            try:
+                Path(p).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 @app.post("/api/generate-shorts-async")
@@ -999,16 +1014,26 @@ async def generate_shorts_async_endpoint(
     region: str = Form("TR"),
     use_video: str = Form("false"),
     platform: str = Form("youtube"),
+    custom_images: list[UploadFile] = File(default=[]),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
     if _manual_shorts_lock:
         raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+
+    custom_image_paths = []
+    for i, img in enumerate(custom_images):
+        if not img.filename:
+            continue
+        data = await img.read()
+        dest = UPLOAD_DIR / f"customimg_{uuid.uuid4().hex}_{i}.jpg"
+        if _save_as_jpeg(data, dest):
+            custom_image_paths.append(dest)
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths))
     return {"ok": True}
 
 
