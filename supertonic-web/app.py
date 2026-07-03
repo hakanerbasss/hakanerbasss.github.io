@@ -4708,6 +4708,44 @@ async def _rescue_interrupted_jobs_task():
             pass
 
 
+_VIDEO_RETENTION_DAYS = 3      # başarıyla paylaşılan / ilgisiz videolar bu kadar gün sonra silinir
+_FAILED_UPLOAD_EXPIRY_DAYS = 7  # bekleyen yüklemeler bu kadar gün çözülmezse otomatik iptal edilir (haber bayatlar)
+
+
+def _cleanup_old_media():
+    """OUTPUT_DIR'daki eski video dosyalarını temizler — diskin dolmasını önler.
+    Thumbnail'lere dokunmaz (haber sitesi kalıcı olarak kullanıyor)."""
+    now = time.time()
+    failed = _load_failed_ig_uploads()
+    failed_filenames = {x.get("filename") for x in failed}
+
+    # 7 günden eski bekleyen yüklemeleri otomatik iptal et (haber bayatladı)
+    still_pending = []
+    for item in failed:
+        if now - item.get("ts", 0) > _FAILED_UPLOAD_EXPIRY_DAYS * 86400:
+            vf = OUTPUT_DIR / item.get("filename", "")
+            if vf.exists():
+                vf.unlink()
+            failed_filenames.discard(item.get("filename"))
+        else:
+            still_pending.append(item)
+    if len(still_pending) != len(failed):
+        IG_FAILED_FILE.write_text(json.dumps(still_pending, ensure_ascii=False))
+
+    # OUTPUT_DIR'daki eski video dosyalarını sil (hâlâ bekleyen yükleme kuyruğunda olanlar hariç)
+    try:
+        for f in OUTPUT_DIR.iterdir():
+            if not f.is_file() or f.name in failed_filenames:
+                continue
+            if now - f.stat().st_mtime > _VIDEO_RETENTION_DAYS * 86400:
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 @app.on_event("startup")
 async def startup_event():
     global _SERVICE_STARTED_AT, _RESCUE_MAP
@@ -4729,6 +4767,10 @@ async def startup_event():
     _rebuild_en_shorts_scheduler()
     _rebuild_tnlv_scheduler()
     _rebuild_ig_only_tr_scheduler()
+    scheduler.add_job(
+        _cleanup_old_media, CronTrigger(hour=4, minute=30, timezone="Europe/Istanbul"),
+        id="cleanup_old_media", replace_existing=True,
+    )
 
     asyncio.create_task(_rescue_interrupted_jobs_task())
 
