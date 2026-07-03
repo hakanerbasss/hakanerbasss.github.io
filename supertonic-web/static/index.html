@@ -2830,13 +2830,15 @@ async function loadIGFailedUploads() {
     list.innerHTML = items.map(item => {
       const dt = new Date(item.ts * 1000).toLocaleString('tr-TR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       const errShort = (item.error || '').slice(0, 80);
+      const isDedup = (item.error || '').startsWith('dedup:');
+      const retryLabel = isDedup ? '⚠️ Aynı başlıkla önceden atılmış — yine de gönder' : '↻ Yeniden Dene';
       return `<div style="background:#1a0a0a;border:1px solid #5a1a1a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="color:#e0e0e0;font-size:12px;font-weight:600;margin-bottom:4px;">${item.title || item.filename}</div>
         <div style="color:#888;font-size:11px;margin-bottom:6px;">${dt} — ${errShort}</div>
         <div style="display:flex;gap:8px;">
           <button onclick="retryIGUpload('${item.filename}', this)"
             style="font-size:11px;padding:5px 12px;background:#1a1a3a;border:1px solid #333;border-radius:6px;color:#e0e0e0;cursor:pointer;">
-            ↻ Yeniden Dene
+            ${retryLabel}
           </button>
           <button onclick="deleteIGFailed('${item.filename}', this)"
             style="font-size:11px;padding:5px 12px;background:#2a0a0a;border:1px solid #5a1a1a;border-radius:6px;color:#f87171;cursor:pointer;">

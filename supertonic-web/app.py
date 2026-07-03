@@ -2540,17 +2540,21 @@ def get_ig_config() -> dict:
     return {}
 
 
-_IG_DEDUP_HOURS = 4  # aynı başlık bu süreden önce atıldıysa tekrar atma
+_IG_DEDUP_HOURS = 24  # aynı başlık bu süreden önce atıldıysa tekrar atma — haberler günlük/saatlik yenilendiği için 1 gün yeterli
 
 
 def _ig_recently_posted(title: str) -> bool:
-    """Aynı başlık daha önce Instagram'a atıldıysa True döner (süre sınırı yok)."""
+    """Aynı başlık son _IG_DEDUP_HOURS saat içinde Instagram'a atıldıysa True döner."""
     if not IG_RECENT_FILE.exists():
         return False
     try:
         records = json.loads(IG_RECENT_FILE.read_text())
+        cutoff = time.time() - _IG_DEDUP_HOURS * 3600
         title_lower = title.strip().lower()[:80]
-        return any(r.get("title", "").lower()[:80] == title_lower for r in records)
+        return any(
+            r.get("title", "").lower()[:80] == title_lower and r.get("ts", 0) > cutoff
+            for r in records
+        )
     except Exception:
         return False
 
@@ -3930,11 +3934,6 @@ async def auto_shorts_job():
 
 async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "") -> tuple[bool, str]:
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
-    # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla
-    if _ig_recently_posted(title) or _ig_is_pending(title):
-        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP:{source}] Zaten atıldı/bekliyor, atlanıyor: {title[:60]}"}))
-        return False, "dedup: zaten atıldı veya bekliyor"
-
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
     _POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
@@ -3942,6 +3941,15 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
     full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
     caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
+
+    # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
+    # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
+    if _ig_recently_posted(title) or _ig_is_pending(title):
+        err = "dedup: zaten atıldı veya bekliyor"
+        IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP:{source}] Zaten atıldı/bekliyor, atlanıyor: {title[:60]}"}))
+        _save_failed_ig_upload(filename, title, caption, err)
+        return False, err
+
     ig_log = ""
     upload_ok = False
 
