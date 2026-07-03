@@ -1518,6 +1518,21 @@
         </div>
         <div id="backup-status" style="font-size:12px;color:#888;margin-top:6px;"></div>
 
+        <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
+
+        <!-- Biriken Videolar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <p style="color:#888;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0;">🗄️ Biriken Videolar</p>
+          <button onclick="loadOutputVideos()" style="background:#1a1a1a;color:#888;border:1px solid #2a2a2a;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;">↻ Yenile</button>
+        </div>
+        <p style="color:#666;font-size:12px;margin-bottom:10px;">Otomatik temizlik her gece çalışır (3 günden eski videolar). Çalışmazsa buradan elle silebilirsin.</p>
+        <div id="output-videos-summary" style="font-size:12px;color:#888;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button onclick="deleteSelectedVideos()" style="background:#1a1a3a;color:#e0e0e0;border:1px solid #333;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;">Seçilenleri Sil</button>
+          <button onclick="deleteAllVideos()" style="background:#2a0a0a;color:#f87171;border:1px solid #5a1a1a;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;">🗑 Tümünü Sil</button>
+        </div>
+        <div id="output-videos-list" style="max-height:320px;overflow-y:auto;"></div>
+
         <!-- Çıkış -->
         <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
         <button onclick="window.location='/logout'" style="background:#1a1a1a;color:#f87171;border:1px solid #3a1a1a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">⏻ Çıkış Yap</button>
@@ -2937,6 +2952,64 @@ async function setHookStyle(style) {
   }
 }
 loadHookStyle();
+loadOutputVideos();
+
+function _fmtAge(hours) {
+  if (hours < 1) return `${Math.round(hours * 60)} dk`;
+  if (hours < 48) return `${Math.round(hours)} sa`;
+  return `${Math.round(hours / 24)} gün`;
+}
+
+async function loadOutputVideos() {
+  const list = document.getElementById('output-videos-list');
+  const summary = document.getElementById('output-videos-summary');
+  list.innerHTML = '<span style="color:#666;font-size:12px;">Yükleniyor...</span>';
+  try {
+    const r = await fetch('/api/output-videos');
+    const d = await r.json();
+    summary.textContent = `${d.count} dosya — toplam ${d.total_mb} MB`;
+    if (!d.items.length) {
+      list.innerHTML = '<span style="color:#666;font-size:12px;">Biriken video yok.</span>';
+      return;
+    }
+    list.innerHTML = d.items.map(it => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1e1e1e;">
+        <input type="checkbox" class="output-video-cb" value="${it.filename}" style="flex-shrink:0;">
+        <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#ccc;">
+          ${it.filename}${it.pending ? ' <span style="color:#f87171;">(bekliyor)</span>' : ''}
+        </div>
+        <div style="font-size:11px;color:#888;flex-shrink:0;">${it.size_mb} MB · ${_fmtAge(it.age_hours)}</div>
+        <button onclick="deleteOneVideo('${it.filename}')" style="background:#2a0a0a;color:#f87171;border:1px solid #5a1a1a;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;flex-shrink:0;">Sil</button>
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = '<span style="color:#f87171;font-size:12px;">Yüklenemedi.</span>';
+  }
+}
+
+async function deleteOneVideo(filename) {
+  await fetch(`/api/output-videos/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+  loadOutputVideos();
+}
+
+async function deleteSelectedVideos() {
+  const boxes = Array.from(document.querySelectorAll('.output-video-cb:checked'));
+  if (!boxes.length) return;
+  if (!confirm(`${boxes.length} video silinsin mi?`)) return;
+  const fd = new FormData();
+  fd.append('filenames', boxes.map(b => b.value).join(','));
+  await fetch('/api/output-videos/bulk-delete', { method: 'POST', body: fd });
+  loadOutputVideos();
+}
+
+async function deleteAllVideos() {
+  const boxes = Array.from(document.querySelectorAll('.output-video-cb'));
+  if (!boxes.length) return;
+  if (!confirm(`Tüm biriken videolar (${boxes.length} dosya) silinsin mi? Bu işlem geri alınamaz.`)) return;
+  const fd = new FormData();
+  fd.append('filenames', boxes.map(b => b.value).join(','));
+  await fetch('/api/output-videos/bulk-delete', { method: 'POST', body: fd });
+  loadOutputVideos();
+}
 
 async function sendBackupTelegram(btn) {
   const status = document.getElementById('backup-status');

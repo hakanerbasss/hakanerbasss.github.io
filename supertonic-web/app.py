@@ -4671,6 +4671,48 @@ async def delete_ig_failed_upload(filename: str):
     return {"ok": True}
 
 
+# ── Biriken video dosyaları — otomatik temizlik çalışmazsa manuel yedek ────────
+
+@app.get("/api/output-videos")
+async def list_output_videos():
+    failed_filenames = {x.get("filename") for x in _load_failed_ig_uploads()}
+    now = time.time()
+    items = []
+    for f in OUTPUT_DIR.iterdir():
+        if not f.is_file():
+            continue
+        st = f.stat()
+        items.append({
+            "filename": f.name,
+            "size_mb": round(st.st_size / (1024 * 1024), 2),
+            "age_hours": round((now - st.st_mtime) / 3600, 1),
+            "pending": f.name in failed_filenames,
+        })
+    items.sort(key=lambda x: x["age_hours"], reverse=True)
+    return {"items": items, "total_mb": round(sum(i["size_mb"] for i in items), 2), "count": len(items)}
+
+
+@app.delete("/api/output-videos/{filename}")
+async def delete_output_video(filename: str):
+    video_file = OUTPUT_DIR / Path(filename).name
+    if video_file.exists():
+        video_file.unlink()
+    _remove_failed_ig_upload(Path(filename).name)
+    return {"ok": True}
+
+
+@app.post("/api/output-videos/bulk-delete")
+async def bulk_delete_output_videos(filenames: str = Form("")):
+    deleted = 0
+    for name in [n.strip() for n in filenames.split(",") if n.strip()]:
+        vf = OUTPUT_DIR / Path(name).name
+        if vf.exists():
+            vf.unlink()
+            deleted += 1
+        _remove_failed_ig_upload(Path(name).name)
+    return {"ok": True, "deleted": deleted}
+
+
 # ── Startup / Shutdown ────────────────────────────────────────────────────────
 _SERVICE_STARTED_AT: float = 0.0
 
