@@ -5442,10 +5442,16 @@ _BACKUP_FILES = [
 ]
 
 
-def _write_full_backup_zip(zf) -> None:
+def _write_simple_backup_zip(zf) -> None:
+    """Sadece config/token dosyaları — Telegram için küçük boyutlu yedek."""
     for p in _BACKUP_FILES:
         if p.exists():
             zf.write(str(p), p.name)
+
+
+def _write_full_backup_zip(zf) -> None:
+    """Config + haber veritabanı + tüm thumbnail arşivi — tam yedek."""
+    _write_simple_backup_zip(zf)
     if THUMB_DIR.exists():
         for f in THUMB_DIR.iterdir():
             if f.is_file():
@@ -5482,7 +5488,7 @@ async def backup_send_telegram():
     today = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     fname = f"supertonic_backup_{today}.zip"
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        _write_full_backup_zip(zf)
+        _write_simple_backup_zip(zf)
     buf.seek(0)
     data = buf.read()
     try:
