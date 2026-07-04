@@ -13,7 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.bluechip.finance.UnityAdsManager
+import com.bluechip.finance.AdManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -106,7 +106,7 @@ fun SeveranceScreen() {
         if (sevEligible) { projectionText = buildString { append("📊 PROJEKSİYON\n"); listOf(6 to "+6 ay", 12 to "+1 yıl", 24 to "+2 yıl", 60 to "+5 yıl").forEach { (am, label) ->
             val fc = ed.clone() as Calendar; fc.add(Calendar.MONTH, am); val fd = ((fc.timeInMillis - sd.timeInMillis + 86400000) / 86400000).toInt()
             val fg = minOf(sal, severanceCeiling) * (fd / 365.0); val fn = fg - (fg * stampTaxRate); append("⏳ $label → ${formatMoney(fn)}₺\n") } } } else projectionText = ""
-        activity?.let { act -> UnityAdsManager.showInterstitial(act) { showResult = true } }
+        activity?.let { act -> AdManager.showInterstitial(act) { showResult = true } }
             ?: run { showResult = true }
         scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
         HistoryManager.save(context, HistoryEntry(
