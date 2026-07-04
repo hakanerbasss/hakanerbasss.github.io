@@ -50,7 +50,7 @@ object AdManager {
         UnityAdsManager.init(context)
     }
 
-    // ── BANNER ────────────────────────────────────────────────────────
+    // ── BANNER ──────────────────────────────────────────────────────────────
 
     fun showBanner(activity: Activity, container: FrameLayout) {
         val adView = AdView(activity)
@@ -72,7 +72,7 @@ object AdManager {
         adView.loadAd(AdRequest.Builder().build())
     }
 
-    // ── INTERSTITIAL ───────────────────────────────────────────────────
+    // ── INTERSTITIAL ─────────────────────────────────────────────────────────
 
     private fun loadInterstitial() {
         if (admobInterstitialLoading) return
@@ -116,7 +116,7 @@ object AdManager {
         }
     }
 
-    // ── REWARDED (AdFree modu) ─────────────────────────────────────────
+    // ── REWARDED (AdFree modu) ───────────────────────────────────────────────
 
     private fun loadRewarded() {
         if (admobRewardedLoading) return
@@ -164,7 +164,7 @@ object AdManager {
         }
     }
 
-    // ── REWARDED (Birikim yenile butonu) ───────────────────────────────
+    // ── REWARDED (Birikim yenile butonu) ─────────────────────────────────────
 
     private fun loadSavingsRewarded() {
         if (admobSavingsRewardedLoading) return

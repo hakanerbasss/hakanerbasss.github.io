@@ -22,7 +22,7 @@ class MyApp : Application(),
 
     override fun onStart(owner: LifecycleOwner) {}
 
-    // ── ActivityLifecycleCallbacks ──────────────────────────────────────
+    // ── ActivityLifecycleCallbacks ──────────────────────────────────
     override fun onActivityResumed(activity: Activity) { currentActivity = activity }
     override fun onActivityPaused(activity: Activity)  { currentActivity = null }
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}

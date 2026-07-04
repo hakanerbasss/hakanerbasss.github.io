@@ -9,64 +9,99 @@ object BackupManager {
 
     private val PREF_NAMES = listOf(
         "user_profile",
-        "overtime_prefs",
+        "overtime_track_prefs",
         "payment_prefs",
         "savings_prefs",
+        "special_days",
         "notif_settings",
+        "deepseek_prefs",
         "ad_free_prefs",
-        "history_prefs",
-        "overtime_track_prefs",
-        "special_day_prefs"
+        "calc_history",
+        "custom_cryptos"
     )
 
     fun export(context: Context, out: OutputStream) {
-        val root = JSONObject()
-        for (name in PREF_NAMES) {
-            val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        val root  = JSONObject()
+        root.put("version", 1)
+        root.put("timestamp", System.currentTimeMillis())
+        val prefs = JSONObject()
+        PREF_NAMES.forEach { name ->
+            val sp  = context.getSharedPreferences(name, Context.MODE_PRIVATE)
             val obj = JSONObject()
-            for ((k, v) in prefs.all) {
+            sp.all.forEach { (k, v) ->
+                val entry = JSONObject()
                 when (v) {
-                    is String  -> obj.put(k, v)
-                    is Int     -> obj.put(k, v)
-                    is Long    -> obj.put(k, v)
-                    is Float   -> obj.put(k, v)
-                    is Boolean -> obj.put(k, v)
-                    is Set<*>  -> obj.put(k, org.json.JSONArray(v.toList()))
+                    is Boolean -> { entry.put("t", "b"); entry.put("v", v.toString()) }
+                    is Int     -> { entry.put("t", "i"); entry.put("v", v.toString()) }
+                    is Long    -> { entry.put("t", "l"); entry.put("v", v.toString()) }
+                    is Float   -> { entry.put("t", "f"); entry.put("v", v.toString()) }
+                    else       -> { entry.put("t", "s"); entry.put("v", v?.toString() ?: "") }
                 }
+                obj.put(k, entry)
             }
-            root.put(name, obj)
+            prefs.put(name, obj)
         }
-        out.write(root.toString(2).toByteArray(Charsets.UTF_8))
+        root.put("prefs", prefs)
+        out.write(root.toString(2).toByteArray())
+        out.flush()
+        markBackupDone(context)
     }
 
-    fun import(context: Context, inp: InputStream): Boolean {
+    /** export() ile aynı ama markBackupDone() çağırmaz — sadece okuma amaçlı. */
+    fun exportForRead(context: Context, out: OutputStream) {
+        val root  = JSONObject()
+        root.put("version", 1)
+        root.put("timestamp", System.currentTimeMillis())
+        val prefs = JSONObject()
+        PREF_NAMES.forEach { name ->
+            val sp  = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+            val obj = JSONObject()
+            sp.all.forEach { (k, v) ->
+                val entry = JSONObject()
+                when (v) {
+                    is Boolean -> { entry.put("t", "b"); entry.put("v", v.toString()) }
+                    is Int     -> { entry.put("t", "i"); entry.put("v", v.toString()) }
+                    is Long    -> { entry.put("t", "l"); entry.put("v", v.toString()) }
+                    is Float   -> { entry.put("t", "f"); entry.put("v", v.toString()) }
+                    else       -> { entry.put("t", "s"); entry.put("v", v?.toString() ?: "") }
+                }
+                obj.put(k, entry)
+            }
+            prefs.put(name, obj)
+        }
+        root.put("prefs", prefs)
+        out.write(root.toString(2).toByteArray())
+        out.flush()
+    }
+
+    fun markBackupDone(context: Context) {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        context.getSharedPreferences("notif_settings", Context.MODE_PRIVATE).edit()
+            .putString(NotificationSettingsManager.KEY_LAST_BACKUP_DATE, today).apply()
+    }
+
+    fun import(context: Context, input: InputStream): Boolean {
         return try {
-            val text = inp.bufferedReader().readText()
-            val root = JSONObject(text)
-            for (name in PREF_NAMES) {
-                if (!root.has(name)) continue
-                val obj = root.getJSONObject(name)
+            val root  = JSONObject(input.bufferedReader().readText())
+            val prefs = root.getJSONObject("prefs")
+            PREF_NAMES.forEach { name ->
+                if (!prefs.has(name)) return@forEach
+                val obj    = prefs.getJSONObject(name)
                 val editor = context.getSharedPreferences(name, Context.MODE_PRIVATE).edit()
-                editor.clear()
-                for (k in obj.keys()) {
-                    when (val v = obj.get(k)) {
-                        is String  -> editor.putString(k, v)
-                        is Int     -> editor.putInt(k, v)
-                        is Long    -> editor.putLong(k, v)
-                        is Double  -> editor.putFloat(k, v.toFloat())
-                        is Boolean -> editor.putBoolean(k, v)
-                        is org.json.JSONArray -> {
-                            val set = mutableSetOf<String>()
-                            for (i in 0 until v.length()) set.add(v.getString(i))
-                            editor.putStringSet(k, set)
-                        }
+                obj.keys().forEach { key ->
+                    val entry = obj.getJSONObject(key)
+                    val v     = entry.getString("v")
+                    when (entry.getString("t")) {
+                        "b"  -> editor.putBoolean(key, v.toBoolean())
+                        "i"  -> editor.putInt(key, v.toIntOrNull() ?: 0)
+                        "l"  -> editor.putLong(key, v.toLongOrNull() ?: 0L)
+                        "f"  -> editor.putFloat(key, v.toFloatOrNull() ?: 0f)
+                        else -> editor.putString(key, v)
                     }
                 }
                 editor.apply()
             }
             true
-        } catch (e: Exception) {
-            false
-        }
+        } catch (_: Exception) { false }
     }
 }

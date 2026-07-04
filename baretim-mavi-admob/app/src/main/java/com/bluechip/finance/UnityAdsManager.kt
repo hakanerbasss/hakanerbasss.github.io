@@ -49,7 +49,7 @@ object UnityAdsManager {
             })
     }
 
-    // ── BANNER ────────────────────────────────────────────────────────
+    // ── BANNER ──────────────────────────────────────────────────
     fun showBanner(activity: Activity, container: FrameLayout) {
         destroyBanner()
         val banner = BannerView(activity, BANNER_ID, UnityBannerSize(320, 50))
@@ -80,7 +80,7 @@ object UnityAdsManager {
         bannerView = null
     }
 
-    // ── INTERSTITIAL ───────────────────────────────────────────────────
+    // ── INTERSTITIAL ─────────────────────────────────────────────
     fun loadInterstitial() {
         interstitialReady = false
         UnityAds.load(INTERSTITIAL_ID, object : IUnityAdsLoadListener {
@@ -120,7 +120,7 @@ object UnityAdsManager {
         }
     }
 
-    // ── REWARDED ──────────────────────────────────────────────────────
+    // ── REWARDED ─────────────────────────────────────────────────
     fun loadRewarded() {
         rewardedReady = false
         UnityAds.load(REWARDED_ID, object : IUnityAdsLoadListener {
