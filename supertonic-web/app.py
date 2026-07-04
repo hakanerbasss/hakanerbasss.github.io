@@ -5436,19 +5436,30 @@ _BACKUP_FILES = [
     IG_ONLY_TR_SCHED_CONFIG,
     IG_ONLY_TR_SCHED_LOG,
     IG_ONLY_TR_DAILY_TOPICS,
+    news_site.HOOK_STYLE_CONFIG,
+    news_site.RECENT_CATEGORIES_FILE,
+    news_site.DB_PATH,
 ]
+
+
+def _write_full_backup_zip(zf) -> None:
+    for p in _BACKUP_FILES:
+        if p.exists():
+            zf.write(str(p), p.name)
+    if THUMB_DIR.exists():
+        for f in THUMB_DIR.iterdir():
+            if f.is_file():
+                zf.write(str(f), f"thumbnails/{f.name}")
 
 
 @app.get("/api/backup/download")
 async def backup_download():
-    """Tüm config dosyalarını ZIP olarak indir."""
+    """Tüm config dosyalarını, haber veritabanını ve thumbnail arşivini ZIP olarak indir."""
     import zipfile, io, datetime
     buf = io.BytesIO()
     today = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for p in _BACKUP_FILES:
-            if p.exists():
-                zf.write(str(p), p.name)
+        _write_full_backup_zip(zf)
     buf.seek(0)
     from fastapi.responses import StreamingResponse
     return StreamingResponse(
@@ -5471,9 +5482,7 @@ async def backup_send_telegram():
     today = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     fname = f"supertonic_backup_{today}.zip"
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for p in _BACKUP_FILES:
-            if p.exists():
-                zf.write(str(p), p.name)
+        _write_full_backup_zip(zf)
     buf.seek(0)
     data = buf.read()
     try:
@@ -5504,7 +5513,11 @@ async def backup_restore(file: UploadFile = File(...)):
     allowed = {p.name for p in _BACKUP_FILES}
     with zipfile.ZipFile(io.BytesIO(content)) as zf:
         for name in zf.namelist():
-            if name in allowed:
+            if name.startswith("thumbnails/") and not name.endswith("/"):
+                dest = THUMB_DIR / Path(name).name
+                dest.write_bytes(zf.read(name))
+                restored.append(name)
+            elif name in allowed:
                 Path(name).write_bytes(zf.read(name))
                 restored.append(name)
             else:
