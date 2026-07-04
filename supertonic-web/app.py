@@ -526,6 +526,60 @@ def get_diversity_instruction() -> str:
     return ""
 
 
+async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) -> dict:
+    """Google News RSS'ten gerçek haber detayları çeker. Hata olursa {} döner."""
+    import xml.etree.ElementTree as ET
+    import re
+    from urllib.parse import quote
+
+    hl = "tr" if lang == "tr" else "en"
+    gl = "TR" if lang == "tr" else "US"
+    ceid = f"{gl}:{hl}"
+    url = f"https://news.google.com/rss/search?q={quote(query)}&hl={hl}&gl={gl}&ceid={ceid}"
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code != 200:
+            return {}
+        root = ET.fromstring(r.text)
+        channel = root.find("channel")
+        if channel is None:
+            return {}
+        articles, sources = [], []
+        for item in channel.findall("item")[:max_items]:
+            title = (item.findtext("title") or "").strip()
+            desc = re.sub(r"<[^>]+>", "", (item.findtext("description") or "")).strip()
+            src_el = item.find("source")
+            src_name = (src_el.text or "").strip() if src_el is not None else ""
+            if not src_name:
+                # dc:creator fallback
+                dc = item.find("{http://purl.org/dc/elements/1.1/}creator")
+                if dc is not None:
+                    src_name = (dc.text or "").strip()
+            if title:
+                articles.append({"title": title, "desc": desc[:300], "source": src_name})
+                if src_name and src_name not in sources:
+                    sources.append(src_name)
+        if not articles:
+            return {}
+        context_lines = []
+        for a in articles:
+            line = f"- {a['title']}"
+            if a["source"]:
+                line += f" [{a['source']}]"
+            if a["desc"]:
+                line += f"\n  {a['desc']}"
+            context_lines.append(line)
+        return {
+            "found": True,
+            "articles": articles,
+            "sources": sources,
+            "context_text": "\n".join(context_lines),
+        }
+    except Exception:
+        return {}
+
+
 async def _generate_shorts_core(
     topic: str,
     api_key: str,
@@ -560,6 +614,38 @@ async def _generate_shorts_core(
     exclude_instruction = ""
     if exclude_topics.strip():
         exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
+
+    # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
+    # Konu belirlenmemişse önce ucuz bir çağrıyla konu seçtir, sonra haberi ara
+    gnews_data = {}
+    search_query = topic.strip()
+    if not search_query:
+        try:
+            sel_resp = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content":
+                    f"From this list of Turkish trending topics, pick ONE that would make the most engaging breaking news Short. "
+                    f"Return ONLY the topic name in Turkish, nothing else.\n\nTopics: {trend_topics}"
+                    + (f"\n\nAvoid: {exclude_topics}" if exclude_topics.strip() else "")
+                }],
+                temperature=0.5,
+                max_tokens=60,
+            )
+            search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
+        except Exception:
+            search_query = trend_data["topics"][0] if trend_data["topics"] else ""
+    if search_query:
+        gnews_data = await fetch_gnews_summary(search_query, lang)
+
+    news_context_instruction = ""
+    if gnews_data.get("found"):
+        news_context_instruction = (
+            f"\n\nREAL NEWS VERIFICATION — Use these verified facts (exact names, ages, locations MUST match):\n"
+            f"{gnews_data['context_text']}\n"
+            f"CRITICAL: Do NOT invent or change names, ages, or locations. Use what is written above.\n"
+        )
+    # ─────────────────────────────────────────────────────────────────────────
+
     if topic.strip():
         topic_instruction = (
             f"Make a Short video ONLY about this specific topic: {topic}\n"
@@ -582,7 +668,7 @@ async def _generate_shorts_core(
     prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
 {topic_instruction}
-{exclude_instruction}Suggested hashtags: {trend_tags}{yt_tag_instruction}
+{exclude_instruction}{news_context_instruction}Suggested hashtags: {trend_tags}{yt_tag_instruction}
 
 Return ONLY valid JSON, no markdown, no explanation:
 {{
@@ -912,6 +998,9 @@ Rules:
     # Kullanılan konuyu kaydet — scheduler aynı haberi tekrar seçmesin
     add_shorts_used_topic(generated_title)
 
+    sources = gnews_data.get("sources", [])
+    source_text = ("Kaynak: " + ", ".join(sources)) if sources else ""
+
     return {
         "video": f"/api/video/{output_file.name}",
         "thumbnail": thumb_path,
@@ -921,6 +1010,7 @@ Rules:
         "suggested_tags": video_tags,
         "suggested_description": _smart_truncate(full_script, limit=300),
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
+        "source_text": source_text,
     }
 
 
@@ -3924,6 +4014,7 @@ async def auto_shorts_job():
                     description=d.get("suggested_description", ""),
                     thumbnail=thumbnail,
                     source="TR-Shorts",
+                    source_text=d.get("source_text", ""),
                 ))
 
     except Exception as e:
@@ -3932,7 +4023,7 @@ async def auto_shorts_job():
         lock.release()
 
 
-async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "") -> tuple[bool, str]:
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "") -> tuple[bool, str]:
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
@@ -3941,9 +4032,14 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
     full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
     desc_excerpt = _smart_truncate(description, limit=500) if description else ""
-    body = f"{title}\n\n{desc_excerpt}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}" if desc_excerpt \
-        else f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
-    caption = body
+    parts = [title]
+    if desc_excerpt:
+        parts.append(desc_excerpt)
+    if source_text:
+        parts.append(source_text)
+    parts.append("Siz ne düşünüyorsunuz? 👇")
+    parts.append(full_tags)
+    caption = "\n\n".join(parts)
 
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
     # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
@@ -4606,6 +4702,7 @@ async def auto_ig_only_tr_job():
             description=d.get("suggested_description", ""),
             thumbnail=thumbnail,
             source="IG-Only-TR",
+            source_text=d.get("source_text", ""),
         )
         if ig_ok:
             save_ig_only_tr_log("success", log_title)
