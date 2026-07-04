@@ -20,7 +20,10 @@ class MyApp : Application(),
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
     }
 
-    override fun onStart(owner: LifecycleOwner) {}
+    // Uygulama arka plandan on plana her geldiginde (cold start dahil) App Open reklami dene
+    override fun onStart(owner: LifecycleOwner) {
+        currentActivity?.let { AdManager.showAppOpenAdIfAvailable(it) }
+    }
 
     // ── ActivityLifecycleCallbacks ──────────────────────────────────
     override fun onActivityResumed(activity: Activity) { currentActivity = activity }

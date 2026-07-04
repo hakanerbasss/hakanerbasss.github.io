@@ -12,6 +12,7 @@ import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
@@ -23,6 +24,8 @@ private const val ADMOB_BANNER_ID          = "ca-app-pub-7820582813827252/852225
 private const val ADMOB_INTERSTITIAL_ID    = "ca-app-pub-7820582813827252/5460511169"
 private const val ADMOB_REWARDED_ID        = "ca-app-pub-7820582813827252/3824449145"
 private const val ADMOB_SAVINGS_REWARDED_ID = "ca-app-pub-7820582813827252/4892694634"
+// TEST ID - AdMob konsolunda gercek App Open reklam birimi olustur ve bu satiri guncelle
+private const val ADMOB_APP_OPEN_ID        = "ca-app-pub-3940256099942544/9257395921"
 
 object AdManager {
 
@@ -37,6 +40,11 @@ object AdManager {
     private var admobSavingsRewarded: RewardedAd? = null
     private var admobSavingsRewardedLoading = false
 
+    private var appOpenAd: AppOpenAd? = null
+    private var appOpenLoading = false
+    private var appOpenShowing = false
+    private var appOpenLoadTimeMs = 0L
+
     fun init(context: Context) {
         appCtx = context.applicationContext
 
@@ -45,6 +53,7 @@ object AdManager {
             loadInterstitial()
             loadRewarded()
             loadSavingsRewarded()
+            loadAppOpenAd()
         }
 
         UnityAdsManager.init(context)
@@ -210,5 +219,60 @@ object AdManager {
             loadSavingsRewarded()
             UnityAdsManager.showRewarded(activity, onRewarded, onNotReady)
         }
+    }
+
+    // ── APP OPEN ──────────────────────────────────────────────────────────────
+
+    private fun loadAppOpenAd() {
+        if (appOpenLoading || isAppOpenAdAvailable()) return
+        appOpenLoading = true
+        AppOpenAd.load(appCtx, ADMOB_APP_OPEN_ID, AdRequest.Builder().build(),
+            object : AppOpenAd.AppOpenAdLoadCallback() {
+                override fun onAdLoaded(ad: AppOpenAd) {
+                    Log.d(TAG, "AdMob app open yuklendi")
+                    appOpenAd = ad
+                    appOpenLoading = false
+                    appOpenLoadTimeMs = System.currentTimeMillis()
+                }
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    Log.e(TAG, "AdMob app open hata: ${error.message}")
+                    appOpenAd = null
+                    appOpenLoading = false
+                }
+            })
+    }
+
+    private fun isAppOpenAdAvailable(): Boolean {
+        val ad = appOpenAd ?: return false
+        val fourHoursMs = 4L * 60 * 60 * 1000
+        return (System.currentTimeMillis() - appOpenLoadTimeMs) < fourHoursMs
+    }
+
+    /** Uygulama on plana her gelisinde (cold start dahil) cagir. */
+    fun showAppOpenAdIfAvailable(activity: Activity) {
+        if (appOpenShowing) return
+        if (com.bluechip.finance.data.AdFreeManager.isAdFree(activity)) return
+        val ad = appOpenAd
+        if (ad == null || !isAppOpenAdAvailable()) {
+            loadAppOpenAd()
+            return
+        }
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdShowedFullScreenContent() {
+                appOpenShowing = true
+            }
+            override fun onAdDismissedFullScreenContent() {
+                appOpenAd = null
+                appOpenShowing = false
+                loadAppOpenAd()
+            }
+            override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                Log.e(TAG, "AdMob app open gosterilemedi: ${error.message}")
+                appOpenAd = null
+                appOpenShowing = false
+                loadAppOpenAd()
+            }
+        }
+        ad.show(activity)
     }
 }

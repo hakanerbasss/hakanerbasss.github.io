@@ -3,7 +3,6 @@ package com.bluechip.finance.ui.components
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -13,9 +12,6 @@ import com.bluechip.finance.AdManager
 @Composable
 fun BannerAd(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val isEnabled by RemoteConfigManager.isAdEnabled
-
-    if (!isEnabled) return
     if (com.bluechip.finance.data.AdFreeManager.isAdFree(context)) return
 
     val container = remember { FrameLayout(context) }
