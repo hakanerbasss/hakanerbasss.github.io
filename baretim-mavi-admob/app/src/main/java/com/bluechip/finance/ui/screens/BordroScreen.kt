@@ -37,6 +37,7 @@ fun BordroScreen() {
     var selectedMonth by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
     var overtimeHours by remember { mutableStateOf("") }
     var showResult by remember { mutableStateOf(false) }; var showMonthDialog by remember { mutableStateOf(false) }
+    var showScanner by remember { mutableStateOf(false) }
     val prefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
     var isSimpleMode by remember { mutableStateOf(prefs.getBoolean("bordro_simple_mode", false)) }
     var minWageGross by remember { mutableDoubleStateOf(33030.0) }; var sgkRate by remember { mutableDoubleStateOf(0.14) }
@@ -96,6 +97,21 @@ fun BordroScreen() {
         ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         SectionHeader("BORDRO SİMÜLATÖRÜ", Icons.Default.Description)
+        // Bordro tarama butonu
+        OutlinedButton(
+            onClick = { showScanner = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp,
+                com.bluechip.finance.ui.theme.PurplePrimary.copy(alpha = 0.5f)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = com.bluechip.finance.ui.theme.PurplePrimary)
+        ) {
+            Icon(Icons.Default.DocumentScanner, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Bordronu Tara — Otomatik Doldur",
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 13.sp)
+        }
         CurrencyField(value = salary, onValueChange = { salary = it; profileLoaded = false }, label = "Brüt Maaş (₺)")
         if (profileLoaded) ProfileAutoFillNote()
         NumberField(value = overtimeHours, onValueChange = { overtimeHours = it }, label = "Fazla Mesai Saati (opsiyonel)")
@@ -173,4 +189,17 @@ fun BordroScreen() {
         }
     }
     if (showMonthDialog) MonthPickerDialog(selectedMonth, onSelect = { selectedMonth = it; showMonthDialog = false }, onDismiss = { showMonthDialog = false })
+    if (showScanner) {
+        BordroScanner(
+            onDismiss = { showScanner = false },
+            onResult = { result ->
+                if (result.grossSalary.isNotEmpty()) {
+                    salary = result.grossSalary
+                    profileLoaded = false
+                }
+                if (result.month >= 0) selectedMonth = result.month
+                showScanner = false
+            }
+        )
+    }
 }

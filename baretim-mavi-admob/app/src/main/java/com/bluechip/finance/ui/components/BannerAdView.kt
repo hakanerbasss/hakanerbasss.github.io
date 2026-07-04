@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.bluechip.finance.UnityAdsManager
+import com.bluechip.finance.AdManager
 
 @Composable
 fun BannerAd(modifier: Modifier = Modifier) {
@@ -24,7 +24,7 @@ fun BannerAd(modifier: Modifier = Modifier) {
         factory = { ctx ->
             container.also {
                 val activity = ctx as? android.app.Activity ?: return@also
-                UnityAdsManager.showBanner(activity, container)
+                AdManager.showBanner(activity, container)
             }
         },
         modifier = modifier.fillMaxWidth()
