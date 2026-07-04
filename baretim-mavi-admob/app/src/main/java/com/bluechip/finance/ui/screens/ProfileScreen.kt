@@ -311,7 +311,7 @@ fun ProfileScreen(onNavigate: (String) -> Unit = {}, autoAddIncome: Boolean = fa
                     Box(modifier = Modifier.size(36.dp).background(Color(0xFF1565C0).copy(0.12f), RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center) { Text("💼", fontSize = 18.sp) }
                     Spacer(Modifier.width(10.dp))
-                    Text("Yan Gelirler", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                    Text("Yan Gelirler / Haklar", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = colors.textPrimary, modifier = Modifier.weight(1f))
                     IconButton(onClick = { editSideIncome = null; showAddSideIncome = true }) {
                         Icon(Icons.Default.Add, null, tint = PurplePrimary)
                     }
@@ -327,12 +327,22 @@ fun ProfileScreen(onNavigate: (String) -> Unit = {}, autoAddIncome: Boolean = fa
                                 Spacer(Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(side.label.ifBlank { side.category.label }, fontSize = 13.sp, color = colors.textPrimary)
-                                    val dispAmt = side.currentMonthAmount()
+                                    val dispMonthly = side.effectiveAmount()
+                                val periodLabel = when(side.periodMonths) { 3 -> "3 ayda bir"; 6 -> "6 ayda bir"; 12 -> "yilda bir"; else -> "" }
                                     Text(
-                                        if (side.isVariable) "Bu ay: ${com.bluechip.finance.ui.components.formatMoney(dispAmt)} TL  (ort: ${com.bluechip.finance.ui.components.formatMoney(side.effectiveAmount())} TL)"
-                                        else "${com.bluechip.finance.ui.components.formatMoney(side.amount)} TL",
+                                        when {
+                                            side.isVariable -> "Bu ay: ${com.bluechip.finance.ui.components.formatMoney(side.currentMonthAmount())} TL  (ort: ${com.bluechip.finance.ui.components.formatMoney(dispMonthly)} TL)"
+                                            side.periodMonths > 1 -> "${com.bluechip.finance.ui.components.formatMoney(side.amount)} TL / $periodLabel  (aylik: ~${com.bluechip.finance.ui.components.formatMoney(dispMonthly)} TL)"
+                                            else -> "${com.bluechip.finance.ui.components.formatMoney(side.amount)} TL"
+                                        },
                                         fontSize = 11.sp, color = colors.textSecondary
                                     )
+                                    if (side.dailySpend > 0 && !side.isVariable) {
+                                        val gap = side.monthlyGap()
+                                        if (gap > 0)
+                                            Text("⚠ Aylik acik: ~${com.bluechip.finance.ui.components.formatMoney(gap)} TL",
+                                                fontSize = 10.sp, color = Color(0xFFE53935))
+                                    }
                                 }
                                 IconButton(onClick = { editSideIncome = side; showAddSideIncome = true }, modifier = Modifier.size(32.dp)) {
                                     Icon(Icons.Default.Edit, null, tint = colors.info, modifier = Modifier.size(16.dp))
@@ -376,7 +386,7 @@ fun ProfileScreen(onNavigate: (String) -> Unit = {}, autoAddIncome: Boolean = fa
                     Spacer(Modifier.height(4.dp))
                     val sideTotal = sideIncomes.sumOf { it.effectiveAmount() }
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("Toplam yan gelir:", fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.weight(1f))
+                        Text("Toplam aylik katki:", fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.weight(1f))
                         Text("${formatMoney(sideTotal)} TL", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PurplePrimary)
                     }
                 }
@@ -575,6 +585,8 @@ private fun SideIncomeDialog(
     var isVariable by remember { mutableStateOf(existing?.isVariable ?: false) }
     var category   by remember { mutableStateOf(existing?.category ?: com.bluechip.finance.data.SideIncomeCategory.DIGER) }
     var catExpanded by remember { mutableStateOf(false) }
+    var periodMonths by remember { mutableIntStateOf(existing?.periodMonths ?: 1) }
+    var dailySpendStr by remember { mutableStateOf(if ((existing?.dailySpend ?: 0.0) > 0) existing!!.dailySpend.toInt().toString() else "") }
     // Degisken: bu ay icin tutar girisi (records e eklenecek)
     var thisMonthAmount by remember { mutableStateOf("") }
 
@@ -583,7 +595,7 @@ private fun SideIncomeDialog(
             colors = CardDefaults.cardColors(containerColor = colors.cardBg),
             elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(if (existing == null) "Yan Gelir Ekle" else "Yan Gelir Duzenle",
+                Text(if (existing == null) "Yan Gelir / Hak Ekle" else "Yan Gelir / Hak Duzenle",
                     fontWeight = FontWeight.Bold, fontSize = 17.sp, color = colors.textPrimary)
 
                 ExposedDropdownMenuBox(expanded = catExpanded, onExpandedChange = { catExpanded = it }) {
@@ -640,6 +652,51 @@ private fun SideIncomeDialog(
                     }
                 }
 
+                if (!isVariable) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Odeme Periyodu", fontSize = 13.sp, color = colors.textSecondary)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Button(onClick = { periodMonths = 1 }, modifier = Modifier.weight(1f).height(34.dp), shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (periodMonths == 1) PurplePrimary else PurplePrimary.copy(alpha = 0.08f), contentColor = if (periodMonths == 1) Color.White else PurplePrimary),
+                                contentPadding = PaddingValues(2.dp)) { Text("Aylik", fontSize = 10.sp) }
+                            Button(onClick = { periodMonths = 3 }, modifier = Modifier.weight(1f).height(34.dp), shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (periodMonths == 3) PurplePrimary else PurplePrimary.copy(alpha = 0.08f), contentColor = if (periodMonths == 3) Color.White else PurplePrimary),
+                                contentPadding = PaddingValues(2.dp)) { Text("3 Ayda Bir", fontSize = 10.sp) }
+                            Button(onClick = { periodMonths = 6 }, modifier = Modifier.weight(1f).height(34.dp), shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (periodMonths == 6) PurplePrimary else PurplePrimary.copy(alpha = 0.08f), contentColor = if (periodMonths == 6) Color.White else PurplePrimary),
+                                contentPadding = PaddingValues(2.dp)) { Text("6 Ayda Bir", fontSize = 10.sp) }
+                            Button(onClick = { periodMonths = 12 }, modifier = Modifier.weight(1f).height(34.dp), shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (periodMonths == 12) PurplePrimary else PurplePrimary.copy(alpha = 0.08f), contentColor = if (periodMonths == 12) Color.White else PurplePrimary),
+                                contentPadding = PaddingValues(2.dp)) { Text("Yilda Bir", fontSize = 10.sp) }
+                        }
+                        if (periodMonths > 1) {
+                            val amt = amount.toDoubleOrNull() ?: 0.0
+                            if (amt > 0) Text("Aylik katki: ~${com.bluechip.finance.ui.components.formatMoney(amt / periodMonths)} TL",
+                                fontSize = 11.sp, color = colors.textSecondary)
+                        }
+                    }
+                }
+
+                if (!isVariable && (category == com.bluechip.finance.data.SideIncomeCategory.YOL ||
+                    category == com.bluechip.finance.data.SideIncomeCategory.YEMEK)) {
+                    CurrencyField(
+                        value = dailySpendStr,
+                        onValueChange = { dailySpendStr = it },
+                        label = "Gunluk gercek harcama (TL, opsiyonel)"
+                    )
+                    val daily = dailySpendStr.toDoubleOrNull() ?: 0.0
+                    val monthlyAmt = amount.toDoubleOrNull() ?: 0.0
+                    if (daily > 0 && monthlyAmt > 0) {
+                        val gap = daily * 22 - monthlyAmt
+                        Text(
+                            if (gap > 0) "Aylik acik: ~${com.bluechip.finance.ui.components.formatMoney(gap)} TL eksik"
+                            else "Harcamaniz tam karsilaniyor",
+                            fontSize = 11.sp,
+                            color = if (gap > 0) Color(0xFFE53935) else Color(0xFF43A047)
+                        )
+                    }
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f),
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)) { Text("Iptal") }
@@ -656,6 +713,8 @@ private fun SideIncomeDialog(
                                     label = label.trim(),
                                     amount = newAmt,
                                     isVariable = true,
+                                    periodMonths = 1,
+                                    dailySpend = 0.0,
                                     records = base.records + newRecord
                                 ))
                             } else {
@@ -664,6 +723,8 @@ private fun SideIncomeDialog(
                                     label = label.trim(),
                                     amount = amount.toDoubleOrNull() ?: 0.0,
                                     isVariable = false,
+                                    periodMonths = periodMonths,
+                                    dailySpend = dailySpendStr.toDoubleOrNull() ?: 0.0,
                                     records = emptyList()
                                 ))
                             }

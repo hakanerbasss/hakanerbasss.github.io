@@ -187,6 +187,26 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 }
             }
 
+            // Yedekleme hatirlatici
+            item {
+                Card(shape = RoundedCornerShape(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Yedekleme Hatirlatici", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("Yedek alinmadigi gunlerde hatirlat", fontSize = 12.sp, color = Color.Gray)
+                        }
+                        Switch(
+                            checked = settings.backupReminderEnabled,
+                            onCheckedChange = { settings = settings.copy(backupReminderEnabled = it); save() }
+                        )
+                    }
+                }
+            }
+
             item { Spacer(Modifier.height(16.dp)) }
         }
     }

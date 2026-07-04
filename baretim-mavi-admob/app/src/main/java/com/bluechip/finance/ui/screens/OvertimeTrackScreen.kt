@@ -49,17 +49,12 @@ fun OvertimeTrackScreen() {
 
     fun reload() { records = OvertimeManager.loadAll(context) }
 
-    val now             = Calendar.getInstance()
-    val thisMonth       = now.get(Calendar.MONTH)
-    val thisYear        = now.get(Calendar.YEAR)
-    val thisMonthRecs   = records.filter {
-        val c = Calendar.getInstance().apply { timeInMillis = it.dateMillis }
-        c.get(Calendar.MONTH) == thisMonth && c.get(Calendar.YEAR) == thisYear
-    }
+    val salaryDay       = profile.salaryDay
+    val thisMonthRecs   = OvertimeManager.currentPeriodRecords(context, salaryDay)
     val thisMonthBrut   = thisMonthRecs.sumOf { it.brutAmount }
     val thisMonthNet    = thisMonthRecs.sumOf { it.netAmount }
     val thisMonthHours  = thisMonthRecs.sumOf { it.hours }
-    val thisMonthName   = monthFmt.format(now.time).replaceFirstChar { it.uppercase() }
+    val thisMonthName   = OvertimeManager.currentPeriodLabel(salaryDay)
 
     // %50 birim net saat ucreti - bilgi icin
     val unit50Net  = OvertimeManager.unitHourlyNet(grossSalary, OvertimeTrackType.PCT50)
