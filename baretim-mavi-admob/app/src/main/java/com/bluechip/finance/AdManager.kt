@@ -24,8 +24,7 @@ private const val ADMOB_BANNER_ID          = "ca-app-pub-7820582813827252/852225
 private const val ADMOB_INTERSTITIAL_ID    = "ca-app-pub-7820582813827252/5460511169"
 private const val ADMOB_REWARDED_ID        = "ca-app-pub-7820582813827252/3824449145"
 private const val ADMOB_SAVINGS_REWARDED_ID = "ca-app-pub-7820582813827252/4892694634"
-// TEST ID - AdMob konsolunda gercek App Open reklam birimi olustur ve bu satiri guncelle
-private const val ADMOB_APP_OPEN_ID        = "ca-app-pub-3940256099942544/9257395921"
+private const val ADMOB_APP_OPEN_ID        = "ca-app-pub-7820582813827252/8523349934"
 
 object AdManager {
 
