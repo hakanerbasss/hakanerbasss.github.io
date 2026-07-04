@@ -3940,7 +3940,10 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     existing_lower = suggested_tags.lower()
     extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
     full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
-    caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
+    desc_excerpt = _smart_truncate(description, limit=500) if description else ""
+    body = f"{title}\n\n{desc_excerpt}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}" if desc_excerpt \
+        else f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
+    caption = body
 
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
     # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
@@ -5353,6 +5356,7 @@ async def shorts_send_instagram(request: Request):
     filename = body.get("filename", "").strip()
     title = body.get("title", "").strip()
     tags = body.get("tags", "").strip()
+    description = body.get("description", "").strip()
 
     if not filename:
         raise HTTPException(400, "filename gerekli")
@@ -5369,7 +5373,13 @@ async def shorts_send_instagram(request: Request):
     existing_lower = tags.lower()
     extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
     full_tags = f"{tags} {extra}".strip() if extra else tags
-    caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}" if title else full_tags
+    desc_excerpt = _smart_truncate(description, limit=500) if description else ""
+    if title and desc_excerpt:
+        caption = f"{title}\n\n{desc_excerpt}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
+    elif title:
+        caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
+    else:
+        caption = full_tags
 
     media_id, err = await post_reel_to_instagram(
         output_file, caption, cfg["ig_user_id"], cfg["access_token"]

@@ -2114,7 +2114,8 @@ async function sendShortsToInstagram() {
       body: JSON.stringify({
         filename: currentVideoFilename,
         title: document.getElementById('yt-title').value || '',
-        tags: document.getElementById('yt-tags').value || ''
+        tags: document.getElementById('yt-tags').value || '',
+        description: document.getElementById('yt-desc').value || ''
       })
     });
     const d = await r.json();
