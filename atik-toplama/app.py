@@ -681,5 +681,67 @@ def osm_neighborhoods_list():
         return jsonify({'error': f'OSM hatası: {e}'}), 502
 
 
+# ── Sokak detay (tüm roller) ─────────────────────────────────────────────────
+@app.route('/api/streets/<int:sid>/details')
+@login_required
+def street_details(sid):
+    work_date = request.args.get('date') or today()
+    nid = request.args.get('neighborhood_id', type=int)
+
+    conn = get_db()
+    street = conn.execute(
+        'SELECT s.*, n.id as nb_id, n.name as nb_name FROM streets s '
+        'JOIN neighborhoods n ON n.id = s.neighborhood_id WHERE s.id = ?', (sid,)
+    ).fetchone()
+    if not street:
+        conn.close()
+        return jsonify({'error': 'Sokak bulunamadı'}), 404
+
+    nb_id = nid or street['nb_id']
+
+    assignments = conn.execute(
+        'SELECT ra.team_type, sh.display_name as shift_name, '
+        'u.display_name as user_name '
+        'FROM route_assignments ra '
+        'JOIN assignment_streets ast ON ast.assignment_id = ra.id '
+        'LEFT JOIN shifts sh ON sh.id = ra.shift_id '
+        'LEFT JOIN users u ON u.id = ra.assigned_user_id '
+        'WHERE ast.street_id = ? AND ra.neighborhood_id = ? AND ra.work_date = ?',
+        (sid, nb_id, work_date)
+    ).fetchall()
+
+    completions = conn.execute(
+        'SELECT sc.completed_at, sc.photo_sent, sc.note, '
+        'u.display_name as user_name, u.role '
+        'FROM street_completions sc '
+        'JOIN users u ON u.id = sc.user_id '
+        'WHERE sc.street_id = ? AND sc.work_date = ?',
+        (sid, work_date)
+    ).fetchall()
+
+    notifications = conn.execute(
+        'SELECT n.type, n.note, n.created_at, u.display_name as creator_name '
+        'FROM notifications n JOIN users u ON u.id = n.created_by '
+        'WHERE n.neighborhood_id = ? AND n.status = ? ORDER BY n.created_at DESC LIMIT 10',
+        (nb_id, 'open')
+    ).fetchall()
+
+    supervisors = conn.execute(
+        'SELECT u.display_name, u.role FROM users u '
+        'JOIN user_neighborhoods un ON un.user_id = u.id '
+        'WHERE un.neighborhood_id = ? AND u.role IN (?,?) ORDER BY u.role',
+        (nb_id, 'cavus', 'onbasi')
+    ).fetchall()
+
+    conn.close()
+    return jsonify({
+        'street_name': street['name'],
+        'assignments': [dict(r) for r in assignments],
+        'completions': [dict(r) for r in completions],
+        'notifications': [dict(r) for r in notifications],
+        'supervisors': [dict(r) for r in supervisors],
+    })
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5057)), debug=False)

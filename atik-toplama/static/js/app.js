@@ -191,15 +191,106 @@ function onStreetClick(street) {
     el('assignStreetCount').textContent = S.assignSelected.size;
     return;
   }
-
-  if (SUPERVISOR_ROLES.has(S.user.role)) return; // supervisor sadece bakır
-
-  // Süpürgeci: sokak kapatma akışı
-  const myStreet = S.myStreets.find(s => s.id === street.id);
-  if (!myStreet) { toast('Bu sokak bugünkü görevinde yok'); return; }
-  if (S.completedIds.has(street.id)) { toast('Bu sokak zaten tamamlandı ✅', 'success'); return; }
-  openCloseStreetModal(street);
+  openStreetDetail(street);
 }
+
+// ── Sokak detay paneli ─────────────────────────────────────────────────────────
+const ROLE_NAMES = {
+  supurgeci:'Yaya Süpürgeci', aracli_supurge:'Araçlı Süpürge',
+  cop_araci:'Çöp Aracı', ring_araci:'Ring Aracı',
+  kaba_atik:'Kaba Atık', konteyner_yikama:'Konteyner Yıkama',
+  cavus:'Çavuş', onbasi:'Onbaşı', santiye_amiri:'Şantiye Amiri',
+};
+
+async function openStreetDetail(street) {
+  el('sdStreetName').textContent = street.name;
+  el('sdBody').innerHTML = '<p style="padding:8px 0;color:var(--muted);font-size:13px">Yükleniyor…</p>';
+  el('sdActions').innerHTML = '';
+  openModal('streetDetailModal');
+
+  const nid = S.activeNb ? S.activeNb.id : '';
+  try {
+    const d = await api(`/api/streets/${street.id}/details?date=${todayStr()}&neighborhood_id=${nid}`);
+    renderStreetDetail(d, street);
+  } catch(e) {
+    el('sdBody').innerHTML = `<p style="color:var(--red);font-size:13px">${e.message}</p>`;
+  }
+}
+
+function renderStreetDetail(d, street) {
+  let html = '';
+
+  if (d.supervisors && d.supervisors.length) {
+    html += `<div class="sd-section"><div class="sd-label">👮 Mahalle Sorumlusu</div>`;
+    d.supervisors.forEach(s => {
+      html += `<div class="sd-row"><span>${ROLE_NAMES[s.role]||s.role}</span><b>${esc(s.display_name)}</b></div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="sd-section"><div class="sd-label">📋 Bugünkü Atamalar</div>`;
+  if (d.assignments && d.assignments.length) {
+    d.assignments.forEach(a => {
+      html += `<div class="sd-row">
+        <span>${ROLE_NAMES[a.team_type]||a.team_type}</span>
+        <b>${esc(a.user_name || '— Tüm ekip —')}</b>
+        ${a.shift_name ? `<span class="sd-muted">${esc(a.shift_name)}</span>` : ''}
+      </div>`;
+    });
+  } else {
+    html += `<div class="sd-row sd-pending">Bu sokağa bugün atama yok</div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="sd-section"><div class="sd-label">✅ Bugün Yapılanlar</div>`;
+  if (d.completions && d.completions.length) {
+    d.completions.forEach(c => {
+      html += `<div class="sd-row">
+        <span class="sd-done">✅</span>
+        <span>${ROLE_NAMES[c.role]||c.role}</span>
+        <b>${esc(c.user_name)}</b>
+        ${c.photo_sent ? '📷' : ''}
+        <span class="sd-muted">${timeAgo(c.completed_at)}</span>
+      </div>`;
+      if (c.note) html += `<div style="font-size:12px;color:var(--muted);padding:2px 0 4px">${esc(c.note)}</div>`;
+    });
+  } else {
+    html += `<div class="sd-row sd-pending">Henüz işlem yapılmamış</div>`;
+  }
+  html += `</div>`;
+
+  if (d.notifications && d.notifications.length) {
+    html += `<div class="sd-section"><div class="sd-label">⚠️ Açık Bildirimler (${d.notifications.length})</div>`;
+    d.notifications.slice(0, 4).forEach(n => {
+      html += `<div class="sd-row">${NOTIF_ICONS[n.type]||'📝'} ${NOTIF_LABELS[n.type]||n.type}
+        ${n.note ? `<span style="font-size:12px;color:var(--muted)">— ${esc(n.note)}</span>` : ''}
+        <span class="sd-muted">${esc(n.creator_name)}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  el('sdBody').innerHTML = html;
+
+  const actions = el('sdActions');
+  const notifBtn = document.createElement('button');
+  notifBtn.textContent = '⚠️ Bildirim Ekle';
+  notifBtn.onclick = () => { closeModal('streetDetailModal'); openNotifModal(); };
+  actions.appendChild(notifBtn);
+
+  if (!SUPERVISOR_ROLES.has(S.user.role)) {
+    const myStreet = S.myStreets.find(s => s.id === street.id);
+    if (myStreet && !S.completedIds.has(street.id)) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'primary';
+      closeBtn.textContent = '🧹 Sokağı Kapat';
+      closeBtn.onclick = () => { closeModal('streetDetailModal'); openCloseStreetModal(street); };
+      actions.appendChild(closeBtn);
+    }
+  }
+}
+
+el('sdCloseBtn').addEventListener('click', () => closeModal('streetDetailModal'));
 
 // ── Harita tıklama (bildirim konumu) ──────────────────────────────────────────
 function onMapClick(e) {
@@ -279,6 +370,10 @@ el('csSaveBtn').addEventListener('click', async () => {
 
 // ── En yakın sokak ─────────────────────────────────────────────────────────────
 el('nearestBtn').addEventListener('click', () => {
+  if (!S.lastPos) {
+    toast('GPS konumu henüz alınamadı — bekleyin veya uygulamaya konum izni verin', 'error', 4000);
+    return;
+  }
   const pool = S.myStreets.length ? S.myStreets : S.streets;
   const unvisited = pool.filter(s => !S.completedIds.has(s.id));
   if (!unvisited.length) { toast('Tüm sokaklar tamamlandı 🎉', 'success'); return; }
@@ -324,6 +419,8 @@ function onGpsPosition(pos) {
 }
 
 if ('geolocation' in navigator) {
+  // Hemen bir kez al (watchPosition gecikmeli başlayabiliyor)
+  navigator.geolocation.getCurrentPosition(onGpsPosition, () => {}, {enableHighAccuracy:true, timeout:10000});
   navigator.geolocation.watchPosition(onGpsPosition, () => {}, {
     enableHighAccuracy: true, maximumAge: 6000, timeout: 30000
   });
@@ -339,15 +436,27 @@ el('voiceBtn').addEventListener('click', () => {
 el('voiceBtn').classList.add('active');
 
 // ── Bildirim ekle ─────────────────────────────────────────────────────────────
-el('addNotifBtn').addEventListener('click', () => {
+function openNotifModal() {
   if (!S.activeNb) { toast('Önce bir mahalle seçin'); return; }
-  S._pendingNotifLatLng = S.lastPos ? L.latLng(S.lastPos.lat, S.lastPos.lng) : null;
-  el('notifLocInfo').textContent = S.lastPos
-    ? `📍 ${S.lastPos.lat.toFixed(5)}, ${S.lastPos.lng.toFixed(5)} (GPS konumun)`
-    : '📍 GPS alınamadı — haritaya dokun';
   el('notifNote').value = '';
+  if (S.lastPos) {
+    S._pendingNotifLatLng = L.latLng(S.lastPos.lat, S.lastPos.lng);
+    el('notifLocInfo').textContent = `📍 ${S.lastPos.lat.toFixed(5)}, ${S.lastPos.lng.toFixed(5)} (GPS konumun)`;
+  } else {
+    S._pendingNotifLatLng = null;
+    el('notifLocInfo').textContent = '📍 GPS bekleniyor — haritaya da dokunabilirsin';
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        onGpsPosition(pos);
+        S._pendingNotifLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        el('notifLocInfo').textContent = `📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} (GPS)`;
+      }, () => {}, {enableHighAccuracy:true, timeout:8000});
+    }
+  }
   openModal('addNotifModal');
-});
+}
+
+el('addNotifBtn').addEventListener('click', openNotifModal);
 
 el('notifCancelBtn').addEventListener('click', () => closeModal('addNotifModal'));
 
