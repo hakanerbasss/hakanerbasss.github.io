@@ -147,18 +147,26 @@
       <label>Kişi (opsiyonel)</label>
       <select id="assignUser"><option value="">— Tüm ekip —</option></select>
     </div>
-    <div class="assign-info">
-      Haritaya dokun: sokakları seç/kaldır. <span id="assignStreetCount">0</span> sokak seçili.
-    </div>
-    <div class="assign-btns">
-      <button id="assignSelectAllBtn">Tümünü Seç</button>
-      <button id="assignClearBtn">Temizle</button>
-    </div>
-    <div class="row">
+    <p style="font-size:12px;color:var(--muted);margin-top:12px">Sokakları haritadan tıklayarak veya listeden işaretleyerek seçin.</p>
+    <div class="row" style="margin-top:10px">
       <button id="assignCancelBtn">Vazgeç</button>
-      <button class="primary" id="assignSaveBtn">Kaydet</button>
+      <button id="assignMapBtn" style="background:var(--blue);border-color:var(--blue);color:#fff">🗺️ Haritadan</button>
+      <button class="primary" id="assignListBtn">📋 Listeden</button>
     </div>
   </div>
+</div>
+
+<!-- ── Atama seçim çubuğu (modal kapanınca haritanın üstünde kalır) ── -->
+<div id="assignBar" style="display:none">
+  <button id="assignBarBackBtn">← Geri</button>
+  <div id="assignBarInfo">
+    <b id="assignBarCount">0</b> sokak seçili
+    <div id="assignBarTeam" style="font-size:10px;color:var(--muted)"></div>
+  </div>
+  <button id="assignBarListBtn">📋 Liste</button>
+  <button id="assignBarAllBtn">Tümü</button>
+  <button id="assignBarClearBtn">Sıfırla</button>
+  <button class="primary" id="assignBarSaveBtn">✅ Kaydet</button>
 </div>
 
 <!-- ── Sokak detay modal ── -->
