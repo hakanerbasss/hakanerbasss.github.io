@@ -218,7 +218,17 @@ LANG_MAP = {
     "pl": "Polish",
 }
 
-VOICES = ["M1", "M2", "M3", "F1", "F2", "F3"]
+VOICES = ["M1", "M2", "M3", "F1", "F2", "F3", "M4"]
+CUSTOM_VOICE_REF = Path("voice_m4_ref.wav")
+
+_chatterbox_model = None
+
+def _get_chatterbox():
+    global _chatterbox_model
+    if _chatterbox_model is None:
+        from chatterbox.tts import ChatterboxTTS
+        _chatterbox_model = ChatterboxTTS.from_pretrained(device="cpu")
+    return _chatterbox_model
 
 
 def _parse_llm_json(text: str) -> dict:
@@ -335,6 +345,17 @@ async def synthesize(
     if voice not in VOICES:
         raise HTTPException(400, "Geçersiz ses")
 
+    out_file = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
+
+    if voice == "M4":
+        if not CUSTOM_VOICE_REF.exists():
+            raise HTTPException(400, "M4 için referans ses yüklenmemiş. Önce ses dosyası yükleyin.")
+        import torchaudio
+        model = await asyncio.to_thread(_get_chatterbox)
+        wav = await asyncio.to_thread(model.generate, _clean_tts_text(text, lang), audio_prompt_path=str(CUSTOM_VOICE_REF))
+        await asyncio.to_thread(torchaudio.save, str(out_file), wav, model.sr)
+        return {"file": f"/api/audio/{out_file.name}", "duration": 0}
+
     tts = get_tts()
     style = tts.get_voice_style(voice_name=voice)
 
@@ -343,11 +364,21 @@ async def synthesize(
         voice_style=style, total_steps=8, speed=speed,
     )
 
-    out_file = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
     tts.save_audio(wav, str(out_file))
 
     dur = float(duration[0]) if hasattr(duration, '__getitem__') else float(duration)
     return {"file": f"/api/audio/{out_file.name}", "duration": round(dur, 2)}
+
+
+@app.post("/api/voice/upload-ref")
+async def upload_voice_ref(file: UploadFile = File(...)):
+    content = await file.read()
+    CUSTOM_VOICE_REF.write_bytes(content)
+    return {"ok": True, "size": len(content)}
+
+@app.get("/api/voice/ref-status")
+async def voice_ref_status():
+    return {"exists": CUSTOM_VOICE_REF.exists()}
 
 
 @app.post("/api/translate")
