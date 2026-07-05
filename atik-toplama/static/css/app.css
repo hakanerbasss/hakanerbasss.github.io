@@ -168,6 +168,19 @@ button{cursor:pointer;font-family:inherit}
 .comment-add input{flex:1;padding:7px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;min-width:0}
 .comment-add button{padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--green);background:var(--green);color:#fff;font-size:12px;font-weight:600;white-space:nowrap}
 
+/* ── Atama çubuğu (haritadan/listeden seçim) ── */
+#assignBar{
+  display:flex;align-items:center;gap:6px;padding:8px 10px;
+  padding-bottom:max(8px,env(safe-area-inset-bottom));
+  background:var(--panel);border-top:2px solid var(--blue);z-index:100;overflow-x:auto;
+}
+#assignBar button{
+  white-space:nowrap;padding:9px 10px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:12px;font-weight:600;flex-shrink:0;
+}
+#assignBar button.primary{background:var(--green);border-color:var(--green);color:#fff}
+#assignBarInfo{flex:1;font-size:13px;white-space:nowrap;min-width:60px}
+
 /* ── Harita düğmeleri üzerine bindirme ── */
 .map-overlay{position:absolute;bottom:80px;right:12px;z-index:50;display:flex;flex-direction:column;gap:8px}
 .map-overlay button{

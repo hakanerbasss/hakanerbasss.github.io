@@ -107,23 +107,29 @@ function streetColor(street) {
 }
 
 function renderStreets(streets) {
-  // Temizle
-  Object.values(S.streetLayers).forEach(l => S.map.removeLayer(l));
+  Object.values(S.streetLayers).forEach(lr => {
+    S.map.removeLayer(lr.vis);
+    S.map.removeLayer(lr.hit);
+  });
   S.streetLayers = {};
 
   streets.forEach(street => {
-    const line = L.polyline(street.geometry, streetColor(street));
-    line.bindTooltip(street.name, {sticky:true, className:'', opacity:.9});
-    line.on('click', () => onStreetClick(street));
-    line.addTo(S.map);
-    S.streetLayers[street.id] = line;
+    const vis = L.polyline(street.geometry, {...streetColor(street), interactive:false});
+    // Geniş şeffaf hit alanı — ince çizgiye dokunmayı kolaylaştırır
+    const hit = L.polyline(street.geometry, {weight:20, opacity:0, interactive:true});
+    hit.on('click', () => onStreetClick(street));
+    vis.bindTooltip(street.name, {direction:'top', sticky:false, opacity:.9});
+    vis.addTo(S.map);
+    hit.addTo(S.map);
+    S.streetLayers[street.id] = {vis, hit};
   });
 }
 
 function refreshStreetColor(streetId) {
   const street = S.streets.find(s => s.id === streetId) || S.myStreets.find(s => s.id === streetId);
-  if (!street || !S.streetLayers[streetId]) return;
-  S.streetLayers[streetId].setStyle(streetColor(street));
+  const lr = S.streetLayers[streetId];
+  if (!street || !lr) return;
+  lr.vis.setStyle(streetColor(street));
 }
 
 // ── Mahalle yükleme ─────────────────────────────────────────────────────────────
@@ -196,11 +202,25 @@ function onStreetClick(street) {
   if (S.mode === 'assign') {
     if (S.assignSelected.has(street.id)) S.assignSelected.delete(street.id);
     else S.assignSelected.add(street.id);
-    refreshStreetColor(street.id);
-    el('assignStreetCount').textContent = S.assignSelected.size;
+    const lr = S.streetLayers[street.id];
+    if (lr) lr.vis.setStyle(streetColor(street));
+    _updateAssignCount();
     return;
   }
+  // Normal mod: kısa mavi vurgu → detay aç
+  const lr = S.streetLayers[street.id];
+  if (lr) {
+    lr.vis.setStyle({color:'#1f6feb', weight:8, opacity:1});
+    setTimeout(() => refreshStreetColor(street.id), 1800);
+  }
   openStreetDetail(street);
+}
+
+function _updateAssignCount() {
+  el('assignBarCount').textContent = S.assignSelected.size;
+  document.querySelectorAll('[data-assign-street]').forEach(cb => {
+    cb.checked = S.assignSelected.has(+cb.dataset.assignStreet);
+  });
 }
 
 // ── Sokak detay paneli ─────────────────────────────────────────────────────────
@@ -588,9 +608,9 @@ function renderStreetList() {
   body.querySelectorAll('[data-fly]').forEach(btn => {
     btn.onclick = () => {
       const street = pool.find(s => s.id === Number(btn.dataset.fly));
-      if (!street) return;
-      const bounds = L.latLngBounds(street.geometry);
-      S.map.flyToBounds(bounds, {padding:[40,40], animate:true, duration:.8});
+      if (!street || !street.geometry.length) return;
+      const mid = street.geometry[Math.floor(street.geometry.length / 2)];
+      S.map.flyTo(mid, 17, {animate:true, duration:.7});
       speak(street.name);
       el('sidePanel').classList.remove('open');
     };
@@ -667,11 +687,11 @@ function flyToNotif(streetId, lat, lon) {
   if (streetId) {
     const street = S.streets.find(s => s.id === streetId);
     if (street && street.geometry && street.geometry.length) {
-      S.map.flyToBounds(L.latLngBounds(street.geometry), {padding:[40,40], animate:true, duration:.8});
-      // Sokağı 3 sn sarı ile vurgula
-      const layer = S.streetLayers[streetId];
-      if (layer) {
-        layer.setStyle({color:'#d29922', weight:8, opacity:1});
+      const mid = street.geometry[Math.floor(street.geometry.length / 2)];
+      S.map.flyTo(mid, 17, {animate:true, duration:.7});
+      const lr = S.streetLayers[streetId];
+      if (lr) {
+        lr.vis.setStyle({color:'#d29922', weight:8, opacity:1});
         setTimeout(() => refreshStreetColor(streetId), 3000);
       }
       return;
@@ -1022,7 +1042,7 @@ async function openAssignPanel() {
   if (!S.activeNb) { toast('Önce mahalle seçin'); return; }
   S.mode = 'assign';
   S.assignSelected.clear();
-  el('assignStreetCount').textContent = '0';
+  el('assignBarCount').textContent = '0';
 
   // Kalıcı toggle sıfırla
   el('assignPermanent').checked = false;
@@ -1072,42 +1092,118 @@ async function openAssignPanel() {
   openModal('assignModal');
 }
 
-el('assignSelectAllBtn').addEventListener('click', () => {
-  S.streets.forEach(s => { S.assignSelected.add(s.id); S.streetLayers[s.id] && S.streetLayers[s.id].setStyle(streetColor(s)); });
-  el('assignStreetCount').textContent = S.assignSelected.size;
-});
-
-el('assignClearBtn').addEventListener('click', () => {
-  S.assignSelected.clear();
-  S.streets.forEach(s => S.streetLayers[s.id] && S.streetLayers[s.id].setStyle(streetColor(s)));
-  el('assignStreetCount').textContent = '0';
-});
-
 el('assignCancelBtn').addEventListener('click', () => {
-  S.mode = 'normal'; S.assignSelected.clear();
-  closeModal('assignModal');
-  loadNeighborhood(S.activeNb);
+  _exitAssignMode();
 });
 
-el('assignSaveBtn').addEventListener('click', async () => {
-  if (!S.assignSelected.size) { toast('Hiç sokak seçilmedi', 'error'); return; }
-  const permanent = el('assignPermanent').checked;
-  const payload = {
-    neighborhood_id: S.activeNb.id,
+el('assignMapBtn').addEventListener('click', () => {
+  _enterAssignSelectMode('map');
+});
+
+el('assignListBtn').addEventListener('click', () => {
+  _enterAssignSelectMode('list');
+});
+
+// ── Atama çubuğu ─────────────────────────────────────────────────────────────
+function _enterAssignSelectMode(mode) {
+  // Config'i kaydet
+  S._assignConfig = {
+    permanent: el('assignPermanent').checked,
+    work_date: el('assignDate').value || todayStr(),
     team_type: el('assignTeamType').value,
     shift_id: el('assignShift').value || null,
-    permanent,
-    work_date: permanent ? null : (el('assignDate').value || todayStr()),
-    street_ids: [...S.assignSelected],
     assigned_user_id: el('assignUser').value || null,
   };
+  closeModal('assignModal');
+  el('bottombar').style.display = 'none';
+  el('assignBar').style.display = 'flex';
+  const roles = {'supurgeci':'Yaya Süpürgeci','aracli_supurge':'Araçlı Süpürge','cop_araci':'Çöp Aracı','ring_araci':'Ring Aracı','kaba_atik':'Kaba Atık','konteyner_yikama':'Kont. Yıkama'};
+  el('assignBarTeam').textContent = roles[S._assignConfig.team_type] || S._assignConfig.team_type;
+  _updateAssignCount();
+  if (mode === 'list') _openAssignList();
+}
+
+function _exitAssignMode() {
+  S.mode = 'normal'; S.assignSelected.clear();
+  el('assignBar').style.display = 'none';
+  el('bottombar').style.display = 'flex';
+  el('sidePanel').classList.remove('open');
+  closeModal('assignModal');
+  loadNeighborhood(S.activeNb);
+}
+
+function _openAssignList() {
+  el('sidePanelTitle').textContent = 'Sokak Seçimi';
+  const body = el('sidePanelBody');
+  body.innerHTML = S.streets.map(s => `
+    <label class="street-row" style="cursor:pointer;gap:10px">
+      <input type="checkbox" data-assign-street="${s.id}" ${S.assignSelected.has(s.id) ? 'checked' : ''}
+        style="width:18px;height:18px;accent-color:var(--blue);flex-shrink:0">
+      <span class="sname">${esc(s.name)}</span>
+    </label>
+  `).join('');
+  body.querySelectorAll('[data-assign-street]').forEach(cb => {
+    cb.onchange = () => {
+      const sid = +cb.dataset.assignStreet;
+      if (cb.checked) S.assignSelected.add(sid);
+      else S.assignSelected.delete(sid);
+      const lr = S.streetLayers[sid];
+      if (lr) lr.vis.setStyle(streetColor(S.streets.find(s => s.id === sid) || {id:sid}));
+      _updateAssignCount();
+    };
+  });
+  el('sidePanel').classList.add('open');
+}
+
+el('assignBarBackBtn').addEventListener('click', () => {
+  el('sidePanel').classList.remove('open');
+  el('assignBar').style.display = 'none';
+  el('bottombar').style.display = 'flex';
+  openModal('assignModal');
+});
+
+el('assignBarListBtn').addEventListener('click', () => {
+  if (el('sidePanel').classList.contains('open') && el('sidePanelTitle').textContent === 'Sokak Seçimi') {
+    el('sidePanel').classList.remove('open');
+  } else {
+    _openAssignList();
+  }
+});
+
+el('assignBarAllBtn').addEventListener('click', () => {
+  S.streets.forEach(s => { S.assignSelected.add(s.id); const lr = S.streetLayers[s.id]; if (lr) lr.vis.setStyle(streetColor(s)); });
+  _updateAssignCount();
+});
+
+el('assignBarClearBtn').addEventListener('click', () => {
+  S.assignSelected.clear();
+  S.streets.forEach(s => { const lr = S.streetLayers[s.id]; if (lr) lr.vis.setStyle(streetColor(s)); });
+  _updateAssignCount();
+});
+
+el('assignBarSaveBtn').addEventListener('click', async () => {
+  if (!S.assignSelected.size) { toast('Hiç sokak seçilmedi', 'error'); return; }
+  const cfg = S._assignConfig || {};
+  const payload = {
+    neighborhood_id: S.activeNb.id,
+    team_type: cfg.team_type,
+    shift_id: cfg.shift_id,
+    permanent: cfg.permanent,
+    work_date: cfg.permanent ? null : cfg.work_date,
+    street_ids: [...S.assignSelected],
+    assigned_user_id: cfg.assigned_user_id,
+  };
+  el('assignBarSaveBtn').disabled = true;
+  el('assignBarSaveBtn').textContent = 'Kaydediliyor…';
   try {
     const res = await api('/api/assignments', {method:'POST', body:JSON.stringify(payload)});
-    S.mode = 'normal'; S.assignSelected.clear();
-    closeModal('assignModal');
     toast(`${res.street_count} sokak atandı ✅`, 'success');
-    loadNeighborhood(S.activeNb);
-  } catch(e) { toast(e.message, 'error'); }
+    _exitAssignMode();
+  } catch(e) {
+    toast(e.message, 'error');
+    el('assignBarSaveBtn').disabled = false;
+    el('assignBarSaveBtn').textContent = '✅ Kaydet';
+  }
 });
 
 // ── Personel yönetimi ─────────────────────────────────────────────────────────
@@ -1216,6 +1312,11 @@ el('epSaveBtn').addEventListener('click', async () => {
 // ── Modal yardımcıları ─────────────────────────────────────────────────────────
 function openModal(id) { el(id).classList.remove('hidden'); }
 function closeModal(id) { el(id).classList.add('hidden'); }
+
+// Overlay dışına tıklayınca kapat
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if (e.target === ov) closeModal(ov.id); });
+});
 
 // ── Zaman yardımcısı ──────────────────────────────────────────────────────────
 function timeAgo(ts) {

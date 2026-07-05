@@ -727,8 +727,11 @@ def accept_notification(nid):
 @app.route('/api/notifications/<int:nid>/resolve', methods=['POST'])
 @login_required
 def resolve_notification(nid):
-    photo = request.files.get('photo')
+    import threading, io
+    photo_file = request.files.get('photo')
+    photo_data = photo_file.read() if photo_file else None
     note = request.form.get('note', '').strip()
+
     conn = get_db()
     notif = conn.execute(
         'SELECT n.*, nb.name as nb_name, nb.id as nb_id, s.name as street_name '
@@ -741,26 +744,27 @@ def resolve_notification(nid):
         conn.close()
         return jsonify({'error': 'bulunamadı'}), 404
 
-    photo_sent = False
-    notif_dict = dict(notif)
-    if photo:
-        photo_sent = tg.notify_resolved(notif_dict, session['display_name'],
-                                        notif['nb_name'], photo_file=photo.stream,
-                                        neighborhood_id=notif['nb_id'],
-                                        street_name=notif['street_name'],
-                                        note=note)
-    else:
-        tg.notify_resolved(notif_dict, session['display_name'], notif['nb_name'],
-                           neighborhood_id=notif['nb_id'],
-                           street_name=notif['street_name'],
-                           note=note)
-
+    # DB'yi hemen güncelle — istemciyi Telegram'ı bekletme
     conn.execute(
-        'UPDATE notifications SET status = ?, resolved_by = ?, resolved_at = ?, photo_sent = ? WHERE id = ?',
-        ('resolved', session['user_id'], now(), int(photo_sent), nid)
+        'UPDATE notifications SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?',
+        ('resolved', session['user_id'], now(), nid)
     )
     conn.commit()
     conn.close()
+
+    # Telegram arka planda gönder
+    notif_dict = dict(notif)
+    user_display = session['display_name']
+    nb_name, nb_id = notif['nb_name'], notif['nb_id']
+    street_name = notif['street_name']
+
+    def _send_tg():
+        photo_stream = io.BytesIO(photo_data) if photo_data else None
+        tg.notify_resolved(notif_dict, user_display, nb_name,
+                           photo_file=photo_stream, neighborhood_id=nb_id,
+                           street_name=street_name, note=note)
+
+    threading.Thread(target=_send_tg, daemon=True).start()
     return jsonify({'ok': True})
 
 
