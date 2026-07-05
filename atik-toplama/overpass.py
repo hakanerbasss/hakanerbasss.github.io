@@ -138,7 +138,7 @@ def search_neighborhoods(district_name, province_name):
     query = f"""
     [out:json][timeout:30];
     area({area_id})->.d;
-    relation(area.d)["admin_level"~"^(9|10)$"]["name"]["boundary"="administrative"];
+    relation(area.d)["admin_level"~"^(8|9|10)$"]["name"]["boundary"="administrative"];
     out tags;
     """
     resp = requests.post(OVERPASS_URL, data={'data': query},
