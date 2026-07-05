@@ -862,7 +862,8 @@ def street_details(sid):
     ).fetchall()
 
     notifications = conn.execute(
-        'SELECT n.type, n.note, n.created_at, u.display_name as creator_name '
+        'SELECT n.id, n.type, n.note, n.lat, n.lon, n.street_id, n.created_at, '
+        'u.display_name as creator_name '
         'FROM notifications n JOIN users u ON u.id = n.created_by '
         'WHERE n.street_id = ? AND n.status = ? ORDER BY n.created_at DESC LIMIT 10',
         (sid, 'open')
