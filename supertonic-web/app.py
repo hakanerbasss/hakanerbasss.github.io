@@ -361,12 +361,6 @@ async def synthesize(
     return {"file": f"/api/audio/{out_file.name}", "duration": round(dur, 2)}
 
 
-@app.post("/api/voice/upload-ref")
-async def upload_voice_ref(file: UploadFile = File(...)):
-    Path("voice_ref.m4a").write_bytes(await file.read())
-    return {"ok": True}
-
-
 @app.post("/api/translate")
 async def translate_text(
     text: str = Form(...),
