@@ -32,6 +32,7 @@ const S = {
   mode: 'normal',       // 'normal' | 'assign'
   closingStreetId: null,
   photoFile: null,
+  _notifStreet: null,   // bildirim eklerken seçili sokak
 };
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
@@ -133,11 +134,17 @@ async function loadNeighborhood(nb) {
   const allStreets = await api(`/api/neighborhoods/${nb.id}/streets`);
   S.streets = allStreets;
 
+  // Açık bildirimler
+  try {
+    S.notifications = await api(`/api/notifications?neighborhood_id=${nb.id}&status=open`);
+  } catch(e) { S.notifications = []; }
+
   if (SUPERVISOR_ROLES.has(S.user.role)) {
     await loadSupervisorView();
   } else {
     await loadSweeperView();
   }
+  renderNotifMarkers(S.notifications);
   fitMapToStreets(S.streets.length ? S.streets : []);
   localStorage.setItem('lastNbId', String(nb.id));
 }
@@ -228,17 +235,18 @@ function renderStreetDetail(d, street) {
     html += `</div>`;
   }
 
-  html += `<div class="sd-section"><div class="sd-label">📋 Bugünkü Atamalar</div>`;
+  html += `<div class="sd-section"><div class="sd-label">📋 Atamalar</div>`;
   if (d.assignments && d.assignments.length) {
     d.assignments.forEach(a => {
       html += `<div class="sd-row">
         <span>${ROLE_NAMES[a.team_type]||a.team_type}</span>
         <b>${esc(a.user_name || '— Tüm ekip —')}</b>
         ${a.shift_name ? `<span class="sd-muted">${esc(a.shift_name)}</span>` : ''}
+        ${!a.work_date ? `<span style="font-size:10px;color:var(--green);background:rgba(26,122,60,.15);padding:2px 6px;border-radius:10px">Kalıcı</span>` : ''}
       </div>`;
     });
   } else {
-    html += `<div class="sd-row sd-pending">Bu sokağa bugün atama yok</div>`;
+    html += `<div class="sd-row sd-pending">Bu sokağa atama yok</div>`;
   }
   html += `</div>`;
 
@@ -275,7 +283,7 @@ function renderStreetDetail(d, street) {
   const actions = el('sdActions');
   const notifBtn = document.createElement('button');
   notifBtn.textContent = '⚠️ Bildirim Ekle';
-  notifBtn.onclick = () => { closeModal('streetDetailModal'); openNotifModal(); };
+  notifBtn.onclick = () => { closeModal('streetDetailModal'); openNotifModal(street); };
   actions.appendChild(notifBtn);
 
   if (!SUPERVISOR_ROLES.has(S.user.role)) {
@@ -436,42 +444,66 @@ el('voiceBtn').addEventListener('click', () => {
 el('voiceBtn').classList.add('active');
 
 // ── Bildirim ekle ─────────────────────────────────────────────────────────────
-function openNotifModal() {
+function openNotifModal(street) {
   if (!S.activeNb) { toast('Önce bir mahalle seçin'); return; }
   el('notifNote').value = '';
-  if (S.lastPos) {
-    S._pendingNotifLatLng = L.latLng(S.lastPos.lat, S.lastPos.lng);
-    el('notifLocInfo').textContent = `📍 ${S.lastPos.lat.toFixed(5)}, ${S.lastPos.lng.toFixed(5)} (GPS konumun)`;
-  } else {
+  S._notifStreet = street || null;
+
+  if (street) {
+    // Sokağa bağlı bildirim — koordinat sokaktan alınır
     S._pendingNotifLatLng = null;
-    el('notifLocInfo').textContent = '📍 GPS bekleniyor — haritaya da dokunabilirsin';
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        onGpsPosition(pos);
-        S._pendingNotifLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-        el('notifLocInfo').textContent = `📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} (GPS)`;
-      }, () => {}, {enableHighAccuracy:true, timeout:8000});
+    el('notifLocInfo').textContent = `🛣 ${street.name}`;
+  } else {
+    // GPS konumlu bildirim (eski davranış)
+    if (S.lastPos) {
+      S._pendingNotifLatLng = L.latLng(S.lastPos.lat, S.lastPos.lng);
+      el('notifLocInfo').textContent = `📍 ${S.lastPos.lat.toFixed(5)}, ${S.lastPos.lng.toFixed(5)} (GPS konumun)`;
+    } else {
+      S._pendingNotifLatLng = null;
+      el('notifLocInfo').textContent = '📍 GPS bekleniyor — haritaya da dokunabilirsin';
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          onGpsPosition(pos);
+          S._pendingNotifLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+          el('notifLocInfo').textContent = `📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} (GPS)`;
+        }, () => {}, {enableHighAccuracy:true, timeout:8000});
+      }
     }
   }
   openModal('addNotifModal');
 }
 
-el('addNotifBtn').addEventListener('click', openNotifModal);
+el('addNotifBtn').addEventListener('click', () => openNotifModal());
 
-el('notifCancelBtn').addEventListener('click', () => closeModal('addNotifModal'));
+el('notifCancelBtn').addEventListener('click', () => { S._notifStreet = null; closeModal('addNotifModal'); });
 
 el('notifSaveBtn').addEventListener('click', async () => {
-  if (!S._pendingNotifLatLng) { toast('Konum seçilmedi — haritaya dokun', 'error'); return; }
+  if (!S._notifStreet && !S._pendingNotifLatLng) {
+    toast('Konum veya sokak seçilmedi', 'error'); return;
+  }
   const type = el('notifType').value;
   const note = el('notifNote').value.trim();
+  const payload = { neighborhood_id: S.activeNb.id, type, note };
+
+  if (S._notifStreet) {
+    payload.street_id = S._notifStreet.id;
+    // Koordinatı da gönder (eski istemci desteği + Telegram mesajı için)
+    const geom = S._notifStreet.geometry;
+    if (geom && geom.length) {
+      const mid = geom[Math.floor(geom.length / 2)];
+      payload.lat = mid[0];
+      payload.lon = mid[1];
+    }
+  } else {
+    payload.lat = S._pendingNotifLatLng.lat;
+    payload.lon = S._pendingNotifLatLng.lng;
+  }
+
   try {
-    const n = await api('/api/notifications', {method:'POST', body:JSON.stringify({
-      neighborhood_id: S.activeNb.id,
-      lat: S._pendingNotifLatLng.lat, lon: S._pendingNotifLatLng.lng,
-      type, note,
-    })});
+    const n = await api('/api/notifications', {method:'POST', body:JSON.stringify(payload)});
     S.notifications.push(n);
-    addNotifMarker(n);
+    renderNotifMarkers(S.notifications);
+    S._notifStreet = null;
     closeModal('addNotifModal');
     toast('Bildirim gönderildi ✅', 'success');
   } catch(e) { toast(e.message, 'error'); }
@@ -535,34 +567,57 @@ async function renderNotifPool() {
           <span class="nlabel">${NOTIF_LABELS[n.type]||n.type}</span>
           <span class="status-open" style="margin-left:auto;font-size:11px">Açık</span>
         </div>
+        ${n.street_name ? `<div style="font-size:12px;color:var(--text);margin:2px 0">🛣 ${esc(n.street_name)}</div>` : ''}
         ${n.note ? `<div style="margin:2px 0 4px;font-size:12px">${esc(n.note)}</div>` : ''}
         <div class="ninfo">👤 ${esc(n.creator_name||'')} — ${timeAgo(n.created_at)}</div>
         <div class="nbtn-row">
-          <button data-fly-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}">📍 Git</button>
-          <button class="primary" data-resolve-notif="${n.id}">✅ Çöz</button>
+          <button data-fly-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-street-id="${n.street_id||''}">📍 Git</button>
+          <button class="primary" data-resolve-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-street-id="${n.street_id||''}">✅ Çöz</button>
           ${SUPERVISOR_ROLES.has(S.user.role) ? `<button data-cancel-notif="${n.id}" style="background:var(--red-light);border-color:var(--red);color:#fff">İptal</button>` : ''}
         </div>
       </div>
     `).join('');
 
     body.querySelectorAll('[data-fly-notif]').forEach(btn => {
-      btn.onclick = () => { S.map.flyTo([+btn.dataset.lat, +btn.dataset.lon], 17); el('sidePanel').classList.remove('open'); };
+      btn.onclick = () => flyToNotif(+btn.dataset.streetId || null, +btn.dataset.lat, +btn.dataset.lon);
     });
     body.querySelectorAll('[data-resolve-notif]').forEach(btn => {
-      btn.onclick = () => resolveNotif(+btn.dataset.resolveNotif);
+      btn.onclick = () => resolveNotif(+btn.dataset.resolveNotif, +btn.dataset.lat, +btn.dataset.lon, +btn.dataset.streetId || null);
     });
     body.querySelectorAll('[data-cancel-notif]').forEach(btn => {
       btn.onclick = async () => {
         if (!confirm('Bildirimi iptal et?')) return;
-        await api(`/api/notifications/${btn.dataset.cancelNotif}/cancel`, {method:'POST'});
+        const nid = +btn.dataset.cancelNotif;
+        await api(`/api/notifications/${nid}/cancel`, {method:'POST'});
+        S.notifications = S.notifications.filter(n => n.id !== nid);
+        renderNotifMarkers(S.notifications);
         renderNotifPool();
       };
     });
   } catch(e) { body.innerHTML = `<p style="padding:12px;color:var(--red)">${e.message}</p>`; }
 }
 
-function resolveNotif(nid) {
-  // Fotoğraflı kapama — basit dosya seç
+function flyToNotif(streetId, lat, lon) {
+  el('sidePanel').classList.remove('open');
+  if (streetId) {
+    const street = S.streets.find(s => s.id === streetId);
+    if (street && street.geometry && street.geometry.length) {
+      S.map.flyToBounds(L.latLngBounds(street.geometry), {padding:[40,40], animate:true, duration:.8});
+      // Sokağı 3 sn sarı ile vurgula
+      const layer = S.streetLayers[streetId];
+      if (layer) {
+        layer.setStyle({color:'#d29922', weight:8, opacity:1});
+        setTimeout(() => refreshStreetColor(streetId), 3000);
+      }
+      return;
+    }
+  }
+  if (lat && lon) S.map.flyTo([lat, lon], 17, {animate:true, duration:.8});
+}
+
+function resolveNotif(nid, lat, lon, streetId) {
+  flyToNotif(streetId, lat, lon);
+  // Fotoğraflı kapama
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
   input.onchange = async () => {
@@ -570,6 +625,9 @@ function resolveNotif(nid) {
     const fd = new FormData(); fd.append('photo', file, 'photo.jpg');
     try {
       await fetch(`/api/notifications/${nid}/resolve`, {method:'POST', body:fd});
+      // Bildirimi listeden kaldır ve markerları güncelle
+      S.notifications = S.notifications.filter(n => n.id !== nid);
+      renderNotifMarkers(S.notifications);
       toast('Bildirim kapatıldı ✅', 'success');
       renderNotifPool();
     } catch(e) { toast(e.message, 'error'); }
@@ -578,14 +636,59 @@ function resolveNotif(nid) {
 }
 
 // ── Bildirim markerları ────────────────────────────────────────────────────────
-const notifMarkers = {};
-function addNotifMarker(n) {
-  if (notifMarkers[n.id]) return;
-  const icon = L.divIcon({html:`<div style="font-size:24px;line-height:1">${NOTIF_ICONS[n.type]||'📝'}</div>`,className:'',iconSize:[24,24],iconAnchor:[12,12]});
-  const m = L.marker([n.lat,n.lon],{icon});
-  m.bindPopup(`<b>${NOTIF_LABELS[n.type]||n.type}</b>${n.note?'<br>'+esc(n.note):''}`);
-  m.addTo(S.map);
-  notifMarkers[n.id] = m;
+const _notifMarkersByStreet = {}; // street_id → L.Marker
+const _notifMarkersById    = {}; // notif_id  → L.Marker (sokak bağlantısı olmayan)
+
+function _clearNotifMarkers() {
+  Object.values(_notifMarkersByStreet).forEach(m => S.map.removeLayer(m));
+  Object.values(_notifMarkersById).forEach(m => S.map.removeLayer(m));
+  Object.keys(_notifMarkersByStreet).forEach(k => delete _notifMarkersByStreet[k]);
+  Object.keys(_notifMarkersById).forEach(k => delete _notifMarkersById[k]);
+}
+
+function renderNotifMarkers(notifications) {
+  _clearNotifMarkers();
+
+  // Sokak bazında grupla
+  const byStreet = {};
+  for (const n of notifications) {
+    if (n.street_id) {
+      (byStreet[n.street_id] = byStreet[n.street_id] || []).push(n);
+    } else {
+      // Sokaksız eski bildirim: lat/lon markerı
+      if (_notifMarkersById[n.id]) return;
+      const icon = L.divIcon({
+        html:`<div style="font-size:22px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">⚠️</div>`,
+        className:'',iconSize:[24,24],iconAnchor:[12,12]
+      });
+      const m = L.marker([n.lat, n.lon], {icon, zIndexOffset:500});
+      m.bindPopup(`<b>${NOTIF_LABELS[n.type]||n.type}</b>${n.note?'<br>'+esc(n.note):''}`);
+      m.addTo(S.map);
+      _notifMarkersById[n.id] = m;
+    }
+  }
+
+  // Her sokak için tek ⚠️ marker (birden fazlaysa sayı rozeti)
+  for (const [streetId, notifs] of Object.entries(byStreet)) {
+    const street = S.streets.find(s => s.id === Number(streetId));
+    if (!street || !street.geometry || !street.geometry.length) continue;
+    const mid = street.geometry[Math.floor(street.geometry.length / 2)];
+    const cnt = notifs.length;
+    const badge = cnt > 1
+      ? `<span style="position:absolute;top:-5px;right:-8px;font-size:10px;background:#b91c1c;color:#fff;border-radius:8px;padding:0 4px">${cnt}</span>`
+      : '';
+    const icon = L.divIcon({
+      html: `<div style="position:relative;font-size:22px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))">⚠️${badge}</div>`,
+      className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+    const m = L.marker(mid, {icon, zIndexOffset: 600});
+    m.on('click', () => {
+      const s = S.streets.find(x => x.id === Number(streetId));
+      if (s) openStreetDetail(s);
+    });
+    m.addTo(S.map);
+    _notifMarkersByStreet[streetId] = m;
+  }
 }
 
 // ── Menü ──────────────────────────────────────────────────────────────────────
@@ -726,6 +829,11 @@ el('menuBtn').addEventListener('click', async () => {
     };
 
     el('openAssignBtn').onclick = () => { closeModal('menuModal'); openAssignPanel(); };
+
+    // Personel yönetimi butonu
+    const personnelBtnHtml = `<button id="openPersonnelBtn" style="width:100%;padding:10px;margin-top:6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600">👥 Personel Yönetimi</button>`;
+    el('menuRoleSection').insertAdjacentHTML('beforeend', personnelBtnHtml);
+    el('openPersonnelBtn').onclick = () => { closeModal('menuModal'); openPersonnelPanel(); };
   } else {
     section.innerHTML = '';
   }
@@ -756,6 +864,14 @@ async function openAssignPanel() {
   S.mode = 'assign';
   S.assignSelected.clear();
   el('assignStreetCount').textContent = '0';
+
+  // Kalıcı toggle sıfırla
+  el('assignPermanent').checked = false;
+  el('assignDateSection').style.display = '';
+
+  el('assignPermanent').onchange = () => {
+    el('assignDateSection').style.display = el('assignPermanent').checked ? 'none' : '';
+  };
 
   // Tarih varsayılanı: bugün
   el('assignDate').value = todayStr();
@@ -816,11 +932,13 @@ el('assignCancelBtn').addEventListener('click', () => {
 
 el('assignSaveBtn').addEventListener('click', async () => {
   if (!S.assignSelected.size) { toast('Hiç sokak seçilmedi', 'error'); return; }
+  const permanent = el('assignPermanent').checked;
   const payload = {
     neighborhood_id: S.activeNb.id,
     team_type: el('assignTeamType').value,
     shift_id: el('assignShift').value || null,
-    work_date: el('assignDate').value || todayStr(),
+    permanent,
+    work_date: permanent ? null : (el('assignDate').value || todayStr()),
     street_ids: [...S.assignSelected],
     assigned_user_id: el('assignUser').value || null,
   };
@@ -831,6 +949,109 @@ el('assignSaveBtn').addEventListener('click', async () => {
     toast(`${res.street_count} sokak atandı ✅`, 'success');
     loadNeighborhood(S.activeNb);
   } catch(e) { toast(e.message, 'error'); }
+});
+
+// ── Personel yönetimi ─────────────────────────────────────────────────────────
+async function openPersonnelPanel() {
+  openModal('personnelModal');
+  await refreshPersonnelList();
+}
+
+async function refreshPersonnelList() {
+  const list = el('personnelList');
+  list.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:4px 0">Yükleniyor…</p>';
+  try {
+    const users = await api('/api/users');
+    if (!users.length) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:13px">Henüz personel yok</p>';
+      return;
+    }
+    list.innerHTML = users.map(u => `
+      <div class="personnel-row">
+        <div style="flex:1;min-width:0">
+          <div class="pname">${esc(u.display_name)}</div>
+          <div class="prole">${ROLE_NAMES[u.role]||u.role} — @${esc(u.username)}</div>
+        </div>
+        <span class="pbadge ${u.is_active===0||u.is_active==='0' ? 'inactive' : ''}">${u.is_active===0||u.is_active==='0' ? 'Pasif' : 'Aktif'}</span>
+        <button data-edit-uid="${u.id}">Düzenle</button>
+      </div>
+    `).join('');
+    list.querySelectorAll('[data-edit-uid]').forEach(btn => {
+      const uid = Number(btn.dataset.editUid);
+      const u = users.find(x => x.id === uid);
+      btn.onclick = () => openEditPersonnel(u);
+    });
+  } catch(e) {
+    list.innerHTML = `<p style="color:var(--red);font-size:13px">${e.message}</p>`;
+  }
+}
+
+el('addPersonnelBtn').addEventListener('click', () => openEditPersonnel(null));
+el('personnelCloseBtn').addEventListener('click', () => closeModal('personnelModal'));
+
+async function openEditPersonnel(user) {
+  const isNew = !user;
+  el('editPersonnelTitle').textContent = isNew ? '👤 Personel Ekle' : '✏️ Personel Düzenle';
+  el('epUserId').value = user ? user.id : '';
+  el('epDisplayName').value = user ? user.display_name : '';
+  el('epUsername').value = user ? user.username : '';
+  el('epUsernameSection').querySelector('input').disabled = !isNew;
+  el('epPassword').value = '';
+  el('epPasswordHint').textContent = isNew ? '(zorunlu)' : '(değiştirmek için girin)';
+  el('epRole').value = user ? user.role : 'supurgeci';
+  el('epIsActive').checked = user ? (user.is_active !== 0 && user.is_active !== '0') : true;
+
+  // Vardiyaları yükle
+  const shiftSel = el('epShift');
+  shiftSel.innerHTML = '<option value="">— Seçmek zorunda değilsiniz —</option>';
+  if (S.user.district_id) {
+    try {
+      const shifts = await api(`/api/shifts?district_id=${S.user.district_id}`);
+      shifts.forEach(sh => {
+        const o = document.createElement('option');
+        o.value = sh.id; o.textContent = sh.display_name;
+        if (user && user.default_shift_id === sh.id) o.selected = true;
+        shiftSel.appendChild(o);
+      });
+    } catch(e) {}
+  }
+
+  openModal('editPersonnelModal');
+}
+
+el('epCancelBtn').addEventListener('click', () => closeModal('editPersonnelModal'));
+
+el('epSaveBtn').addEventListener('click', async () => {
+  const uid = el('epUserId').value;
+  const isNew = !uid;
+  const payload = {
+    display_name: el('epDisplayName').value.trim(),
+    username: el('epUsername').value.trim(),
+    password: el('epPassword').value.trim(),
+    role: el('epRole').value,
+    default_shift_id: el('epShift').value || null,
+    is_active: el('epIsActive').checked ? 1 : 0,
+  };
+
+  if (!payload.display_name || !payload.role) { toast('Ad ve rol zorunludur', 'error'); return; }
+  if (isNew && !payload.username) { toast('Kullanıcı adı zorunludur', 'error'); return; }
+  if (isNew && !payload.password) { toast('Yeni personel için şifre zorunludur', 'error'); return; }
+
+  el('epSaveBtn').disabled = true;
+  try {
+    if (isNew) {
+      await api('/api/users', {method:'POST', body:JSON.stringify(payload)});
+      toast(`${payload.display_name} eklendi ✅`, 'success');
+    } else {
+      await api(`/api/users/${uid}`, {method:'PUT', body:JSON.stringify(payload)});
+      toast(`${payload.display_name} güncellendi ✅`, 'success');
+    }
+    closeModal('editPersonnelModal');
+    await refreshPersonnelList();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+  el('epSaveBtn').disabled = false;
 });
 
 // ── Modal yardımcıları ─────────────────────────────────────────────────────────

@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS users (
     role              TEXT    NOT NULL,
     district_id       INTEGER REFERENCES districts(id),
     telegram_chat_id  TEXT,
+    default_shift_id  INTEGER REFERENCES shifts(id),
+    is_active         INTEGER NOT NULL DEFAULT 1,
     created_at        INTEGER NOT NULL
 );
 
@@ -100,12 +102,13 @@ CREATE TABLE IF NOT EXISTS shifts (
 );
 
 -- Güzergah Ataması  (çavuş belirli gün+vardiya+ekip için sokak atar)
+-- work_date NULL = kalıcı atama (silinene kadar geçerli)
 CREATE TABLE IF NOT EXISTS route_assignments (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     neighborhood_id  INTEGER NOT NULL REFERENCES neighborhoods(id),
     team_type        TEXT    NOT NULL,      -- 'supurgeci' | 'kaba_atik' | ...
     shift_id         INTEGER REFERENCES shifts(id),
-    work_date        TEXT    NOT NULL,      -- YYYY-MM-DD
+    work_date        TEXT,                  -- YYYY-MM-DD veya NULL (kalıcı)
     assigned_user_id INTEGER REFERENCES users(id),  -- NULL → tüm ekip
     assigned_by      INTEGER NOT NULL REFERENCES users(id),
     created_at       INTEGER NOT NULL
@@ -137,6 +140,7 @@ CREATE INDEX IF NOT EXISTS idx_sc_date ON street_completions(work_date, neighbor
 CREATE TABLE IF NOT EXISTS notifications (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     neighborhood_id  INTEGER NOT NULL REFERENCES neighborhoods(id),
+    street_id        INTEGER REFERENCES streets(id),   -- NULL = GPS konumlu
     lat              REAL    NOT NULL,
     lon              REAL    NOT NULL,
     type             TEXT    NOT NULL,
@@ -164,12 +168,58 @@ def get_db():
     return conn
 
 
+def _migrate_db():
+    """Mevcut DB şemasını gerekli değişikliklerle günceller."""
+    conn = get_db()
+    try:
+        # users tablosuna yeni kolonlar ekle
+        existing = {row[1] for row in conn.execute('PRAGMA table_info(users)').fetchall()}
+        if 'default_shift_id' not in existing:
+            conn.execute('ALTER TABLE users ADD COLUMN default_shift_id INTEGER REFERENCES shifts(id)')
+        if 'is_active' not in existing:
+            conn.execute('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
+        conn.commit()
+
+        # notifications tablosuna street_id kolonu ekle
+        notif_cols = {row[1] for row in conn.execute('PRAGMA table_info(notifications)').fetchall()}
+        if 'street_id' not in notif_cols:
+            conn.execute('ALTER TABLE notifications ADD COLUMN street_id INTEGER REFERENCES streets(id)')
+        conn.commit()
+
+        # route_assignments.work_date NOT NULL kısıtını kaldır (kalıcı atama için NULL gerekli)
+        ra_info = conn.execute('PRAGMA table_info(route_assignments)').fetchall()
+        work_date_notnull = next((row[3] for row in ra_info if row[1] == 'work_date'), 0)
+        if work_date_notnull:
+            conn.executescript("""
+                PRAGMA foreign_keys=OFF;
+                DROP TABLE IF EXISTS route_assignments_new;
+                CREATE TABLE route_assignments_new (
+                    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    neighborhood_id  INTEGER NOT NULL REFERENCES neighborhoods(id),
+                    team_type        TEXT    NOT NULL,
+                    shift_id         INTEGER REFERENCES shifts(id),
+                    work_date        TEXT,
+                    assigned_user_id INTEGER REFERENCES users(id),
+                    assigned_by      INTEGER NOT NULL REFERENCES users(id),
+                    created_at       INTEGER NOT NULL
+                );
+                INSERT INTO route_assignments_new SELECT * FROM route_assignments;
+                DROP TABLE route_assignments;
+                ALTER TABLE route_assignments_new RENAME TO route_assignments;
+                CREATE INDEX IF NOT EXISTS idx_ra_date ON route_assignments(work_date, neighborhood_id, team_type);
+                PRAGMA foreign_keys=ON;
+            """)
+    finally:
+        conn.close()
+
+
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = get_db()
     conn.executescript(SCHEMA)
     conn.commit()
     conn.close()
+    _migrate_db()
 
 
 def now() -> int:

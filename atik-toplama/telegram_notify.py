@@ -96,7 +96,7 @@ def send_voice(voice_file, caption='', neighborhood_id=None):
 # ── Yüksek seviye bildirimler ────────────────────────────────────────────────
 
 def notify_street_complete(street_name, user_display, neighborhood_name, shift_name,
-                           photo_file=None, neighborhood_id=None):
+                           photo_file=None, neighborhood_id=None, lat=None, lon=None):
     import datetime
     saat = datetime.datetime.now().strftime('%H:%M')
     caption = (
@@ -105,12 +105,19 @@ def notify_street_complete(street_name, user_display, neighborhood_name, shift_n
         f"🏘 {neighborhood_name}\n"
         f"🕐 {saat}  |  {shift_name}"
     )
+    if lat is not None and lon is not None:
+        caption += f"\n📍 https://maps.google.com/?q={lat},{lon}"
     if photo_file:
-        return send_photo(photo_file, caption=caption, neighborhood_id=neighborhood_id)
-    return send_message(caption, neighborhood_id=neighborhood_id)
+        ok = send_photo(photo_file, caption=caption, neighborhood_id=neighborhood_id)
+    else:
+        ok = send_message(caption, neighborhood_id=neighborhood_id)
+    if ok and lat is not None and lon is not None:
+        send_location(lat, lon, neighborhood_id=neighborhood_id)
+    return ok
 
 
-def notify_new_notification(notif, user_display, neighborhood_name, neighborhood_id=None):
+def notify_new_notification(notif, user_display, neighborhood_name,
+                            street_name=None, neighborhood_id=None):
     from db import NOTIFICATION_TYPES
     icon, label, _ = NOTIFICATION_TYPES.get(notif['type'], ('📝', notif['type'], None))
     import datetime
@@ -118,8 +125,10 @@ def notify_new_notification(notif, user_display, neighborhood_name, neighborhood
     text = (
         f"{icon} <b>Olumsuzluk Bildirimi</b>\n"
         f"🏘 {neighborhood_name}\n"
-        f"📋 {label}\n"
     )
+    if street_name:
+        text += f"🛣 {street_name}\n"
+    text += f"📋 {label}\n"
     if notif.get('note'):
         text += f"💬 {notif['note']}\n"
     text += f"👤 {user_display}  |  🕐 {saat}\n"

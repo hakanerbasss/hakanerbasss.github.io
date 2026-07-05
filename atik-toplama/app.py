@@ -4,7 +4,7 @@ import datetime
 from functools import wraps
 
 from flask import Flask, render_template, request, session, jsonify, redirect, url_for
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import get_db, init_db, now, today, ROLES, SUPERVISOR_ROLES, NOTIFICATION_TYPES
 from overpass import (resolve_neighborhood, fetch_streets, NeighborhoodNotFound,
@@ -240,12 +240,93 @@ def list_users():
     district_id = session.get('district_id')
     conn = get_db()
     if session['role'] == 'santiye_amiri':
-        rows = conn.execute('SELECT id, username, display_name, role, district_id FROM users ORDER BY display_name').fetchall()
+        rows = conn.execute(
+            'SELECT id, username, display_name, role, district_id, default_shift_id, is_active '
+            'FROM users ORDER BY display_name'
+        ).fetchall()
     else:
-        rows = conn.execute('SELECT id, username, display_name, role, district_id FROM users WHERE district_id = ? ORDER BY display_name',
-                            (district_id,)).fetchall()
+        rows = conn.execute(
+            'SELECT id, username, display_name, role, district_id, default_shift_id, is_active '
+            'FROM users WHERE district_id = ? ORDER BY display_name',
+            (district_id,)
+        ).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route('/api/users', methods=['POST'])
+@supervisor_required
+def create_user():
+    d = request.get_json(force=True)
+    username = (d.get('username') or '').strip()
+    password = (d.get('password') or '').strip()
+    display_name = (d.get('display_name') or '').strip()
+    role = d.get('role', '')
+    district_id = d.get('district_id') or session.get('district_id')
+    default_shift_id = d.get('default_shift_id') or None
+    neighborhood_id = d.get('neighborhood_id') or None
+
+    if not (username and password and display_name and role):
+        return jsonify({'error': 'Kullanıcı adı, şifre, ad ve rol zorunludur'}), 400
+    if role not in ROLES:
+        return jsonify({'error': 'Geçersiz rol'}), 400
+
+    conn = get_db()
+    try:
+        ph = generate_password_hash(password)
+        cur = conn.execute(
+            'INSERT INTO users (username, password_hash, display_name, role, district_id, '
+            'default_shift_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
+            (username, ph, display_name, role, district_id, default_shift_id, now())
+        )
+        uid = cur.lastrowid
+        if neighborhood_id:
+            conn.execute(
+                'INSERT OR IGNORE INTO user_neighborhoods (user_id, neighborhood_id, is_primary) VALUES (?, ?, 1)',
+                (uid, neighborhood_id)
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({'id': uid, 'display_name': display_name, 'username': username})
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/users/<int:uid>', methods=['PUT'])
+@supervisor_required
+def update_user(uid):
+    d = request.get_json(force=True)
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (uid,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'Kullanıcı bulunamadı'}), 404
+
+    display_name = (d.get('display_name') or user['display_name']).strip()
+    role = d.get('role') or user['role']
+    default_shift_id = d.get('default_shift_id') or None
+    is_active = int(d.get('is_active', 1))
+    password = (d.get('password') or '').strip()
+
+    if role not in ROLES:
+        conn.close()
+        return jsonify({'error': 'Geçersiz rol'}), 400
+
+    if password:
+        ph = generate_password_hash(password)
+        conn.execute(
+            'UPDATE users SET display_name=?, role=?, default_shift_id=?, is_active=?, password_hash=? WHERE id=?',
+            (display_name, role, default_shift_id, is_active, ph, uid)
+        )
+    else:
+        conn.execute(
+            'UPDATE users SET display_name=?, role=?, default_shift_id=?, is_active=? WHERE id=?',
+            (display_name, role, default_shift_id, is_active, uid)
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
 
 
 @app.route('/api/users/<int:uid>/neighborhoods', methods=['GET'])
@@ -317,7 +398,7 @@ def list_assignments():
     conn = get_db()
     q = 'SELECT ra.*, u.display_name as assigned_user_name FROM route_assignments ra ' \
         'LEFT JOIN users u ON u.id = ra.assigned_user_id ' \
-        'WHERE ra.neighborhood_id = ? AND ra.work_date = ?'
+        'WHERE ra.neighborhood_id = ? AND (ra.work_date IS NULL OR ra.work_date = ?)'
     params = [nid, date]
     if team_type:
         q += ' AND ra.team_type = ?'
@@ -343,7 +424,8 @@ def create_assignment():
     nid = d.get('neighborhood_id')
     team_type = d.get('team_type')
     shift_id = d.get('shift_id')
-    work_date = d.get('work_date') or today()
+    permanent = d.get('permanent', False)
+    work_date = None if permanent else (d.get('work_date') or today())
     street_ids = d.get('street_ids', [])
     assigned_user_id = d.get('assigned_user_id')
 
@@ -385,9 +467,10 @@ def my_streets():
     nid = request.args.get('neighborhood_id')
 
     conn = get_db()
-    # Bu kullanıcıya veya ekip türüne atanmış bugünkü atamalar
+    # Bu kullanıcıya veya ekip türüne atanmış atamalar (kalıcı + bugünkü)
     assignments = conn.execute(
-        'SELECT id FROM route_assignments WHERE neighborhood_id = ? AND work_date = ? '
+        'SELECT id FROM route_assignments WHERE neighborhood_id = ? '
+        'AND (work_date IS NULL OR work_date = ?) '
         'AND team_type = ? AND (assigned_user_id = ? OR assigned_user_id IS NULL)',
         (nid, work_date, role, uid)
     ).fetchall()
@@ -448,14 +531,24 @@ def complete_street(sid):
     # Telegram'a fotoğraf gönder
     photo_sent = False
     if photo:
-        street_row = conn.execute('SELECT s.name, n.name as nb_name FROM streets s '
-                                  'JOIN neighborhoods n ON n.id = s.neighborhood_id '
-                                  'WHERE s.id = ?', (sid,)).fetchone()
+        street_row = conn.execute(
+            'SELECT s.name, s.geometry, n.name as nb_name FROM streets s '
+            'JOIN neighborhoods n ON n.id = s.neighborhood_id WHERE s.id = ?', (sid,)
+        ).fetchone()
         if street_row:
             shift = None
             if session.get('district_id'):
                 shift = _current_shift(session['district_id'])
             shift_name = shift['display_name'] if shift else 'Bilinmeyen Vardiya'
+            # Sokak orta noktasını hesapla
+            street_lat = street_lon = None
+            try:
+                geom = json.loads(street_row['geometry'])
+                if geom:
+                    mid = geom[len(geom) // 2]
+                    street_lat, street_lon = mid[0], mid[1]
+            except Exception:
+                pass
             photo_sent = tg.notify_street_complete(
                 street_name=street_row['name'],
                 user_display=session['display_name'],
@@ -463,6 +556,8 @@ def complete_street(sid):
                 shift_name=shift_name,
                 photo_file=photo.stream,
                 neighborhood_id=nid,
+                lat=street_lat,
+                lon=street_lon,
             )
 
     conn.execute(
@@ -483,11 +578,11 @@ def neighborhood_progress(nid):
     team_type = request.args.get('team_type')
 
     conn = get_db()
-    # Bugün bu mahalleye atanmış sokaklar
+    # Bu mahalleye atanmış sokaklar (kalıcı + bugün)
     q = ('SELECT DISTINCT s.id, s.name, s.geometry FROM streets s '
          'JOIN assignment_streets ast ON ast.street_id = s.id '
          'JOIN route_assignments ra ON ra.id = ast.assignment_id '
-         'WHERE ra.neighborhood_id = ? AND ra.work_date = ?')
+         'WHERE ra.neighborhood_id = ? AND (ra.work_date IS NULL OR ra.work_date = ?)')
     params = [nid, work_date]
     if team_type:
         q += ' AND ra.team_type = ?'
@@ -529,8 +624,10 @@ def list_notifications():
     status = request.args.get('status', 'open')
     conn = get_db()
     rows = conn.execute(
-        'SELECT n.*, u.display_name as creator_name FROM notifications n '
+        'SELECT n.*, u.display_name as creator_name, s.name as street_name '
+        'FROM notifications n '
         'JOIN users u ON u.id = n.created_by '
+        'LEFT JOIN streets s ON s.id = n.street_id '
         'WHERE n.neighborhood_id = ? AND n.status = ? ORDER BY n.created_at DESC',
         (nid, status)
     ).fetchall()
@@ -546,26 +643,70 @@ def create_notification():
     lat, lon = d.get('lat'), d.get('lon')
     ntype = d.get('type')
     note = (d.get('note') or '').strip()
+    street_id = d.get('street_id')
 
-    if not (nid and lat is not None and lon is not None and ntype in NOTIFICATION_TYPES):
+    if not (nid and ntype in NOTIFICATION_TYPES):
         return jsonify({'error': 'Eksik veya geçersiz alan'}), 400
 
-    _, _, target_team = NOTIFICATION_TYPES[ntype]
     conn = get_db()
+    street_name = None
+
+    # Sokak ID verilmişse: koordinatı geometriden al, adı doğrudan biliyoruz
+    if street_id:
+        srow = conn.execute('SELECT name, geometry FROM streets WHERE id = ?', (street_id,)).fetchone()
+        if srow:
+            street_name = srow['name']
+            if lat is None or lon is None:
+                try:
+                    geom = json.loads(srow['geometry'])
+                    if geom:
+                        mid = geom[len(geom) // 2]
+                        lat, lon = mid[0], mid[1]
+                except Exception:
+                    pass
+
+    # Koordinat hâlâ yoksa: GPS zorunlu
+    if lat is None or lon is None:
+        conn.close()
+        return jsonify({'error': 'Konum koordinatı gerekli'}), 400
+
+    # Sokak ID yoksa en yakın sokağı bul (GPS bildirimleri için)
+    if not street_id:
+        try:
+            streets = conn.execute('SELECT id, name, geometry FROM streets WHERE neighborhood_id = ?', (nid,)).fetchall()
+            best = float('inf')
+            for s in streets:
+                geom = json.loads(s['geometry'])
+                for pt in geom:
+                    dist = (pt[0] - lat) ** 2 + (pt[1] - lon) ** 2
+                    if dist < best:
+                        best = dist
+                        street_name = s['name']
+                        street_id = s['id']
+        except Exception:
+            pass
+
+    _, _, target_team = NOTIFICATION_TYPES[ntype]
+
     cur = conn.execute(
-        'INSERT INTO notifications (neighborhood_id, lat, lon, type, note, created_by, created_at, target_team) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        (nid, lat, lon, ntype, note, session['user_id'], now(), target_team)
+        'INSERT INTO notifications (neighborhood_id, street_id, lat, lon, type, note, created_by, created_at, target_team) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        (nid, street_id, lat, lon, ntype, note, session['user_id'], now(), target_team)
     )
     notif_id = cur.lastrowid
     nb = conn.execute('SELECT name FROM neighborhoods WHERE id = ?', (nid,)).fetchone()
     conn.commit()
 
-    notif = conn.execute('SELECT * FROM notifications WHERE id = ?', (notif_id,)).fetchone()
+    notif = conn.execute(
+        'SELECT n.*, s.name as street_name FROM notifications n '
+        'LEFT JOIN streets s ON s.id = n.street_id WHERE n.id = ?', (notif_id,)
+    ).fetchone()
     conn.close()
 
     tg.notify_new_notification(dict(notif), session['display_name'],
-                               nb['name'] if nb else '', neighborhood_id=nid)
+                               nb['name'] if nb else '',
+                               street_name=street_name,
+                               neighborhood_id=nid)
 
     return jsonify(dict(notif))
 
@@ -701,12 +842,13 @@ def street_details(sid):
 
     assignments = conn.execute(
         'SELECT ra.team_type, sh.display_name as shift_name, '
-        'u.display_name as user_name '
+        'u.display_name as user_name, ra.work_date '
         'FROM route_assignments ra '
         'JOIN assignment_streets ast ON ast.assignment_id = ra.id '
         'LEFT JOIN shifts sh ON sh.id = ra.shift_id '
         'LEFT JOIN users u ON u.id = ra.assigned_user_id '
-        'WHERE ast.street_id = ? AND ra.neighborhood_id = ? AND ra.work_date = ?',
+        'WHERE ast.street_id = ? AND ra.neighborhood_id = ? '
+        'AND (ra.work_date IS NULL OR ra.work_date = ?)',
         (sid, nb_id, work_date)
     ).fetchall()
 
@@ -722,8 +864,8 @@ def street_details(sid):
     notifications = conn.execute(
         'SELECT n.type, n.note, n.created_at, u.display_name as creator_name '
         'FROM notifications n JOIN users u ON u.id = n.created_by '
-        'WHERE n.neighborhood_id = ? AND n.status = ? ORDER BY n.created_at DESC LIMIT 10',
-        (nb_id, 'open')
+        'WHERE n.street_id = ? AND n.status = ? ORDER BY n.created_at DESC LIMIT 10',
+        (sid, 'open')
     ).fetchall()
 
     supervisors = conn.execute(

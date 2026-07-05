@@ -116,8 +116,14 @@
         {% endif %}
         {% endfor %}
       </select>
-      <label>Tarih</label>
-      <input type="date" id="assignDate" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:15px">
+      <div class="checkrow" style="margin-top:10px">
+        <input type="checkbox" id="assignPermanent">
+        <label for="assignPermanent">Kalıcı Atama (silinene kadar geçerli)</label>
+      </div>
+      <div id="assignDateSection">
+        <label>Tarih</label>
+        <input type="date" id="assignDate" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:15px">
+      </div>
       <label>Vardiya</label>
       <select id="assignShift"><option value="">— Tüm gün —</option></select>
       <label>Kişi (opsiyonel)</label>
@@ -146,6 +152,52 @@
     </div>
     <div id="sdBody"></div>
     <div id="sdActions" style="display:flex;gap:8px;margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ── Personel listesi modal ── -->
+<div class="modal-overlay hidden" id="personnelModal">
+  <div class="modal">
+    <h2>👥 Personel Yönetimi</h2>
+    <button id="addPersonnelBtn" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--green);background:var(--green);color:#fff;font-size:13px;font-weight:600;margin-bottom:12px">+ Yeni Personel Ekle</button>
+    <div id="personnelList"><p style="color:var(--muted);font-size:13px">Yükleniyor…</p></div>
+    <div class="row" style="margin-top:12px">
+      <button id="personnelCloseBtn">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Personel ekle / düzenle modal ── -->
+<div class="modal-overlay hidden" id="editPersonnelModal">
+  <div class="modal">
+    <h2 id="editPersonnelTitle">👤 Personel Ekle</h2>
+    <input type="hidden" id="epUserId">
+    <label>Ad Soyad</label>
+    <input type="text" id="epDisplayName" placeholder="Mehmet Yılmaz" autocomplete="off">
+    <div id="epUsernameSection">
+      <label>Kullanıcı Adı</label>
+      <input type="text" id="epUsername" placeholder="mehmet.yilmaz" autocomplete="off">
+    </div>
+    <label>Şifre <span id="epPasswordHint" style="color:var(--muted);font-weight:400;font-size:12px"></span></label>
+    <input type="text" id="epPassword" placeholder="Şifre…" autocomplete="new-password">
+    <label>Rol</label>
+    <select id="epRole">
+      {% for key, label in roles.items() %}
+      <option value="{{ key }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label>Varsayılan Vardiya</label>
+    <select id="epShift">
+      <option value="">— Seçmek zorunda değilsiniz —</option>
+    </select>
+    <div class="checkrow" style="margin-top:12px">
+      <input type="checkbox" id="epIsActive" checked>
+      <label for="epIsActive">Aktif kullanıcı</label>
+    </div>
+    <div class="row">
+      <button id="epCancelBtn">Vazgeç</button>
+      <button class="primary" id="epSaveBtn">Kaydet</button>
+    </div>
   </div>
 </div>
 
