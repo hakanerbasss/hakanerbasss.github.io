@@ -271,16 +271,47 @@ function renderStreetDetail(d, street) {
 
   if (d.notifications && d.notifications.length) {
     html += `<div class="sd-section"><div class="sd-label">⚠️ Açık Bildirimler (${d.notifications.length})</div>`;
-    d.notifications.slice(0, 4).forEach(n => {
-      html += `<div class="sd-row">${NOTIF_ICONS[n.type]||'📝'} ${NOTIF_LABELS[n.type]||n.type}
-        ${n.note ? `<span style="font-size:12px;color:var(--muted)">— ${esc(n.note)}</span>` : ''}
-        <span class="sd-muted">${esc(n.creator_name)}</span>
+    d.notifications.forEach(n => {
+      html += `<div style="border-bottom:1px solid var(--border);padding:8px 0">
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;flex-wrap:wrap">
+          <span>${NOTIF_ICONS[n.type]||'📝'}</span>
+          <b>${NOTIF_LABELS[n.type]||n.type}</b>
+          <span class="sd-muted">${esc(n.creator_name)}</span>
+        </div>
+        ${n.note ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(n.note)}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:7px">
+          <button class="sd-notif-resolve" data-nid="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-sid="${n.street_id||0}"
+            style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--green);background:var(--green);color:#fff;font-weight:600;cursor:pointer">✅ Çöz</button>
+          <button class="sd-notif-comment" data-nid="${n.id}"
+            style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-weight:600;cursor:pointer">💬 Yorum</button>
+        </div>
+        <div class="comment-section" id="cs-${n.id}" style="display:none"></div>
       </div>`;
     });
     html += `</div>`;
   }
 
   el('sdBody').innerHTML = html;
+
+  // Sokak detayındaki bildirim butonları
+  el('sdBody').querySelectorAll('.sd-notif-resolve').forEach(btn => {
+    btn.onclick = () => {
+      const nid = +btn.dataset.nid;
+      const sid = +btn.dataset.sid || null;
+      const lat = +btn.dataset.lat, lon = +btn.dataset.lon;
+      let notif = S.notifications.find(n => n.id === nid);
+      if (!notif) {
+        const nd = d.notifications.find(n => n.id === nid);
+        if (nd) { notif = {...nd, street_name: street.name, status: 'open'}; S.notifications.push(notif); }
+      }
+      closeModal('streetDetailModal');
+      flyToNotif(sid, lat, lon);
+      if (notif) openResolveModal(notif);
+    };
+  });
+  el('sdBody').querySelectorAll('.sd-notif-comment').forEach(btn => {
+    btn.onclick = () => toggleComments(+btn.dataset.nid);
+  });
 
   const actions = el('sdActions');
   const notifBtn = document.createElement('button');
