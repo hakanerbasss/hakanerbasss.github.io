@@ -1,0 +1,12 @@
+{
+  "name": "Saha Yönetim — Belediye",
+  "short_name": "Saha",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#1a7a3c",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

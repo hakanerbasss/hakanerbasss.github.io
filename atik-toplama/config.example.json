@@ -1,0 +1,5 @@
+{
+  "secret_key": "buraya-uzun-rastgele-bir-anahtar-yaz",
+  "telegram_bot_token": "123456789:AA...botfather-tokenin",
+  "telegram_chat_id": "yetkilinin-veya-grubun-chat-id-si"
+}

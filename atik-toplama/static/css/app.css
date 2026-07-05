@@ -1,0 +1,143 @@
+/* ── Reset & Değişkenler ── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2128;
+  --border:#30363d; --text:#e6edf3; --muted:#8b949e;
+  --green:#1a7a3c; --green-light:#238636;
+  --red:#b91c1c; --red-light:#da3633;
+  --yellow:#d29922; --blue:#1f6feb;
+  --radius:12px; --radius-sm:8px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  -webkit-tap-highlight-color:transparent}
+button{cursor:pointer;font-family:inherit}
+
+/* ── Ana layout ── */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
+#map{flex:1;z-index:0}
+
+/* ── Topbar ── */
+#topbar{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  background:var(--panel);border-bottom:1px solid var(--border);z-index:100;
+  min-height:52px;
+}
+#topbar .name{font-weight:700;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#topbar .progress{font-size:11px;color:var(--muted);margin-top:2px}
+.prog-bar{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:3px;border:1px solid var(--border)}
+.prog-fill{height:100%;background:var(--green);transition:width .3s}
+
+/* ── Bottombar ── */
+#bottombar{
+  display:flex;gap:6px;padding:8px 10px;padding-bottom:max(8px, env(safe-area-inset-bottom));
+  background:var(--panel);border-top:1px solid var(--border);z-index:100;overflow-x:auto;
+}
+#bottombar button{
+  flex:1;min-width:0;white-space:nowrap;padding:10px 8px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:12px;font-weight:600;
+}
+#bottombar button.primary{background:var(--green);border-color:var(--green);color:#fff}
+#bottombar button.danger{background:var(--red);border-color:var(--red);color:#fff}
+#bottombar button.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.iconbtn{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);
+  padding:8px 10px;font-size:16px;line-height:1}
+.iconbtn.active{background:var(--green);border-color:var(--green);color:#fff}
+
+/* ── Modal (bottom sheet) ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:flex-end;justify-content:center}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--panel);border-top:1px solid var(--border);border-radius:16px 16px 0 0;
+  padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto}
+.modal h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.modal label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;margin-top:10px}
+.modal select,.modal textarea,.modal input[type=text]{
+  width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--bg);color:var(--text);font-size:15px;font-family:inherit}
+.modal textarea{min-height:60px;resize:vertical}
+.modal .row{display:flex;gap:8px;margin-top:14px}
+.modal .row button{flex:1;padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--panel2);color:var(--text);font-weight:600;font-size:14px}
+.modal .row button.primary{background:var(--green);border-color:var(--green);color:#fff}
+.modal .row button.danger{background:var(--red);border-color:var(--red);color:#fff}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--muted)}
+.checkrow input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
+
+/* Fotoğraf önizleme */
+#photoPreview{width:100%;border-radius:var(--radius-sm);margin-top:8px;display:none}
+.photo-btn{
+  width:100%;padding:16px;margin-top:10px;border-radius:var(--radius-sm);border:2px dashed var(--border);
+  background:var(--bg);color:var(--muted);font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.photo-btn.has-photo{border-color:var(--green);color:var(--green)}
+
+/* ── Sağ panel (sokak listesi / atama) ── */
+#sidePanel{
+  position:fixed;right:0;top:0;bottom:0;width:88%;max-width:360px;
+  background:var(--panel);border-left:1px solid var(--border);z-index:200;
+  transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column;
+}
+#sidePanel.open{transform:translateX(0)}
+#sidePanelHeader{padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+#sidePanelHeader h2{font-size:14px;flex:1}
+#sidePanelBody{flex:1;overflow-y:auto;padding:8px}
+.street-row{
+  display:flex;justify-content:space-between;align-items:center;padding:10px 8px;
+  border-bottom:1px solid var(--border);font-size:13px;gap:8px;
+}
+.street-row .sname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.street-row .badge{
+  font-size:10px;padding:3px 7px;border-radius:20px;white-space:nowrap;
+  background:var(--red);color:#fff;
+}
+.street-row .badge.done{background:var(--green)}
+.street-row button{font-size:11px;padding:5px 9px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--panel2);color:var(--text)}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+  background:var(--panel2);border:1px solid var(--border);color:var(--text);
+  padding:10px 16px;border-radius:10px;z-index:1000;font-size:13px;max-width:90%;text-align:center;
+  animation:fadeup .2s ease;pointer-events:none;
+}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:var(--red);color:var(--red)}
+@keyframes fadeup{from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ── Çavuş — sekmeler ── */
+#tabs{display:flex;border-bottom:1px solid var(--border);background:var(--panel)}
+#tabs button{flex:1;padding:12px 4px;font-size:12px;font-weight:600;border:none;
+  background:none;color:var(--muted);border-bottom:2px solid transparent}
+#tabs button.active{color:var(--text);border-bottom-color:var(--green)}
+#tabContent{flex:1;overflow-y:auto;padding:12px}
+
+/* ── Atama paneli (çavuş) ── */
+.assign-form select{width:100%;padding:10px;margin-bottom:8px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px}
+.assign-info{font-size:12px;color:var(--muted);margin:8px 0}
+#assignStreetCount{font-weight:700;color:var(--text)}
+.assign-btns{display:flex;gap:8px;margin-bottom:8px}
+.assign-btns button{flex:1;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--panel2);color:var(--text);font-size:12px;font-weight:600}
+
+/* ── Bildirim havuzu ── */
+.notif-card{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 12px;margin-bottom:8px;font-size:13px}
+.notif-card .ntop{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.notif-card .nlabel{font-weight:600}
+.notif-card .ninfo{color:var(--muted);font-size:11px}
+.notif-card .nbtn-row{display:flex;gap:6px;margin-top:8px}
+.notif-card .nbtn-row button{flex:1;padding:7px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--panel);color:var(--text);font-size:11px;font-weight:600}
+.notif-card .nbtn-row button.primary{background:var(--green);border-color:var(--green);color:#fff}
+.status-open{color:var(--red)}
+.status-accepted{color:var(--yellow)}
+.status-resolved{color:var(--green)}
+
+/* ── Harita düğmeleri üzerine bindirme ── */
+.map-overlay{position:absolute;bottom:80px;right:12px;z-index:50;display:flex;flex-direction:column;gap:8px}
+.map-overlay button{
+  width:44px;height:44px;border-radius:50%;background:var(--panel);border:1px solid var(--border);
+  color:var(--text);font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;
+}
