@@ -1017,8 +1017,6 @@ el('menuBtn').addEventListener('click', async () => {
     const personnelBtnHtml = `<button id="openPersonnelBtn" style="width:100%;padding:10px;margin-top:6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600">👥 Personel Yönetimi</button>`;
     el('menuRoleSection').insertAdjacentHTML('beforeend', personnelBtnHtml);
     el('openPersonnelBtn').onclick = () => { closeModal('menuModal'); openPersonnelPanel(); };
-  } else {
-    section.innerHTML = '';
   }
 
   // Çıkış butonuna ad yaz
