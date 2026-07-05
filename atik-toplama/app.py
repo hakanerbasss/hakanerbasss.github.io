@@ -1,5 +1,7 @@
 import json
 import os
+import io
+import threading
 import datetime
 from functools import wraps
 
@@ -253,12 +255,12 @@ def list_users():
     conn = get_db()
     if session['role'] == 'santiye_amiri':
         rows = conn.execute(
-            'SELECT id, username, display_name, role, district_id, default_shift_id, is_active '
+            'SELECT id, username, display_name, role, district_id, default_shift_id, is_active, notify_sweep '
             'FROM users ORDER BY display_name'
         ).fetchall()
     else:
         rows = conn.execute(
-            'SELECT id, username, display_name, role, district_id, default_shift_id, is_active '
+            'SELECT id, username, display_name, role, district_id, default_shift_id, is_active, notify_sweep '
             'FROM users WHERE district_id = ? ORDER BY display_name',
             (district_id,)
         ).fetchall()
@@ -319,6 +321,7 @@ def update_user(uid):
     role = d.get('role') or user['role']
     default_shift_id = d.get('default_shift_id') or None
     is_active = int(d.get('is_active', 1))
+    notify_sweep = int(d.get('notify_sweep', user['notify_sweep'] if 'notify_sweep' in user.keys() else 1))
     password = (d.get('password') or '').strip()
 
     if role not in ROLES:
@@ -328,13 +331,13 @@ def update_user(uid):
     if password:
         ph = generate_password_hash(password)
         conn.execute(
-            'UPDATE users SET display_name=?, role=?, default_shift_id=?, is_active=?, password_hash=? WHERE id=?',
-            (display_name, role, default_shift_id, is_active, ph, uid)
+            'UPDATE users SET display_name=?, role=?, default_shift_id=?, is_active=?, notify_sweep=?, password_hash=? WHERE id=?',
+            (display_name, role, default_shift_id, is_active, notify_sweep, ph, uid)
         )
     else:
         conn.execute(
-            'UPDATE users SET display_name=?, role=?, default_shift_id=?, is_active=? WHERE id=?',
-            (display_name, role, default_shift_id, is_active, uid)
+            'UPDATE users SET display_name=?, role=?, default_shift_id=?, is_active=?, notify_sweep=? WHERE id=?',
+            (display_name, role, default_shift_id, is_active, notify_sweep, uid)
         )
     conn.commit()
     conn.close()
@@ -540,19 +543,28 @@ def complete_street(sid):
         conn.close()
         return jsonify({'ok': True, 'already': True})
 
-    # Telegram'a fotoğraf gönder
+    # Bildirim gönderilecek mi? İlçede notify_sweep=1 olan en az bir yetkili varsa gönder
     photo_sent = False
-    if photo:
+    district_id = session.get('district_id')
+    should_notify = False
+    if district_id:
+        sup = conn.execute(
+            "SELECT id FROM users WHERE district_id=? AND role IN ('santiye_amiri','cavus','onbasi')"
+            " AND notify_sweep=1 AND is_active=1",
+            (district_id,)
+        ).fetchone()
+        should_notify = bool(sup)
+
+    if should_notify:
         street_row = conn.execute(
             'SELECT s.name, s.geometry, n.name as nb_name FROM streets s '
             'JOIN neighborhoods n ON n.id = s.neighborhood_id WHERE s.id = ?', (sid,)
         ).fetchone()
         if street_row:
             shift = None
-            if session.get('district_id'):
-                shift = _current_shift(session['district_id'])
+            if district_id:
+                shift = _current_shift(district_id)
             shift_name = shift['display_name'] if shift else 'Bilinmeyen Vardiya'
-            # Sokak orta noktasını hesapla
             street_lat = street_lon = None
             try:
                 geom = json.loads(street_row['geometry'])
@@ -561,16 +573,20 @@ def complete_street(sid):
                     street_lat, street_lon = mid[0], mid[1]
             except Exception:
                 pass
-            photo_sent = tg.notify_street_complete(
-                street_name=street_row['name'],
-                user_display=session['display_name'],
-                neighborhood_name=street_row['nb_name'],
-                shift_name=shift_name,
-                photo_file=photo.stream,
-                neighborhood_id=nid,
-                lat=street_lat,
-                lon=street_lon,
-            )
+            # Fotoğraf baytlarını thread başlamadan oku
+            photo_bytes = photo.read() if photo else None
+            _sname = street_row['name']
+            _nb_name = street_row['nb_name']
+            _disp = session['display_name']
+            def _send_bg(_pb=photo_bytes, _sn=_sname, _nbn=_nb_name, _dn=_disp,
+                         _sh=shift_name, _nid=nid, _la=street_lat, _lo=street_lon):
+                tg.notify_street_complete(
+                    street_name=_sn, user_display=_dn, neighborhood_name=_nbn,
+                    shift_name=_sh, photo_file=io.BytesIO(_pb) if _pb else None,
+                    neighborhood_id=_nid, lat=_la, lon=_lo,
+                )
+            threading.Thread(target=_send_bg, daemon=True).start()
+            photo_sent = True
 
     conn.execute(
         'INSERT INTO street_completions (street_id, assignment_id, user_id, neighborhood_id, work_date, completed_at, photo_sent, note) '
@@ -626,6 +642,53 @@ def neighborhood_progress(nid):
         'completed': sum(1 for s in streets if s['completed']),
         'streets': streets,
     })
+
+
+# ── Yetkili: belirli personelin sokak durumu ────────────────────────────────
+@app.route('/api/workers/<int:uid>/streets')
+@login_required
+def worker_streets(uid):
+    if session.get('role') not in SUPERVISOR_ROLES:
+        return jsonify({'error': 'Yetkisiz'}), 403
+    work_date = request.args.get('date') or today()
+    nid = request.args.get('neighborhood_id', type=int)
+
+    conn = get_db()
+    worker = conn.execute('SELECT id, display_name, role FROM users WHERE id=?', (uid,)).fetchone()
+    if not worker:
+        conn.close()
+        return jsonify({'error': 'Kullanıcı bulunamadı'}), 404
+
+    params = [work_date, worker['role'], uid]
+    q = ('SELECT id FROM route_assignments WHERE (work_date IS NULL OR work_date=?) '
+         'AND team_type=? AND (assigned_user_id=? OR assigned_user_id IS NULL)')
+    if nid:
+        q += ' AND neighborhood_id=?'
+        params.append(nid)
+    assignments = conn.execute(q, params).fetchall()
+
+    streets = []
+    if assignments:
+        aid_list = [r['id'] for r in assignments]
+        placeholders = ','.join('?' * len(aid_list))
+        streets_rows = conn.execute(
+            f'SELECT DISTINCT s.id, s.name, s.geometry FROM streets s '
+            f'JOIN assignment_streets ast ON ast.street_id=s.id '
+            f'WHERE ast.assignment_id IN ({placeholders})',
+            aid_list
+        ).fetchall()
+        cp = [work_date, uid]
+        cp_q = 'SELECT street_id FROM street_completions WHERE work_date=? AND user_id=?'
+        if nid:
+            cp_q += ' AND neighborhood_id=?'
+            cp.append(nid)
+        completed_ids = {r['street_id'] for r in conn.execute(cp_q, cp).fetchall()}
+        for r in streets_rows:
+            streets.append({'id': r['id'], 'name': r['name'],
+                            'geometry': json.loads(r['geometry']),
+                            'completed': r['id'] in completed_ids})
+    conn.close()
+    return jsonify({'streets': streets, 'worker_name': worker['display_name']})
 
 
 # ── Bildirim Havuzu ──────────────────────────────────────────────────────────
