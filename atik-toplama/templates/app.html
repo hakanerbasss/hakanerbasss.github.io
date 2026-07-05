@@ -41,6 +41,19 @@
     <button id="notifPoolBtn">📋 Havuz</button>
   </div>
 
+  <!-- Atama seçim çubuğu (#app içinde olmalı ki flex layout'ta görünsün) -->
+  <div id="assignBar" style="display:none">
+    <button id="assignBarBackBtn">← Geri</button>
+    <div id="assignBarInfo">
+      <b id="assignBarCount">0</b> sokak seçili
+      <div id="assignBarTeam" style="font-size:10px;color:var(--muted)"></div>
+    </div>
+    <button id="assignBarListBtn">📋 Liste</button>
+    <button id="assignBarAllBtn">Tümü</button>
+    <button id="assignBarClearBtn">Sıfırla</button>
+    <button class="primary" id="assignBarSaveBtn">✅ Kaydet</button>
+  </div>
+
 </div>
 
 <!-- ── Menü modal ── -->
@@ -157,18 +170,6 @@
 </div>
 
 <!-- ── Atama seçim çubuğu (modal kapanınca haritanın üstünde kalır) ── -->
-<div id="assignBar" style="display:none">
-  <button id="assignBarBackBtn">← Geri</button>
-  <div id="assignBarInfo">
-    <b id="assignBarCount">0</b> sokak seçili
-    <div id="assignBarTeam" style="font-size:10px;color:var(--muted)"></div>
-  </div>
-  <button id="assignBarListBtn">📋 Liste</button>
-  <button id="assignBarAllBtn">Tümü</button>
-  <button id="assignBarClearBtn">Sıfırla</button>
-  <button class="primary" id="assignBarSaveBtn">✅ Kaydet</button>
-</div>
-
 <!-- ── Sokak detay modal ── -->
 <div class="modal-overlay hidden" id="streetDetailModal">
   <div class="modal">

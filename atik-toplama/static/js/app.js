@@ -1132,16 +1132,33 @@ function _exitAssignMode() {
   loadNeighborhood(S.activeNb);
 }
 
-function _openAssignList() {
+function _openAssignList(filter) {
   el('sidePanelTitle').textContent = 'Sokak Seçimi';
   const body = el('sidePanelBody');
-  body.innerHTML = S.streets.map(s => `
+  const q = (filter || '').toLowerCase();
+  const sorted = [...S.streets].sort((a,b) => a.name.localeCompare(b.name, 'tr'));
+  const filtered = q ? sorted.filter(s => s.name.toLowerCase().includes(q)) : sorted;
+
+  body.innerHTML = `
+    <div style="padding:8px 8px 4px">
+      <input id="assignSearch" type="text" placeholder="Sokak ara…" value="${esc(filter||'')}"
+        style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);
+        background:var(--bg);color:var(--text);font-size:14px;font-family:inherit">
+    </div>
+  ` + filtered.map(s => `
     <label class="street-row" style="cursor:pointer;gap:10px">
       <input type="checkbox" data-assign-street="${s.id}" ${S.assignSelected.has(s.id) ? 'checked' : ''}
         style="width:18px;height:18px;accent-color:var(--blue);flex-shrink:0">
       <span class="sname">${esc(s.name)}</span>
     </label>
   `).join('');
+
+  const searchEl = body.querySelector('#assignSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', () => _openAssignList(searchEl.value));
+    if (filter) searchEl.focus();
+  }
+
   body.querySelectorAll('[data-assign-street]').forEach(cb => {
     cb.onchange = () => {
       const sid = +cb.dataset.assignStreet;
