@@ -882,9 +882,13 @@ el('menuBtn').addEventListener('click', async () => {
     sel.appendChild(opt);
   }
 
-  // Çavuş/Şantiye amiri için ekstra menü
+  // Saha personeli için mahalle notu
   const section = el('menuRoleSection');
-  if (SUPERVISOR_ROLES.has(S.user.role)) {
+  if (!SUPERVISOR_ROLES.has(S.user.role)) {
+    section.innerHTML = S.neighborhoods.length
+      ? `<p style="font-size:12px;color:var(--muted);margin-top:10px">📍 Görev mahalleniz amiriniz tarafından atanır. Listedeki mahalle(ler) bugünkü atamalarınızı gösterir.</p>`
+      : `<p style="font-size:12px;color:var(--red);margin-top:10px">⚠️ Bugün atanmış güzergah yok. Amirinizle iletişime geçin.</p>`;
+  } else {
     section.innerHTML = `
       <hr style="border-color:var(--border);margin:14px 0 10px">
       <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Mahalle Ekle (OSM'den)</div>
@@ -1367,7 +1371,8 @@ async function init() {
     const nb = lastId && S.neighborhoods.find(n => n.id === Number(lastId))
                 || S.neighborhoods[0];
     if (nb) await loadNeighborhood(nb);
-    else toast('Menüden mahalle seçin ☰');
+    else if (SUPERVISOR_ROLES.has(S.user.role)) toast('Menüden mahalle seçin ☰');
+    else toast('Bugün atanmış güzergah yok. Amirle iletişime geçin.', 'error', 7000);
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
   } catch(e) {
