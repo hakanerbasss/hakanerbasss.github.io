@@ -1,71 +1,145 @@
+"""Telegram bildirim modülü — metin, fotoğraf, konum, ses."""
 import json
 import os
 import requests
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+_cfg_cache = None
 
 
-def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        return {}
-    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def _cfg():
+    global _cfg_cache
+    if _cfg_cache is None:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                _cfg_cache = json.load(f)
+        else:
+            _cfg_cache = {}
+    return _cfg_cache
 
 
-def _bot_token():
-    return load_config().get('telegram_bot_token') or os.environ.get('TELEGRAM_BOT_TOKEN')
+def _token():
+    return _cfg().get('telegram_bot_token') or os.environ.get('TELEGRAM_BOT_TOKEN', '')
 
 
-def _default_chat_id():
-    return load_config().get('telegram_chat_id') or os.environ.get('TELEGRAM_CHAT_ID')
+def _default_chat(neighborhood_id=None):
+    """Mahalleye özel chat id varsa onu, yoksa genel grubu döner."""
+    cfg = _cfg()
+    if neighborhood_id:
+        nb_chats = cfg.get('neighborhood_telegram_chats', {})
+        cid = nb_chats.get(str(neighborhood_id))
+        if cid:
+            return cid
+    return cfg.get('telegram_chat_id') or os.environ.get('TELEGRAM_CHAT_ID', '')
 
 
-def send_message(text, chat_id=None):
-    token = _bot_token()
-    chat_id = chat_id or _default_chat_id()
+def _post(endpoint, data=None, files=None, neighborhood_id=None):
+    token = _token()
+    chat_id = _default_chat(neighborhood_id)
     if not token or not chat_id:
         return False
+    if data is None:
+        data = {}
+    data['chat_id'] = chat_id
     try:
-        requests.post(
+        r = requests.post(
+            f'https://api.telegram.org/bot{token}/{endpoint}',
+            data=data,
+            files=files,
+            timeout=30,
+        )
+        return r.ok
+    except requests.RequestException:
+        return False
+
+
+def send_message(text, neighborhood_id=None, chat_id=None):
+    token = _token()
+    cid = chat_id or _default_chat(neighborhood_id)
+    if not token or not cid:
+        return False
+    try:
+        r = requests.post(
             f'https://api.telegram.org/bot{token}/sendMessage',
-            data={'chat_id': chat_id, 'text': text},
-            timeout=10,
+            data={'chat_id': cid, 'text': text, 'parse_mode': 'HTML'},
+            timeout=15,
         )
-        return True
+        return r.ok
     except requests.RequestException:
         return False
 
 
-def send_location(lat, lon, chat_id=None):
-    token = _bot_token()
-    chat_id = chat_id or _default_chat_id()
-    if not token or not chat_id:
-        return False
-    try:
-        requests.post(
-            f'https://api.telegram.org/bot{token}/sendLocation',
-            data={'chat_id': chat_id, 'latitude': lat, 'longitude': lon},
-            timeout=10,
-        )
-        return True
-    except requests.RequestException:
-        return False
+def send_location(lat, lon, neighborhood_id=None):
+    return _post('sendLocation', {'latitude': lat, 'longitude': lon}, neighborhood_id=neighborhood_id)
 
 
-def notify_point(point, neighborhood_name, chat_id=None):
-    """Yeni eklenen bir nokta/not için metin + konum bildirimi gönderir."""
-    from db import POINT_TYPES
-    label = POINT_TYPES.get(point['type'], point['type'])
-    lines = [
-        f"📍 {neighborhood_name}",
-        label,
-    ]
-    if point.get('note'):
-        lines.append(f"Not: {point['note']}")
-    if point.get('created_by'):
-        lines.append(f"Ekleyen: {point['created_by']}")
-    lines.append(f"https://www.google.com/maps?q={point['lat']},{point['lon']}")
-    ok = send_message('\n'.join(lines), chat_id=chat_id)
+def send_photo(photo_file, caption='', neighborhood_id=None):
+    """photo_file: file-like object (Flask request.files)."""
+    return _post(
+        'sendPhoto',
+        data={'caption': caption},
+        files={'photo': ('photo.jpg', photo_file, 'image/jpeg')},
+        neighborhood_id=neighborhood_id,
+    )
+
+
+def send_voice(voice_file, caption='', neighborhood_id=None):
+    """voice_file: file-like object."""
+    return _post(
+        'sendVoice',
+        data={'caption': caption},
+        files={'voice': ('voice.ogg', voice_file, 'audio/ogg')},
+        neighborhood_id=neighborhood_id,
+    )
+
+
+# ── Yüksek seviye bildirimler ────────────────────────────────────────────────
+
+def notify_street_complete(street_name, user_display, neighborhood_name, shift_name,
+                           photo_file=None, neighborhood_id=None):
+    import datetime
+    saat = datetime.datetime.now().strftime('%H:%M')
+    caption = (
+        f"🧹 <b>{street_name}</b> süpürüldü\n"
+        f"👤 {user_display}\n"
+        f"🏘 {neighborhood_name}\n"
+        f"🕐 {saat}  |  {shift_name}"
+    )
+    if photo_file:
+        return send_photo(photo_file, caption=caption, neighborhood_id=neighborhood_id)
+    return send_message(caption, neighborhood_id=neighborhood_id)
+
+
+def notify_new_notification(notif, user_display, neighborhood_name, neighborhood_id=None):
+    from db import NOTIFICATION_TYPES
+    icon, label, _ = NOTIFICATION_TYPES.get(notif['type'], ('📝', notif['type'], None))
+    import datetime
+    saat = datetime.datetime.now().strftime('%H:%M')
+    text = (
+        f"{icon} <b>Olumsuzluk Bildirimi</b>\n"
+        f"🏘 {neighborhood_name}\n"
+        f"📋 {label}\n"
+    )
+    if notif.get('note'):
+        text += f"💬 {notif['note']}\n"
+    text += f"👤 {user_display}  |  🕐 {saat}\n"
+    text += f"📍 https://maps.google.com/?q={notif['lat']},{notif['lon']}"
+    ok = send_message(text, neighborhood_id=neighborhood_id)
     if ok:
-        send_location(point['lat'], point['lon'], chat_id=chat_id)
+        send_location(notif['lat'], notif['lon'], neighborhood_id=neighborhood_id)
     return ok
+
+
+def notify_resolved(notif, user_display, neighborhood_name, photo_file=None, neighborhood_id=None):
+    from db import NOTIFICATION_TYPES
+    icon, label, _ = NOTIFICATION_TYPES.get(notif['type'], ('📝', notif['type'], None))
+    import datetime
+    saat = datetime.datetime.now().strftime('%H:%M')
+    caption = (
+        f"✅ <b>Giderildi: {label}</b>\n"
+        f"🏘 {neighborhood_name}\n"
+        f"👤 {user_display}  |  🕐 {saat}"
+    )
+    if photo_file:
+        return send_photo(photo_file, caption=caption, neighborhood_id=neighborhood_id)
+    return send_message(caption, neighborhood_id=neighborhood_id)

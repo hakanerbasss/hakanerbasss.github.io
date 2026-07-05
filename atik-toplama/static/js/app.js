@@ -1,379 +1,654 @@
-// Kaba Atık Toplama Rota — istemci tarafı uygulama mantığı
+/* Saha Yönetim — istemci tarafı ana mantık */
 (function () {
-  'use strict';
+'use strict';
 
-  const state = {
-    neighborhoodId: null,
-    neighborhoodName: null,
-    streets: [],       // {id, name, geometry, visited, ...}
-    points: [],        // {id, lat, lon, type, note, resolved, ...}
-    streetLayers: {},  // id -> leaflet polyline
-    pointLayers: {},    // id -> leaflet marker
-    addMode: false,
-    pendingLatLng: null,
-    voiceOn: true,
-    announcedPoints: new Set(),
-    lastAnnouncedStreetId: null,
-    meMarker: null,
-    lastPos: null,
-  };
+// ── Sabitler ─────────────────────────────────────────────────────────────────
+const SUPERVISOR_ROLES = new Set(['santiye_amiri', 'cavus', 'onbasi']);
+const NOTIF_ICONS = {
+  dolu_konteyner:'🗑️', kaba_atik:'🪑', yikanmasi_lazim:'🚿',
+  suprulmesi_lazim:'🧹', park_bahce:'🌳', fen_isleri:'🔧', diger:'📝'
+};
+const NOTIF_LABELS = {
+  dolu_konteyner:'Dolu Konteyner', kaba_atik:'Kaba Atık', yikanmasi_lazim:'Konteyner Yıkanmalı',
+  suprulmesi_lazim:'Süpürülmeli', park_bahce:'Park & Bahçe', fen_isleri:'Fen İşleri', diger:'Diğer'
+};
 
-  const POINT_ICONS = {
-    kaba_atik_dolu: '🗑️',
-    konteyner_yok: '🚫',
-    temizlik_gerekli: '🧹',
-    toplu_calisma: '👥',
-    diger: '📝',
-  };
+// ── Durum ─────────────────────────────────────────────────────────────────────
+const S = {
+  user: null,
+  neighborhoods: [],
+  activeNb: null,       // aktif mahalle objesi
+  streets: [],          // tüm sokaklar (harita için)
+  myStreets: [],        // bugün bana atanmış sokaklar (süpürgeci)
+  completedIds: new Set(),
+  notifications: [],
+  map: null,
+  streetLayers: {},     // id → polyline
+  assignSelected: new Set(), // atama için seçili sokak id'leri
+  meMarker: null,
+  lastPos: null,
+  voiceOn: true,
+  announcedNotifs: new Set(),
+  mode: 'normal',       // 'normal' | 'assign'
+  closingStreetId: null,
+  photoFile: null,
+};
 
-  // ── Yardımcılar ──────────────────────────────────────────
-  function toast(msg, ms) {
-    const el = document.createElement('div');
-    el.className = 'toast';
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), ms || 3000);
-  }
+// ── Yardımcılar ───────────────────────────────────────────────────────────────
+function el(id){ return document.getElementById(id); }
 
-  function speak(text) {
-    if (!state.voiceOn || !('speechSynthesis' in window) || !text) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'tr-TR';
-      u.rate = 1.0;
-      window.speechSynthesis.speak(u);
-    } catch (e) { /* speechSynthesis desteklenmiyor */ }
-  }
+function toast(msg, type, ms) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), ms || 3000);
+}
 
-  function haversine(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const toRad = (d) => (d * Math.PI) / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(a));
-  }
+function speak(text) {
+  if (!S.voiceOn || !('speechSynthesis' in window) || !text) return;
+  try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'tr-TR'; u.rate = 1.05; window.speechSynthesis.speak(u); } catch(e){}
+}
 
-  function nearestPointOnStreet(street, lat, lon) {
-    let best = Infinity;
-    for (const [plat, plon] of street.geometry) {
-      const d = haversine(lat, lon, plat, plon);
-      if (d < best) best = d;
-    }
-    return best;
-  }
+function haversine(la1, lo1, la2, lo2) {
+  const R = 6371000, r = Math.PI/180;
+  const dLa = (la2-la1)*r, dLo = (lo2-lo1)*r;
+  const a = Math.sin(dLa/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
 
-  async function api(path, opts) {
-    const res = await fetch(path, Object.assign({
-      headers: { 'Content-Type': 'application/json' },
-    }, opts));
-    if (res.status === 401) { window.location.href = '/login'; throw new Error('giriş gerekli'); }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'İstek başarısız');
-    return data;
-  }
+function streetMidpoint(geom) {
+  const mid = geom[Math.floor(geom.length/2)];
+  return mid;
+}
 
-  // ── Harita ───────────────────────────────────────────────
-  const map = L.map('map', { zoomControl: false }).setView([41.015, 28.979], 14);
-  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+function nearestStreetDist(street) {
+  if (!S.lastPos) return Infinity;
+  let best = Infinity;
+  for (const [la,lo] of street.geometry)
+    best = Math.min(best, haversine(S.lastPos.lat, S.lastPos.lng, la, lo));
+  return best;
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opts));
+  if (r.status === 401) { location.href='/login'; throw Error('giris gerekli'); }
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) throw Error(d.error || 'Hata');
+  return d;
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+
+// ── Harita kurulum ─────────────────────────────────────────────────────────────
+function initMap() {
+  S.map = L.map('map', {zoomControl:false}).setView([41.015, 28.979], 14);
+  L.control.zoom({position:'bottomleft'}).addTo(S.map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap katkıda bulunanlar',
-  }).addTo(map);
+    maxZoom:19, attribution:'© OSM'
+  }).addTo(S.map);
 
-  function streetStyle(street) {
-    return {
-      color: street.visited ? '#1a7a3c' : '#d6432b',
-      weight: 5,
-      opacity: 0.85,
+  S.map.on('click', onMapClick);
+}
+
+// ── Sokak renk mantığı ─────────────────────────────────────────────────────────
+function streetColor(street) {
+  if (S.mode === 'assign') {
+    if (S.assignSelected.has(street.id)) return {color:'#1f6feb', weight:6, opacity:.9};
+    return {color:'#30363d', weight:4, opacity:.7};
+  }
+  if (street.completed) return {color:'#1a7a3c', weight:5, opacity:.85};
+  return {color:'#b91c1c', weight:5, opacity:.85};
+}
+
+function renderStreets(streets) {
+  // Temizle
+  Object.values(S.streetLayers).forEach(l => S.map.removeLayer(l));
+  S.streetLayers = {};
+
+  streets.forEach(street => {
+    const line = L.polyline(street.geometry, streetColor(street));
+    line.bindTooltip(street.name, {sticky:true, className:'', opacity:.9});
+    line.on('click', () => onStreetClick(street));
+    line.addTo(S.map);
+    S.streetLayers[street.id] = line;
+  });
+}
+
+function refreshStreetColor(streetId) {
+  const street = S.streets.find(s => s.id === streetId) || S.myStreets.find(s => s.id === streetId);
+  if (!street || !S.streetLayers[streetId]) return;
+  S.streetLayers[streetId].setStyle(streetColor(street));
+}
+
+// ── Mahalle yükleme ─────────────────────────────────────────────────────────────
+async function loadNeighborhood(nb) {
+  S.activeNb = nb;
+  el('nbTitle').textContent = nb.name;
+  el('progressLabel').textContent = 'Yükleniyor…';
+
+  // Tüm sokaklar
+  const allStreets = await api(`/api/neighborhoods/${nb.id}/streets`);
+  S.streets = allStreets;
+
+  if (SUPERVISOR_ROLES.has(S.user.role)) {
+    await loadSupervisorView();
+  } else {
+    await loadSweeperView();
+  }
+  fitMapToStreets(S.streets.length ? S.streets : []);
+  localStorage.setItem('lastNbId', String(nb.id));
+}
+
+async function loadSweeperView() {
+  const nid = S.activeNb.id;
+  const data = await api(`/api/my/streets?neighborhood_id=${nid}&date=${todayStr()}`);
+  S.myStreets = data.streets;
+  S.completedIds = new Set(data.completed_ids);
+
+  if (!S.myStreets.length) {
+    renderStreets(S.streets.map(s => ({...s, completed: false})));
+    updateProgress(0, S.streets.length);
+    toast('Bugün bu mahalle için görev atanmamış', '', 4000);
+    return;
+  }
+
+  // Atanmış sokakları tamamlama durumlarıyla birlikte göster
+  const displayStreets = S.myStreets.map(s => ({...s, completed: S.completedIds.has(s.id)}));
+  renderStreets(displayStreets);
+  updateProgress(S.completedIds.size, S.myStreets.length);
+  speak(`${S.activeNb.name}. ${S.myStreets.length} sokak görevin var.`);
+}
+
+async function loadSupervisorView() {
+  const nid = S.activeNb.id;
+  const data = await api(`/api/neighborhoods/${nid}/progress?date=${todayStr()}`);
+  const streets = data.streets.length ? data.streets : S.streets.map(s => ({...s, completed:false}));
+  renderStreets(streets.map(s => ({...s, geometry: s.geometry || (S.streets.find(x=>x.id===s.id)||{}).geometry || []})));
+  updateProgress(data.completed, data.total || S.streets.length);
+}
+
+function updateProgress(done, total) {
+  const pct = total ? Math.round((done/total)*100) : 0;
+  el('progFill').style.width = pct + '%';
+  el('progressLabel').textContent = `${done} / ${total} sokak tamamlandı`;
+}
+
+function fitMapToStreets(streets) {
+  const coords = streets.flatMap(s => s.geometry || []);
+  if (!coords.length) return;
+  try { S.map.fitBounds(L.latLngBounds(coords), {padding:[20,20]}); } catch(e){}
+}
+
+// ── Sokak tıklama ─────────────────────────────────────────────────────────────
+function onStreetClick(street) {
+  if (S.mode === 'assign') {
+    if (S.assignSelected.has(street.id)) S.assignSelected.delete(street.id);
+    else S.assignSelected.add(street.id);
+    refreshStreetColor(street.id);
+    el('assignStreetCount').textContent = S.assignSelected.size;
+    return;
+  }
+
+  if (SUPERVISOR_ROLES.has(S.user.role)) return; // supervisor sadece bakır
+
+  // Süpürgeci: sokak kapatma akışı
+  const myStreet = S.myStreets.find(s => s.id === street.id);
+  if (!myStreet) { toast('Bu sokak bugünkü görevinde yok'); return; }
+  if (S.completedIds.has(street.id)) { toast('Bu sokak zaten tamamlandı ✅', 'success'); return; }
+  openCloseStreetModal(street);
+}
+
+// ── Harita tıklama (bildirim konumu) ──────────────────────────────────────────
+function onMapClick(e) {
+  if (S.mode !== 'notif') return;
+  S._pendingNotifLatLng = e.latlng;
+  el('notifLocInfo').textContent = `📍 ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+}
+
+// ── Sokak kapat modal ─────────────────────────────────────────────────────────
+function openCloseStreetModal(street) {
+  S.closingStreetId = street.id;
+  S.photoFile = null;
+  el('csStreetName').textContent = street.name;
+  el('csNote').value = '';
+  el('photoPreview').style.display = 'none';
+  el('photoPickBtn').className = 'photo-btn';
+  el('photoPickBtn').textContent = '📷 Fotoğraf Çek / Seç';
+  el('csSaveBtn').disabled = true;
+  openModal('closeStreetModal');
+}
+
+el('photoPickBtn').addEventListener('click', () => el('photoInput').click());
+
+el('photoInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  S.photoFile = file;
+  const url = URL.createObjectURL(file);
+  el('photoPreview').src = url;
+  el('photoPreview').style.display = 'block';
+  el('photoPickBtn').className = 'photo-btn has-photo';
+  el('photoPickBtn').textContent = '✅ Fotoğraf seçildi — değiştirmek için dokun';
+  el('csSaveBtn').disabled = false;
+});
+
+el('csCancelBtn').addEventListener('click', () => closeModal('closeStreetModal'));
+
+el('csSaveBtn').addEventListener('click', async () => {
+  if (!S.photoFile || !S.closingStreetId || !S.activeNb) return;
+  el('csSaveBtn').disabled = true;
+  el('csSaveBtn').textContent = 'Gönderiliyor…';
+
+  const fd = new FormData();
+  fd.append('photo', S.photoFile, 'photo.jpg');
+  fd.append('work_date', todayStr());
+  fd.append('neighborhood_id', S.activeNb.id);
+
+  // assignment_id bul
+  const myS = S.myStreets.find(s => s.id === S.closingStreetId);
+  if (myS && myS.assignment_id) fd.append('assignment_id', myS.assignment_id);
+
+  const note = el('csNote').value.trim();
+  if (note) fd.append('note', note);
+
+  try {
+    const res = await fetch(`/api/streets/${S.closingStreetId}/complete`, {method:'POST', body:fd});
+    if (res.status === 401) { location.href = '/login'; return; }
+    const d = await res.json();
+    if (!res.ok) throw Error(d.error || 'Hata');
+
+    S.completedIds.add(S.closingStreetId);
+    const street = S.myStreets.find(s => s.id === S.closingStreetId);
+    if (street) street.completed = true;
+    refreshStreetColor(S.closingStreetId);
+    updateProgress(S.completedIds.size, S.myStreets.length);
+    closeModal('closeStreetModal');
+
+    const streetName = street ? street.name : 'Sokak';
+    toast(`${streetName} tamamlandı ✅` + (d.photo_sent ? ' — Telegram\'a gönderildi' : ''), 'success', 4000);
+    speak(`${streetName} süpürüldü`);
+  } catch(e) {
+    toast(e.message, 'error');
+    el('csSaveBtn').disabled = false;
+    el('csSaveBtn').textContent = '✅ Kapat & Gönder';
+  }
+});
+
+// ── En yakın sokak ─────────────────────────────────────────────────────────────
+el('nearestBtn').addEventListener('click', () => {
+  const pool = S.myStreets.length ? S.myStreets : S.streets;
+  const unvisited = pool.filter(s => !S.completedIds.has(s.id));
+  if (!unvisited.length) { toast('Tüm sokaklar tamamlandı 🎉', 'success'); return; }
+
+  let nearest = unvisited[0], nearestD = Infinity;
+  for (const s of unvisited) {
+    const d = nearestStreetDist(s);
+    if (d < nearestD) { nearestD = d; nearest = s; }
+  }
+  const [la, lo] = nearest.geometry[Math.floor(nearest.geometry.length/2)];
+  S.map.flyTo([la, lo], 17, {animate:true, duration:.8});
+  speak(`En yakın sokak: ${nearest.name}, yaklaşık ${Math.round(nearestD)} metre`);
+  toast(`🧭 ${nearest.name} — ${Math.round(nearestD)}m`);
+});
+
+// ── GPS ───────────────────────────────────────────────────────────────────────
+el('locateBtn').addEventListener('click', () => {
+  if (S.lastPos) S.map.setView([S.lastPos.lat, S.lastPos.lng], 17);
+  else toast('Konum alınamadı');
+});
+
+function onGpsPosition(pos) {
+  const {latitude:lat, longitude:lng} = pos.coords;
+  S.lastPos = {lat, lng};
+
+  if (!S.meMarker) {
+    S.meMarker = L.circleMarker([lat,lng], {radius:9, color:'#1f6feb', fillColor:'#1f6feb', fillOpacity:.9, weight:2}).addTo(S.map);
+  } else {
+    S.meMarker.setLatLng([lat,lng]);
+  }
+
+  // Yakın notif oku
+  for (const n of S.notifications) {
+    if (n.status !== 'open' || S.announcedNotifs.has(n.id)) continue;
+    const d = haversine(lat, lng, n.lat, n.lon);
+    if (d <= 50) {
+      S.announcedNotifs.add(n.id);
+      const label = NOTIF_LABELS[n.type] || n.type;
+      speak(`Yakında olumsuzluk: ${label}` + (n.note ? '. ' + n.note : ''));
+      toast(`⚠️ ${label}${n.note ? ': '+n.note : ''}`, '', 5000);
+    }
+  }
+}
+
+if ('geolocation' in navigator) {
+  navigator.geolocation.watchPosition(onGpsPosition, () => {}, {
+    enableHighAccuracy: true, maximumAge: 6000, timeout: 30000
+  });
+}
+
+// ── Sesli yönlendirme toggle ──────────────────────────────────────────────────
+el('voiceBtn').addEventListener('click', () => {
+  S.voiceOn = !S.voiceOn;
+  el('voiceBtn').textContent = S.voiceOn ? '🔊' : '🔇';
+  el('voiceBtn').classList.toggle('active', S.voiceOn);
+  speak(S.voiceOn ? 'Sesli yönlendirme açık' : '');
+});
+el('voiceBtn').classList.add('active');
+
+// ── Bildirim ekle ─────────────────────────────────────────────────────────────
+el('addNotifBtn').addEventListener('click', () => {
+  if (!S.activeNb) { toast('Önce bir mahalle seçin'); return; }
+  S._pendingNotifLatLng = S.lastPos ? L.latLng(S.lastPos.lat, S.lastPos.lng) : null;
+  el('notifLocInfo').textContent = S.lastPos
+    ? `📍 ${S.lastPos.lat.toFixed(5)}, ${S.lastPos.lng.toFixed(5)} (GPS konumun)`
+    : '📍 GPS alınamadı — haritaya dokun';
+  el('notifNote').value = '';
+  openModal('addNotifModal');
+});
+
+el('notifCancelBtn').addEventListener('click', () => closeModal('addNotifModal'));
+
+el('notifSaveBtn').addEventListener('click', async () => {
+  if (!S._pendingNotifLatLng) { toast('Konum seçilmedi — haritaya dokun', 'error'); return; }
+  const type = el('notifType').value;
+  const note = el('notifNote').value.trim();
+  try {
+    const n = await api('/api/notifications', {method:'POST', body:JSON.stringify({
+      neighborhood_id: S.activeNb.id,
+      lat: S._pendingNotifLatLng.lat, lon: S._pendingNotifLatLng.lng,
+      type, note,
+    })});
+    S.notifications.push(n);
+    addNotifMarker(n);
+    closeModal('addNotifModal');
+    toast('Bildirim gönderildi ✅', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+});
+
+// ── Sokak listesi paneli ───────────────────────────────────────────────────────
+el('streetListBtn').addEventListener('click', () => openSidePanel('Sokaklar', renderStreetList));
+el('notifPoolBtn').addEventListener('click', () => openSidePanel('Bildirim Havuzu', renderNotifPool));
+
+function openSidePanel(title, renderFn) {
+  el('sidePanelTitle').textContent = title;
+  el('sidePanelBody').innerHTML = '';
+  renderFn();
+  el('sidePanel').classList.add('open');
+}
+
+el('sidePanelCloseBtn').addEventListener('click', () => el('sidePanel').classList.remove('open'));
+
+function renderStreetList() {
+  const body = el('sidePanelBody');
+  const pool = S.myStreets.length ? S.myStreets : S.streets;
+  if (!pool.length) { body.innerHTML = '<p style="padding:12px;color:var(--muted)">Sokak yok</p>'; return; }
+
+  // Sırala: tamamlanmayanlar önce, sonra ada göre
+  const sorted = [...pool].map(s => ({...s, completed: S.completedIds.has(s.id)}))
+    .sort((a,b) => a.completed - b.completed || a.name.localeCompare(b.name, 'tr'));
+
+  body.innerHTML = sorted.map(s => `
+    <div class="street-row">
+      <span class="sname">${esc(s.name)}</span>
+      <span class="badge ${s.completed ? 'done' : ''}">${s.completed ? '✅ Tamam' : '⬛ Bekliyor'}</span>
+      <button data-fly="${s.id}">Git</button>
+    </div>
+  `).join('');
+
+  body.querySelectorAll('[data-fly]').forEach(btn => {
+    btn.onclick = () => {
+      const street = pool.find(s => s.id === Number(btn.dataset.fly));
+      if (!street) return;
+      const bounds = L.latLngBounds(street.geometry);
+      S.map.flyToBounds(bounds, {padding:[40,40], animate:true, duration:.8});
+      speak(street.name);
+      el('sidePanel').classList.remove('open');
     };
-  }
+  });
+}
 
-  function renderStreets() {
-    Object.values(state.streetLayers).forEach((l) => map.removeLayer(l));
-    state.streetLayers = {};
-    state.streets.forEach((street) => {
-      const line = L.polyline(street.geometry, streetStyle(street));
-      line.bindTooltip(street.name, { sticky: true });
-      line.on('click', () => onStreetClick(street));
-      line.addTo(map);
-      state.streetLayers[street.id] = line;
+// ── Bildirim havuzu renderı ─────────────────────────────────────────────────────
+async function renderNotifPool() {
+  const body = el('sidePanelBody');
+  if (!S.activeNb) { body.innerHTML = '<p style="padding:12px;color:var(--muted)">Mahalle seçin</p>'; return; }
+  body.innerHTML = '<p style="padding:12px;color:var(--muted)">Yükleniyor…</p>';
+  try {
+    const items = await api(`/api/notifications?neighborhood_id=${S.activeNb.id}&status=open`);
+    S.notifications = items;
+    if (!items.length) { body.innerHTML = '<p style="padding:12px;color:var(--green)">Açık olumsuzluk yok 🎉</p>'; return; }
+    body.innerHTML = items.map(n => `
+      <div class="notif-card">
+        <div class="ntop">
+          <span>${NOTIF_ICONS[n.type]||'📝'}</span>
+          <span class="nlabel">${NOTIF_LABELS[n.type]||n.type}</span>
+          <span class="status-open" style="margin-left:auto;font-size:11px">Açık</span>
+        </div>
+        ${n.note ? `<div style="margin:2px 0 4px;font-size:12px">${esc(n.note)}</div>` : ''}
+        <div class="ninfo">👤 ${esc(n.creator_name||'')} — ${timeAgo(n.created_at)}</div>
+        <div class="nbtn-row">
+          <button data-fly-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}">📍 Git</button>
+          <button class="primary" data-resolve-notif="${n.id}">✅ Çöz</button>
+          ${SUPERVISOR_ROLES.has(S.user.role) ? `<button data-cancel-notif="${n.id}" style="background:var(--red-light);border-color:var(--red);color:#fff">İptal</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    body.querySelectorAll('[data-fly-notif]').forEach(btn => {
+      btn.onclick = () => { S.map.flyTo([+btn.dataset.lat, +btn.dataset.lon], 17); el('sidePanel').classList.remove('open'); };
     });
-  }
-
-  function onStreetClick(street) {
-    const willVisit = !street.visited;
-    const msg = willVisit ? `"${street.name}" gezildi olarak işaretlensin mi?` : `"${street.name}" işareti kaldırılsın mı?`;
-    if (!window.confirm(msg)) return;
-    api(`/api/streets/${street.id}/visit`, { method: 'POST', body: JSON.stringify({ visited: willVisit }) })
-      .then(() => {
-        street.visited = willVisit;
-        state.streetLayers[street.id].setStyle(streetStyle(street));
-        updateProgress();
-        if (willVisit) speak(`${street.name} işaretlendi`);
-      })
-      .catch((e) => toast(e.message));
-  }
-
-  function pointPopupHtml(point) {
-    const label = POINT_ICONS[point.type] || '📝';
-    const parts = [`<b>${label} ${point.note ? escapeHtml(point.note) : '(not yok)'}</b>`];
-    if (point.created_by) parts.push(`<div style="color:#9aa0a8;font-size:12px;">Ekleyen: ${escapeHtml(point.created_by)}</div>`);
-    if (point.resolved) {
-      parts.push('<div style="color:#1a7a3c;font-size:12px;">✔ Çözüldü</div>');
-    } else {
-      parts.push(`<button data-resolve="${point.id}">Çözüldü olarak işaretle</button>`);
-    }
-    parts.push(`<button data-speak="${point.id}">🔊 Sesli Oku</button>`);
-    return parts.join('');
-  }
-
-  function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
-  }
-
-  function renderPoints() {
-    Object.values(state.pointLayers).forEach((l) => map.removeLayer(l));
-    state.pointLayers = {};
-    state.points.forEach((point) => {
-      const icon = L.divIcon({
-        html: `<div style="font-size:26px;line-height:1;filter:${point.resolved ? 'grayscale(1) opacity(.5)' : 'none'};">${POINT_ICONS[point.type] || '📝'}</div>`,
-        className: '', iconSize: [26, 26], iconAnchor: [13, 13],
-      });
-      const marker = L.marker([point.lat, point.lon], { icon });
-      marker.bindPopup(pointPopupHtml(point));
-      marker.on('popupopen', (e) => {
-        const c = e.popup.getElement();
-        const resolveBtn = c.querySelector('[data-resolve]');
-        const speakBtn = c.querySelector('[data-speak]');
-        if (resolveBtn) resolveBtn.onclick = () => resolvePoint(point.id);
-        if (speakBtn) speakBtn.onclick = () => speak(point.note || 'Not eklenmemiş');
-      });
-      marker.addTo(map);
-      state.pointLayers[point.id] = marker;
+    body.querySelectorAll('[data-resolve-notif]').forEach(btn => {
+      btn.onclick = () => resolveNotif(+btn.dataset.resolveNotif);
     });
-  }
-
-  function resolvePoint(id) {
-    api(`/api/points/${id}/resolve`, { method: 'POST' }).then(() => {
-      const p = state.points.find((x) => x.id === id);
-      if (p) p.resolved = true;
-      renderPoints();
-    }).catch((e) => toast(e.message));
-  }
-
-  function updateProgress() {
-    const total = state.streets.length;
-    const visited = state.streets.filter((s) => s.visited).length;
-    const pct = total ? Math.round((visited / total) * 100) : 0;
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressLabel').textContent = `${visited} / ${total} sokak gezildi`;
-  }
-
-  // ── Mahalle yükleme ─────────────────────────────────────
-  async function loadNeighborhood(id) {
-    const data = await api(`/api/neighborhoods/${id}`);
-    state.neighborhoodId = id;
-    state.neighborhoodName = data.neighborhood.name;
-    state.streets = data.streets;
-    state.points = data.points;
-    document.getElementById('neighborhoodTitle').textContent = data.neighborhood.name;
-    renderStreets();
-    renderPoints();
-    updateProgress();
-    state.announcedPoints.clear();
-    if (state.streets.length) {
-      const bounds = L.latLngBounds(state.streets.flatMap((s) => s.geometry));
-      map.fitBounds(bounds, { padding: [20, 20] });
-    } else {
-      map.setView([data.neighborhood.center_lat, data.neighborhood.center_lon], 15);
-    }
-    localStorage.setItem('lastNeighborhoodId', String(id));
-  }
-
-  async function refreshNeighborhoodList() {
-    const list = await api('/api/neighborhoods');
-    const wrap = document.getElementById('neighborhoodListWrap');
-    wrap.innerHTML = list.map((n) =>
-      `<div class="streetRow"><span>${escapeHtml(n.name)}</span><button data-nb="${n.id}">Seç</button></div>`
-    ).join('') || '<div style="color:#9aa0a8;font-size:13px;">Henüz mahalle eklenmedi</div>';
-    wrap.querySelectorAll('[data-nb]').forEach((btn) => {
-      btn.onclick = () => {
-        loadNeighborhood(Number(btn.dataset.nb));
-        closeModal('menuModalOverlay');
+    body.querySelectorAll('[data-cancel-notif]').forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm('Bildirimi iptal et?')) return;
+        await api(`/api/notifications/${btn.dataset.cancelNotif}/cancel`, {method:'POST'});
+        renderNotifPool();
       };
     });
+  } catch(e) { body.innerHTML = `<p style="padding:12px;color:var(--red)">${e.message}</p>`; }
+}
+
+function resolveNotif(nid) {
+  // Fotoğraflı kapama — basit dosya seç
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const fd = new FormData(); fd.append('photo', file, 'photo.jpg');
+    try {
+      await fetch(`/api/notifications/${nid}/resolve`, {method:'POST', body:fd});
+      toast('Bildirim kapatıldı ✅', 'success');
+      renderNotifPool();
+    } catch(e) { toast(e.message, 'error'); }
+  };
+  input.click();
+}
+
+// ── Bildirim markerları ────────────────────────────────────────────────────────
+const notifMarkers = {};
+function addNotifMarker(n) {
+  if (notifMarkers[n.id]) return;
+  const icon = L.divIcon({html:`<div style="font-size:24px;line-height:1">${NOTIF_ICONS[n.type]||'📝'}</div>`,className:'',iconSize:[24,24],iconAnchor:[12,12]});
+  const m = L.marker([n.lat,n.lon],{icon});
+  m.bindPopup(`<b>${NOTIF_LABELS[n.type]||n.type}</b>${n.note?'<br>'+esc(n.note):''}`);
+  m.addTo(S.map);
+  notifMarkers[n.id] = m;
+}
+
+// ── Menü ──────────────────────────────────────────────────────────────────────
+el('menuBtn').addEventListener('click', async () => {
+  // Mahalleleri güncelle
+  const sel = el('nbSelect');
+  sel.innerHTML = '<option value="">— Mahalle seç —</option>';
+  for (const nb of S.neighborhoods) {
+    const opt = document.createElement('option');
+    opt.value = nb.id; opt.textContent = nb.name;
+    if (S.activeNb && nb.id === S.activeNb.id) opt.selected = true;
+    sel.appendChild(opt);
   }
 
-  // ── Nokta ekleme ─────────────────────────────────────────
-  map.on('click', (e) => {
-    if (!state.addMode) return;
-    if (!state.neighborhoodId) { toast('Önce ☰ menüsünden bir mahalle seçin'); return; }
-    state.pendingLatLng = e.latlng;
-    openModal('pointModalOverlay');
-  });
+  // Çavuş/Şantiye amiri için ekstra menü
+  const section = el('menuRoleSection');
+  if (SUPERVISOR_ROLES.has(S.user.role)) {
+    section.innerHTML = `
+      <div class="row" style="margin-top:14px">
+        <button id="openAssignBtn" class="primary">📋 Güzergah Ata</button>
+      </div>`;
+    el('openAssignBtn').onclick = () => { closeModal('menuModal'); openAssignPanel(); };
+  } else {
+    section.innerHTML = '';
+  }
 
-  document.getElementById('addPointBtn').addEventListener('click', () => {
-    state.addMode = !state.addMode;
-    document.getElementById('addPointBtn').classList.toggle('primary', state.addMode);
-    toast(state.addMode ? 'Haritada bir noktaya dokunun' : 'Nokta ekleme kapatıldı');
-  });
+  // Çıkış butonuna ad yaz
+  const logBtn = el('logoutBtn');
+  if (logBtn) logBtn.textContent = `Çıkış (${S.user.display_name})`;
 
-  document.getElementById('pointCancelBtn').addEventListener('click', () => closeModal('pointModalOverlay'));
-  document.getElementById('pointSaveBtn').addEventListener('click', async () => {
-    const type = document.getElementById('pointType').value;
-    const note = document.getElementById('pointNote').value.trim();
-    const notify = document.getElementById('pointNotify').checked;
-    if (!state.pendingLatLng) return;
+  openModal('menuModal');
+});
+
+el('nbSelect').addEventListener('change', e => {
+  const nid = Number(e.target.value);
+  if (!nid) return;
+  const nb = S.neighborhoods.find(n => n.id === nid);
+  if (nb) { loadNeighborhood(nb); closeModal('menuModal'); }
+});
+
+el('menuCloseBtn').addEventListener('click', () => closeModal('menuModal'));
+el('logoutBtn').addEventListener('click', async () => {
+  await api('/api/logout', {method:'POST'}).catch(()=>{});
+  location.href = '/login';
+});
+
+// ── Güzergah atama paneli (çavuş) ─────────────────────────────────────────────
+async function openAssignPanel() {
+  if (!S.activeNb) { toast('Önce mahalle seçin'); return; }
+  S.mode = 'assign';
+  S.assignSelected.clear();
+  el('assignStreetCount').textContent = '0';
+
+  // Tarih varsayılanı: bugün
+  el('assignDate').value = todayStr();
+
+  // Vardiyaları yükle
+  try {
+    const shifts = await api(`/api/shifts?district_id=${S.user.district_id}`);
+    const sel = el('assignShift');
+    sel.innerHTML = '<option value="">— Tüm gün —</option>';
+    shifts.forEach(sh => {
+      const o = document.createElement('option'); o.value = sh.id; o.textContent = sh.display_name; sel.appendChild(o);
+    });
+  } catch(e) {}
+
+  // Ekip kullanıcılarını yükle
+  try {
+    const users = await api('/api/users');
+    const teamType = el('assignTeamType').value;
+    const sel = el('assignUser');
+    sel.innerHTML = '<option value="">— Tüm ekip —</option>';
+    users.filter(u => u.role === teamType).forEach(u => {
+      const o = document.createElement('option'); o.value = u.id; o.textContent = u.display_name; sel.appendChild(o);
+    });
+  } catch(e) {}
+
+  el('assignTeamType').onchange = async () => {
     try {
-      const point = await api('/api/points', {
-        method: 'POST',
-        body: JSON.stringify({
-          neighborhood_id: state.neighborhoodId,
-          lat: state.pendingLatLng.lat,
-          lon: state.pendingLatLng.lng,
-          type, note, notify,
-        }),
+      const users = await api('/api/users');
+      const sel = el('assignUser');
+      sel.innerHTML = '<option value="">— Tüm ekip —</option>';
+      users.filter(u => u.role === el('assignTeamType').value).forEach(u => {
+        const o = document.createElement('option'); o.value = u.id; o.textContent = u.display_name; sel.appendChild(o);
       });
-      state.points.push(point);
-      renderPoints();
-      document.getElementById('pointNote').value = '';
-      closeModal('pointModalOverlay');
-      toast('Nokta eklendi' + (notify ? ' ve yetkiliye gönderildi' : ''));
-    } catch (e) { toast(e.message); }
-  });
+    } catch(e) {}
+  };
 
-  // ── Modallar / menü ──────────────────────────────────────
-  function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-  function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+  // Sokakları atama moduna al
+  renderStreets(S.streets.map(s => ({...s, completed: false})));
+  openModal('assignModal');
+}
 
-  document.getElementById('menuBtn').addEventListener('click', () => {
-    refreshNeighborhoodList();
-    openModal('menuModalOverlay');
-  });
-  document.getElementById('menuCancelBtn').addEventListener('click', () => closeModal('menuModalOverlay'));
-  document.getElementById('neighborhoodLoadBtn').addEventListener('click', async () => {
-    const q = document.getElementById('neighborhoodInput').value.trim();
-    if (!q) return;
-    toast('Mahalle sınırı ve sokaklar yükleniyor...');
-    try {
-      const res = await api('/api/neighborhoods', { method: 'POST', body: JSON.stringify({ query: q }) });
-      await loadNeighborhood(res.id);
-      document.getElementById('neighborhoodInput').value = '';
-      closeModal('menuModalOverlay');
-      toast(`${res.street_count != null ? res.street_count : ''} sokak yüklendi`.trim());
-    } catch (e) { toast(e.message); }
-  });
-  document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await api('/api/logout', { method: 'POST' });
-    window.location.href = '/login';
-  });
+el('assignSelectAllBtn').addEventListener('click', () => {
+  S.streets.forEach(s => { S.assignSelected.add(s.id); S.streetLayers[s.id] && S.streetLayers[s.id].setStyle(streetColor(s)); });
+  el('assignStreetCount').textContent = S.assignSelected.size;
+});
 
-  document.getElementById('voiceToggleBtn').addEventListener('click', () => {
-    state.voiceOn = !state.voiceOn;
-    document.getElementById('voiceToggleBtn').classList.toggle('active', state.voiceOn);
-    document.getElementById('voiceToggleBtn').textContent = state.voiceOn ? '🔊' : '🔇';
-    if (state.voiceOn) speak('Sesli yönlendirme açık');
-  });
-  document.getElementById('voiceToggleBtn').classList.add('active');
+el('assignClearBtn').addEventListener('click', () => {
+  S.assignSelected.clear();
+  S.streets.forEach(s => S.streetLayers[s.id] && S.streetLayers[s.id].setStyle(streetColor(s)));
+  el('assignStreetCount').textContent = '0';
+});
 
-  // ── Girilmeyen sokaklar / rota paneli ────────────────────
-  document.getElementById('routeBtn').addEventListener('click', () => {
-    const panel = document.getElementById('sidePanel');
-    panel.classList.toggle('open');
-    if (panel.classList.contains('open')) renderRoutePanel();
-  });
+el('assignCancelBtn').addEventListener('click', () => {
+  S.mode = 'normal'; S.assignSelected.clear();
+  closeModal('assignModal');
+  loadNeighborhood(S.activeNb);
+});
 
-  function renderRoutePanel() {
-    const list = document.getElementById('streetList');
-    const pos = state.lastPos;
-    let unvisited = state.streets.filter((s) => !s.visited);
-    if (pos) {
-      unvisited = unvisited.map((s) => ({ s, d: nearestPointOnStreet(s, pos.lat, pos.lng) }))
-        .sort((a, b) => a.d - b.d).map((x) => x.s);
+el('assignSaveBtn').addEventListener('click', async () => {
+  if (!S.assignSelected.size) { toast('Hiç sokak seçilmedi', 'error'); return; }
+  const payload = {
+    neighborhood_id: S.activeNb.id,
+    team_type: el('assignTeamType').value,
+    shift_id: el('assignShift').value || null,
+    work_date: el('assignDate').value || todayStr(),
+    street_ids: [...S.assignSelected],
+    assigned_user_id: el('assignUser').value || null,
+  };
+  try {
+    const res = await api('/api/assignments', {method:'POST', body:JSON.stringify(payload)});
+    S.mode = 'normal'; S.assignSelected.clear();
+    closeModal('assignModal');
+    toast(`${res.street_count} sokak atandı ✅`, 'success');
+    loadNeighborhood(S.activeNb);
+  } catch(e) { toast(e.message, 'error'); }
+});
+
+// ── Modal yardımcıları ─────────────────────────────────────────────────────────
+function openModal(id) { el(id).classList.remove('hidden'); }
+function closeModal(id) { el(id).classList.add('hidden'); }
+
+// ── Zaman yardımcısı ──────────────────────────────────────────────────────────
+function timeAgo(ts) {
+  const d = Math.floor(Date.now()/1000 - ts);
+  if (d < 60) return `${d}sn önce`;
+  if (d < 3600) return `${Math.floor(d/60)}dk önce`;
+  if (d < 86400) return `${Math.floor(d/3600)}sa önce`;
+  return `${Math.floor(d/86400)}g önce`;
+}
+
+function esc(s) {
+  const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML;
+}
+
+// ── Uygulama başlatma ──────────────────────────────────────────────────────────
+async function init() {
+  initMap();
+  try {
+    const data = await api('/api/me');
+    S.user = data.user;
+    S.neighborhoods = data.neighborhoods;
+
+    // Rol bazlı alt bar
+    if (SUPERVISOR_ROLES.has(S.user.role)) {
+      el('addNotifBtn').style.display = 'none'; // çavuş de bildirim ekleyebilir ama bottombar'da değil
+      el('addNotifBtn').style.display = '';
     }
-    if (!unvisited.length) {
-      list.innerHTML = '<div style="color:#1a7a3c;">Tüm sokaklar gezildi 🎉</div>';
-      return;
-    }
-    list.innerHTML = unvisited.map((s) =>
-      `<div class="streetRow"><span>${escapeHtml(s.name)}</span><button data-fly="${s.id}">Git</button></div>`
-    ).join('');
-    list.querySelectorAll('[data-fly]').forEach((btn) => {
-      btn.onclick = () => {
-        const street = state.streets.find((s) => s.id === Number(btn.dataset.fly));
-        if (!street) return;
-        map.fitBounds(L.latLngBounds(street.geometry), { padding: [40, 40] });
-        speak(`${street.name} yönüne gidin`);
-        document.getElementById('sidePanel').classList.remove('open');
-      };
-    });
-    if (unvisited[0]) speak(`En yakın gezilmemiş sokak: ${unvisited[0].name}`);
+
+    // Son mahalle
+    const lastId = localStorage.getItem('lastNbId');
+    const nb = lastId && S.neighborhoods.find(n => n.id === Number(lastId))
+                || S.neighborhoods[0];
+    if (nb) await loadNeighborhood(nb);
+    else toast('Menüden mahalle seçin ☰');
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
+  } catch(e) {
+    if (e.message !== 'giris gerekli') toast(e.message, 'error');
   }
+}
 
-  // ── Bitti ────────────────────────────────────────────────
-  document.getElementById('finishBtn').addEventListener('click', async () => {
-    if (!state.neighborhoodId) { toast('Önce bir mahalle seçin'); return; }
-    const remaining = state.streets.filter((s) => !s.visited).length;
-    if (remaining > 0) {
-      if (!window.confirm(`${remaining} sokak henüz işaretlenmedi. Yine de bitirilsin mi?`)) return;
-    }
-    try {
-      const res = await api(`/api/neighborhoods/${state.neighborhoodId}/finish`, { method: 'POST' });
-      toast(`Tamamlandı: ${res.visited}/${res.total} sokak. Yetkiliye bildirim gönderildi.`, 5000);
-      speak('Tarama tamamlandı olarak bildirildi');
-    } catch (e) { toast(e.message); }
-  });
-
-  // ── Konum takibi + sesli yönlendirme ─────────────────────
-  function onPosition(pos) {
-    const { latitude: lat, longitude: lon } = pos.coords;
-    state.lastPos = { lat, lng: lon };
-    if (!state.meMarker) {
-      state.meMarker = L.circleMarker([lat, lon], { radius: 8, color: '#2b7fd6', fillColor: '#2b7fd6', fillOpacity: 0.9 }).addTo(map);
-    } else {
-      state.meMarker.setLatLng([lat, lon]);
-    }
-
-    // Yakındaki çözülmemiş notları sesli oku
-    state.points.forEach((p) => {
-      if (p.resolved || !p.note || state.announcedPoints.has(p.id)) return;
-      if (haversine(lat, lon, p.lat, p.lon) <= 40) {
-        state.announcedPoints.add(p.id);
-        speak(p.note);
-        toast(`Yakında not: ${p.note}`);
-      }
-    });
-
-    // En yakın gezilmemiş sokağa girildiyse hatırlat
-    let nearest = null, nearestDist = Infinity;
-    state.streets.forEach((s) => {
-      if (s.visited) return;
-      const d = nearestPointOnStreet(s, lat, lon);
-      if (d < nearestDist) { nearestDist = d; nearest = s; }
-    });
-    if (nearest && nearestDist <= 25 && state.lastAnnouncedStreetId !== nearest.id) {
-      state.lastAnnouncedStreetId = nearest.id;
-      speak(`${nearest.name} — henüz işaretlenmedi`);
-    }
-  }
-
-  if ('geolocation' in navigator) {
-    navigator.geolocation.watchPosition(onPosition, () => {}, {
-      enableHighAccuracy: true, maximumAge: 5000, timeout: 20000,
-    });
-  }
-
-  // ── Servis çalışanı (PWA) ────────────────────────────────
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
-  }
-
-  // ── Başlangıç: son seçilen mahalleyi yükle ───────────────
-  const lastId = localStorage.getItem('lastNeighborhoodId');
-  if (lastId) loadNeighborhood(Number(lastId)).catch(() => {});
+document.addEventListener('DOMContentLoaded', init);
 })();

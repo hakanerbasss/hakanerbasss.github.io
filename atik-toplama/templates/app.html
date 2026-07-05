@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Saha Yönetim</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a7a3c">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Topbar -->
+  <div id="topbar">
+    <button class="iconbtn" id="menuBtn">☰</button>
+    <div style="flex:1;overflow:hidden">
+      <div class="name" id="nbTitle">Mahalle seçilmedi</div>
+      <div class="progress" id="progressLabel">—</div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+    <button class="iconbtn" id="voiceBtn" title="Sesli yönlendirme">🔊</button>
+  </div>
+
+  <!-- Harita -->
+  <div id="map"></div>
+
+  <!-- Harita üzeri butonlar -->
+  <div class="map-overlay" id="mapOverlay">
+    <button id="locateBtn" title="Konumuma git">📍</button>
+    <button id="nearestBtn" title="En yakın sokak">🧭</button>
+  </div>
+
+  <!-- Alt bar (süpürgeci modu) -->
+  <div id="bottombar" id="sweepBar">
+    <button id="addNotifBtn" class="primary">⚠️ Bildirim</button>
+    <button id="streetListBtn">🗺️ Sokaklar</button>
+    <button id="notifPoolBtn">📋 Havuz</button>
+  </div>
+
+</div>
+
+<!-- ── Menü modal ── -->
+<div class="modal-overlay hidden" id="menuModal">
+  <div class="modal">
+    <h2>🏙️ Menü</h2>
+    <label>Mahalle</label>
+    <select id="nbSelect"><option value="">— Mahalle seç —</option></select>
+    <div id="menuRoleSection"></div>
+    <div class="row">
+      <button id="menuCloseBtn">Kapat</button>
+      <button class="danger" id="logoutBtn">Çıkış ({{ '{{user}}' }})</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Sokak kapat modal (fotoğrafla) ── -->
+<div class="modal-overlay hidden" id="closeStreetModal">
+  <div class="modal">
+    <h2>🧹 Sokağı Kapat</h2>
+    <div id="csStreetName" style="font-weight:700;font-size:15px;margin-bottom:12px"></div>
+    <button class="photo-btn" id="photoPickBtn">📷 Fotoğraf Çek / Seç</button>
+    <img id="photoPreview" alt="önizleme">
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+    <label style="margin-top:10px">Not (opsiyonel)</label>
+    <textarea id="csNote" placeholder="örn. sokak başından sona süpürüldü"></textarea>
+    <div class="row">
+      <button id="csCancelBtn">Vazgeç</button>
+      <button class="primary" id="csSaveBtn" disabled>✅ Kapat & Gönder</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Bildirim ekle modal ── -->
+<div class="modal-overlay hidden" id="addNotifModal">
+  <div class="modal">
+    <h2>⚠️ Olumsuzluk Bildir</h2>
+    <label>Tür</label>
+    <select id="notifType">
+      {% for key, (icon, label, _) in notification_types.items() %}
+      <option value="{{ key }}">{{ icon }} {{ label }}</option>
+      {% endfor %}
+    </select>
+    <label>Not (opsiyonel, sesli not için aşağıdaki butonu kullan)</label>
+    <textarea id="notifNote" placeholder="Kısa açıklama…"></textarea>
+    <div style="color:var(--muted);font-size:12px;margin-top:6px" id="notifLocInfo">📍 Konum: GPS bekleniyor…</div>
+    <div class="row">
+      <button id="notifCancelBtn">Vazgeç</button>
+      <button class="primary" id="notifSaveBtn">Gönder</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Sağ panel: sokak listesi / bildirim havuzu ── -->
+<div id="sidePanel">
+  <div id="sidePanelHeader">
+    <h2 id="sidePanelTitle">Sokaklar</h2>
+    <button class="iconbtn" id="sidePanelCloseBtn">✕</button>
+  </div>
+  <div id="sidePanelBody"></div>
+</div>
+
+<!-- ── Çavuş: güzergah atama modal ── -->
+<div class="modal-overlay hidden" id="assignModal">
+  <div class="modal">
+    <h2>📋 Güzergah Ata</h2>
+    <div class="assign-form">
+      <label>Ekip Türü</label>
+      <select id="assignTeamType">
+        {% for key, label in roles.items() %}
+        {% if key not in ('santiye_amiri', 'cavus', 'onbasi') %}
+        <option value="{{ key }}">{{ label }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+      <label>Tarih</label>
+      <input type="date" id="assignDate" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:15px">
+      <label>Vardiya</label>
+      <select id="assignShift"><option value="">— Tüm gün —</option></select>
+      <label>Kişi (opsiyonel)</label>
+      <select id="assignUser"><option value="">— Tüm ekip —</option></select>
+    </div>
+    <div class="assign-info">
+      Haritaya dokun: sokakları seç/kaldır. <span id="assignStreetCount">0</span> sokak seçili.
+    </div>
+    <div class="assign-btns">
+      <button id="assignSelectAllBtn">Tümünü Seç</button>
+      <button id="assignClearBtn">Temizle</button>
+    </div>
+    <div class="row">
+      <button id="assignCancelBtn">Vazgeç</button>
+      <button class="primary" id="assignSaveBtn">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

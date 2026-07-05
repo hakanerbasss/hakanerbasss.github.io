@@ -1,9 +1,9 @@
 {
-  "name": "Kaba Atık Toplama Rota",
-  "short_name": "Atık Rota",
+  "name": "Saha Yönetim — Belediye",
+  "short_name": "Saha",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f1115",
+  "background_color": "#0d1117",
   "theme_color": "#1a7a3c",
   "orientation": "portrait-primary",
   "icons": [
