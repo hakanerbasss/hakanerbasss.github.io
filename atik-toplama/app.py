@@ -624,8 +624,10 @@ def list_notifications():
     status = request.args.get('status', 'open')
     conn = get_db()
     rows = conn.execute(
-        'SELECT n.*, u.display_name as creator_name FROM notifications n '
+        'SELECT n.*, u.display_name as creator_name, s.name as street_name '
+        'FROM notifications n '
         'JOIN users u ON u.id = n.created_by '
+        'LEFT JOIN streets s ON s.id = n.street_id '
         'WHERE n.neighborhood_id = ? AND n.status = ? ORDER BY n.created_at DESC',
         (nid, status)
     ).fetchall()
@@ -641,43 +643,69 @@ def create_notification():
     lat, lon = d.get('lat'), d.get('lon')
     ntype = d.get('type')
     note = (d.get('note') or '').strip()
+    street_id = d.get('street_id')
 
-    if not (nid and lat is not None and lon is not None and ntype in NOTIFICATION_TYPES):
+    if not (nid and ntype in NOTIFICATION_TYPES):
         return jsonify({'error': 'Eksik veya geçersiz alan'}), 400
 
-    _, _, target_team = NOTIFICATION_TYPES[ntype]
     conn = get_db()
+    street_name = None
 
-    # En yakın sokak adını bul (Euclidean yaklaşımı, küçük alanlar için yeterli)
-    nearest_street = None
-    try:
-        streets = conn.execute('SELECT name, geometry FROM streets WHERE neighborhood_id = ?', (nid,)).fetchall()
-        best = float('inf')
-        for s in streets:
-            geom = json.loads(s['geometry'])
-            for pt in geom:
-                d = (pt[0] - lat) ** 2 + (pt[1] - lon) ** 2
-                if d < best:
-                    best = d
-                    nearest_street = s['name']
-    except Exception:
-        pass
+    # Sokak ID verilmişse: koordinatı geometriden al, adı doğrudan biliyoruz
+    if street_id:
+        srow = conn.execute('SELECT name, geometry FROM streets WHERE id = ?', (street_id,)).fetchone()
+        if srow:
+            street_name = srow['name']
+            if lat is None or lon is None:
+                try:
+                    geom = json.loads(srow['geometry'])
+                    if geom:
+                        mid = geom[len(geom) // 2]
+                        lat, lon = mid[0], mid[1]
+                except Exception:
+                    pass
+
+    # Koordinat hâlâ yoksa: GPS zorunlu
+    if lat is None or lon is None:
+        conn.close()
+        return jsonify({'error': 'Konum koordinatı gerekli'}), 400
+
+    # Sokak ID yoksa en yakın sokağı bul (GPS bildirimleri için)
+    if not street_id:
+        try:
+            streets = conn.execute('SELECT id, name, geometry FROM streets WHERE neighborhood_id = ?', (nid,)).fetchall()
+            best = float('inf')
+            for s in streets:
+                geom = json.loads(s['geometry'])
+                for pt in geom:
+                    dist = (pt[0] - lat) ** 2 + (pt[1] - lon) ** 2
+                    if dist < best:
+                        best = dist
+                        street_name = s['name']
+                        street_id = s['id']
+        except Exception:
+            pass
+
+    _, _, target_team = NOTIFICATION_TYPES[ntype]
 
     cur = conn.execute(
-        'INSERT INTO notifications (neighborhood_id, lat, lon, type, note, created_by, created_at, target_team) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        (nid, lat, lon, ntype, note, session['user_id'], now(), target_team)
+        'INSERT INTO notifications (neighborhood_id, street_id, lat, lon, type, note, created_by, created_at, target_team) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        (nid, street_id, lat, lon, ntype, note, session['user_id'], now(), target_team)
     )
     notif_id = cur.lastrowid
     nb = conn.execute('SELECT name FROM neighborhoods WHERE id = ?', (nid,)).fetchone()
     conn.commit()
 
-    notif = conn.execute('SELECT * FROM notifications WHERE id = ?', (notif_id,)).fetchone()
+    notif = conn.execute(
+        'SELECT n.*, s.name as street_name FROM notifications n '
+        'LEFT JOIN streets s ON s.id = n.street_id WHERE n.id = ?', (notif_id,)
+    ).fetchone()
     conn.close()
 
     tg.notify_new_notification(dict(notif), session['display_name'],
                                nb['name'] if nb else '',
-                               street_name=nearest_street,
+                               street_name=street_name,
                                neighborhood_id=nid)
 
     return jsonify(dict(notif))
@@ -836,8 +864,8 @@ def street_details(sid):
     notifications = conn.execute(
         'SELECT n.type, n.note, n.created_at, u.display_name as creator_name '
         'FROM notifications n JOIN users u ON u.id = n.created_by '
-        'WHERE n.neighborhood_id = ? AND n.status = ? ORDER BY n.created_at DESC LIMIT 10',
-        (nb_id, 'open')
+        'WHERE n.street_id = ? AND n.status = ? ORDER BY n.created_at DESC LIMIT 10',
+        (sid, 'open')
     ).fetchall()
 
     supervisors = conn.execute(

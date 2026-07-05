@@ -140,6 +140,7 @@ CREATE INDEX IF NOT EXISTS idx_sc_date ON street_completions(work_date, neighbor
 CREATE TABLE IF NOT EXISTS notifications (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     neighborhood_id  INTEGER NOT NULL REFERENCES neighborhoods(id),
+    street_id        INTEGER REFERENCES streets(id),   -- NULL = GPS konumlu
     lat              REAL    NOT NULL,
     lon              REAL    NOT NULL,
     type             TEXT    NOT NULL,
@@ -177,6 +178,12 @@ def _migrate_db():
             conn.execute('ALTER TABLE users ADD COLUMN default_shift_id INTEGER REFERENCES shifts(id)')
         if 'is_active' not in existing:
             conn.execute('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
+        conn.commit()
+
+        # notifications tablosuna street_id kolonu ekle
+        notif_cols = {row[1] for row in conn.execute('PRAGMA table_info(notifications)').fetchall()}
+        if 'street_id' not in notif_cols:
+            conn.execute('ALTER TABLE notifications ADD COLUMN street_id INTEGER REFERENCES streets(id)')
         conn.commit()
 
         # route_assignments.work_date NOT NULL kısıtını kaldır (kalıcı atama için NULL gerekli)
