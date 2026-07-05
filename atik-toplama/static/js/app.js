@@ -1354,7 +1354,15 @@ function esc(s) {
 
 // ── Uygulama başlatma ──────────────────────────────────────────────────────────
 async function init() {
-  initMap();
+  try {
+    initMap();
+  } catch(e) {
+    // Leaflet henüz yüklenmediyse kısa bekleyip tekrar dene
+    await new Promise(r => setTimeout(r, 200));
+    try { initMap(); } catch(e2) { toast('Harita yüklenemedi. Sayfayı yenileyin.', 'error'); return; }
+  }
+  // Harita boyutunu zorla hesapla (mobilde flex layout gecikmesine karşı)
+  setTimeout(() => S.map && S.map.invalidateSize(), 300);
   try {
     const data = await api('/api/me');
     S.user = data.user;

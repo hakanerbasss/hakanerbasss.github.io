@@ -1,5 +1,5 @@
-const CACHE = 'atik-rota-v1';
-const SHELL = ['/', '/static/css/app.css', '/static/js/app.js', '/static/manifest.json'];
+const CACHE = 'atik-rota-v3';
+const SHELL = ['/static/css/app.css', '/static/js/app.js', '/static/manifest.json'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
@@ -13,10 +13,12 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
-// API ve harita karolarını asla önbellekten sunma; sadece uygulama kabuğu offline'da çalışsın
+// Yalnızca aynı kökenden gelen uygulama kabuğu isteklerini önbelleğe al
+// API, harita karoları ve dış CDN istekleri doğrudan ağa gitsin
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('tile.openstreetmap.org')) return;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
   e.respondWith(
     caches.match(e.request).then((cached) => cached || fetch(e.request).catch(() => cached))
   );
