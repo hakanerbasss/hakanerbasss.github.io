@@ -230,6 +230,25 @@ def _get_chatterbox():
         _chatterbox_model = ChatterboxTTS.from_pretrained(device="cpu")
     return _chatterbox_model
 
+async def _synth_audio(text: str, lang: str, voice: str, speed: float, out_path: Path) -> float:
+    """Ses sentezi: M4 için Chatterbox, diğerleri için supertonic."""
+    if voice == "M4":
+        if not CUSTOM_VOICE_REF.exists():
+            raise HTTPException(400, "M4 için referans ses yüklenmemiş.")
+        import torchaudio
+        model = await asyncio.to_thread(_get_chatterbox)
+        wav = await asyncio.to_thread(model.generate, _clean_tts_text(text, lang), audio_prompt_path=str(CUSTOM_VOICE_REF))
+        await asyncio.to_thread(torchaudio.save, str(out_path), wav, model.sr)
+        info = await asyncio.to_thread(torchaudio.info, str(out_path))
+        return info.num_frames / info.sample_rate
+    tts_obj = get_tts()
+    style = tts_obj.get_voice_style(voice_name=voice)
+    wav, dur = await asyncio.to_thread(tts_obj.synthesize,
+        _clean_tts_text(text, lang), lang=lang, voice_style=style, total_steps=8, speed=speed)
+    dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
+    tts_obj.save_audio(wav, str(out_path))
+    return dur_val
+
 
 def _parse_llm_json(text: str) -> dict:
     """DeepSeek/LLM yanıtından JSON objesini güvenilir şekilde çıkar."""
@@ -765,9 +784,6 @@ Rules:
     scene_dir = UPLOAD_DIR / uid
     scene_dir.mkdir()
 
-    tts = get_tts()
-    style = tts.get_voice_style(voice_name=voice)
-
     audio_files = []
     png_files = []
     durations = []
@@ -775,13 +791,8 @@ Rules:
     scene_raw_videos = []  # video modunda her sahne için ham video yolu (None = foto kullan)
 
     for i, scene in enumerate(scenes):
-        wav, dur = await asyncio.to_thread(tts.synthesize,
-            _clean_tts_text(scene["text"], lang), lang=lang,
-            voice_style=style, total_steps=8, speed=speed,
-        )
-        dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
         audio_path = scene_dir / f"audio_{i}.wav"
-        tts.save_audio(wav, str(audio_path))
+        dur_val = await _synth_audio(scene["text"], lang, voice, speed, audio_path)
         audio_files.append(audio_path)
         durations.append(dur_val)
 
