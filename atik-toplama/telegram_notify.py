@@ -139,7 +139,8 @@ def notify_new_notification(notif, user_display, neighborhood_name,
     return ok
 
 
-def notify_resolved(notif, user_display, neighborhood_name, photo_file=None, neighborhood_id=None):
+def notify_resolved(notif, user_display, neighborhood_name, photo_file=None,
+                    neighborhood_id=None, street_name=None, note=None):
     from db import NOTIFICATION_TYPES
     icon, label, _ = NOTIFICATION_TYPES.get(notif['type'], ('📝', notif['type'], None))
     import datetime
@@ -147,8 +148,12 @@ def notify_resolved(notif, user_display, neighborhood_name, photo_file=None, nei
     caption = (
         f"✅ <b>Giderildi: {label}</b>\n"
         f"🏘 {neighborhood_name}\n"
-        f"👤 {user_display}  |  🕐 {saat}"
     )
+    if street_name:
+        caption += f"🛣 {street_name}\n"
+    if note:
+        caption += f"💬 {note}\n"
+    caption += f"👤 {user_display}  |  🕐 {saat}"
     if photo_file:
         return send_photo(photo_file, caption=caption, neighborhood_id=neighborhood_id)
     return send_message(caption, neighborhood_id=neighborhood_id)

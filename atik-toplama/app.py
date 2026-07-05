@@ -728,21 +728,32 @@ def accept_notification(nid):
 @login_required
 def resolve_notification(nid):
     photo = request.files.get('photo')
+    note = request.form.get('note', '').strip()
     conn = get_db()
-    notif = conn.execute('SELECT n.*, nb.name as nb_name, nb.id as nb_id FROM notifications n '
-                         'JOIN neighborhoods nb ON nb.id = n.neighborhood_id WHERE n.id = ?', (nid,)).fetchone()
+    notif = conn.execute(
+        'SELECT n.*, nb.name as nb_name, nb.id as nb_id, s.name as street_name '
+        'FROM notifications n '
+        'JOIN neighborhoods nb ON nb.id = n.neighborhood_id '
+        'LEFT JOIN streets s ON s.id = n.street_id '
+        'WHERE n.id = ?', (nid,)
+    ).fetchone()
     if not notif:
         conn.close()
         return jsonify({'error': 'bulunamadı'}), 404
 
     photo_sent = False
+    notif_dict = dict(notif)
     if photo:
-        photo_sent = tg.notify_resolved(dict(notif), session['display_name'],
+        photo_sent = tg.notify_resolved(notif_dict, session['display_name'],
                                         notif['nb_name'], photo_file=photo.stream,
-                                        neighborhood_id=notif['nb_id'])
-    elif not photo:
-        tg.notify_resolved(dict(notif), session['display_name'], notif['nb_name'],
-                           neighborhood_id=notif['nb_id'])
+                                        neighborhood_id=notif['nb_id'],
+                                        street_name=notif['street_name'],
+                                        note=note)
+    else:
+        tg.notify_resolved(notif_dict, session['display_name'], notif['nb_name'],
+                           neighborhood_id=notif['nb_id'],
+                           street_name=notif['street_name'],
+                           note=note)
 
     conn.execute(
         'UPDATE notifications SET status = ?, resolved_by = ?, resolved_at = ?, photo_sent = ? WHERE id = ?',
@@ -751,6 +762,43 @@ def resolve_notification(nid):
     conn.commit()
     conn.close()
     return jsonify({'ok': True})
+
+
+@app.route('/api/notifications/<int:nid>/comments', methods=['GET'])
+@login_required
+def get_notification_comments(nid):
+    conn = get_db()
+    rows = conn.execute(
+        'SELECT nc.id, nc.text, nc.created_at, u.display_name as user_name '
+        'FROM notification_comments nc '
+        'JOIN users u ON u.id = nc.user_id '
+        'WHERE nc.notification_id = ? ORDER BY nc.created_at',
+        (nid,)
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/api/notifications/<int:nid>/comments', methods=['POST'])
+@login_required
+def add_notification_comment(nid):
+    d = request.get_json(force=True)
+    text = (d.get('text') or '').strip()
+    if not text:
+        return jsonify({'error': 'Yorum metni gerekli'}), 400
+    conn = get_db()
+    cur = conn.execute(
+        'INSERT INTO notification_comments (notification_id, user_id, text, created_at) VALUES (?, ?, ?, ?)',
+        (nid, session['user_id'], text, now())
+    )
+    cid = cur.lastrowid
+    row = conn.execute(
+        'SELECT nc.id, nc.text, nc.created_at, u.display_name as user_name '
+        'FROM notification_comments nc JOIN users u ON u.id = nc.user_id WHERE nc.id = ?', (cid,)
+    ).fetchone()
+    conn.commit()
+    conn.close()
+    return jsonify(dict(row))
 
 
 @app.route('/api/notifications/<int:nid>/cancel', methods=['POST'])

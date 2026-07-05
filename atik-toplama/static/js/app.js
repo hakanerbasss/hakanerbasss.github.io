@@ -32,7 +32,9 @@ const S = {
   mode: 'normal',       // 'normal' | 'assign'
   closingStreetId: null,
   photoFile: null,
-  _notifStreet: null,   // bildirim eklerken seçili sokak
+  _notifStreet: null,      // bildirim eklerken seçili sokak
+  _resolvingNotif: null,   // gider modalındaki bildirim
+  _resolvePhotoFile: null, // gider modalı fotoğrafı
 };
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
@@ -511,7 +513,20 @@ el('notifSaveBtn').addEventListener('click', async () => {
 
 // ── Sokak listesi paneli ───────────────────────────────────────────────────────
 el('streetListBtn').addEventListener('click', () => openSidePanel('Sokaklar', renderStreetList));
-el('notifPoolBtn').addEventListener('click', () => openSidePanel('Bildirim Havuzu', renderNotifPool));
+el('notifPoolBtn').addEventListener('click', async () => {
+  el('sidePanelTitle').textContent = 'Bildirim Havuzu';
+  el('sidePanelBody').innerHTML = '<p style="padding:12px;color:var(--muted)">Yükleniyor…</p>';
+  el('sidePanel').classList.add('open');
+  if (S.activeNb) {
+    try {
+      const fresh = await api(`/api/notifications?neighborhood_id=${S.activeNb.id}&status=open`);
+      const localNonOpen = S.notifications.filter(n => n.status !== 'open');
+      S.notifications = [...fresh, ...localNonOpen];
+      renderNotifMarkers(S.notifications.filter(n => n.status === 'open'));
+    } catch(e) {}
+  }
+  renderNotifPool();
+});
 
 function openSidePanel(title, renderFn) {
   el('sidePanelTitle').textContent = title;
@@ -551,50 +566,69 @@ function renderStreetList() {
   });
 }
 
-// ── Bildirim havuzu renderı ─────────────────────────────────────────────────────
-async function renderNotifPool() {
+// ── Bildirim havuzu renderı (S.notifications'dan senkron render) ────────────────
+function renderNotifPool() {
   const body = el('sidePanelBody');
   if (!S.activeNb) { body.innerHTML = '<p style="padding:12px;color:var(--muted)">Mahalle seçin</p>'; return; }
-  body.innerHTML = '<p style="padding:12px;color:var(--muted)">Yükleniyor…</p>';
-  try {
-    const items = await api(`/api/notifications?neighborhood_id=${S.activeNb.id}&status=open`);
-    S.notifications = items;
-    if (!items.length) { body.innerHTML = '<p style="padding:12px;color:var(--green)">Açık olumsuzluk yok 🎉</p>'; return; }
-    body.innerHTML = items.map(n => `
+  const items = S.notifications;
+  if (!items.length) { body.innerHTML = '<p style="padding:12px;color:var(--green)">Açık olumsuzluk yok 🎉</p>'; return; }
+
+  body.innerHTML = items.map(n => {
+    const isOpen = n.status === 'open';
+    const statusBadge = isOpen
+      ? `<span class="status-open" style="margin-left:auto;font-size:11px">Açık</span>`
+      : n.status === 'resolved'
+        ? `<span class="status-resolved" style="margin-left:auto;font-size:11px">Giderildi ✅</span>`
+        : `<span style="margin-left:auto;font-size:11px;color:var(--muted)">İptal</span>`;
+    const actionBtns = isOpen
+      ? `<button data-fly-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-street-id="${n.street_id||''}">📍 Git</button>
+         <button class="primary" data-resolve-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-street-id="${n.street_id||''}">✅ Çöz</button>
+         ${SUPERVISOR_ROLES.has(S.user.role) ? `<button data-cancel-notif="${n.id}" style="background:var(--red-light);border-color:var(--red);color:#fff">İptal</button>` : ''}
+         <button data-comment-toggle="${n.id}" style="flex:0;padding:7px 10px">💬</button>`
+      : `<button data-fly-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-street-id="${n.street_id||''}">📍 Git</button>
+         <button data-comment-toggle="${n.id}">💬 Yorumlar</button>`;
+    return `
       <div class="notif-card">
         <div class="ntop">
           <span>${NOTIF_ICONS[n.type]||'📝'}</span>
           <span class="nlabel">${NOTIF_LABELS[n.type]||n.type}</span>
-          <span class="status-open" style="margin-left:auto;font-size:11px">Açık</span>
+          ${statusBadge}
         </div>
         ${n.street_name ? `<div style="font-size:12px;color:var(--text);margin:2px 0">🛣 ${esc(n.street_name)}</div>` : ''}
         ${n.note ? `<div style="margin:2px 0 4px;font-size:12px">${esc(n.note)}</div>` : ''}
         <div class="ninfo">👤 ${esc(n.creator_name||'')} — ${timeAgo(n.created_at)}</div>
-        <div class="nbtn-row">
-          <button data-fly-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-street-id="${n.street_id||''}">📍 Git</button>
-          <button class="primary" data-resolve-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}" data-street-id="${n.street_id||''}">✅ Çöz</button>
-          ${SUPERVISOR_ROLES.has(S.user.role) ? `<button data-cancel-notif="${n.id}" style="background:var(--red-light);border-color:var(--red);color:#fff">İptal</button>` : ''}
-        </div>
-      </div>
-    `).join('');
+        <div class="nbtn-row">${actionBtns}</div>
+        <div class="comment-section" id="cs-${n.id}" style="display:none"></div>
+      </div>`;
+  }).join('');
 
-    body.querySelectorAll('[data-fly-notif]').forEach(btn => {
-      btn.onclick = () => flyToNotif(+btn.dataset.streetId || null, +btn.dataset.lat, +btn.dataset.lon);
-    });
-    body.querySelectorAll('[data-resolve-notif]').forEach(btn => {
-      btn.onclick = () => resolveNotif(+btn.dataset.resolveNotif, +btn.dataset.lat, +btn.dataset.lon, +btn.dataset.streetId || null);
-    });
-    body.querySelectorAll('[data-cancel-notif]').forEach(btn => {
-      btn.onclick = async () => {
-        if (!confirm('Bildirimi iptal et?')) return;
-        const nid = +btn.dataset.cancelNotif;
+  body.querySelectorAll('[data-fly-notif]').forEach(btn => {
+    btn.onclick = () => flyToNotif(+btn.dataset.streetId || null, +btn.dataset.lat, +btn.dataset.lon);
+  });
+  body.querySelectorAll('[data-resolve-notif]').forEach(btn => {
+    btn.onclick = () => {
+      const nid = +btn.dataset.resolveNotif;
+      flyToNotif(+btn.dataset.streetId || null, +btn.dataset.lat, +btn.dataset.lon);
+      const notif = S.notifications.find(n => n.id === nid);
+      if (notif) openResolveModal(notif);
+    };
+  });
+  body.querySelectorAll('[data-cancel-notif]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Bildirimi iptal et?')) return;
+      const nid = +btn.dataset.cancelNotif;
+      try {
         await api(`/api/notifications/${nid}/cancel`, {method:'POST'});
-        S.notifications = S.notifications.filter(n => n.id !== nid);
-        renderNotifMarkers(S.notifications);
+        const idx = S.notifications.findIndex(n => n.id === nid);
+        if (idx !== -1) S.notifications[idx] = {...S.notifications[idx], status: 'cancelled'};
+        renderNotifMarkers(S.notifications.filter(n => n.status === 'open'));
         renderNotifPool();
-      };
-    });
-  } catch(e) { body.innerHTML = `<p style="padding:12px;color:var(--red)">${e.message}</p>`; }
+      } catch(e) { toast(e.message, 'error'); }
+    };
+  });
+  body.querySelectorAll('[data-comment-toggle]').forEach(btn => {
+    btn.onclick = () => toggleComments(+btn.dataset.commentToggle);
+  });
 }
 
 function flyToNotif(streetId, lat, lon) {
@@ -617,22 +651,116 @@ function flyToNotif(streetId, lat, lon) {
 
 function resolveNotif(nid, lat, lon, streetId) {
   flyToNotif(streetId, lat, lon);
-  // Fotoğraflı kapama
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-  input.onchange = async () => {
-    const file = input.files[0]; if (!file) return;
-    const fd = new FormData(); fd.append('photo', file, 'photo.jpg');
-    try {
-      await fetch(`/api/notifications/${nid}/resolve`, {method:'POST', body:fd});
-      // Bildirimi listeden kaldır ve markerları güncelle
-      S.notifications = S.notifications.filter(n => n.id !== nid);
-      renderNotifMarkers(S.notifications);
-      toast('Bildirim kapatıldı ✅', 'success');
+  const notif = S.notifications.find(n => n.id === nid);
+  if (notif) openResolveModal(notif);
+}
+
+function openResolveModal(notif) {
+  S._resolvingNotif = notif;
+  S._resolvePhotoFile = null;
+  el('resolveNotifTitle').textContent = `✅ Gider: ${NOTIF_LABELS[notif.type]||notif.type}`;
+  const street = notif.street_name;
+  el('resolveNotifStreet').textContent = street ? `🛣 ${street}` : '';
+  el('resolveNotifNote').value = '';
+  el('resolvePhotoPreview').style.display = 'none';
+  el('resolvePhotoInput').value = '';
+  el('resolvePhotoBtn').className = 'photo-btn';
+  el('resolvePhotoBtn').textContent = '📷 Fotoğraf Çek / Seç (isteğe bağlı)';
+  openModal('resolveNotifModal');
+}
+
+el('resolvePhotoBtn').addEventListener('click', () => el('resolvePhotoInput').click());
+
+el('resolvePhotoInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  S._resolvePhotoFile = file;
+  el('resolvePhotoPreview').src = URL.createObjectURL(file);
+  el('resolvePhotoPreview').style.display = 'block';
+  el('resolvePhotoBtn').className = 'photo-btn has-photo';
+  el('resolvePhotoBtn').textContent = '✅ Fotoğraf seçildi — değiştirmek için dokun';
+});
+
+el('resolveNotifCancelBtn').addEventListener('click', () => {
+  S._resolvingNotif = null; S._resolvePhotoFile = null;
+  closeModal('resolveNotifModal');
+});
+
+el('resolveNotifSaveBtn').addEventListener('click', async () => {
+  const notif = S._resolvingNotif;
+  if (!notif) return;
+  el('resolveNotifSaveBtn').disabled = true;
+  el('resolveNotifSaveBtn').textContent = 'Kaydediliyor…';
+
+  const fd = new FormData();
+  const note = el('resolveNotifNote').value.trim();
+  if (note) fd.append('note', note);
+  if (S._resolvePhotoFile) fd.append('photo', S._resolvePhotoFile, 'photo.jpg');
+
+  try {
+    const res = await fetch(`/api/notifications/${notif.id}/resolve`, {method:'POST', body:fd});
+    if (res.status === 401) { location.href = '/login'; return; }
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw Error(d.error || 'Hata');
+
+    const idx = S.notifications.findIndex(n => n.id === notif.id);
+    if (idx !== -1) S.notifications[idx] = {...S.notifications[idx], status: 'resolved'};
+    renderNotifMarkers(S.notifications.filter(n => n.status === 'open'));
+
+    S._resolvingNotif = null; S._resolvePhotoFile = null;
+    closeModal('resolveNotifModal');
+    toast('Bildirim giderildi ✅', 'success');
+
+    if (el('sidePanel').classList.contains('open') && el('sidePanelTitle').textContent === 'Bildirim Havuzu') {
       renderNotifPool();
-    } catch(e) { toast(e.message, 'error'); }
-  };
-  input.click();
+    }
+  } catch(e) { toast(e.message, 'error'); }
+
+  el('resolveNotifSaveBtn').disabled = false;
+  el('resolveNotifSaveBtn').textContent = '✅ Giderildi Kaydet';
+});
+
+// ── Bildirim yorumları ────────────────────────────────────────────────────────
+async function toggleComments(nid) {
+  const section = el(`cs-${nid}`);
+  if (!section) return;
+  if (section.style.display !== 'none') { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  section.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0">Yükleniyor…</div>';
+  try {
+    const comments = await api(`/api/notifications/${nid}/comments`);
+    let html = comments.length
+      ? comments.map(c => `
+          <div class="comment-row">
+            <span class="cuser">${esc(c.user_name)}</span>
+            <span style="flex:1">${esc(c.text)}</span>
+            <span class="ctime">${timeAgo(c.created_at)}</span>
+          </div>`).join('')
+      : '<div style="color:var(--muted);font-size:12px;padding:4px 0">Henüz yorum yok</div>';
+    html += `<div class="comment-add">
+      <input type="text" class="cmt-input" placeholder="Yorum ekle…" maxlength="300">
+      <button class="cmt-send">Gönder</button>
+    </div>`;
+    section.innerHTML = html;
+
+    const input = section.querySelector('.cmt-input');
+    const send = section.querySelector('.cmt-send');
+    const doSend = async () => {
+      const text = input.value.trim(); if (!text) return;
+      send.disabled = true;
+      try {
+        await api(`/api/notifications/${nid}/comments`, {method:'POST', body:JSON.stringify({text})});
+        input.value = '';
+        section.style.display = 'none';
+        toggleComments(nid);
+      } catch(e) { toast(e.message, 'error'); }
+      send.disabled = false;
+    };
+    send.onclick = doSend;
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
+  } catch(e) {
+    section.innerHTML = `<div style="color:var(--red);font-size:12px">${e.message}</div>`;
+  }
 }
 
 // ── Bildirim markerları ────────────────────────────────────────────────────────

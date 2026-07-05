@@ -136,6 +136,16 @@ CREATE TABLE IF NOT EXISTS street_completions (
 );
 CREATE INDEX IF NOT EXISTS idx_sc_date ON street_completions(work_date, neighborhood_id);
 
+-- Bildirim yorumları
+CREATE TABLE IF NOT EXISTS notification_comments (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    notification_id  INTEGER NOT NULL REFERENCES notifications(id),
+    user_id          INTEGER NOT NULL REFERENCES users(id),
+    text             TEXT    NOT NULL,
+    created_at       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nc_notif ON notification_comments(notification_id);
+
 -- Ortak bildirim havuzu
 CREATE TABLE IF NOT EXISTS notifications (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,6 +188,17 @@ def _migrate_db():
             conn.execute('ALTER TABLE users ADD COLUMN default_shift_id INTEGER REFERENCES shifts(id)')
         if 'is_active' not in existing:
             conn.execute('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
+        conn.commit()
+
+        # notification_comments tablosu
+        conn.execute("""CREATE TABLE IF NOT EXISTS notification_comments (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            notification_id  INTEGER NOT NULL REFERENCES notifications(id),
+            user_id          INTEGER NOT NULL REFERENCES users(id),
+            text             TEXT    NOT NULL,
+            created_at       INTEGER NOT NULL
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nc_notif ON notification_comments(notification_id)")
         conn.commit()
 
         # notifications tablosuna street_id kolonu ekle

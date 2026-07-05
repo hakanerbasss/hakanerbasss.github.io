@@ -74,6 +74,24 @@
   </div>
 </div>
 
+<!-- ── Bildirim gider modal ── -->
+<div class="modal-overlay hidden" id="resolveNotifModal">
+  <div class="modal">
+    <h2 id="resolveNotifTitle">✅ Bildirimi Gider</h2>
+    <input type="hidden" id="resolveNotifId">
+    <div id="resolveNotifStreet" style="font-size:13px;font-weight:600;margin-bottom:10px"></div>
+    <label>Not (isteğe bağlı)</label>
+    <textarea id="resolveNotifNote" placeholder="Ne yapıldı? Nasıl giderildi?"></textarea>
+    <button class="photo-btn" id="resolvePhotoBtn">📷 Fotoğraf Çek / Seç (isteğe bağlı)</button>
+    <img id="resolvePhotoPreview" alt="önizleme" style="width:100%;border-radius:8px;margin-top:8px;display:none">
+    <input type="file" id="resolvePhotoInput" accept="image/*" capture="environment" style="display:none">
+    <div class="row">
+      <button id="resolveNotifCancelBtn">Vazgeç</button>
+      <button class="primary" id="resolveNotifSaveBtn">✅ Giderildi Kaydet</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Bildirim ekle modal ── -->
 <div class="modal-overlay hidden" id="addNotifModal">
   <div class="modal">
