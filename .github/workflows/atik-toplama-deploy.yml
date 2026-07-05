@@ -1,0 +1,37 @@
+name: Atik Toplama Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'atik-toplama/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sunucuya deploy et
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/hakanerbasss.github.io
+            git fetch origin main
+            git reset --hard origin/main
+            DEST=~/atik-toplama/atik-toplama
+            mkdir -p $DEST
+            cp atik-toplama/app.py $DEST/
+            cp atik-toplama/db.py $DEST/
+            cp atik-toplama/overpass.py $DEST/
+            cp atik-toplama/telegram_notify.py $DEST/
+            cp atik-toplama/manage.py $DEST/
+            cp atik-toplama/requirements.txt $DEST/
+            cp -r atik-toplama/templates $DEST/
+            cp -r atik-toplama/static $DEST/
+            find $DEST -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+            ~/atik-toplama/venv/bin/pip install -q -r $DEST/requirements.txt
+            systemctl restart atik-toplama
+            systemctl status atik-toplama --no-pager

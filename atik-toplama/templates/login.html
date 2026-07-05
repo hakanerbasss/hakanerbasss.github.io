@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kaba Atık Rota</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <h1>🚛 Kaba Atık Rota</h1>
+    <p class="subtitle">Belediye saha ekibi girişi</p>
+    <form id="loginForm">
+      <input type="text" id="username" placeholder="Kullanıcı adı" autocomplete="username" required>
+      <input type="password" id="password" placeholder="Şifre" autocomplete="current-password" required>
+      <button type="submit">Giriş Yap</button>
+      <div id="loginError" class="error"></div>
+    </form>
+  </div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Giriş başarısız'; return; }
+    window.location.href = '/';
+  } catch (err) {
+    errEl.textContent = 'Bağlantı hatası';
+  }
+});
+</script>
+</body>
+</html>

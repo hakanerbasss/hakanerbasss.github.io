@@ -1,0 +1,23 @@
+const CACHE = 'atik-rota-v1';
+const SHELL = ['/', '/static/css/app.css', '/static/js/app.js', '/static/manifest.json'];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+  );
+  self.clients.claim();
+});
+
+// API ve harita karolarını asla önbellekten sunma; sadece uygulama kabuğu offline'da çalışsın
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url);
+  if (url.pathname.startsWith('/api/') || url.hostname.includes('tile.openstreetmap.org')) return;
+  e.respondWith(
+    caches.match(e.request).then((cached) => cached || fetch(e.request).catch(() => cached))
+  );
+});

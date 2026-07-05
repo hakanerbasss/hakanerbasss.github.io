@@ -1,0 +1,12 @@
+{
+  "name": "Kaba Atık Toplama Rota",
+  "short_name": "Atık Rota",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#1a7a3c",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
