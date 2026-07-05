@@ -56,14 +56,24 @@ def _me():
     }
 
 
-def _user_neighborhoods(user_id):
+def _user_neighborhoods(user_id, role=None):
     conn = get_db()
-    rows = conn.execute(
-        'SELECT n.* FROM neighborhoods n '
-        'JOIN user_neighborhoods un ON un.neighborhood_id = n.id '
-        'WHERE un.user_id = ? ORDER BY un.is_primary DESC, n.name',
-        (user_id,)
-    ).fetchall()
+    if role and role not in SUPERVISOR_ROLES:
+        # Saha personeli: bugün veya kalıcı atama olan mahalleleri döner
+        rows = conn.execute(
+            'SELECT DISTINCT n.* FROM neighborhoods n '
+            'JOIN route_assignments a ON a.neighborhood_id = n.id '
+            'WHERE a.assigned_user_id = ? AND (a.work_date IS NULL OR a.work_date = ?) '
+            'ORDER BY n.name',
+            (user_id, today())
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            'SELECT n.* FROM neighborhoods n '
+            'JOIN user_neighborhoods un ON un.neighborhood_id = n.id '
+            'WHERE un.user_id = ? ORDER BY un.is_primary DESC, n.name',
+            (user_id,)
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -111,7 +121,7 @@ def api_logout():
 @app.route('/api/me')
 @login_required
 def api_me():
-    nbs = _user_neighborhoods(session['user_id'])
+    nbs = _user_neighborhoods(session['user_id'], role=session.get('role'))
     return jsonify({'user': _me(), 'neighborhoods': nbs})
 
 
