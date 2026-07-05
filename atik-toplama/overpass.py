@@ -62,6 +62,98 @@ def resolve_neighborhood(query):
     raise NeighborhoodNotFound(f"'{query}' için mahalle sınırı bulunamadı")
 
 
+def search_districts(province_name):
+    """İl adından ilçe listesini Overpass ile döner."""
+    resp = requests.get(
+        NOMINATIM_URL,
+        params={'q': f'{province_name}, Türkiye', 'format': 'json', 'limit': 5,
+                'countrycodes': 'tr', 'featuretype': 'state'},
+        headers={'User-Agent': USER_AGENT},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    results = resp.json()
+    osm_id = None
+    for r in results:
+        if r.get('osm_type') == 'relation':
+            osm_id = int(r['osm_id'])
+            break
+    if not osm_id:
+        # featuretype=state bazen çalışmaz; tekrar dene
+        resp2 = requests.get(
+            NOMINATIM_URL,
+            params={'q': f'{province_name}, Türkiye', 'format': 'json', 'limit': 10,
+                    'countrycodes': 'tr'},
+            headers={'User-Agent': USER_AGENT},
+            timeout=20,
+        )
+        resp2.raise_for_status()
+        for r in resp2.json():
+            if r.get('osm_type') == 'relation':
+                osm_id = int(r['osm_id'])
+                break
+    if not osm_id:
+        raise NeighborhoodNotFound(f"'{province_name}' ili OSM'de bulunamadı")
+
+    area_id = 3600000000 + osm_id
+    query = f"""
+    [out:json][timeout:30];
+    area({area_id})->.p;
+    relation(area.p)["admin_level"="6"]["name"]["boundary"="administrative"];
+    out tags;
+    """
+    resp = requests.post(OVERPASS_URL, data={'data': query},
+                         headers={'User-Agent': USER_AGENT}, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+    districts = []
+    for el in data.get('elements', []):
+        name = el.get('tags', {}).get('name')
+        if name:
+            districts.append({'name': name, 'osm_id': el.get('id')})
+    districts.sort(key=lambda x: x['name'])
+    return districts
+
+
+def search_neighborhoods(district_name, province_name):
+    """İlçe adından mahalle listesini Overpass ile döner."""
+    resp = requests.get(
+        NOMINATIM_URL,
+        params={'q': f'{district_name}, {province_name}, Türkiye',
+                'format': 'json', 'limit': 5, 'countrycodes': 'tr'},
+        headers={'User-Agent': USER_AGENT},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    results = resp.json()
+    osm_id = None
+    for r in results:
+        if r.get('osm_type') == 'relation':
+            osm_id = int(r['osm_id'])
+            break
+    if not osm_id:
+        raise NeighborhoodNotFound(f"'{district_name}' ilçesi OSM'de bulunamadı")
+
+    area_id = 3600000000 + osm_id
+    query = f"""
+    [out:json][timeout:30];
+    area({area_id})->.d;
+    relation(area.d)["admin_level"~"^(9|10)$"]["name"]["boundary"="administrative"];
+    out tags;
+    """
+    resp = requests.post(OVERPASS_URL, data={'data': query},
+                         headers={'User-Agent': USER_AGENT}, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+    neighborhoods = []
+    for el in data.get('elements', []):
+        name = el.get('tags', {}).get('name')
+        if name:
+            neighborhoods.append({'name': name, 'osm_id': el.get('id')})
+    neighborhoods.sort(key=lambda x: x['name'])
+    return neighborhoods
+
+
 def fetch_streets(osm_relation_id):
     """Verilen relation id sınırı içindeki isimli yolları geometrileriyle döner.
 

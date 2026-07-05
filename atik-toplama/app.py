@@ -7,7 +7,8 @@ from flask import Flask, render_template, request, session, jsonify, redirect, u
 from werkzeug.security import check_password_hash
 
 from db import get_db, init_db, now, today, ROLES, SUPERVISOR_ROLES, NOTIFICATION_TYPES
-from overpass import resolve_neighborhood, fetch_streets, NeighborhoodNotFound
+from overpass import (resolve_neighborhood, fetch_streets, NeighborhoodNotFound,
+                      search_districts, search_neighborhoods)
 import telegram_notify as tg
 
 # ── App kurulum ─────────────────────────────────────────────────────────────
@@ -194,6 +195,12 @@ def create_neighborhood():
         (district_id, query, info.get('osm_id'), info['lat'], info['lon'], now())
     )
     nb_id = cur.lastrowid
+
+    # Oluşturan kullanıcıyı otomatik olarak bu mahalleye ata
+    conn.execute(
+        'INSERT OR IGNORE INTO user_neighborhoods (user_id, neighborhood_id, is_primary) VALUES (?, ?, ?)',
+        (session['user_id'], nb_id, 1)
+    )
 
     streets = []
     if info.get('osm_id'):
@@ -616,6 +623,62 @@ def cancel_notification(nid):
     conn.commit()
     conn.close()
     return jsonify({'ok': True})
+
+
+# ── OSM İl/İlçe/Mahalle arama ───────────────────────────────────────────────
+
+_TR_PROVINCES = [
+    'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Aksaray', 'Amasya',
+    'Ankara', 'Antalya', 'Ardahan', 'Artvin', 'Aydın', 'Balıkesir',
+    'Bartın', 'Batman', 'Bayburt', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu',
+    'Burdur', 'Bursa', 'Çanakkale', 'Çankırı', 'Çorum', 'Denizli',
+    'Diyarbakır', 'Düzce', 'Edirne', 'Elazığ', 'Erzincan', 'Erzurum',
+    'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari', 'Hatay',
+    'Iğdır', 'Isparta', 'İstanbul', 'İzmir', 'Kahramanmaraş', 'Karabük',
+    'Karaman', 'Kars', 'Kastamonu', 'Kayseri', 'Kilis', 'Kırıkkale',
+    'Kırklareli', 'Kırşehir', 'Kocaeli', 'Konya', 'Kütahya', 'Malatya',
+    'Manisa', 'Mardin', 'Mersin', 'Muğla', 'Muş', 'Nevşehir', 'Niğde',
+    'Ordu', 'Osmaniye', 'Rize', 'Sakarya', 'Samsun', 'Siirt', 'Sinop',
+    'Sivas', 'Şanlıurfa', 'Şırnak', 'Tekirdağ', 'Tokat', 'Trabzon',
+    'Tunceli', 'Uşak', 'Van', 'Yalova', 'Yozgat', 'Zonguldak',
+]
+
+
+@app.route('/api/osm/provinces')
+@login_required
+def osm_provinces():
+    return jsonify(_TR_PROVINCES)
+
+
+@app.route('/api/osm/districts')
+@login_required
+def osm_districts():
+    province = request.args.get('province', '').strip()
+    if not province:
+        return jsonify({'error': 'İl adı gerekli'}), 400
+    try:
+        districts = search_districts(province)
+        return jsonify(districts)
+    except NeighborhoodNotFound as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'error': f'OSM hatası: {e}'}), 502
+
+
+@app.route('/api/osm/neighborhoods')
+@login_required
+def osm_neighborhoods_list():
+    province = request.args.get('province', '').strip()
+    district = request.args.get('district', '').strip()
+    if not province or not district:
+        return jsonify({'error': 'İl ve ilçe adı gerekli'}), 400
+    try:
+        nbs = search_neighborhoods(district, province)
+        return jsonify(nbs)
+    except NeighborhoodNotFound as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'error': f'OSM hatası: {e}'}), 502
 
 
 if __name__ == '__main__':

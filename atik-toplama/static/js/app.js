@@ -495,9 +495,127 @@ el('menuBtn').addEventListener('click', async () => {
   const section = el('menuRoleSection');
   if (SUPERVISOR_ROLES.has(S.user.role)) {
     section.innerHTML = `
-      <div class="row" style="margin-top:14px">
-        <button id="openAssignBtn" class="primary">📋 Güzergah Ata</button>
-      </div>`;
+      <hr style="border-color:var(--border);margin:14px 0 10px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Mahalle Ekle (OSM'den)</div>
+      <select id="addNbIl" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:6px">
+        <option value="">— İl seç —</option>
+      </select>
+      <select id="addNbIlce" disabled style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:6px">
+        <option value="">— Önce il seçin —</option>
+      </select>
+      <select id="addNbMahalle" disabled style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:6px">
+        <option value="">— Önce ilçe seçin —</option>
+      </select>
+      <button id="addNbBtn" disabled style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--green);background:var(--green);color:#fff;font-size:13px;font-weight:600">+ Mahalle Ekle</button>
+      <hr style="border-color:var(--border);margin:12px 0">
+      <button id="openAssignBtn" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600">📋 Güzergah Ata</button>`;
+
+    // İl listesini yükle
+    try {
+      const provinces = await api('/api/osm/provinces');
+      const ilSel = el('addNbIl');
+      provinces.forEach(p => {
+        const o = document.createElement('option');
+        o.value = p; o.textContent = p;
+        ilSel.appendChild(o);
+      });
+    } catch(e) {}
+
+    el('addNbIl').onchange = async () => {
+      const prov = el('addNbIl').value;
+      const ilceSel = el('addNbIlce');
+      const mahSel = el('addNbMahalle');
+      mahSel.innerHTML = '<option value="">— Önce ilçe seçin —</option>';
+      mahSel.disabled = true;
+      el('addNbBtn').disabled = true;
+      if (!prov) {
+        ilceSel.innerHTML = '<option value="">— Önce il seçin —</option>';
+        ilceSel.disabled = true;
+        return;
+      }
+      ilceSel.innerHTML = '<option value="">Yükleniyor…</option>';
+      ilceSel.disabled = true;
+      try {
+        const districts = await api(`/api/osm/districts?province=${encodeURIComponent(prov)}`);
+        ilceSel.innerHTML = '<option value="">— İlçe seç —</option>';
+        districts.forEach(d => {
+          const o = document.createElement('option');
+          o.value = d.name; o.textContent = d.name;
+          ilceSel.appendChild(o);
+        });
+        ilceSel.disabled = false;
+      } catch(e) {
+        ilceSel.innerHTML = `<option value="">Hata: ${e.message}</option>`;
+      }
+    };
+
+    el('addNbIlce').onchange = async () => {
+      const prov = el('addNbIl').value;
+      const dist = el('addNbIlce').value;
+      const mahSel = el('addNbMahalle');
+      el('addNbBtn').disabled = true;
+      if (!dist) {
+        mahSel.innerHTML = '<option value="">— Önce ilçe seçin —</option>';
+        mahSel.disabled = true;
+        return;
+      }
+      mahSel.innerHTML = '<option value="">Yükleniyor…</option>';
+      mahSel.disabled = true;
+      try {
+        const nbs = await api(`/api/osm/neighborhoods?province=${encodeURIComponent(prov)}&district=${encodeURIComponent(dist)}`);
+        mahSel.innerHTML = '<option value="">— Mahalle seç —</option>';
+        nbs.forEach(n => {
+          const o = document.createElement('option');
+          o.value = n.name; o.textContent = n.name;
+          mahSel.appendChild(o);
+        });
+        mahSel.disabled = false;
+      } catch(e) {
+        mahSel.innerHTML = `<option value="">Hata: ${e.message}</option>`;
+      }
+    };
+
+    el('addNbMahalle').onchange = () => {
+      el('addNbBtn').disabled = !el('addNbMahalle').value;
+    };
+
+    el('addNbBtn').onclick = async () => {
+      const mahalle = el('addNbMahalle').value;
+      const ilce = el('addNbIlce').value;
+      const il = el('addNbIl').value;
+      if (!mahalle || !S.user.district_id) return;
+      el('addNbBtn').disabled = true;
+      el('addNbBtn').textContent = 'Ekleniyor… (sokaklar çekiliyor)';
+      try {
+        const res = await api('/api/neighborhoods', {
+          method: 'POST',
+          body: JSON.stringify({
+            query: `${mahalle}, ${ilce}, ${il}`,
+            district_id: S.user.district_id,
+          }),
+        });
+        toast(`${mahalle} eklendi — ${res.street_count || 0} sokak ✅`, 'success', 5000);
+        // Mahalleleri yenile
+        const me = await api('/api/me');
+        S.neighborhoods = me.neighborhoods;
+        const nbSel = el('nbSelect');
+        nbSel.innerHTML = '<option value="">— Mahalle seç —</option>';
+        S.neighborhoods.forEach(nb => {
+          const o = document.createElement('option');
+          o.value = nb.id; o.textContent = nb.name;
+          if (S.activeNb && nb.id === S.activeNb.id) o.selected = true;
+          nbSel.appendChild(o);
+        });
+        // Seçili mahalleye geç
+        if (!S.activeNb) {
+          const newNb = S.neighborhoods.find(n => n.name === res.name || n.id === res.id);
+          if (newNb) { closeModal('menuModal'); loadNeighborhood(newNb); return; }
+        }
+      } catch(e) { toast(e.message, 'error'); }
+      el('addNbBtn').disabled = false;
+      el('addNbBtn').textContent = '+ Mahalle Ekle';
+    };
+
     el('openAssignBtn').onclick = () => { closeModal('menuModal'); openAssignPanel(); };
   } else {
     section.innerHTML = '';
