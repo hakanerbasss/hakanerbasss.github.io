@@ -188,6 +188,8 @@ def _migrate_db():
             conn.execute('ALTER TABLE users ADD COLUMN default_shift_id INTEGER REFERENCES shifts(id)')
         if 'is_active' not in existing:
             conn.execute('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
+        if 'notify_sweep' not in existing:
+            conn.execute('ALTER TABLE users ADD COLUMN notify_sweep INTEGER NOT NULL DEFAULT 1')
         conn.commit()
 
         # notification_comments tablosu

@@ -126,7 +126,8 @@ function renderStreets(streets) {
 }
 
 function refreshStreetColor(streetId) {
-  const street = S.streets.find(s => s.id === streetId) || S.myStreets.find(s => s.id === streetId);
+  // myStreets önce — tamamlama durumu orada güncelleniyor
+  const street = S.myStreets.find(s => s.id === streetId) || S.streets.find(s => s.id === streetId);
   const lr = S.streetLayers[streetId];
   if (!street || !lr) return;
   lr.vis.setStyle(streetColor(street));
@@ -1226,6 +1227,23 @@ el('assignBarSaveBtn').addEventListener('click', async () => {
 });
 
 // ── Personel yönetimi ─────────────────────────────────────────────────────────
+async function viewWorkerStreets(uid, name) {
+  if (!S.activeNb) { toast('Önce mahalle seçin', 'error'); return; }
+  toast(`${name} sokakları yükleniyor…`);
+  try {
+    const data = await api(`/api/workers/${uid}/streets?neighborhood_id=${S.activeNb.id}&date=${todayStr()}`);
+    if (!data.streets.length) { toast(`${name} için bugün atanmış sokak yok`, '', 4000); return; }
+    // Mevcut sokakları haritadan kaldır, personelin sokaklarını göster
+    renderStreets(data.streets);
+    fitMapToStreets(data.streets);
+    // Üst bara kimin sokakları gösterildiğini yaz
+    el('nbTitle').textContent = `👁 ${name}`;
+    el('progressLabel').textContent =
+      `${data.streets.filter(s=>s.completed).length} / ${data.streets.length} tamamlandı`;
+    toast(`${name} — ${data.streets.length} sokak gösteriliyor`, 'success', 3000);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 async function openPersonnelPanel() {
   openModal('personnelModal');
   await refreshPersonnelList();
@@ -1247,6 +1265,7 @@ async function refreshPersonnelList() {
           <div class="prole">${ROLE_NAMES[u.role]||u.role} — @${esc(u.username)}</div>
         </div>
         <span class="pbadge ${u.is_active===0||u.is_active==='0' ? 'inactive' : ''}">${u.is_active===0||u.is_active==='0' ? 'Pasif' : 'Aktif'}</span>
+        ${!SUPERVISOR_ROLES.has(u.role) ? `<button data-track-uid="${u.id}" data-track-name="${esc(u.display_name)}" style="background:var(--blue);border-color:var(--blue);color:#fff">📍</button>` : ''}
         <button data-edit-uid="${u.id}">Düzenle</button>
       </div>
     `).join('');
@@ -1254,6 +1273,12 @@ async function refreshPersonnelList() {
       const uid = Number(btn.dataset.editUid);
       const u = users.find(x => x.id === uid);
       btn.onclick = () => openEditPersonnel(u);
+    });
+    list.querySelectorAll('[data-track-uid]').forEach(btn => {
+      btn.onclick = () => {
+        closeModal('personnelModal');
+        viewWorkerStreets(Number(btn.dataset.trackUid), btn.dataset.trackName);
+      };
     });
   } catch(e) {
     list.innerHTML = `<p style="color:var(--red);font-size:13px">${e.message}</p>`;
@@ -1274,6 +1299,12 @@ async function openEditPersonnel(user) {
   el('epPasswordHint').textContent = isNew ? '(zorunlu)' : '(değiştirmek için girin)';
   el('epRole').value = user ? user.role : 'supurgeci';
   el('epIsActive').checked = user ? (user.is_active !== 0 && user.is_active !== '0') : true;
+  const isSup = user ? SUPERVISOR_ROLES.has(user.role) : false;
+  el('epNotifSweepRow').style.display = isSup ? '' : 'none';
+  el('epNotifSweep').checked = user ? (user.notify_sweep !== 0 && user.notify_sweep !== '0') : true;
+  el('epRole').onchange = () => {
+    el('epNotifSweepRow').style.display = SUPERVISOR_ROLES.has(el('epRole').value) ? '' : 'none';
+  };
 
   // Vardiyaları yükle
   const shiftSel = el('epShift');
@@ -1305,6 +1336,7 @@ el('epSaveBtn').addEventListener('click', async () => {
     role: el('epRole').value,
     default_shift_id: el('epShift').value || null,
     is_active: el('epIsActive').checked ? 1 : 0,
+    notify_sweep: SUPERVISOR_ROLES.has(el('epRole').value) ? (el('epNotifSweep').checked ? 1 : 0) : 1,
   };
 
   if (!payload.display_name || !payload.role) { toast('Ad ve rol zorunludur', 'error'); return; }
