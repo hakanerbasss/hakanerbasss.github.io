@@ -228,17 +228,18 @@ function renderStreetDetail(d, street) {
     html += `</div>`;
   }
 
-  html += `<div class="sd-section"><div class="sd-label">📋 Bugünkü Atamalar</div>`;
+  html += `<div class="sd-section"><div class="sd-label">📋 Atamalar</div>`;
   if (d.assignments && d.assignments.length) {
     d.assignments.forEach(a => {
       html += `<div class="sd-row">
         <span>${ROLE_NAMES[a.team_type]||a.team_type}</span>
         <b>${esc(a.user_name || '— Tüm ekip —')}</b>
         ${a.shift_name ? `<span class="sd-muted">${esc(a.shift_name)}</span>` : ''}
+        ${!a.work_date ? `<span style="font-size:10px;color:var(--green);background:rgba(26,122,60,.15);padding:2px 6px;border-radius:10px">Kalıcı</span>` : ''}
       </div>`;
     });
   } else {
-    html += `<div class="sd-row sd-pending">Bu sokağa bugün atama yok</div>`;
+    html += `<div class="sd-row sd-pending">Bu sokağa atama yok</div>`;
   }
   html += `</div>`;
 
@@ -726,6 +727,11 @@ el('menuBtn').addEventListener('click', async () => {
     };
 
     el('openAssignBtn').onclick = () => { closeModal('menuModal'); openAssignPanel(); };
+
+    // Personel yönetimi butonu
+    const personnelBtnHtml = `<button id="openPersonnelBtn" style="width:100%;padding:10px;margin-top:6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600">👥 Personel Yönetimi</button>`;
+    el('menuRoleSection').insertAdjacentHTML('beforeend', personnelBtnHtml);
+    el('openPersonnelBtn').onclick = () => { closeModal('menuModal'); openPersonnelPanel(); };
   } else {
     section.innerHTML = '';
   }
@@ -756,6 +762,14 @@ async function openAssignPanel() {
   S.mode = 'assign';
   S.assignSelected.clear();
   el('assignStreetCount').textContent = '0';
+
+  // Kalıcı toggle sıfırla
+  el('assignPermanent').checked = false;
+  el('assignDateSection').style.display = '';
+
+  el('assignPermanent').onchange = () => {
+    el('assignDateSection').style.display = el('assignPermanent').checked ? 'none' : '';
+  };
 
   // Tarih varsayılanı: bugün
   el('assignDate').value = todayStr();
@@ -816,11 +830,13 @@ el('assignCancelBtn').addEventListener('click', () => {
 
 el('assignSaveBtn').addEventListener('click', async () => {
   if (!S.assignSelected.size) { toast('Hiç sokak seçilmedi', 'error'); return; }
+  const permanent = el('assignPermanent').checked;
   const payload = {
     neighborhood_id: S.activeNb.id,
     team_type: el('assignTeamType').value,
     shift_id: el('assignShift').value || null,
-    work_date: el('assignDate').value || todayStr(),
+    permanent,
+    work_date: permanent ? null : (el('assignDate').value || todayStr()),
     street_ids: [...S.assignSelected],
     assigned_user_id: el('assignUser').value || null,
   };
@@ -831,6 +847,109 @@ el('assignSaveBtn').addEventListener('click', async () => {
     toast(`${res.street_count} sokak atandı ✅`, 'success');
     loadNeighborhood(S.activeNb);
   } catch(e) { toast(e.message, 'error'); }
+});
+
+// ── Personel yönetimi ─────────────────────────────────────────────────────────
+async function openPersonnelPanel() {
+  openModal('personnelModal');
+  await refreshPersonnelList();
+}
+
+async function refreshPersonnelList() {
+  const list = el('personnelList');
+  list.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:4px 0">Yükleniyor…</p>';
+  try {
+    const users = await api('/api/users');
+    if (!users.length) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:13px">Henüz personel yok</p>';
+      return;
+    }
+    list.innerHTML = users.map(u => `
+      <div class="personnel-row">
+        <div style="flex:1;min-width:0">
+          <div class="pname">${esc(u.display_name)}</div>
+          <div class="prole">${ROLE_NAMES[u.role]||u.role} — @${esc(u.username)}</div>
+        </div>
+        <span class="pbadge ${u.is_active===0||u.is_active==='0' ? 'inactive' : ''}">${u.is_active===0||u.is_active==='0' ? 'Pasif' : 'Aktif'}</span>
+        <button data-edit-uid="${u.id}">Düzenle</button>
+      </div>
+    `).join('');
+    list.querySelectorAll('[data-edit-uid]').forEach(btn => {
+      const uid = Number(btn.dataset.editUid);
+      const u = users.find(x => x.id === uid);
+      btn.onclick = () => openEditPersonnel(u);
+    });
+  } catch(e) {
+    list.innerHTML = `<p style="color:var(--red);font-size:13px">${e.message}</p>`;
+  }
+}
+
+el('addPersonnelBtn').addEventListener('click', () => openEditPersonnel(null));
+el('personnelCloseBtn').addEventListener('click', () => closeModal('personnelModal'));
+
+async function openEditPersonnel(user) {
+  const isNew = !user;
+  el('editPersonnelTitle').textContent = isNew ? '👤 Personel Ekle' : '✏️ Personel Düzenle';
+  el('epUserId').value = user ? user.id : '';
+  el('epDisplayName').value = user ? user.display_name : '';
+  el('epUsername').value = user ? user.username : '';
+  el('epUsernameSection').querySelector('input').disabled = !isNew;
+  el('epPassword').value = '';
+  el('epPasswordHint').textContent = isNew ? '(zorunlu)' : '(değiştirmek için girin)';
+  el('epRole').value = user ? user.role : 'supurgeci';
+  el('epIsActive').checked = user ? (user.is_active !== 0 && user.is_active !== '0') : true;
+
+  // Vardiyaları yükle
+  const shiftSel = el('epShift');
+  shiftSel.innerHTML = '<option value="">— Seçmek zorunda değilsiniz —</option>';
+  if (S.user.district_id) {
+    try {
+      const shifts = await api(`/api/shifts?district_id=${S.user.district_id}`);
+      shifts.forEach(sh => {
+        const o = document.createElement('option');
+        o.value = sh.id; o.textContent = sh.display_name;
+        if (user && user.default_shift_id === sh.id) o.selected = true;
+        shiftSel.appendChild(o);
+      });
+    } catch(e) {}
+  }
+
+  openModal('editPersonnelModal');
+}
+
+el('epCancelBtn').addEventListener('click', () => closeModal('editPersonnelModal'));
+
+el('epSaveBtn').addEventListener('click', async () => {
+  const uid = el('epUserId').value;
+  const isNew = !uid;
+  const payload = {
+    display_name: el('epDisplayName').value.trim(),
+    username: el('epUsername').value.trim(),
+    password: el('epPassword').value.trim(),
+    role: el('epRole').value,
+    default_shift_id: el('epShift').value || null,
+    is_active: el('epIsActive').checked ? 1 : 0,
+  };
+
+  if (!payload.display_name || !payload.role) { toast('Ad ve rol zorunludur', 'error'); return; }
+  if (isNew && !payload.username) { toast('Kullanıcı adı zorunludur', 'error'); return; }
+  if (isNew && !payload.password) { toast('Yeni personel için şifre zorunludur', 'error'); return; }
+
+  el('epSaveBtn').disabled = true;
+  try {
+    if (isNew) {
+      await api('/api/users', {method:'POST', body:JSON.stringify(payload)});
+      toast(`${payload.display_name} eklendi ✅`, 'success');
+    } else {
+      await api(`/api/users/${uid}`, {method:'PUT', body:JSON.stringify(payload)});
+      toast(`${payload.display_name} güncellendi ✅`, 'success');
+    }
+    closeModal('editPersonnelModal');
+    await refreshPersonnelList();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+  el('epSaveBtn').disabled = false;
 });
 
 // ── Modal yardımcıları ─────────────────────────────────────────────────────────
