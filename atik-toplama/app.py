@@ -59,13 +59,15 @@ def _me():
 def _user_neighborhoods(user_id, role=None):
     conn = get_db()
     if role and role not in SUPERVISOR_ROLES:
-        # Saha personeli: bugün veya kalıcı atama olan mahalleleri döner
+        # Saha personeli: kişiye özel veya ekip geneli (assigned_user_id IS NULL, team_type eşleşen) atamalardaki mahalleler
         rows = conn.execute(
             'SELECT DISTINCT n.* FROM neighborhoods n '
             'JOIN route_assignments a ON a.neighborhood_id = n.id '
-            'WHERE a.assigned_user_id = ? AND (a.work_date IS NULL OR a.work_date = ?) '
+            'WHERE (a.work_date IS NULL OR a.work_date = ?) '
+            'AND a.team_type = ? '
+            'AND (a.assigned_user_id = ? OR a.assigned_user_id IS NULL) '
             'ORDER BY n.name',
-            (user_id, today())
+            (today(), role, user_id)
         ).fetchall()
     else:
         rows = conn.execute(
