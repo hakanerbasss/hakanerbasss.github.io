@@ -369,7 +369,7 @@ function openCloseStreetModal(street) {
   el('photoPreview').style.display = 'none';
   el('photoPickBtn').className = 'photo-btn';
   el('photoPickBtn').textContent = '📷 Fotoğraf Çek / Seç';
-  el('csSaveBtn').disabled = true;
+  el('csSaveBtn').disabled = false;
   openModal('closeStreetModal');
 }
 
@@ -390,12 +390,12 @@ el('photoInput').addEventListener('change', e => {
 el('csCancelBtn').addEventListener('click', () => closeModal('closeStreetModal'));
 
 el('csSaveBtn').addEventListener('click', async () => {
-  if (!S.photoFile || !S.closingStreetId || !S.activeNb) return;
+  if (!S.closingStreetId || !S.activeNb) return;
   el('csSaveBtn').disabled = true;
   el('csSaveBtn').textContent = 'Gönderiliyor…';
 
   const fd = new FormData();
-  fd.append('photo', S.photoFile, 'photo.jpg');
+  if (S.photoFile) fd.append('photo', S.photoFile, 'photo.jpg');
   fd.append('work_date', todayStr());
   fd.append('neighborhood_id', S.activeNb.id);
 
