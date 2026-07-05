@@ -540,7 +540,7 @@ async function renderNotifPool() {
         <div class="ninfo">👤 ${esc(n.creator_name||'')} — ${timeAgo(n.created_at)}</div>
         <div class="nbtn-row">
           <button data-fly-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}">📍 Git</button>
-          <button class="primary" data-resolve-notif="${n.id}">✅ Çöz</button>
+          <button class="primary" data-resolve-notif="${n.id}" data-lat="${n.lat}" data-lon="${n.lon}">✅ Çöz</button>
           ${SUPERVISOR_ROLES.has(S.user.role) ? `<button data-cancel-notif="${n.id}" style="background:var(--red-light);border-color:var(--red);color:#fff">İptal</button>` : ''}
         </div>
       </div>
@@ -550,7 +550,7 @@ async function renderNotifPool() {
       btn.onclick = () => { S.map.flyTo([+btn.dataset.lat, +btn.dataset.lon], 17); el('sidePanel').classList.remove('open'); };
     });
     body.querySelectorAll('[data-resolve-notif]').forEach(btn => {
-      btn.onclick = () => resolveNotif(+btn.dataset.resolveNotif);
+      btn.onclick = () => resolveNotif(+btn.dataset.resolveNotif, +btn.dataset.lat, +btn.dataset.lon);
     });
     body.querySelectorAll('[data-cancel-notif]').forEach(btn => {
       btn.onclick = async () => {
@@ -562,7 +562,12 @@ async function renderNotifPool() {
   } catch(e) { body.innerHTML = `<p style="padding:12px;color:var(--red)">${e.message}</p>`; }
 }
 
-function resolveNotif(nid) {
+function resolveNotif(nid, lat, lon) {
+  // Önce konuma git
+  if (lat && lon) {
+    S.map.flyTo([lat, lon], 17, {animate: true, duration: 0.8});
+    el('sidePanel').classList.remove('open');
+  }
   // Fotoğraflı kapama — basit dosya seç
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';

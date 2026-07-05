@@ -531,14 +531,24 @@ def complete_street(sid):
     # Telegram'a fotoğraf gönder
     photo_sent = False
     if photo:
-        street_row = conn.execute('SELECT s.name, n.name as nb_name FROM streets s '
-                                  'JOIN neighborhoods n ON n.id = s.neighborhood_id '
-                                  'WHERE s.id = ?', (sid,)).fetchone()
+        street_row = conn.execute(
+            'SELECT s.name, s.geometry, n.name as nb_name FROM streets s '
+            'JOIN neighborhoods n ON n.id = s.neighborhood_id WHERE s.id = ?', (sid,)
+        ).fetchone()
         if street_row:
             shift = None
             if session.get('district_id'):
                 shift = _current_shift(session['district_id'])
             shift_name = shift['display_name'] if shift else 'Bilinmeyen Vardiya'
+            # Sokak orta noktasını hesapla
+            street_lat = street_lon = None
+            try:
+                geom = json.loads(street_row['geometry'])
+                if geom:
+                    mid = geom[len(geom) // 2]
+                    street_lat, street_lon = mid[0], mid[1]
+            except Exception:
+                pass
             photo_sent = tg.notify_street_complete(
                 street_name=street_row['name'],
                 user_display=session['display_name'],
@@ -546,6 +556,8 @@ def complete_street(sid):
                 shift_name=shift_name,
                 photo_file=photo.stream,
                 neighborhood_id=nid,
+                lat=street_lat,
+                lon=street_lon,
             )
 
     conn.execute(
@@ -635,6 +647,22 @@ def create_notification():
 
     _, _, target_team = NOTIFICATION_TYPES[ntype]
     conn = get_db()
+
+    # En yakın sokak adını bul (Euclidean yaklaşımı, küçük alanlar için yeterli)
+    nearest_street = None
+    try:
+        streets = conn.execute('SELECT name, geometry FROM streets WHERE neighborhood_id = ?', (nid,)).fetchall()
+        best = float('inf')
+        for s in streets:
+            geom = json.loads(s['geometry'])
+            for pt in geom:
+                d = (pt[0] - lat) ** 2 + (pt[1] - lon) ** 2
+                if d < best:
+                    best = d
+                    nearest_street = s['name']
+    except Exception:
+        pass
+
     cur = conn.execute(
         'INSERT INTO notifications (neighborhood_id, lat, lon, type, note, created_by, created_at, target_team) '
         'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -648,7 +676,9 @@ def create_notification():
     conn.close()
 
     tg.notify_new_notification(dict(notif), session['display_name'],
-                               nb['name'] if nb else '', neighborhood_id=nid)
+                               nb['name'] if nb else '',
+                               street_name=nearest_street,
+                               neighborhood_id=nid)
 
     return jsonify(dict(notif))
 
