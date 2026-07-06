@@ -627,55 +627,22 @@ async def _generate_shorts_core(
         exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
 
     # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
-    # Konu belirlenmemişse önce ucuz bir çağrıyla konu seçtir, sonra haberi ara
-    _TR_TOPIC_PRIORITY = """
-TOPIC QUALITY PRIORITY (always pick from the HIGHEST available tier):
-
-TIER 1 — MAXIMUM engagement (pick these first):
-  • Disasters & emergencies: earthquake, flood, fire, explosion, accident, storm
-  • Wars & conflicts: military operations, attacks, casualties, territorial changes
-  • Major political breaking news: arrests, resignations, elections, court verdicts with major impact
-  • Major economic shocks: currency collapse, stock market crash, major fraud/scandal
-
-TIER 2 — HIGH engagement:
-  • International relations: summits, sanctions, foreign policy decisions
-  • Major crime or terrorism: mass incidents, high-profile cases
-  • Health emergencies: epidemic outbreaks, major accident casualties
-  • Major sports events: championships, record-breaking, national team results
-
-TIER 3 — MEDIUM engagement (use if nothing from Tier 1-2 available):
-  • Domestic politics: parliamentary decisions, party news with real impact
-  • Technology or science discoveries with broad public interest
-  • Major celebrity or public figure news with real legal/social impact
-
-TIER 4 — LOW quality — AVOID unless nothing else available:
-  • Local minor disputes (beach chair arguments, neighborhood conflicts)
-  • Routine political statements without action
-  • Minor local incidents with no national significance
-  • Celebrity gossip without legal or major social consequences
-  • "X said Y" statements without actual events
-
-Always pick the HIGHEST tier topic available in the trending list.
-"""
-
+    # Konu belirlenmemişse trend listesinin en üstünden seç — Google Trends zaten
+    # popülerlik sırasıyla veriyor, yapay öncelik eklemeye gerek yok
     gnews_data = {}
     search_query = topic.strip()
     if not search_query:
         try:
-            priority_prompt = (
-                f"From this list of Turkish trending topics, pick ONE that would make the most engaging breaking news Short.\n"
-                f"{_TR_TOPIC_PRIORITY}\n"
-                f"Return ONLY the topic name in Turkish, nothing else.\n\nTopics: {trend_topics}"
-                + (f"\n\nAvoid: {exclude_topics}" if exclude_topics.strip() else "")
-            ) if lang != "en" else (
-                f"From this list of trending topics, pick ONE that would make the most engaging breaking news Short. "
+            sel_prompt = (
+                f"From this list of trending topics, pick ONE to make a breaking news Short video about. "
+                f"The list is already sorted by popularity — prefer topics near the top. "
                 f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
-                + (f"\n\nAvoid: {exclude_topics}" if exclude_topics.strip() else "")
+                + (f"\n\nAvoid (already posted today): {exclude_topics}" if exclude_topics.strip() else "")
             )
             sel_resp = client.chat.completions.create(
                 model="deepseek-chat",
-                messages=[{"role": "user", "content": priority_prompt}],
-                temperature=0.5,
+                messages=[{"role": "user", "content": sel_prompt}],
+                temperature=0.3,
                 max_tokens=60,
             )
             search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
@@ -709,7 +676,7 @@ Always pick the HIGHEST tier topic available in the trending list.
     else:
         topic_instruction = (
             f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}\n"
-            f"{_TR_TOPIC_PRIORITY}"
+            f"The list is sorted by popularity — prefer topics near the top of the list.\n"
             f"{get_diversity_instruction()}"
         )
     yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
