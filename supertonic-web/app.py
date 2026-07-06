@@ -2635,6 +2635,20 @@ def get_ig_config() -> dict:
 
 _IG_DEDUP_HOURS = 24  # aynı başlık bu süreden önce atıldıysa tekrar atma — haberler günlük/saatlik yenilendiği için 1 gün yeterli
 
+_TR_STOP_WORDS = {
+    "ile", "bir", "bu", "şu", "ne", "ki", "son", "için", "gibi",
+    "kadar", "daha", "çok", "var", "yok", "ama", "veya", "ayrı",
+    "aynı", "oldu", "olan", "eden", "etti", "etdi", "konusu",
+    "haberi", "haber", "dakika", "acil", "işte", "birer", "fakat",
+    "vurdu", "geldi", "çıktı", "atıldı", "yapıldı", "alındı",
+}
+
+
+def _extract_topic_keywords(title: str) -> set:
+    """Başlıktan yer adı, olay adı gibi anlamlı kelimeleri çıkarır (≥4 harf)."""
+    cleaned = re.sub(r"[^a-züğışöçA-ZÜĞİŞÖÇ\s]", " ", title.lower())
+    return {w for w in cleaned.split() if len(w) >= 4 and w not in _TR_STOP_WORDS}
+
 
 def _ig_recently_posted(title: str) -> bool:
     """Aynı başlık son _IG_DEDUP_HOURS saat içinde Instagram'a atıldıysa True döner."""
@@ -2648,6 +2662,30 @@ def _ig_recently_posted(title: str) -> bool:
             r.get("title", "").lower()[:80] == title_lower and r.get("ts", 0) > cutoff
             for r in records
         )
+    except Exception:
+        return False
+
+
+def _ig_same_topic_posted(title: str) -> bool:
+    """Aynı konuyu (2+ ortak anahtar kelime) 24 saat içinde attıysa True döner.
+    Örn: 'Balıkesir yangın' → farklı başlıkla da olsa tekrar atılmasın."""
+    if not IG_RECENT_FILE.exists():
+        return False
+    try:
+        records = json.loads(IG_RECENT_FILE.read_text())
+        cutoff = time.time() - 24 * 3600
+        new_kw = _extract_topic_keywords(title)
+        if len(new_kw) < 2:
+            return False
+        for r in records:
+            if r.get("ts", 0) <= cutoff:
+                continue
+            past_kw = _extract_topic_keywords(r.get("title", ""))
+            common = new_kw & past_kw
+            if len(common) >= 2:
+                print(f"[DEDUP-TOPIC] '{title[:60]}' → ortak kelimeler: {common}", flush=True)
+                return True
+        return False
     except Exception:
         return False
 
@@ -4046,7 +4084,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
 
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
     # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
-    if _ig_recently_posted(title) or _ig_is_pending(title):
+    if _ig_recently_posted(title) or _ig_is_pending(title) or _ig_same_topic_posted(title):
         err = "dedup: zaten atıldı veya bekliyor"
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[DEDUP:{source}] Zaten atıldı/bekliyor, atlanıyor: {title[:60]}"}))
         _save_failed_ig_upload(filename, title, caption, err)
