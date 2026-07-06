@@ -36,6 +36,8 @@ const S = {
   _resolvingNotif: null,
   _resolvePhotoFile: null,
   _refreshTimer: null,
+  heading: null,
+  _needsOrientationPermission: false,
 };
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
@@ -560,21 +562,82 @@ el('nearestBtn').addEventListener('click', () => {
   toast(`🧭 ${nearest.name} — ${Math.round(nearestD)}m`);
 });
 
+// ── Konum markeri (yön oku) ────────────────────────────────────────────────
+function _meDivIcon(heading) {
+  const hasH = heading != null && isFinite(heading);
+  const rot = hasH ? heading : 0;
+  return L.divIcon({
+    className: '',
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    html: `<div style="width:44px;height:44px;position:relative">
+      ${hasH ? `<div style="position:absolute;inset:0;transform:rotate(${rot}deg);transform-origin:22px 22px">
+        <svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,2 15,24 22,19 29,24" fill="#1f6feb" opacity="0.88"/></svg>
+      </div>` : ''}
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#1f6feb;border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5)"></div>
+    </div>`,
+  });
+}
+
+function _updateMeMarker(lat, lng) {
+  if (!S.meMarker) {
+    S.meMarker = L.marker([lat, lng], {icon: _meDivIcon(S.heading), zIndexOffset: 1000}).addTo(S.map);
+  } else {
+    S.meMarker.setLatLng([lat, lng]);
+    S.meMarker.setIcon(_meDivIcon(S.heading));
+  }
+}
+
+function _onOrientationEvent(e) {
+  let deg = null;
+  if (e.webkitCompassHeading != null && isFinite(e.webkitCompassHeading)) {
+    // iOS: manyetik kuzey bazlı, saat yönü (0=K, 90=D, 180=G, 270=B)
+    deg = e.webkitCompassHeading;
+  } else if ((e.absolute === true || e.type === 'deviceorientationabsolute') && e.alpha != null && isFinite(e.alpha)) {
+    // Android mutlak: alpha saat-yönü tersine, çevir
+    deg = (360 - e.alpha) % 360;
+  }
+  if (deg != null) {
+    S.heading = deg;
+    if (S.lastPos) _updateMeMarker(S.lastPos.lat, S.lastPos.lng);
+  }
+}
+
+function _setupDeviceOrientation() {
+  if (typeof DeviceOrientationEvent === 'undefined') return;
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+: ilk kullanıcı etkileşiminde izin isteyeceğiz
+    S._needsOrientationPermission = true;
+  } else {
+    window.addEventListener('deviceorientationabsolute', _onOrientationEvent, {passive: true});
+    window.addEventListener('deviceorientation', _onOrientationEvent, {passive: true});
+  }
+}
+
 // ── GPS ───────────────────────────────────────────────────────────────────────
 el('locateBtn').addEventListener('click', () => {
+  if (S._needsOrientationPermission) {
+    S._needsOrientationPermission = false;
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        window.addEventListener('deviceorientationabsolute', _onOrientationEvent, {passive: true});
+        window.addEventListener('deviceorientation', _onOrientationEvent, {passive: true});
+        toast('Pusula izni verildi ✅', 'success', 2500);
+      }
+    }).catch(() => {});
+  }
   if (S.lastPos) S.map.setView([S.lastPos.lat, S.lastPos.lng], 17);
   else toast('Konum alınamadı');
 });
 
 function onGpsPosition(pos) {
-  const {latitude:lat, longitude:lng} = pos.coords;
+  const {latitude:lat, longitude:lng, heading} = pos.coords;
   S.lastPos = {lat, lng};
-
-  if (!S.meMarker) {
-    S.meMarker = L.circleMarker([lat,lng], {radius:9, color:'#1f6feb', fillColor:'#1f6feb', fillOpacity:.9, weight:2}).addTo(S.map);
-  } else {
-    S.meMarker.setLatLng([lat,lng]);
+  // GPS heading sadece hareket halindeyken geçerli; pusula yoksa kullan
+  if (S.heading == null && heading != null && isFinite(heading) && heading >= 0) {
+    S.heading = heading;
   }
+  _updateMeMarker(lat, lng);
 
   for (const n of S.notifications) {
     if (n.status !== 'open' || S.announcedNotifs.has(n.id)) continue;
@@ -1604,6 +1667,7 @@ async function init() {
     try { initMap(); } catch(e2) { toast('Harita yüklenemedi. Sayfayı yenileyin.', 'error'); return; }
   }
   setTimeout(() => S.map && S.map.invalidateSize(), 300);
+  _setupDeviceOrientation();
 
   // Çevrimdışı kuyruğu kontrol et
   if (navigator.onLine) syncOfflineQueue().catch(()=>{});
