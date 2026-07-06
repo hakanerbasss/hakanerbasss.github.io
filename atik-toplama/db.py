@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS users (
     telegram_chat_id  TEXT,
     default_shift_id  INTEGER REFERENCES shifts(id),
     is_active         INTEGER NOT NULL DEFAULT 1,
+    notify_sweep      INTEGER NOT NULL DEFAULT 1,
     created_at        INTEGER NOT NULL
 );
 
@@ -179,59 +180,75 @@ def get_db():
 
 
 def _migrate_db():
-    """Mevcut DB şemasını gerekli değişikliklerle günceller."""
+    """Mevcut DB şemasını gerekli değişikliklerle günceller. Her adım bağımsız."""
     conn = get_db()
     try:
-        # users tablosuna yeni kolonlar ekle
+        # users tablosuna yeni kolonlar ekle — her ALTER TABLE bağımsız try/except
         existing = {row[1] for row in conn.execute('PRAGMA table_info(users)').fetchall()}
-        if 'default_shift_id' not in existing:
-            conn.execute('ALTER TABLE users ADD COLUMN default_shift_id INTEGER REFERENCES shifts(id)')
-        if 'is_active' not in existing:
-            conn.execute('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
-        if 'notify_sweep' not in existing:
-            conn.execute('ALTER TABLE users ADD COLUMN notify_sweep INTEGER NOT NULL DEFAULT 1')
-        conn.commit()
+        for col, ddl in [
+            ('default_shift_id', 'ALTER TABLE users ADD COLUMN default_shift_id INTEGER REFERENCES shifts(id)'),
+            ('is_active',        'ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1'),
+            ('notify_sweep',     'ALTER TABLE users ADD COLUMN notify_sweep INTEGER NOT NULL DEFAULT 1'),
+        ]:
+            if col not in existing:
+                try:
+                    conn.execute(ddl)
+                except Exception:
+                    pass
+        try:
+            conn.commit()
+        except Exception:
+            pass
 
         # notification_comments tablosu
-        conn.execute("""CREATE TABLE IF NOT EXISTS notification_comments (
-            id               INTEGER PRIMARY KEY AUTOINCREMENT,
-            notification_id  INTEGER NOT NULL REFERENCES notifications(id),
-            user_id          INTEGER NOT NULL REFERENCES users(id),
-            text             TEXT    NOT NULL,
-            created_at       INTEGER NOT NULL
-        )""")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_nc_notif ON notification_comments(notification_id)")
-        conn.commit()
+        try:
+            conn.execute("""CREATE TABLE IF NOT EXISTS notification_comments (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                notification_id  INTEGER NOT NULL REFERENCES notifications(id),
+                user_id          INTEGER NOT NULL REFERENCES users(id),
+                text             TEXT    NOT NULL,
+                created_at       INTEGER NOT NULL
+            )""")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_nc_notif ON notification_comments(notification_id)")
+            conn.commit()
+        except Exception:
+            pass
 
         # notifications tablosuna street_id kolonu ekle
-        notif_cols = {row[1] for row in conn.execute('PRAGMA table_info(notifications)').fetchall()}
-        if 'street_id' not in notif_cols:
-            conn.execute('ALTER TABLE notifications ADD COLUMN street_id INTEGER REFERENCES streets(id)')
-        conn.commit()
+        try:
+            notif_cols = {row[1] for row in conn.execute('PRAGMA table_info(notifications)').fetchall()}
+            if 'street_id' not in notif_cols:
+                conn.execute('ALTER TABLE notifications ADD COLUMN street_id INTEGER REFERENCES streets(id)')
+            conn.commit()
+        except Exception:
+            pass
 
         # route_assignments.work_date NOT NULL kısıtını kaldır (kalıcı atama için NULL gerekli)
-        ra_info = conn.execute('PRAGMA table_info(route_assignments)').fetchall()
-        work_date_notnull = next((row[3] for row in ra_info if row[1] == 'work_date'), 0)
-        if work_date_notnull:
-            conn.executescript("""
-                PRAGMA foreign_keys=OFF;
-                DROP TABLE IF EXISTS route_assignments_new;
-                CREATE TABLE route_assignments_new (
-                    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-                    neighborhood_id  INTEGER NOT NULL REFERENCES neighborhoods(id),
-                    team_type        TEXT    NOT NULL,
-                    shift_id         INTEGER REFERENCES shifts(id),
-                    work_date        TEXT,
-                    assigned_user_id INTEGER REFERENCES users(id),
-                    assigned_by      INTEGER NOT NULL REFERENCES users(id),
-                    created_at       INTEGER NOT NULL
-                );
-                INSERT INTO route_assignments_new SELECT * FROM route_assignments;
-                DROP TABLE route_assignments;
-                ALTER TABLE route_assignments_new RENAME TO route_assignments;
-                CREATE INDEX IF NOT EXISTS idx_ra_date ON route_assignments(work_date, neighborhood_id, team_type);
-                PRAGMA foreign_keys=ON;
-            """)
+        try:
+            ra_info = conn.execute('PRAGMA table_info(route_assignments)').fetchall()
+            work_date_notnull = next((row[3] for row in ra_info if row[1] == 'work_date'), 0)
+            if work_date_notnull:
+                conn.executescript("""
+                    PRAGMA foreign_keys=OFF;
+                    DROP TABLE IF EXISTS route_assignments_new;
+                    CREATE TABLE route_assignments_new (
+                        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                        neighborhood_id  INTEGER NOT NULL REFERENCES neighborhoods(id),
+                        team_type        TEXT    NOT NULL,
+                        shift_id         INTEGER REFERENCES shifts(id),
+                        work_date        TEXT,
+                        assigned_user_id INTEGER REFERENCES users(id),
+                        assigned_by      INTEGER NOT NULL REFERENCES users(id),
+                        created_at       INTEGER NOT NULL
+                    );
+                    INSERT INTO route_assignments_new SELECT * FROM route_assignments;
+                    DROP TABLE route_assignments;
+                    ALTER TABLE route_assignments_new RENAME TO route_assignments;
+                    CREATE INDEX IF NOT EXISTS idx_ra_date ON route_assignments(work_date, neighborhood_id, team_type);
+                    PRAGMA foreign_keys=ON;
+                """)
+        except Exception:
+            pass
     finally:
         conn.close()
 

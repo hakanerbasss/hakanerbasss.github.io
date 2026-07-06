@@ -893,6 +893,102 @@ def cancel_notification(nid):
     return jsonify({'ok': True})
 
 
+# ── Günlük özet ─────────────────────────────────────────────────────────────
+@app.route('/api/neighborhoods/<int:nid>/summary')
+@login_required
+def neighborhood_summary(nid):
+    work_date = request.args.get('date') or today()
+    conn = get_db()
+    total_streets = conn.execute(
+        'SELECT COUNT(*) FROM streets WHERE neighborhood_id=?', (nid,)
+    ).fetchone()[0]
+    assigned_by_type = conn.execute(
+        'SELECT ra.team_type, COUNT(DISTINCT ast.street_id) as cnt '
+        'FROM route_assignments ra JOIN assignment_streets ast ON ast.assignment_id=ra.id '
+        'WHERE ra.neighborhood_id=? AND (ra.work_date IS NULL OR ra.work_date=?) '
+        'GROUP BY ra.team_type',
+        (nid, work_date)
+    ).fetchall()
+    completed_by_worker = conn.execute(
+        'SELECT u.display_name, u.role, COUNT(*) as cnt, '
+        'MIN(sc.completed_at) as first_at, MAX(sc.completed_at) as last_at '
+        'FROM street_completions sc JOIN users u ON u.id=sc.user_id '
+        'WHERE sc.neighborhood_id=? AND sc.work_date=? GROUP BY sc.user_id ORDER BY cnt DESC',
+        (nid, work_date)
+    ).fetchall()
+    open_notifs = conn.execute(
+        'SELECT COUNT(*) FROM notifications WHERE neighborhood_id=? AND status=?', (nid, 'open')
+    ).fetchone()[0]
+    conn.close()
+    return jsonify({
+        'date': work_date,
+        'total_streets': total_streets,
+        'assigned_by_type': [dict(r) for r in assigned_by_type],
+        'completed_by_worker': [dict(r) for r in completed_by_worker],
+        'open_notifications': open_notifs,
+    })
+
+
+@app.route('/api/neighborhoods/<int:nid>/workers')
+@login_required
+def neighborhood_workers(nid):
+    """Mahalledeki sahaya atanmış personelin ilerlemesi (yetkili görünümü)."""
+    if session.get('role') not in SUPERVISOR_ROLES:
+        return jsonify({'error': 'Yetkisiz'}), 403
+    work_date = request.args.get('date') or today()
+    conn = get_db()
+    workers_rows = conn.execute(
+        'SELECT DISTINCT u.id, u.display_name, u.role '
+        'FROM users u JOIN route_assignments ra ON '
+        '(ra.assigned_user_id=u.id OR (ra.team_type=u.role AND ra.assigned_user_id IS NULL)) '
+        "WHERE ra.neighborhood_id=? AND (ra.work_date IS NULL OR ra.work_date=?) "
+        "AND u.is_active=1 AND u.role NOT IN ('santiye_amiri','cavus','onbasi') "
+        'ORDER BY u.display_name',
+        (nid, work_date)
+    ).fetchall()
+    result = []
+    for w in workers_rows:
+        assigned = conn.execute(
+            'SELECT COUNT(DISTINCT ast.street_id) FROM assignment_streets ast '
+            'JOIN route_assignments ra ON ra.id=ast.assignment_id '
+            'WHERE ra.neighborhood_id=? AND ra.team_type=? '
+            'AND (ra.assigned_user_id=? OR ra.assigned_user_id IS NULL) '
+            'AND (ra.work_date IS NULL OR ra.work_date=?)',
+            (nid, w['role'], w['id'], work_date)
+        ).fetchone()[0]
+        completed = conn.execute(
+            'SELECT COUNT(*) FROM street_completions WHERE neighborhood_id=? AND user_id=? AND work_date=?',
+            (nid, w['id'], work_date)
+        ).fetchone()[0]
+        result.append({
+            'id': w['id'],
+            'display_name': w['display_name'],
+            'role': w['role'],
+            'assigned': assigned,
+            'completed': completed,
+            'pct': round((completed / assigned * 100) if assigned else 0),
+        })
+    conn.close()
+    return jsonify(result)
+
+
+@app.route('/api/streets/<int:sid>/complete', methods=['DELETE'])
+@supervisor_required
+def undo_street_complete(sid):
+    """Süpürgeci hatayla işaretlediğinde çavuş tamamlamayı geri alabilir."""
+    work_date = request.args.get('date') or today()
+    nid = request.args.get('neighborhood_id', type=int)
+    conn = get_db()
+    conn.execute(
+        'DELETE FROM street_completions WHERE street_id=? AND work_date=?'
+        + (' AND neighborhood_id=?' if nid else ''),
+        (sid, work_date, nid) if nid else (sid, work_date)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
 # ── OSM İl/İlçe/Mahalle arama ───────────────────────────────────────────────
 
 _TR_PROVINCES = [
