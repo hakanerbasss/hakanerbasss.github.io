@@ -17,24 +17,27 @@ const NOTIF_LABELS = {
 const S = {
   user: null,
   neighborhoods: [],
-  activeNb: null,       // aktif mahalle objesi
-  streets: [],          // tüm sokaklar (harita için)
-  myStreets: [],        // bugün bana atanmış sokaklar (süpürgeci)
+  activeNb: null,
+  streets: [],
+  myStreets: [],
   completedIds: new Set(),
   notifications: [],
   map: null,
-  streetLayers: {},     // id → polyline
-  assignSelected: new Set(), // atama için seçili sokak id'leri
+  streetLayers: {},
+  assignSelected: new Set(),
   meMarker: null,
   lastPos: null,
   voiceOn: true,
   announcedNotifs: new Set(),
-  mode: 'normal',       // 'normal' | 'assign'
+  mode: 'normal',
   closingStreetId: null,
   photoFile: null,
-  _notifStreet: null,      // bildirim eklerken seçili sokak
-  _resolvingNotif: null,   // gider modalındaki bildirim
-  _resolvePhotoFile: null, // gider modalı fotoğrafı
+  _notifStreet: null,
+  _resolvingNotif: null,
+  _resolvePhotoFile: null,
+  _refreshTimer: null,
+  heading: null,
+  _needsOrientationPermission: false,
 };
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
@@ -61,8 +64,7 @@ function haversine(la1, lo1, la2, lo2) {
 }
 
 function streetMidpoint(geom) {
-  const mid = geom[Math.floor(geom.length/2)];
-  return mid;
+  return geom[Math.floor(geom.length/2)];
 }
 
 function nearestStreetDist(street) {
@@ -85,6 +87,43 @@ function todayStr() {
   return new Date().toISOString().slice(0,10);
 }
 
+// ── Çevrimdışı kuyruk ─────────────────────────────────────────────────────────
+const OQ_KEY = 'atik_offline_queue';
+function _getOQ() { try { return JSON.parse(localStorage.getItem(OQ_KEY) || '[]'); } catch { return []; } }
+function _saveOQ(q) { try { localStorage.setItem(OQ_KEY, JSON.stringify(q)); } catch {} }
+function _addToOQ(item) { const q = _getOQ(); q.push({...item, queued_at: Date.now()}); _saveOQ(q); }
+
+async function syncOfflineQueue() {
+  const q = _getOQ();
+  if (!q.length) return;
+  const remaining = [];
+  let synced = 0;
+  for (const item of q) {
+    try {
+      if (item.type === 'complete_street') {
+        const fd = new FormData();
+        fd.append('work_date', item.work_date);
+        fd.append('neighborhood_id', item.neighborhood_id);
+        if (item.note) fd.append('note', item.note);
+        const res = await fetch(`/api/streets/${item.street_id}/complete`, {method:'POST', body:fd});
+        if (res.ok || res.status === 401) { synced++; continue; }
+      }
+    } catch {}
+    remaining.push(item);
+  }
+  _saveOQ(remaining);
+  if (synced > 0) {
+    toast(`${synced} çevrimdışı kayıt senkronize edildi ✅`, 'success', 4000);
+    if (S.activeNb) loadNeighborhood(S.activeNb);
+  }
+}
+
+window.addEventListener('online', () => {
+  toast('İnternet bağlantısı geri geldi', 'success', 3000);
+  syncOfflineQueue();
+});
+window.addEventListener('offline', () => toast('İnternet bağlantısı kesildi — çevrimdışı mod aktif', '', 5000));
+
 // ── Harita kurulum ─────────────────────────────────────────────────────────────
 function initMap() {
   S.map = L.map('map', {zoomControl:false}).setView([41.015, 28.979], 14);
@@ -92,7 +131,6 @@ function initMap() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom:19, attribution:'© OSM'
   }).addTo(S.map);
-
   S.map.on('click', onMapClick);
 }
 
@@ -115,7 +153,6 @@ function renderStreets(streets) {
 
   streets.forEach(street => {
     const vis = L.polyline(street.geometry, {...streetColor(street), interactive:false});
-    // Geniş şeffaf hit alanı — ince çizgiye dokunmayı kolaylaştırır
     const hit = L.polyline(street.geometry, {weight:20, opacity:0, interactive:true});
     hit.on('click', () => onStreetClick(street));
     vis.bindTooltip(street.name, {direction:'top', sticky:false, opacity:.9});
@@ -126,7 +163,6 @@ function renderStreets(streets) {
 }
 
 function refreshStreetColor(streetId) {
-  // myStreets önce — tamamlama durumu orada güncelleniyor
   const street = S.myStreets.find(s => s.id === streetId) || S.streets.find(s => s.id === streetId);
   const lr = S.streetLayers[streetId];
   if (!street || !lr) return;
@@ -139,23 +175,24 @@ async function loadNeighborhood(nb) {
   el('nbTitle').textContent = nb.name;
   el('progressLabel').textContent = 'Yükleniyor…';
 
-  // Tüm sokaklar
   const allStreets = await api(`/api/neighborhoods/${nb.id}/streets`);
   S.streets = allStreets;
 
-  // Açık bildirimler
   try {
     S.notifications = await api(`/api/notifications?neighborhood_id=${nb.id}&status=open`);
   } catch(e) { S.notifications = []; }
 
   if (SUPERVISOR_ROLES.has(S.user.role)) {
     await loadSupervisorView();
+    _startAutoRefresh();
   } else {
     await loadSweeperView();
+    _stopAutoRefresh();
   }
   renderNotifMarkers(S.notifications);
   fitMapToStreets(S.streets.length ? S.streets : []);
   localStorage.setItem('lastNbId', String(nb.id));
+  updateNotifBadge();
 }
 
 async function loadSweeperView() {
@@ -171,7 +208,6 @@ async function loadSweeperView() {
     return;
   }
 
-  // Atanmış sokakları tamamlama durumlarıyla birlikte göster
   const displayStreets = S.myStreets.map(s => ({...s, completed: S.completedIds.has(s.id)}));
   renderStreets(displayStreets);
   updateProgress(S.completedIds.size, S.myStreets.length);
@@ -192,6 +228,24 @@ function updateProgress(done, total) {
   el('progressLabel').textContent = `${done} / ${total} sokak tamamlandı`;
 }
 
+// ── Yetkili otomatik yenileme (60 saniyede bir) ────────────────────────────────
+function _startAutoRefresh() {
+  _stopAutoRefresh();
+  S._refreshTimer = setInterval(async () => {
+    if (!S.activeNb || document.hidden || S.mode !== 'normal') return;
+    try { await loadSupervisorView(); } catch {}
+  }, 60000);
+}
+function _stopAutoRefresh() {
+  if (S._refreshTimer) { clearInterval(S._refreshTimer); S._refreshTimer = null; }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && S.user && SUPERVISOR_ROLES.has(S.user.role) && S.activeNb) {
+    loadSupervisorView().catch(()=>{});
+  }
+});
+
 function fitMapToStreets(streets) {
   const coords = streets.flatMap(s => s.geometry || []);
   if (!coords.length) return;
@@ -208,7 +262,6 @@ function onStreetClick(street) {
     _updateAssignCount();
     return;
   }
-  // Normal mod: kısa mavi vurgu → detay aç
   const lr = S.streetLayers[street.id];
   if (lr) {
     lr.vis.setStyle({color:'#1f6feb', weight:8, opacity:1});
@@ -314,7 +367,6 @@ function renderStreetDetail(d, street) {
 
   el('sdBody').innerHTML = html;
 
-  // Sokak detayındaki bildirim butonları
   el('sdBody').querySelectorAll('.sd-notif-resolve').forEach(btn => {
     btn.onclick = () => {
       const nid = +btn.dataset.nid;
@@ -335,10 +387,27 @@ function renderStreetDetail(d, street) {
   });
 
   const actions = el('sdActions');
+
   const notifBtn = document.createElement('button');
   notifBtn.textContent = '⚠️ Bildirim Ekle';
   notifBtn.onclick = () => { closeModal('streetDetailModal'); openNotifModal(street); };
   actions.appendChild(notifBtn);
+
+  if (SUPERVISOR_ROLES.has(S.user.role) && d.completions && d.completions.length) {
+    const undoBtn = document.createElement('button');
+    undoBtn.textContent = '↩️ Geri Al';
+    undoBtn.style.cssText = 'background:var(--red);border-color:var(--red);color:#fff';
+    undoBtn.onclick = async () => {
+      if (!confirm(`${street.name} tamamlamasını geri al?`)) return;
+      try {
+        await api(`/api/streets/${street.id}/complete?date=${todayStr()}&neighborhood_id=${S.activeNb?.id||''}`, {method:'DELETE'});
+        closeModal('streetDetailModal');
+        toast('Tamamlama geri alındı', 'success');
+        if (S.activeNb) loadNeighborhood(S.activeNb);
+      } catch(e) { toast(e.message, 'error'); }
+    };
+    actions.appendChild(undoBtn);
+  }
 
   if (!SUPERVISOR_ROLES.has(S.user.role)) {
     const myStreet = S.myStreets.find(s => s.id === street.id);
@@ -371,6 +440,7 @@ function openCloseStreetModal(street) {
   el('photoPickBtn').className = 'photo-btn';
   el('photoPickBtn').textContent = '📷 Fotoğraf Çek / Seç';
   el('csSaveBtn').disabled = false;
+  el('csSaveBtn').textContent = '✅ Kapat & Gönder';
   openModal('closeStreetModal');
 }
 
@@ -400,12 +470,13 @@ el('csSaveBtn').addEventListener('click', async () => {
   fd.append('work_date', todayStr());
   fd.append('neighborhood_id', S.activeNb.id);
 
-  // assignment_id bul
   const myS = S.myStreets.find(s => s.id === S.closingStreetId);
   if (myS && myS.assignment_id) fd.append('assignment_id', myS.assignment_id);
 
   const note = el('csNote').value.trim();
   if (note) fd.append('note', note);
+
+  const streetName = myS ? myS.name : 'Sokak';
 
   try {
     const res = await fetch(`/api/streets/${S.closingStreetId}/complete`, {method:'POST', body:fd});
@@ -414,23 +485,63 @@ el('csSaveBtn').addEventListener('click', async () => {
     if (!res.ok) throw Error(d.error || 'Hata');
 
     S.completedIds.add(S.closingStreetId);
-    const street = S.myStreets.find(s => s.id === S.closingStreetId);
-    if (street) street.completed = true;
+    if (myS) myS.completed = true;
     refreshStreetColor(S.closingStreetId);
     updateProgress(S.completedIds.size, S.myStreets.length);
     closeModal('closeStreetModal');
 
-    const streetName = street ? street.name : 'Sokak';
     toast(`${streetName} tamamlandı ✅` + (d.photo_sent ? ' — Telegram\'a gönderildi' : ''), 'success', 4000);
     speak(`${streetName} süpürüldü`);
+
+    // Sıradaki en yakın sokağa otomatik git
+    setTimeout(() => _navigateToNextStreet(), 1200);
+
   } catch(e) {
-    toast(e.message, 'error');
-    el('csSaveBtn').disabled = false;
-    el('csSaveBtn').textContent = '✅ Kapat & Gönder';
+    if (!navigator.onLine) {
+      // Çevrimdışı kuyruğa ekle, yerel olarak işaretle
+      _addToOQ({
+        type: 'complete_street',
+        street_id: S.closingStreetId,
+        work_date: todayStr(),
+        neighborhood_id: S.activeNb.id,
+        note: el('csNote').value.trim(),
+      });
+      S.completedIds.add(S.closingStreetId);
+      if (myS) myS.completed = true;
+      refreshStreetColor(S.closingStreetId);
+      updateProgress(S.completedIds.size, S.myStreets.length);
+      closeModal('closeStreetModal');
+      toast(`${streetName} çevrimdışı kaydedildi — internet gelince senkronize edilir`, 'success', 5000);
+      speak(`${streetName} kaydedildi`);
+      setTimeout(() => _navigateToNextStreet(), 1200);
+    } else {
+      toast(e.message, 'error');
+      el('csSaveBtn').disabled = false;
+      el('csSaveBtn').textContent = '✅ Kapat & Gönder';
+    }
   }
 });
 
-// ── En yakın sokak ─────────────────────────────────────────────────────────────
+function _navigateToNextStreet() {
+  const unvisited = S.myStreets.filter(s => !S.completedIds.has(s.id));
+  if (!unvisited.length) {
+    toast('🎉 Tüm sokaklar tamamlandı!', 'success', 5000);
+    speak('Tebrikler! Tüm sokaklar tamamlandı.');
+    return;
+  }
+  if (!S.lastPos) return;
+  let nearest = unvisited[0], nearestD = Infinity;
+  for (const s of unvisited) {
+    const d = nearestStreetDist(s);
+    if (d < nearestD) { nearestD = d; nearest = s; }
+  }
+  const [la, lo] = nearest.geometry[Math.floor(nearest.geometry.length / 2)];
+  S.map.flyTo([la, lo], 17, {animate:true, duration:.8});
+  speak(`Sıradaki: ${nearest.name}, yaklaşık ${Math.round(nearestD)} metre`);
+  toast(`�� Sıradaki: ${nearest.name} — ${Math.round(nearestD)}m`, '', 5000);
+}
+
+// ── En yakın sokak butonu ──────────────────────────────────────────────────────
 el('nearestBtn').addEventListener('click', () => {
   if (!S.lastPos) {
     toast('GPS konumu henüz alınamadı — bekleyin veya uygulamaya konum izni verin', 'error', 4000);
@@ -451,23 +562,83 @@ el('nearestBtn').addEventListener('click', () => {
   toast(`🧭 ${nearest.name} — ${Math.round(nearestD)}m`);
 });
 
+// ── Konum markeri (yön oku) ────────────────────────────────────────────────
+function _meDivIcon(heading) {
+  const hasH = heading != null && isFinite(heading);
+  const rot = hasH ? heading : 0;
+  return L.divIcon({
+    className: '',
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    html: `<div style="width:44px;height:44px;position:relative">
+      ${hasH ? `<div style="position:absolute;inset:0;transform:rotate(${rot}deg);transform-origin:22px 22px">
+        <svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,2 15,24 22,19 29,24" fill="#1f6feb" opacity="0.88"/></svg>
+      </div>` : ''}
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#1f6feb;border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5)"></div>
+    </div>`,
+  });
+}
+
+function _updateMeMarker(lat, lng) {
+  if (!S.meMarker) {
+    S.meMarker = L.marker([lat, lng], {icon: _meDivIcon(S.heading), zIndexOffset: 1000}).addTo(S.map);
+  } else {
+    S.meMarker.setLatLng([lat, lng]);
+    S.meMarker.setIcon(_meDivIcon(S.heading));
+  }
+}
+
+function _onOrientationEvent(e) {
+  let deg = null;
+  if (e.webkitCompassHeading != null && isFinite(e.webkitCompassHeading)) {
+    // iOS: manyetik kuzey bazlı, saat yönü (0=K, 90=D, 180=G, 270=B)
+    deg = e.webkitCompassHeading;
+  } else if ((e.absolute === true || e.type === 'deviceorientationabsolute') && e.alpha != null && isFinite(e.alpha)) {
+    // Android mutlak: alpha saat-yönü tersine, çevir
+    deg = (360 - e.alpha) % 360;
+  }
+  if (deg != null) {
+    S.heading = deg;
+    if (S.lastPos) _updateMeMarker(S.lastPos.lat, S.lastPos.lng);
+  }
+}
+
+function _setupDeviceOrientation() {
+  if (typeof DeviceOrientationEvent === 'undefined') return;
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+: ilk kullanıcı etkileşiminde izin isteyeceğiz
+    S._needsOrientationPermission = true;
+  } else {
+    window.addEventListener('deviceorientationabsolute', _onOrientationEvent, {passive: true});
+    window.addEventListener('deviceorientation', _onOrientationEvent, {passive: true});
+  }
+}
+
 // ── GPS ───────────────────────────────────────────────────────────────────────
 el('locateBtn').addEventListener('click', () => {
+  if (S._needsOrientationPermission) {
+    S._needsOrientationPermission = false;
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        window.addEventListener('deviceorientationabsolute', _onOrientationEvent, {passive: true});
+        window.addEventListener('deviceorientation', _onOrientationEvent, {passive: true});
+        toast('Pusula izni verildi ✅', 'success', 2500);
+      }
+    }).catch(() => {});
+  }
   if (S.lastPos) S.map.setView([S.lastPos.lat, S.lastPos.lng], 17);
   else toast('Konum alınamadı');
 });
 
 function onGpsPosition(pos) {
-  const {latitude:lat, longitude:lng} = pos.coords;
+  const {latitude:lat, longitude:lng, heading} = pos.coords;
   S.lastPos = {lat, lng};
-
-  if (!S.meMarker) {
-    S.meMarker = L.circleMarker([lat,lng], {radius:9, color:'#1f6feb', fillColor:'#1f6feb', fillOpacity:.9, weight:2}).addTo(S.map);
-  } else {
-    S.meMarker.setLatLng([lat,lng]);
+  // GPS heading sadece hareket halindeyken geçerli; pusula yoksa kullan
+  if (S.heading == null && heading != null && isFinite(heading) && heading >= 0) {
+    S.heading = heading;
   }
+  _updateMeMarker(lat, lng);
 
-  // Yakın notif oku
   for (const n of S.notifications) {
     if (n.status !== 'open' || S.announcedNotifs.has(n.id)) continue;
     const d = haversine(lat, lng, n.lat, n.lon);
@@ -481,7 +652,6 @@ function onGpsPosition(pos) {
 }
 
 if ('geolocation' in navigator) {
-  // Hemen bir kez al (watchPosition gecikmeli başlayabiliyor)
   navigator.geolocation.getCurrentPosition(onGpsPosition, () => {}, {enableHighAccuracy:true, timeout:10000});
   navigator.geolocation.watchPosition(onGpsPosition, () => {}, {
     enableHighAccuracy: true, maximumAge: 6000, timeout: 30000
@@ -497,6 +667,12 @@ el('voiceBtn').addEventListener('click', () => {
 });
 el('voiceBtn').classList.add('active');
 
+// ── Bildirim rozeti ───────────────────────────────────────────────────────────
+function updateNotifBadge() {
+  const openCount = S.notifications.filter(n => n.status === 'open').length;
+  el('notifPoolBtn').textContent = openCount > 0 ? `📋 Havuz (${openCount})` : '📋 Havuz';
+}
+
 // ── Bildirim ekle ─────────────────────────────────────────────────────────────
 function openNotifModal(street) {
   if (!S.activeNb) { toast('Önce bir mahalle seçin'); return; }
@@ -504,11 +680,9 @@ function openNotifModal(street) {
   S._notifStreet = street || null;
 
   if (street) {
-    // Sokağa bağlı bildirim — koordinat sokaktan alınır
     S._pendingNotifLatLng = null;
     el('notifLocInfo').textContent = `🛣 ${street.name}`;
   } else {
-    // GPS konumlu bildirim (eski davranış)
     if (S.lastPos) {
       S._pendingNotifLatLng = L.latLng(S.lastPos.lat, S.lastPos.lng);
       el('notifLocInfo').textContent = `📍 ${S.lastPos.lat.toFixed(5)}, ${S.lastPos.lng.toFixed(5)} (GPS konumun)`;
@@ -541,7 +715,6 @@ el('notifSaveBtn').addEventListener('click', async () => {
 
   if (S._notifStreet) {
     payload.street_id = S._notifStreet.id;
-    // Koordinatı da gönder (eski istemci desteği + Telegram mesajı için)
     const geom = S._notifStreet.geometry;
     if (geom && geom.length) {
       const mid = geom[Math.floor(geom.length / 2)];
@@ -557,6 +730,7 @@ el('notifSaveBtn').addEventListener('click', async () => {
     const n = await api('/api/notifications', {method:'POST', body:JSON.stringify(payload)});
     S.notifications.push(n);
     renderNotifMarkers(S.notifications);
+    updateNotifBadge();
     S._notifStreet = null;
     closeModal('addNotifModal');
     toast('Bildirim gönderildi ✅', 'success');
@@ -575,6 +749,7 @@ el('notifPoolBtn').addEventListener('click', async () => {
       const localNonOpen = S.notifications.filter(n => n.status !== 'open');
       S.notifications = [...fresh, ...localNonOpen];
       renderNotifMarkers(S.notifications.filter(n => n.status === 'open'));
+      updateNotifBadge();
     } catch(e) {}
   }
   renderNotifPool();
@@ -594,17 +769,34 @@ function renderStreetList() {
   const pool = S.myStreets.length ? S.myStreets : S.streets;
   if (!pool.length) { body.innerHTML = '<p style="padding:12px;color:var(--muted)">Sokak yok</p>'; return; }
 
-  // Sırala: tamamlanmayanlar önce, sonra ada göre
   const sorted = [...pool].map(s => ({...s, completed: S.completedIds.has(s.id)}))
     .sort((a,b) => a.completed - b.completed || a.name.localeCompare(b.name, 'tr'));
 
-  body.innerHTML = sorted.map(s => `
-    <div class="street-row">
+  const done = sorted.filter(s => s.completed).length;
+  body.innerHTML = `
+    <div style="padding:8px 8px 4px">
+      <input id="streetSearch" type="text" placeholder="Sokak ara…"
+        style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);
+        background:var(--bg);color:var(--text);font-size:14px;font-family:inherit">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;padding:0 2px">${done}/${sorted.length} tamamlandı</div>
+    </div>
+  ` + sorted.map(s => `
+    <div class="street-row" data-street-id="${s.id}">
       <span class="sname">${esc(s.name)}</span>
       <span class="badge ${s.completed ? 'done' : ''}">${s.completed ? '✅ Tamam' : '⬛ Bekliyor'}</span>
       <button data-fly="${s.id}">Git</button>
     </div>
   `).join('');
+
+  const searchEl = body.querySelector('#streetSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', () => {
+      const q = searchEl.value.toLowerCase();
+      body.querySelectorAll('[data-street-id]').forEach(row => {
+        row.style.display = row.querySelector('.sname').textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
 
   body.querySelectorAll('[data-fly]').forEach(btn => {
     btn.onclick = () => {
@@ -618,7 +810,7 @@ function renderStreetList() {
   });
 }
 
-// ── Bildirim havuzu renderı (S.notifications'dan senkron render) ────────────────
+// ── Bildirim havuzu renderı ────────────────────────────────────────────────────
 function renderNotifPool() {
   const body = el('sidePanelBody');
   if (!S.activeNb) { body.innerHTML = '<p style="padding:12px;color:var(--muted)">Mahalle seçin</p>'; return; }
@@ -674,6 +866,7 @@ function renderNotifPool() {
         const idx = S.notifications.findIndex(n => n.id === nid);
         if (idx !== -1) S.notifications[idx] = {...S.notifications[idx], status: 'cancelled'};
         renderNotifMarkers(S.notifications.filter(n => n.status === 'open'));
+        updateNotifBadge();
         renderNotifPool();
       } catch(e) { toast(e.message, 'error'); }
     };
@@ -699,12 +892,6 @@ function flyToNotif(streetId, lat, lon) {
     }
   }
   if (lat && lon) S.map.flyTo([lat, lon], 17, {animate:true, duration:.8});
-}
-
-function resolveNotif(nid, lat, lon, streetId) {
-  flyToNotif(streetId, lat, lon);
-  const notif = S.notifications.find(n => n.id === nid);
-  if (notif) openResolveModal(notif);
 }
 
 function openResolveModal(notif) {
@@ -758,6 +945,7 @@ el('resolveNotifSaveBtn').addEventListener('click', async () => {
     const idx = S.notifications.findIndex(n => n.id === notif.id);
     if (idx !== -1) S.notifications[idx] = {...S.notifications[idx], status: 'resolved'};
     renderNotifMarkers(S.notifications.filter(n => n.status === 'open'));
+    updateNotifBadge();
 
     S._resolvingNotif = null; S._resolvePhotoFile = null;
     closeModal('resolveNotifModal');
@@ -816,8 +1004,8 @@ async function toggleComments(nid) {
 }
 
 // ── Bildirim markerları ────────────────────────────────────────────────────────
-const _notifMarkersByStreet = {}; // street_id → L.Marker
-const _notifMarkersById    = {}; // notif_id  → L.Marker (sokak bağlantısı olmayan)
+const _notifMarkersByStreet = {};
+const _notifMarkersById    = {};
 
 function _clearNotifMarkers() {
   Object.values(_notifMarkersByStreet).forEach(m => S.map.removeLayer(m));
@@ -829,13 +1017,11 @@ function _clearNotifMarkers() {
 function renderNotifMarkers(notifications) {
   _clearNotifMarkers();
 
-  // Sokak bazında grupla
   const byStreet = {};
   for (const n of notifications) {
     if (n.street_id) {
       (byStreet[n.street_id] = byStreet[n.street_id] || []).push(n);
     } else {
-      // Sokaksız eski bildirim: lat/lon markerı
       if (_notifMarkersById[n.id]) return;
       const icon = L.divIcon({
         html:`<div style="font-size:22px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">⚠️</div>`,
@@ -848,7 +1034,6 @@ function renderNotifMarkers(notifications) {
     }
   }
 
-  // Her sokak için tek ⚠️ marker (birden fazlaysa sayı rozeti)
   for (const [streetId, notifs] of Object.entries(byStreet)) {
     const street = S.streets.find(s => s.id === Number(streetId));
     if (!street || !street.geometry || !street.geometry.length) continue;
@@ -871,9 +1056,122 @@ function renderNotifMarkers(notifications) {
   }
 }
 
+// ── Yetkili: Personel İlerlemesi paneli ───────────────────────────────────────
+async function openWorkersPanel() {
+  if (!S.activeNb) { toast('Önce mahalle seçin'); return; }
+  el('sidePanelTitle').textContent = '👥 Personel İlerlemesi';
+  el('sidePanelBody').innerHTML = '<p style="padding:12px;color:var(--muted)">Yükleniyor…</p>';
+  el('sidePanel').classList.add('open');
+
+  try {
+    const workers = await api(`/api/neighborhoods/${S.activeNb.id}/workers?date=${todayStr()}`);
+    if (!workers.length) {
+      el('sidePanelBody').innerHTML = '<p style="padding:12px;color:var(--muted)">Bugün atanmış sahada personel yok</p>';
+      return;
+    }
+
+    // Son yenileme zamanı
+    const now = new Date().toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+    el('sidePanelBody').innerHTML = `
+      <div style="padding:6px 8px 2px;font-size:11px;color:var(--muted);text-align:right">Son güncelleme: ${now}</div>
+    ` + workers.map(w => `
+      <div class="personnel-row" style="flex-direction:column;align-items:stretch;gap:6px;padding:12px 8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div class="pname">${esc(w.display_name)}</div>
+            <div class="prole">${ROLE_NAMES[w.role]||w.role} — ${w.completed}/${w.assigned} sokak</div>
+          </div>
+          <span style="font-size:14px;font-weight:700;color:${w.pct===100?'var(--green)':w.pct>50?'var(--yellow)':'var(--red)'};">${w.pct}%</span>
+          <button data-track-uid="${w.id}" data-track-name="${esc(w.display_name)}"
+            style="font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid var(--blue);background:var(--blue);color:#fff;flex-shrink:0">📍 Gör</button>
+        </div>
+        <div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;border:1px solid var(--border)">
+          <div style="height:100%;width:${w.pct}%;background:${w.pct===100?'var(--green)':w.pct>50?'var(--yellow)':'var(--red)'};transition:width .4s;border-radius:4px"></div>
+        </div>
+      </div>
+    `).join('');
+
+    el('sidePanelBody').querySelectorAll('[data-track-uid]').forEach(btn => {
+      btn.onclick = () => {
+        el('sidePanel').classList.remove('open');
+        viewWorkerStreets(Number(btn.dataset.trackUid), btn.dataset.trackName);
+      };
+    });
+  } catch(e) {
+    el('sidePanelBody').innerHTML = `<p style="color:var(--red);padding:12px">${e.message}</p>`;
+  }
+}
+
+// ── Yetkili: Günlük özet paneli ───────────────────────────────────────────────
+async function openDailySummary() {
+  if (!S.activeNb) { toast('Önce mahalle seçin'); return; }
+  const dateStr = todayStr();
+  el('sidePanelTitle').textContent = `📊 Günlük Özet`;
+  el('sidePanelBody').innerHTML = '<p style="padding:12px;color:var(--muted)">Yükleniyor…</p>';
+  el('sidePanel').classList.add('open');
+
+  try {
+    const summary = await api(`/api/neighborhoods/${S.activeNb.id}/summary?date=${dateStr}`);
+    let html = `
+      <div style="padding:12px;border-bottom:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">${S.activeNb.name} — ${dateStr}</div>
+        <div style="display:flex;gap:16px;margin-top:8px">
+          <div style="text-align:center;flex:1">
+            <div style="font-size:24px;font-weight:700">${summary.total_streets}</div>
+            <div style="font-size:11px;color:var(--muted)">Toplam sokak</div>
+          </div>
+          <div style="text-align:center;flex:1">
+            <div style="font-size:24px;font-weight:700;color:var(--green)">${summary.completed_by_worker.reduce((s,w)=>s+w.cnt,0)}</div>
+            <div style="font-size:11px;color:var(--muted)">Tamamlanan</div>
+          </div>
+          <div style="text-align:center;flex:1">
+            <div style="font-size:24px;font-weight:700;color:${summary.open_notifications>0?'var(--red)':'var(--green)'}">${summary.open_notifications}</div>
+            <div style="font-size:11px;color:var(--muted)">Açık bildirim</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (summary.assigned_by_type.length) {
+      html += `<div style="padding:12px;border-bottom:1px solid var(--border)">
+        <div class="sd-label" style="margin-bottom:8px">Ekip Atamaları</div>`;
+      summary.assigned_by_type.forEach(a => {
+        html += `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(48,54,61,.4)">
+          <span>${ROLE_NAMES[a.team_type]||a.team_type}</span>
+          <b>${a.cnt} sokak</b>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (summary.completed_by_worker.length) {
+      html += `<div style="padding:12px">
+        <div class="sd-label" style="margin-bottom:8px">Bugün Tamamlayanlar</div>`;
+      summary.completed_by_worker.forEach(w => {
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(48,54,61,.4)">
+          <div>
+            <div style="font-size:13px;font-weight:700">${esc(w.display_name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${ROLE_NAMES[w.role]||w.role}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:700;color:var(--green)">${w.cnt} sokak</div>
+            <div style="font-size:11px;color:var(--muted)">son: ${timeAgo(w.last_at)}</div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div style="padding:12px;color:var(--muted);font-size:13px;text-align:center">Bugün henüz tamamlanan sokak yok</div>`;
+    }
+
+    el('sidePanelBody').innerHTML = html;
+  } catch(e) {
+    el('sidePanelBody').innerHTML = `<p style="color:var(--red);padding:12px">${e.message}</p>`;
+  }
+}
+
 // ── Menü ──────────────────────────────────────────────────────────────────────
 el('menuBtn').addEventListener('click', async () => {
-  // Mahalleleri güncelle
   const sel = el('nbSelect');
   sel.innerHTML = '<option value="">— Mahalle seç —</option>';
   for (const nb of S.neighborhoods) {
@@ -883,7 +1181,6 @@ el('menuBtn').addEventListener('click', async () => {
     sel.appendChild(opt);
   }
 
-  // Saha personeli için mahalle notu
   const section = el('menuRoleSection');
   if (!SUPERVISOR_ROLES.has(S.user.role)) {
     section.innerHTML = S.neighborhoods.length
@@ -904,9 +1201,11 @@ el('menuBtn').addEventListener('click', async () => {
       </select>
       <button id="addNbBtn" disabled style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--green);background:var(--green);color:#fff;font-size:13px;font-weight:600">+ Mahalle Ekle</button>
       <hr style="border-color:var(--border);margin:12px 0">
-      <button id="openAssignBtn" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600">📋 Güzergah Ata</button>`;
+      <button id="openAssignBtn" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600;margin-bottom:6px">📋 Güzergah Ata</button>
+      <button id="openPersonnelBtn" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600;margin-bottom:6px">👥 Personel Yönetimi</button>
+      <button id="openWorkersBtn" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--blue);background:var(--blue);color:#fff;font-size:13px;font-weight:600;margin-bottom:6px">📍 Personel İlerlemesi</button>
+      <button id="openSummaryBtn" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600">📊 Günlük Özet</button>`;
 
-    // İl listesini yükle
     try {
       const provinces = await api('/api/osm/provinces');
       const ilSel = el('addNbIl');
@@ -991,7 +1290,6 @@ el('menuBtn').addEventListener('click', async () => {
           }),
         });
         toast(`${mahalle} eklendi — ${res.street_count || 0} sokak ✅`, 'success', 5000);
-        // Mahalleleri yenile
         const me = await api('/api/me');
         S.neighborhoods = me.neighborhoods;
         const nbSel = el('nbSelect');
@@ -1002,7 +1300,6 @@ el('menuBtn').addEventListener('click', async () => {
           if (S.activeNb && nb.id === S.activeNb.id) o.selected = true;
           nbSel.appendChild(o);
         });
-        // Seçili mahalleye geç
         if (!S.activeNb) {
           const newNb = S.neighborhoods.find(n => n.name === res.name || n.id === res.id);
           if (newNb) { closeModal('menuModal'); loadNeighborhood(newNb); return; }
@@ -1013,14 +1310,11 @@ el('menuBtn').addEventListener('click', async () => {
     };
 
     el('openAssignBtn').onclick = () => { closeModal('menuModal'); openAssignPanel(); };
-
-    // Personel yönetimi butonu
-    const personnelBtnHtml = `<button id="openPersonnelBtn" style="width:100%;padding:10px;margin-top:6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;font-weight:600">👥 Personel Yönetimi</button>`;
-    el('menuRoleSection').insertAdjacentHTML('beforeend', personnelBtnHtml);
     el('openPersonnelBtn').onclick = () => { closeModal('menuModal'); openPersonnelPanel(); };
+    el('openWorkersBtn').onclick = () => { closeModal('menuModal'); openWorkersPanel(); };
+    el('openSummaryBtn').onclick = () => { closeModal('menuModal'); openDailySummary(); };
   }
 
-  // Çıkış butonuna ad yaz
   const logBtn = el('logoutBtn');
   if (logBtn) logBtn.textContent = `Çıkış (${S.user.display_name})`;
 
@@ -1047,7 +1341,6 @@ async function openAssignPanel() {
   S.assignSelected.clear();
   el('assignBarCount').textContent = '0';
 
-  // Kalıcı toggle sıfırla
   el('assignPermanent').checked = false;
   el('assignDateSection').style.display = '';
 
@@ -1055,10 +1348,8 @@ async function openAssignPanel() {
     el('assignDateSection').style.display = el('assignPermanent').checked ? 'none' : '';
   };
 
-  // Tarih varsayılanı: bugün
   el('assignDate').value = todayStr();
 
-  // Vardiyaları yükle
   try {
     const shifts = await api(`/api/shifts?district_id=${S.user.district_id}`);
     const sel = el('assignShift');
@@ -1068,7 +1359,6 @@ async function openAssignPanel() {
     });
   } catch(e) {}
 
-  // Ekip kullanıcılarını yükle
   try {
     const users = await api('/api/users');
     const teamType = el('assignTeamType').value;
@@ -1090,26 +1380,16 @@ async function openAssignPanel() {
     } catch(e) {}
   };
 
-  // Sokakları atama moduna al
   renderStreets(S.streets.map(s => ({...s, completed: false})));
   openModal('assignModal');
 }
 
-el('assignCancelBtn').addEventListener('click', () => {
-  _exitAssignMode();
-});
-
-el('assignMapBtn').addEventListener('click', () => {
-  _enterAssignSelectMode('map');
-});
-
-el('assignListBtn').addEventListener('click', () => {
-  _enterAssignSelectMode('list');
-});
+el('assignCancelBtn').addEventListener('click', () => { _exitAssignMode(); });
+el('assignMapBtn').addEventListener('click', () => { _enterAssignSelectMode('map'); });
+el('assignListBtn').addEventListener('click', () => { _enterAssignSelectMode('list'); });
 
 // ── Atama çubuğu ─────────────────────────────────────────────────────────────
 function _enterAssignSelectMode(mode) {
-  // Config'i kaydet
   S._assignConfig = {
     permanent: el('assignPermanent').checked,
     work_date: el('assignDate').value || todayStr(),
@@ -1120,8 +1400,8 @@ function _enterAssignSelectMode(mode) {
   closeModal('assignModal');
   el('bottombar').style.display = 'none';
   el('assignBar').style.display = 'flex';
-  const roles = {'supurgeci':'Yaya Süpürgeci','aracli_supurge':'Araçlı Süpürge','cop_araci':'Çöp Aracı','ring_araci':'Ring Aracı','kaba_atik':'Kaba Atık','konteyner_yikama':'Kont. Yıkama'};
-  el('assignBarTeam').textContent = roles[S._assignConfig.team_type] || S._assignConfig.team_type;
+  const roleLabels = {'supurgeci':'Yaya Süpürgeci','aracli_supurge':'Araçlı Süpürge','cop_araci':'Çöp Aracı','ring_araci':'Ring Aracı','kaba_atik':'Kaba Atık','konteyner_yikama':'Kont. Yıkama'};
+  el('assignBarTeam').textContent = roleLabels[S._assignConfig.team_type] || S._assignConfig.team_type;
   _updateAssignCount();
   if (mode === 'list') _openAssignList();
 }
@@ -1233,13 +1513,11 @@ async function viewWorkerStreets(uid, name) {
   try {
     const data = await api(`/api/workers/${uid}/streets?neighborhood_id=${S.activeNb.id}&date=${todayStr()}`);
     if (!data.streets.length) { toast(`${name} için bugün atanmış sokak yok`, '', 4000); return; }
-    // Mevcut sokakları haritadan kaldır, personelin sokaklarını göster
     renderStreets(data.streets);
     fitMapToStreets(data.streets);
-    // Üst bara kimin sokakları gösterildiğini yaz
     el('nbTitle').textContent = `👁 ${name}`;
-    el('progressLabel').textContent =
-      `${data.streets.filter(s=>s.completed).length} / ${data.streets.length} tamamlandı`;
+    const done = data.streets.filter(s=>s.completed).length;
+    el('progressLabel').textContent = `${done} / ${data.streets.length} tamamlandı`;
     toast(`${name} — ${data.streets.length} sokak gösteriliyor`, 'success', 3000);
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -1306,7 +1584,6 @@ async function openEditPersonnel(user) {
     el('epNotifSweepRow').style.display = SUPERVISOR_ROLES.has(el('epRole').value) ? '' : 'none';
   };
 
-  // Vardiyaları yükle
   const shiftSel = el('epShift');
   shiftSel.innerHTML = '<option value="">— Seçmek zorunda değilsiniz —</option>';
   if (S.user.district_id) {
@@ -1364,7 +1641,6 @@ el('epSaveBtn').addEventListener('click', async () => {
 function openModal(id) { el(id).classList.remove('hidden'); }
 function closeModal(id) { el(id).classList.add('hidden'); }
 
-// Overlay dışına tıklayınca kapat
 document.querySelectorAll('.modal-overlay').forEach(ov => {
   ov.addEventListener('click', e => { if (e.target === ov) closeModal(ov.id); });
 });
@@ -1387,24 +1663,20 @@ async function init() {
   try {
     initMap();
   } catch(e) {
-    // Leaflet henüz yüklenmediyse kısa bekleyip tekrar dene
     await new Promise(r => setTimeout(r, 200));
     try { initMap(); } catch(e2) { toast('Harita yüklenemedi. Sayfayı yenileyin.', 'error'); return; }
   }
-  // Harita boyutunu zorla hesapla (mobilde flex layout gecikmesine karşı)
   setTimeout(() => S.map && S.map.invalidateSize(), 300);
+  _setupDeviceOrientation();
+
+  // Çevrimdışı kuyruğu kontrol et
+  if (navigator.onLine) syncOfflineQueue().catch(()=>{});
+
   try {
     const data = await api('/api/me');
     S.user = data.user;
     S.neighborhoods = data.neighborhoods;
 
-    // Rol bazlı alt bar
-    if (SUPERVISOR_ROLES.has(S.user.role)) {
-      el('addNotifBtn').style.display = 'none'; // çavuş de bildirim ekleyebilir ama bottombar'da değil
-      el('addNotifBtn').style.display = '';
-    }
-
-    // Son mahalle
     const lastId = localStorage.getItem('lastNbId');
     const nb = lastId && S.neighborhoods.find(n => n.id === Number(lastId))
                 || S.neighborhoods[0];
