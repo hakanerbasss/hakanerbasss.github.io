@@ -968,9 +968,23 @@ Rules:
 
     # Ses ekle — YouTube + Instagram uyumlu encode
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
+    disclaimer_file = scene_dir / "disclaimer.txt"
+    disclaimer_file.write_text(
+        "Gorseller temsilidir. Gercek kisi veya mekanla ilgili degildir.",
+        encoding="utf-8"
+    )
+    disclaimer_filter = (
+        f"drawtext=textfile={disclaimer_file.absolute()}"
+        f":fontsize=20:fontcolor=white@0.9"
+        f":box=1:boxcolor=black@0.55:boxborderw=6"
+        f":x=(w-text_w)/2:y=h-th-12"
+    )
+    if font_path:
+        disclaimer_filter += f":fontfile={font_path}"
     await arun_ffmpeg([
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
+        "-vf", disclaimer_filter,
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
@@ -2053,13 +2067,28 @@ Rules:
         check=True, capture_output=True, timeout=180,
     )
 
-    # Ses ekle
+    # Ses ekle + disclaimer overlay
     output_file = OUTPUT_DIR / f"{uid}_long.mp4"
+    lv_disclaimer_file = scene_dir / "disclaimer.txt"
+    lv_disclaimer_file.write_text(
+        "Gorseller temsilidir. Gercek kisi veya mekanla ilgili degildir.",
+        encoding="utf-8"
+    )
+    lv_disclaimer_filter = (
+        f"drawtext=textfile={lv_disclaimer_file.absolute()}"
+        f":fontsize=20:fontcolor=white@0.9"
+        f":box=1:boxcolor=black@0.55:boxborderw=6"
+        f":x=(w-text_w)/2:y=h-th-12"
+    )
+    if font_path:
+        lv_disclaimer_filter += f":fontfile={font_path}"
     await asyncio.to_thread(subprocess.run,
         ["ffmpeg", "-y", "-i", str(merged), "-i", str(combined_audio),
          "-map", "0:v:0", "-map", "1:a:0",
-         "-c:v", "copy", "-c:a", "aac", str(output_file)],
-        check=True, capture_output=True, timeout=120,
+         "-vf", lv_disclaimer_filter,
+         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+         "-pix_fmt", "yuv420p", "-c:a", "aac", str(output_file)],
+        check=True, capture_output=True, timeout=300,
     )
 
     full_script = " ".join(s["text"] for s in scenes)
