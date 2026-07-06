@@ -4004,16 +4004,38 @@ async def auto_shorts_job():
         exclude_str = " | ".join(used_topics) if used_topics else ""
 
         async with httpx.AsyncClient(timeout=900) as client:
-            # 1. Video üret (trend haberden)
-            r = await client.post(
-                "http://localhost:8001/api/generate-shorts",
-                data={"topic": "", "api_key": api_key, "lang": s_lang, "voice": s_voice,
-                      "speed": "1.0", "exclude_topics": exclude_str},
-            )
-            if r.status_code != 200:
-                save_sched_log("error", f"Video üretilemedi: {r.text[:800]}")
+            _MAX_DEDUP_RETRY = 3
+            d = None
+            for _attempt in range(_MAX_DEDUP_RETRY):
+                # 1. Video üret (trend haberden)
+                r = await client.post(
+                    "http://localhost:8001/api/generate-shorts",
+                    data={"topic": "", "api_key": api_key, "lang": s_lang, "voice": s_voice,
+                          "speed": "1.0", "exclude_topics": exclude_str},
+                )
+                if r.status_code != 200:
+                    save_sched_log("error", f"Video üretilemedi: {r.text[:800]}")
+                    return
+                d = r.json()
+                gen_title = d.get("title", "")
+
+                # Dedup: video üretildi ama Instagram'a zaten atılmış konu mu?
+                if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
+                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] '{gen_title[:60]}' daha önce atıldı, farklı haber deneniyor…", flush=True)
+                    # Üretilen başlığı exclude listesine ekle, bir sonraki denemede bu konu seçilmesin
+                    exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
+                    if _attempt < _MAX_DEDUP_RETRY - 1:
+                        continue  # yeniden dene
+                    else:
+                        save_sched_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı")
+                        return
+
+                # Dedup geçti — bu konuyu kullanıyoruz
+                break
+
+            if d is None:
                 return
-            d = r.json()
+
             add_shorts_used_topic(d.get("title", ""))
 
             filename = d["video"].split("/").pop()
@@ -4716,19 +4738,38 @@ async def auto_ig_only_tr_job():
         used_topics = get_ig_only_tr_used_topics()
         exclude_str = " | ".join(used_topics) if used_topics else ""
 
+        _MAX_DEDUP_RETRY = 3
+        d = None
         async with httpx.AsyncClient(timeout=900) as client:
-            r = await client.post(
-                "http://localhost:8001/api/generate-shorts",
-                data={"topic": "", "api_key": api_key, "lang": "tr", "voice": s_voice,
-                      "speed": "1.0", "exclude_topics": exclude_str, "region": "TR", "platform": "instagram"},
-            )
-            if r.status_code != 200:
-                save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
-                return
-            d = r.json()
-            add_ig_only_tr_used_topic(d.get("title", ""))
-            filename = d["video"].split("/").pop()
-            thumbnail = (d.get("thumbnail") or "").split("/").pop()
+            for _attempt in range(_MAX_DEDUP_RETRY):
+                r = await client.post(
+                    "http://localhost:8001/api/generate-shorts",
+                    data={"topic": "", "api_key": api_key, "lang": "tr", "voice": s_voice,
+                          "speed": "1.0", "exclude_topics": exclude_str, "region": "TR", "platform": "instagram"},
+                )
+                if r.status_code != 200:
+                    save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
+                    return
+                d = r.json()
+                gen_title = d.get("title", "")
+
+                # Dedup: video üretilmeden önce Instagram konu kontrolü
+                if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
+                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] '{gen_title[:60]}' daha önce atıldı, farklı haber deneniyor…", flush=True)
+                    exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
+                    if _attempt < _MAX_DEDUP_RETRY - 1:
+                        continue
+                    else:
+                        save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı")
+                        return
+                break  # dedup geçti
+
+        if d is None:
+            return
+
+        add_ig_only_tr_used_topic(d.get("title", ""))
+        filename = d["video"].split("/").pop()
+        thumbnail = (d.get("thumbnail") or "").split("/").pop()
 
         # Sadece Instagram — YouTube'a gönderilmez
         ig_cfg["post_reels"] = True
