@@ -38,6 +38,7 @@ const S = {
   _refreshTimer: null,
   heading: null,
   _needsOrientationPermission: false,
+  routeLayer: null,
 };
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
@@ -171,6 +172,7 @@ function refreshStreetColor(streetId) {
 
 // ── Mahalle yükleme ─────────────────────────────────────────────────────────────
 async function loadNeighborhood(nb) {
+  clearRoute();
   S.activeNb = nb;
   el('nbTitle').textContent = nb.name;
   el('progressLabel').textContent = 'Yükleniyor…';
@@ -266,6 +268,11 @@ function onStreetClick(street) {
   if (lr) {
     lr.vis.setStyle({color:'#1f6feb', weight:8, opacity:1});
     setTimeout(() => refreshStreetColor(street.id), 1800);
+  }
+  // Süpürgeci modunda tıklanan sokağa otomatik rota çiz
+  if (S.user && !SUPERVISOR_ROLES.has(S.user.role) && S.lastPos && street.geometry && street.geometry.length) {
+    const mid = streetMidpoint(street.geometry);
+    drawRouteTo(mid[0], mid[1], street.name);
   }
   openStreetDetail(street);
 }
@@ -387,6 +394,18 @@ function renderStreetDetail(d, street) {
   });
 
   const actions = el('sdActions');
+
+  if (S.lastPos && street.geometry && street.geometry.length) {
+    const routeBtn = document.createElement('button');
+    routeBtn.textContent = '🧭 Rota';
+    routeBtn.style.cssText = 'background:var(--blue);border-color:var(--blue);color:#fff';
+    routeBtn.onclick = () => {
+      const mid = streetMidpoint(street.geometry);
+      closeModal('streetDetailModal');
+      drawRouteTo(mid[0], mid[1], street.name);
+    };
+    actions.appendChild(routeBtn);
+  }
 
   const notifBtn = document.createElement('button');
   notifBtn.textContent = '⚠️ Bildirim Ekle';
@@ -540,6 +559,49 @@ function _navigateToNextStreet() {
   speak(`Sıradaki: ${nearest.name}, yaklaşık ${Math.round(nearestD)} metre`);
   toast(`�� Sıradaki: ${nearest.name} — ${Math.round(nearestD)}m`, '', 5000);
 }
+
+// ── Rota çizme (OSRM yürüyüş) ────────────────────────────────────────────────
+async function drawRouteTo(destLat, destLon, destName) {
+  clearRoute();
+  if (!S.lastPos) { toast('GPS konumu alınamadı', 'error'); return; }
+  const {lat, lng} = S.lastPos;
+  el('clearRouteBtn').style.display = 'flex';
+  try {
+    const url = `https://router.project-osrm.org/route/v1/foot/${lng.toFixed(6)},${lat.toFixed(6)};${destLon.toFixed(6)},${destLat.toFixed(6)}?overview=full&geometries=geojson`;
+    const ctrl = new AbortController();
+    const tmo = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(url, {signal: ctrl.signal});
+    clearTimeout(tmo);
+    const data = await res.json();
+    if (!data.routes || !data.routes.length) throw new Error('rota_yok');
+    const coords = data.routes[0].geometry.coordinates.map(([lo, la]) => [la, lo]);
+    const dist = data.routes[0].distance;
+    const dur = Math.round(data.routes[0].duration / 60);
+    S.routeLayer = L.polyline(coords, {
+      color: '#1f6feb', weight: 5, opacity: 0.85, dashArray: '10,6', lineCap: 'round'
+    }).addTo(S.map);
+    S.map.fitBounds(S.routeLayer.getBounds(), {padding: [50, 50]});
+    const distStr = dist > 999 ? (dist / 1000).toFixed(1) + ' km' : Math.round(dist) + ' m';
+    toast(`🧭 ${esc(destName)} — ${distStr}, ~${dur} dk`, '', 6000);
+    speak(`${destName}. ${Math.round(dist) < 1000 ? Math.round(dist) + ' metre' : (dist/1000).toFixed(1) + ' kilometre'}, yaklaşık ${dur} dakika`);
+  } catch(e) {
+    // OSRM erişilemezse düz hat fallback
+    const dist = Math.round(haversine(lat, lng, destLat, destLon));
+    S.routeLayer = L.polyline([[lat, lng], [destLat, destLon]], {
+      color: '#1f6feb', weight: 4, opacity: 0.65, dashArray: '8,8',
+    }).addTo(S.map);
+    S.map.fitBounds(S.routeLayer.getBounds(), {padding: [50, 50]});
+    toast(`🧭 ${esc(destName)} — ~${dist} m`, '', 5000);
+  }
+}
+
+function clearRoute() {
+  if (S.routeLayer) { S.map.removeLayer(S.routeLayer); S.routeLayer = null; }
+  const btn = el('clearRouteBtn');
+  if (btn) btn.style.display = 'none';
+}
+
+el('clearRouteBtn').addEventListener('click', clearRoute);
 
 // ── En yakın sokak butonu ──────────────────────────────────────────────────────
 el('nearestBtn').addEventListener('click', () => {
