@@ -628,17 +628,53 @@ async def _generate_shorts_core(
 
     # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
     # Konu belirlenmemişse önce ucuz bir çağrıyla konu seçtir, sonra haberi ara
+    _TR_TOPIC_PRIORITY = """
+TOPIC QUALITY PRIORITY (always pick from the HIGHEST available tier):
+
+TIER 1 — MAXIMUM engagement (pick these first):
+  • Disasters & emergencies: earthquake, flood, fire, explosion, accident, storm
+  • Wars & conflicts: military operations, attacks, casualties, territorial changes
+  • Major political breaking news: arrests, resignations, elections, court verdicts with major impact
+  • Major economic shocks: currency collapse, stock market crash, major fraud/scandal
+
+TIER 2 — HIGH engagement:
+  • International relations: summits, sanctions, foreign policy decisions
+  • Major crime or terrorism: mass incidents, high-profile cases
+  • Health emergencies: epidemic outbreaks, major accident casualties
+  • Major sports events: championships, record-breaking, national team results
+
+TIER 3 — MEDIUM engagement (use if nothing from Tier 1-2 available):
+  • Domestic politics: parliamentary decisions, party news with real impact
+  • Technology or science discoveries with broad public interest
+  • Major celebrity or public figure news with real legal/social impact
+
+TIER 4 — LOW quality — AVOID unless nothing else available:
+  • Local minor disputes (beach chair arguments, neighborhood conflicts)
+  • Routine political statements without action
+  • Minor local incidents with no national significance
+  • Celebrity gossip without legal or major social consequences
+  • "X said Y" statements without actual events
+
+Always pick the HIGHEST tier topic available in the trending list.
+"""
+
     gnews_data = {}
     search_query = topic.strip()
     if not search_query:
         try:
+            priority_prompt = (
+                f"From this list of Turkish trending topics, pick ONE that would make the most engaging breaking news Short.\n"
+                f"{_TR_TOPIC_PRIORITY}\n"
+                f"Return ONLY the topic name in Turkish, nothing else.\n\nTopics: {trend_topics}"
+                + (f"\n\nAvoid: {exclude_topics}" if exclude_topics.strip() else "")
+            ) if lang != "en" else (
+                f"From this list of trending topics, pick ONE that would make the most engaging breaking news Short. "
+                f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
+                + (f"\n\nAvoid: {exclude_topics}" if exclude_topics.strip() else "")
+            )
             sel_resp = client.chat.completions.create(
                 model="deepseek-chat",
-                messages=[{"role": "user", "content":
-                    f"From this list of Turkish trending topics, pick ONE that would make the most engaging breaking news Short. "
-                    f"Return ONLY the topic name in Turkish, nothing else.\n\nTopics: {trend_topics}"
-                    + (f"\n\nAvoid: {exclude_topics}" if exclude_topics.strip() else "")
-                }],
+                messages=[{"role": "user", "content": priority_prompt}],
                 temperature=0.5,
                 max_tokens=60,
             )
@@ -672,7 +708,8 @@ async def _generate_shorts_core(
         )
     else:
         topic_instruction = (
-            f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}"
+            f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}\n"
+            f"{_TR_TOPIC_PRIORITY}"
             f"{get_diversity_instruction()}"
         )
     yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
