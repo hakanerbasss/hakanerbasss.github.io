@@ -505,6 +505,30 @@
     </div>
   </div>
 
+  <div id="spiker-section" style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch" style="margin:0;">
+        <input type="checkbox" id="use-spiker-mode" onchange="onSpikerToggle(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎙️ Spiker Modu</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">Fotoğrafını yükle — seni konuşturarak video sağ altına ekler (LongCat AI, ek 2-3 dk)</div>
+      </div>
+    </div>
+    <div id="spiker-wrap" style="display:none;margin-top:12px;">
+      <div id="spiker-avatar-preview" style="display:none;margin-bottom:8px;">
+        <img id="spiker-avatar-img" src="" style="width:64px;height:64px;object-fit:cover;border-radius:50%;border:2px solid #333;vertical-align:middle;">
+        <span style="font-size:12px;color:#6dbf6d;margin-left:8px;">Kayıtlı fotoğraf kullanılacak</span>
+        <button onclick="clearSpikerAvatar()" style="margin-left:10px;padding:2px 8px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:6px;color:#f87171;font-size:11px;cursor:pointer;">Değiştir</button>
+      </div>
+      <div id="spiker-upload-area">
+        <input type="file" id="avatar-input" accept="image/*" onchange="onAvatarSelected(this)" style="font-size:12px;color:#999;">
+        <div style="font-size:11px;color:#555;margin-top:6px;">Önden çekilmiş, net bir yüz fotoğrafı kullan. Bir kez yükle, sonra otomatik hatırlanır.</div>
+      </div>
+    </div>
+  </div>
+
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
     <button onclick="generateShorts()" id="btn-shorts">
       <div class="spinner" id="spin-shorts"></div>
@@ -2289,6 +2313,17 @@ async function generateShorts(allowEmpty = false) {
       for (let i = 0; i < files.length; i++) fd.append('custom_images', files[i]);
     }
 
+    const spikerOn = document.getElementById('use-spiker-mode').checked;
+    fd.append('spiker_mode', spikerOn ? 'true' : 'false');
+    if (spikerOn) {
+      const avatarFile = document.getElementById('avatar-input').files[0];
+      if (avatarFile) {
+        fd.append('avatar_image', avatarFile);
+      } else if (!_spikerHasSavedAvatar) {
+        return showError('err-shorts', 'Spiker Modu için fotoğraf yükleyin.');
+      }
+    }
+
     const startR = await fetch('/api/generate-shorts-async', { method: 'POST', body: fd });
     if (!startR.ok) {
       const ct = startR.headers.get('content-type') || '';
@@ -2300,6 +2335,41 @@ async function generateShorts(allowEmpty = false) {
   } catch(e) {
     showError('err-shorts', e.message);
   }
+}
+
+let _spikerHasSavedAvatar = false;
+
+async function onSpikerToggle(checked) {
+  const wrap = document.getElementById('spiker-wrap');
+  wrap.style.display = checked ? 'block' : 'none';
+  if (checked && !_spikerHasSavedAvatar) {
+    try {
+      const r = await fetch('/api/avatar-status');
+      const d = await r.json();
+      if (d.has_avatar) {
+        _spikerHasSavedAvatar = true;
+        document.getElementById('spiker-avatar-img').src = '/api/avatar-photo?' + Date.now();
+        document.getElementById('spiker-avatar-preview').style.display = 'block';
+        document.getElementById('spiker-upload-area').style.display = 'none';
+      }
+    } catch(_) {}
+  }
+}
+
+function onAvatarSelected(input) {
+  if (!input.files[0]) return;
+  const url = URL.createObjectURL(input.files[0]);
+  document.getElementById('spiker-avatar-img').src = url;
+  document.getElementById('spiker-avatar-preview').style.display = 'block';
+  document.getElementById('spiker-upload-area').style.display = 'block';
+  _spikerHasSavedAvatar = false;
+}
+
+function clearSpikerAvatar() {
+  _spikerHasSavedAvatar = false;
+  document.getElementById('avatar-input').value = '';
+  document.getElementById('spiker-avatar-preview').style.display = 'none';
+  document.getElementById('spiker-upload-area').style.display = 'block';
 }
 
 async function uploadLVToYouTube() {

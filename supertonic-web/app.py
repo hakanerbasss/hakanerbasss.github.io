@@ -198,6 +198,9 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 COMEDY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+AVATAR_FILE = UPLOAD_DIR / "avatar_photo.jpg"
+LONGCAT_SPACE = "https://victor-longcat-video-avatar-1-5.hf.space"
+
 tts_model = None
 whisper_model = None
 
@@ -591,6 +594,118 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
         return {}
 
 
+async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Path) -> bool:
+    """Avatar fotoğrafı + ses → lip-synced video. HuggingFace LongCat Space'i kullanır."""
+    try:
+        timeout = httpx.Timeout(30.0, read=360.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as cli:
+            with open(photo_path, "rb") as fp, open(audio_path, "rb") as fa:
+                up_r = await cli.post(
+                    f"{LONGCAT_SPACE}/upload",
+                    files=[
+                        ("files", (photo_path.name, fp.read(), "image/jpeg")),
+                        ("files", (audio_path.name, fa.read(), "audio/wav")),
+                    ],
+                )
+            if up_r.status_code != 200:
+                print(f"[LONGCAT] Upload failed: {up_r.status_code} {up_r.text[:200]}", flush=True)
+                return False
+            uploaded = up_r.json()
+            img_ref = uploaded[0] if isinstance(uploaded[0], str) else uploaded[0].get("path", "")
+            aud_ref = uploaded[1] if isinstance(uploaded[1], str) else uploaded[1].get("path", "")
+
+            session_hash = uuid.uuid4().hex[:10]
+            join_r = await cli.post(
+                f"{LONGCAT_SPACE}/queue/join",
+                json={
+                    "data": [
+                        {"path": img_ref, "meta": {"_type": "gradio.FileData"}},
+                        {"path": aud_ref, "meta": {"_type": "gradio.FileData"}},
+                    ],
+                    "event_data": None,
+                    "fn_index": 0,
+                    "session_hash": session_hash,
+                    "trigger_id": 0,
+                },
+            )
+            if join_r.status_code != 200:
+                print(f"[LONGCAT] Queue join failed: {join_r.status_code}", flush=True)
+                return False
+
+            deadline = time.time() + 360
+            async with cli.stream(
+                "GET",
+                f"{LONGCAT_SPACE}/queue/data?session_hash={session_hash}",
+                headers={"Accept": "text/event-stream"},
+            ) as stream:
+                async for raw_line in stream.aiter_lines():
+                    if time.time() > deadline:
+                        print("[LONGCAT] SSE timeout", flush=True)
+                        return False
+                    if not raw_line.startswith("data:"):
+                        continue
+                    try:
+                        evt = json.loads(raw_line[5:].strip())
+                    except Exception:
+                        continue
+                    msg = evt.get("msg", "")
+                    if msg == "process_completed":
+                        out = evt.get("output", {}).get("data", [])
+                        if not out:
+                            print("[LONGCAT] Empty output data", flush=True)
+                            return False
+                        video_info = out[0]
+                        if isinstance(video_info, dict):
+                            vpath = video_info.get("path") or video_info.get("url", "")
+                        else:
+                            vpath = str(video_info)
+                        if not vpath:
+                            return False
+                        dl_url = vpath if vpath.startswith("http") else f"{LONGCAT_SPACE}/file={vpath}"
+                        dl = await cli.get(dl_url)
+                        if dl.status_code == 200:
+                            output_path.write_bytes(dl.content)
+                            print(f"[LONGCAT] Başarılı → {output_path.name}", flush=True)
+                            return True
+                        print(f"[LONGCAT] Download failed: {dl.status_code}", flush=True)
+                        return False
+                    elif msg == "process_errored":
+                        print(f"[LONGCAT] Process errored: {evt.get('output', '')}", flush=True)
+                        return False
+        return False
+    except Exception as e:
+        print(f"[LONGCAT] API hatası: {e}", flush=True)
+        return False
+
+
+async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output: Path) -> bool:
+    """Avatar videosunu ana videonun sağ alt köşesine PIP olarak yerleştirir."""
+    try:
+        # %22 genişlik, sağ alt köşe, 20px kenar + 80px taban boşluğu
+        filter_complex = (
+            "[1:v]scale=trunc(iw*0.22/2)*2:trunc(ih*0.22/2)*2[av];"
+            "[0:v][av]overlay=main_w-overlay_w-20:main_h-overlay_h-80"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(main_video.absolute()),
+            "-i", str(avatar_video.absolute()),
+            "-filter_complex", filter_complex,
+            "-map", "0:a",
+            "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
+            "-pix_fmt", "yuv420p", "-r", "30",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-shortest",
+            str(output.absolute()),
+        ]
+        await arun_ffmpeg(cmd, timeout=300, step="avatar overlay")
+        return True
+    except Exception as e:
+        print(f"[OVERLAY] Hata: {e}", flush=True)
+        return False
+
+
 async def _generate_shorts_core(
     topic: str,
     api_key: str,
@@ -602,6 +717,8 @@ async def _generate_shorts_core(
     use_video: str = "false",
     platform: str = "youtube",
     custom_image_paths: list = None,
+    spiker_mode: bool = False,
+    avatar_path: Path = None,
 ):
     import json
     import httpx
@@ -1013,6 +1130,30 @@ Rules:
     except Exception:
         pass
 
+    # Spiker Modu: avatar fotoğrafı varsa LongCat API ile lip-sync video oluştur
+    if spiker_mode and avatar_path and Path(avatar_path).exists():
+        try:
+            print(f"[SPIKER] LongCat API çağrısı başlıyor…", flush=True)
+            spiker_audio = OUTPUT_DIR / f"{uid}_spiker_audio.wav"
+            shutil.copy2(str(combined_audio.absolute()), str(spiker_audio))
+            avatar_video_path = OUTPUT_DIR / f"{uid}_avatar.mp4"
+            lc_ok = await _call_longcat_api(Path(avatar_path), spiker_audio, avatar_video_path)
+            if lc_ok and avatar_video_path.exists():
+                spiker_output = OUTPUT_DIR / f"{uid}_spiker_shorts.mp4"
+                ov_ok = await _overlay_avatar_on_video(output_file, avatar_video_path, spiker_output)
+                if ov_ok and spiker_output.exists():
+                    output_file.unlink(missing_ok=True)
+                    spiker_output.rename(output_file)
+                    print(f"[SPIKER] Avatar overlay tamamlandı", flush=True)
+                else:
+                    print("[SPIKER] Overlay başarısız, orijinal video korunuyor", flush=True)
+            else:
+                print("[SPIKER] LongCat başarısız, orijinal video korunuyor", flush=True)
+            for tmp in (spiker_audio, avatar_video_path):
+                tmp.unlink(missing_ok=True)
+        except Exception as _sp_e:
+            print(f"[SPIKER] Hata: {_sp_e}", flush=True)
+
     # Geçici dosyaları temizle (disk dolmaması için)
     shutil.rmtree(scene_dir, ignore_errors=True)
 
@@ -1125,10 +1266,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -1160,6 +1301,8 @@ async def generate_shorts_async_endpoint(
     use_video: str = Form("false"),
     platform: str = Form("youtube"),
     custom_images: list[UploadFile] = File(default=[]),
+    spiker_mode: str = Form("false"),
+    avatar_image: UploadFile = File(default=None),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -1175,11 +1318,32 @@ async def generate_shorts_async_endpoint(
         dest = UPLOAD_DIR / f"customimg_{uuid.uuid4().hex}_{i}.jpg"
         if _save_as_jpeg(data, dest):
             custom_image_paths.append(dest)
+
+    use_spiker = spiker_mode.lower() in ("true", "1", "yes")
+    saved_avatar_path = None
+    if use_spiker and avatar_image and avatar_image.filename:
+        av_data = await avatar_image.read()
+        av_dest = UPLOAD_DIR / f"avatar_{uuid.uuid4().hex}.jpg"
+        if _save_as_jpeg(av_data, av_dest):
+            saved_avatar_path = av_dest
+            shutil.copy2(str(av_dest), str(AVATAR_FILE))
+        else:
+            use_spiker = False
+    elif use_spiker and AVATAR_FILE.exists():
+        saved_avatar_path = AVATAR_FILE
+
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path))
     return {"ok": True}
+
+
+@app.get("/api/avatar-status")
+async def get_avatar_status():
+    if AVATAR_FILE.exists():
+        return {"has_avatar": True, "path": f"/api/avatar-photo"}
+    return {"has_avatar": False}
 
 
 @app.get("/api/manual-shorts/status")
@@ -3909,6 +4073,13 @@ async def get_thumbnail(filename: str):
     if not path.exists():
         raise HTTPException(404, "Thumbnail bulunamadı")
     return FileResponse(str(path), media_type="image/jpeg")
+
+
+@app.get("/api/avatar-photo")
+async def get_avatar_photo():
+    if not AVATAR_FILE.exists():
+        raise HTTPException(404, "Avatar fotoğrafı yüklenmedi")
+    return FileResponse(str(AVATAR_FILE), media_type="image/jpeg")
 
 
 @app.get("/api/audio/{filename}")
