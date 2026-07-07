@@ -198,6 +198,8 @@ fun BlueChipApp() {
             )
         },
         bottomBar = {
+            Column {
+            com.bluechip.finance.ui.components.BannerAd(modifier = androidx.compose.ui.Modifier.fillMaxWidth())
             // Yuzen dock tarzi alt bar
             Box(
                 modifier = androidx.compose.ui.Modifier
@@ -304,6 +306,7 @@ fun BlueChipApp() {
                         }
                     }
                 }
+            }
             }
             }
             }
@@ -510,4 +513,3 @@ fun BlueChipApp() {
         }
         }
     }
-
