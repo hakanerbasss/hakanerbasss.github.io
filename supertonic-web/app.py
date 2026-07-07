@@ -594,7 +594,7 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
         return {}
 
 
-async def _trim_audio_for_longcat(src: Path, dst: Path, max_sec: int = 9) -> bool:
+async def _trim_audio_for_longcat(src: Path, dst: Path, max_sec: int = 5) -> bool:
     """Sesi max_sec saniyeye kısalt (ZeroGPU GPU-time limiti için)."""
     try:
         subprocess.run(
@@ -613,9 +613,10 @@ async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Pat
     try:
         timeout = httpx.Timeout(30.0, read=360.0)
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as cli:
+            # Gradio 5.x: /gradio_api/ prefix
             with open(photo_path, "rb") as fp, open(audio_path, "rb") as fa:
                 up_r = await cli.post(
-                    f"{LONGCAT_SPACE}/upload",
+                    f"{LONGCAT_SPACE}/gradio_api/upload",
                     files=[
                         ("files", (photo_path.name, fp.read(), "image/jpeg")),
                         ("files", (audio_path.name, fa.read(), "audio/wav")),
@@ -630,7 +631,7 @@ async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Pat
 
             session_hash = uuid.uuid4().hex[:10]
             join_r = await cli.post(
-                f"{LONGCAT_SPACE}/queue/join",
+                f"{LONGCAT_SPACE}/gradio_api/queue/join",
                 json={
                     "data": [
                         {"path": img_ref, "meta": {"_type": "gradio.FileData"}},
@@ -652,7 +653,7 @@ async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Pat
             deadline = time.time() + 360
             async with cli.stream(
                 "GET",
-                f"{LONGCAT_SPACE}/queue/data?session_hash={session_hash}",
+                f"{LONGCAT_SPACE}/gradio_api/queue/data?session_hash={session_hash}",
                 headers={"Accept": "text/event-stream"},
             ) as stream:
                 async for raw_line in stream.aiter_lines():
@@ -678,7 +679,7 @@ async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Pat
                             vpath = str(video_info)
                         if not vpath:
                             return False
-                        dl_url = vpath if vpath.startswith("http") else f"{LONGCAT_SPACE}/file={vpath}"
+                        dl_url = vpath if vpath.startswith("http") else f"{LONGCAT_SPACE}/gradio_api/file={vpath}"
                         dl = await cli.get(dl_url)
                         if dl.status_code == 200:
                             output_path.write_bytes(dl.content)
@@ -1154,7 +1155,7 @@ Rules:
             print(f"[SPIKER] LongCat API çağrısı başlıyor…", flush=True)
             # ZeroGPU GPU-time limiti: sesi 9 saniyeye kısalt, overlay'de loop ile tüm videoya yay
             spiker_audio = OUTPUT_DIR / f"{uid}_spiker_audio.wav"
-            trim_ok = await _trim_audio_for_longcat(combined_audio, spiker_audio, max_sec=9)
+            trim_ok = await _trim_audio_for_longcat(combined_audio, spiker_audio, max_sec=5)
             if not trim_ok:
                 shutil.copy2(str(combined_audio.absolute()), str(spiker_audio))
             avatar_video_path = OUTPUT_DIR / f"{uid}_avatar.mp4"
