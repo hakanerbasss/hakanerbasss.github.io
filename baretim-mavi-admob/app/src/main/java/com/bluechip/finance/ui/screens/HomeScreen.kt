@@ -350,9 +350,9 @@ fun HomeScreen(onNavigate: (String) -> Unit) {
                         AsyncImage(
                             model = article.urlToImage, contentDescription = null,
                             modifier = Modifier
-                                .fillMaxWidth().height(160.dp)
+                                .fillMaxWidth()
                                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.FillWidth
                         )
                     }
                     Column(modifier = Modifier.padding(12.dp)) {
