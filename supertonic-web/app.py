@@ -594,6 +594,20 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
         return {}
 
 
+async def _trim_audio_for_longcat(src: Path, dst: Path, max_sec: int = 9) -> bool:
+    """Sesi max_sec saniyeye kısalt (ZeroGPU GPU-time limiti için)."""
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(src), "-t", str(max_sec),
+             "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1", str(dst)],
+            check=True, capture_output=True, timeout=30,
+        )
+        return True
+    except Exception as e:
+        print(f"[LONGCAT] Ses kısaltma hatası: {e}", flush=True)
+        return False
+
+
 async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Path) -> bool:
     """Avatar fotoğrafı + ses → lip-synced video. HuggingFace LongCat Space'i kullanır."""
     try:
@@ -621,6 +635,9 @@ async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Pat
                     "data": [
                         {"path": img_ref, "meta": {"_type": "gradio.FileData"}},
                         {"path": aud_ref, "meta": {"_type": "gradio.FileData"}},
+                        "A photorealistic person speaking naturally to the camera",
+                        42,
+                        False,
                     ],
                     "event_data": None,
                     "fn_index": 0,
@@ -679,9 +696,10 @@ async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Pat
 
 
 async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output: Path) -> bool:
-    """Avatar videosunu ana videonun sağ alt köşesine PIP olarak yerleştirir."""
+    """Avatar videosunu ana videonun sağ alt köşesine PIP olarak yerleştirir (loop destekli)."""
     try:
         # %22 genişlik, sağ alt köşe, 20px kenar + 80px taban boşluğu
+        # stream_loop -1: avatar video kısa olsa bile ana video süresince tekrarlanır
         filter_complex = (
             "[1:v]scale=trunc(iw*0.22/2)*2:trunc(ih*0.22/2)*2[av];"
             "[0:v][av]overlay=main_w-overlay_w-20:main_h-overlay_h-80"
@@ -689,7 +707,7 @@ async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output:
         cmd = [
             "ffmpeg", "-y",
             "-i", str(main_video.absolute()),
-            "-i", str(avatar_video.absolute()),
+            "-stream_loop", "-1", "-i", str(avatar_video.absolute()),
             "-filter_complex", filter_complex,
             "-map", "0:a",
             "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
@@ -1134,8 +1152,11 @@ Rules:
     if spiker_mode and avatar_path and Path(avatar_path).exists():
         try:
             print(f"[SPIKER] LongCat API çağrısı başlıyor…", flush=True)
+            # ZeroGPU GPU-time limiti: sesi 9 saniyeye kısalt, overlay'de loop ile tüm videoya yay
             spiker_audio = OUTPUT_DIR / f"{uid}_spiker_audio.wav"
-            shutil.copy2(str(combined_audio.absolute()), str(spiker_audio))
+            trim_ok = await _trim_audio_for_longcat(combined_audio, spiker_audio, max_sec=9)
+            if not trim_ok:
+                shutil.copy2(str(combined_audio.absolute()), str(spiker_audio))
             avatar_video_path = OUTPUT_DIR / f"{uid}_avatar.mp4"
             lc_ok = await _call_longcat_api(Path(avatar_path), spiker_audio, avatar_video_path)
             if lc_ok and avatar_video_path.exists():
