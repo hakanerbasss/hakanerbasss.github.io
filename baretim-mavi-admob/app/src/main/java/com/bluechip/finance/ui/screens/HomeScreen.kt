@@ -41,6 +41,8 @@ import com.bluechip.finance.data.PaymentManager
 import com.bluechip.finance.data.ProfileManager
 import com.bluechip.finance.util.getMoodInfo
 import com.bluechip.finance.data.NewsApiService
+import com.bluechip.finance.data.WizNewsApiService
+import com.bluechip.finance.data.toArticle
 import com.bluechip.finance.ui.components.TipCard
 import com.bluechip.finance.data.SpecialDayManager
 import com.bluechip.finance.data.HolidayManager
@@ -91,7 +93,6 @@ fun HomeScreen(onNavigate: (String) -> Unit) {
 
     var articles    by remember { mutableStateOf<List<Article>>(emptyList()) }
     var newsStatus  by remember { mutableStateOf("Haberler yukleniyor...") }
-    var showAllNews by remember { mutableStateOf(false) }
     val pagerState  = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
 
@@ -131,11 +132,16 @@ fun HomeScreen(onNavigate: (String) -> Unit) {
         }
 
         withContext(Dispatchers.IO) {
-            try {
-                val response = NewsApiService.instance.getNews()
-                articles    = response.articles.take(6)
-                newsStatus  = "Son guncelleme: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())}"
-            } catch (_: Exception) { newsStatus = "Haber yuklenemedi" }
+            val wizArticles = try {
+                WizNewsApiService.instance.getHaberler(limit = 3).map { it.toArticle() }
+            } catch (_: Exception) { emptyList() }
+            val newsApiArticles = try {
+                NewsApiService.instance.getNews().articles.take(3)
+            } catch (_: Exception) { emptyList() }
+            articles   = wizArticles + newsApiArticles
+            newsStatus = if (articles.isNotEmpty())
+                "Son guncelleme: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())}"
+            else "Haber yuklenemedi"
         }
     }
 
@@ -348,9 +354,7 @@ fun HomeScreen(onNavigate: (String) -> Unit) {
             Text(newsStatus, fontSize = 10.sp, color = colors.textSecondary)
         }
 
-        val visibleArticles = if (showAllNews) articles else articles.take(3)
-
-        visibleArticles.forEach { article ->
+        articles.forEach { article ->
             Card(
                 modifier = Modifier.fillMaxWidth().clickable {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)))
@@ -379,22 +383,6 @@ fun HomeScreen(onNavigate: (String) -> Unit) {
                             fontSize = 12.sp, color = colors.info, maxLines = 2)
                     }
                 }
-            }
-        }
-
-        // "Daha Fazla / Daha Az" butonu
-        if (articles.size > 3) {
-            OutlinedButton(
-                onClick = { showAllNews = !showAllNews },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    if (showAllNews) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    null, modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(if (showAllNews) "Daha Az Goster" else "Daha Fazla Haber")
             }
         }
 
