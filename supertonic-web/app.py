@@ -2703,16 +2703,25 @@ def get_ig_config() -> dict:
 _IG_DEDUP_HOURS = 24  # aynı başlık bu süreden önce atıldıysa tekrar atma — haberler günlük/saatlik yenilendiği için 1 gün yeterli
 
 _TR_STOP_WORDS = {
+    # Bağlaçlar / edatlar
     "ile", "bir", "bu", "şu", "ne", "ki", "son", "için", "gibi",
     "kadar", "daha", "çok", "var", "yok", "ama", "veya", "ayrı",
     "aynı", "oldu", "olan", "eden", "etti", "etdi", "konusu",
     "haberi", "haber", "dakika", "acil", "işte", "birer", "fakat",
     "vurdu", "geldi", "çıktı", "atıldı", "yapıldı", "alındı",
+    # Çok genel ülke / şehir / kurum adları — tek başına ayırt edici değil
+    "nato", "ankara", "istanbul", "türkiye", "türk", "türkiye",
+    "trump", "erdoğan", "biden", "rusya", "ruslar", "ukrayna",
+    "israil", "filistin", "iran", "irak", "suriye", "mısır",
+    "avrupa", "amerika", "almanya", "fransa", "ingiltere",
+    "tbmm", "meclis", "hükümet", "cumhurbaskani", "basbakan",
+    "zirvesi", "toplantı", "zirve", "açıklama", "açıkladı",
+    "bakanlığı", "bakanlık", "başkanlık", "basın",
 }
 
 
 def _extract_topic_keywords(title: str) -> set:
-    """Başlıktan yer adı, olay adı gibi anlamlı kelimeleri çıkarır (≥4 harf)."""
+    """Başlıktan olay/kişi/kurum gibi anlamlı kelimeleri çıkarır (≥4 harf)."""
     cleaned = re.sub(r"[^a-züğışöçA-ZÜĞİŞÖÇ\s]", " ", title.lower())
     return {w for w in cleaned.split() if len(w) >= 4 and w not in _TR_STOP_WORDS}
 
@@ -2734,13 +2743,12 @@ def _ig_recently_posted(title: str) -> bool:
 
 
 def _ig_same_topic_posted(title: str) -> bool:
-    """Aynı konuyu (2+ ortak anahtar kelime) 24 saat içinde attıysa True döner.
-    Örn: 'Balıkesir yangın' → farklı başlıkla da olsa tekrar atılmasın."""
+    """Aynı konuyu (3+ ortak özgün anahtar kelime) 12 saat içinde attıysa True döner."""
     if not IG_RECENT_FILE.exists():
         return False
     try:
         records = json.loads(IG_RECENT_FILE.read_text())
-        cutoff = time.time() - 24 * 3600
+        cutoff = time.time() - 12 * 3600  # 24h → 12h: sık yayın programına uygun
         new_kw = _extract_topic_keywords(title)
         if len(new_kw) < 2:
             return False
@@ -2749,8 +2757,8 @@ def _ig_same_topic_posted(title: str) -> bool:
                 continue
             past_kw = _extract_topic_keywords(r.get("title", ""))
             common = new_kw & past_kw
-            if len(common) >= 2:
-                print(f"[DEDUP-TOPIC] '{title[:60]}' → ortak kelimeler: {common}", flush=True)
+            if len(common) >= 3:  # 2 → 3: genel kelime çakışmalarını engelle
+                print(f"[DEDUP-TOPIC] ENGELLENDI '{title[:60]}' ← çakışan: '{r.get('title','')[:60]}' | ortak: {common}", flush=True)
                 return True
         return False
     except Exception:
@@ -4088,13 +4096,12 @@ async def auto_shorts_job():
 
                 # Dedup: video üretildi ama Instagram'a zaten atılmış konu mu?
                 if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
-                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] '{gen_title[:60]}' daha önce atıldı, farklı haber deneniyor…", flush=True)
-                    # Üretilen başlığı exclude listesine ekle, bir sonraki denemede bu konu seçilmesin
+                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] ENGELLENDI: '{gen_title[:60]}' — exclude'a eklendi", flush=True)
                     exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
                     if _attempt < _MAX_DEDUP_RETRY - 1:
                         continue  # yeniden dene
                     else:
-                        save_sched_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı")
+                        save_sched_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı. Denenenler: {exclude_str[:200]}")
                         return
 
                 # Dedup geçti — bu konuyu kullanıyoruz
@@ -4825,12 +4832,12 @@ async def auto_ig_only_tr_job():
 
                 # Dedup: video üretilmeden önce Instagram konu kontrolü
                 if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
-                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] '{gen_title[:60]}' daha önce atıldı, farklı haber deneniyor…", flush=True)
+                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] ENGELLENDI: '{gen_title[:60]}' — exclude'a eklendi", flush=True)
                     exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
                     if _attempt < _MAX_DEDUP_RETRY - 1:
                         continue
                     else:
-                        save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı")
+                        save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı. Denenenler: {exclude_str[:200]}")
                         return
                 break  # dedup geçti
 
