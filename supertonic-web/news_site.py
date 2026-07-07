@@ -229,6 +229,30 @@ async def sitemap_xml():
     return Response(content=xml, media_type="application/xml")
 
 
+@router.get("/api/haberler")
+async def api_haberler(limit: int = 3, kategori: str | None = None):
+    """Baretim Mavi APK'si (ve benzeri istemciler) icin JSON haber listesi.
+
+    Ornek: GET /api/haberler?limit=3
+    """
+    limit = max(1, min(limit, PER_PAGE))
+    rows, _ = get_articles(page=1, category=kategori)
+    rows = rows[:limit]
+    return [
+        {
+            "id": r["id"],
+            "title": r["title"],
+            "description": r["description"],
+            "category": r["category"],
+            "categoryColor": r["category_color"],
+            "thumbnail": f"{SITE_URL}/api/thumbnail/{r['thumbnail']}" if r["thumbnail"] else None,
+            "url": f"{SITE_URL}/haber/{r['id']}",
+            "createdAt": _isoformat(int(r["created_at"])),
+        }
+        for r in rows
+    ]
+
+
 @router.get("/haberler", response_class=HTMLResponse)
 async def haberler_list(request: Request, sayfa: int = 1, kategori: str | None = None):
     sayfa = max(1, sayfa)
