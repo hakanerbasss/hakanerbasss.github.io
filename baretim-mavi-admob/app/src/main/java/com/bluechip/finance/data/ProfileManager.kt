@@ -10,7 +10,10 @@ enum class SideIncomeCategory(val label: String, val emoji: String) {
     FAIZ("Faiz Geliri", "🏦"),
     DIJITAL("Dijital Gelir", "💻"),
     FREELANCE("Freelance", "🎯"),
-    DIGER("Diger", "📋")
+    DIGER("Diger", "📋"),
+    YOL("Yol Yardimi", "🚌"),
+    YEMEK("Yemek Yardimi", "🍽"),
+    IKRAMIYE("Ikramiye/Prim", "🎁")
 }
 
 data class SideIncomeRecord(
@@ -26,18 +29,25 @@ data class SideIncome(
     val amount: Double = 0.0,
     val isVariable: Boolean = false,
     val dayOfMonth: Int = 0,
+    val periodMonths: Int = 1,
+    val dailySpend: Double = 0.0,
     val records: List<SideIncomeRecord> = emptyList()
 ) {
     // Degisken degilse direkt amount, degiskense son 12 kayit ortalamasi
+    fun monthlyGap(): Double {
+        if (dailySpend <= 0) return 0.0
+        return dailySpend * 22 - effectiveAmount()
+    }
     fun effectiveAmount(): Double {
-        if (!isVariable) return amount
-        if (records.isEmpty()) return amount
-        return records.takeLast(12).map { it.amount }.average()
+        val base = if (!isVariable) amount
+            else if (records.isEmpty()) amount
+            else records.takeLast(12).map { it.amount }.average()
+        return base / maxOf(periodMonths, 1)
     }
     // Bu ayin tutari: en son kayit varsa onu kullan, yoksa ortalama
     fun currentMonthAmount(): Double {
-        if (!isVariable) return amount
-        if (records.isEmpty()) return amount
+        if (!isVariable) return amount / maxOf(periodMonths, 1)
+        if (records.isEmpty()) return amount / maxOf(periodMonths, 1)
         val cal = java.util.Calendar.getInstance()
         val thisMonth = cal.get(java.util.Calendar.MONTH)
         val thisYear  = cal.get(java.util.Calendar.YEAR)
@@ -72,6 +82,48 @@ data class UserProfile(
         return netSalary + retirement + side
     }
 
+    fun proratedNetSalary(): Double {
+        if (netSalary <= 0 || salaryDay <= 0 || startDateMillis <= 0L) return netSalary
+        val today = java.util.Calendar.getInstance()
+        val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
+        val periodStart = java.util.Calendar.getInstance().apply {
+            time = today.time
+            if (todayDay < salaryDay) add(java.util.Calendar.MONTH, -1)
+            val maxDay = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+            set(java.util.Calendar.DAY_OF_MONTH, minOf(salaryDay, maxDay))
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }
+        if (startDateMillis <= periodStart.timeInMillis) return netSalary
+        val startCal = java.util.Calendar.getInstance().apply { timeInMillis = startDateMillis }
+        val startDay = startCal.get(java.util.Calendar.DAY_OF_MONTH)
+        val daysInMonth = startCal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+        val daysWorked = daysInMonth - startDay
+        if (daysWorked <= 0) return 0.0
+        return (daysWorked.toDouble() / daysInMonth.toDouble()) * netSalary
+    }
+
+    fun isFirstPartialPeriod(): Boolean {
+        if (salaryDay <= 0 || startDateMillis <= 0L) return false
+        val today = java.util.Calendar.getInstance()
+        val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
+        val periodStart = java.util.Calendar.getInstance().apply {
+            time = today.time
+            if (todayDay < salaryDay) add(java.util.Calendar.MONTH, -1)
+            val maxDay = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+            set(java.util.Calendar.DAY_OF_MONTH, minOf(salaryDay, maxDay))
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }
+        return startDateMillis > periodStart.timeInMillis
+    }
+
+    fun currentPeriodTotalIncome(): Double {
+        val side = sideIncomes.sumOf { it.effectiveAmount() }
+        val retirement = if (isRetired) retirementSalary else 0.0
+        return proratedNetSalary() + retirement + side
+    }
+
     fun isAdvanceTaken(): Boolean {
         if (advanceDay <= 0 || advanceAmount <= 0.0) return false
         val today = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
@@ -100,6 +152,8 @@ class ProfileManager(context: Context) {
                 put("amount", s.amount)
                 put("isVariable", s.isVariable)
                 put("dayOfMonth", s.dayOfMonth)
+                put("periodMonths", s.periodMonths)
+                put("dailySpend", s.dailySpend)
                 put("records", recArr)
             })
         }
@@ -151,6 +205,8 @@ class ProfileManager(context: Context) {
                 amount = o.optDouble("amount", 0.0),
                 isVariable = o.optBoolean("isVariable", false),
                 dayOfMonth = o.optInt("dayOfMonth", 0),
+                periodMonths = o.optInt("periodMonths", 1),
+                dailySpend = o.optDouble("dailySpend", 0.0),
                 records = recs
             ))
         }

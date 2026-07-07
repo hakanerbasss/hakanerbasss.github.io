@@ -78,6 +78,53 @@ object OvertimeManager {
     fun thisMonthTotalNet(context: Context):  Double = thisMonthRecords(context).sumOf { it.netAmount }
     fun thisMonthTotal(context: Context):     Double = thisMonthTotalNet(context)
 
+    fun currentPeriodStart(salaryDay: Int): Calendar {
+        val today = Calendar.getInstance()
+        return if (salaryDay <= 0) {
+            Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }
+        } else {
+            val todayDay = today.get(Calendar.DAY_OF_MONTH)
+            Calendar.getInstance().apply {
+                time = today.time
+                if (todayDay < salaryDay) add(Calendar.MONTH, -1)
+                val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+                set(Calendar.DAY_OF_MONTH, minOf(salaryDay, maxDay))
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }
+        }
+    }
+
+    fun currentPeriodLabel(salaryDay: Int): String {
+        if (salaryDay <= 0) return java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale("tr"))
+            .format(java.util.Date()).replaceFirstChar { it.uppercase() }
+        val start = currentPeriodStart(salaryDay)
+        val end = Calendar.getInstance().apply {
+            time = start.time
+            add(Calendar.MONTH, 1)
+            add(Calendar.DAY_OF_MONTH, -1)
+        }
+        val fmt  = java.text.SimpleDateFormat("d MMM", java.util.Locale("tr"))
+        val fmtY = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale("tr"))
+        return if (start.get(Calendar.YEAR) == end.get(Calendar.YEAR))
+            "${fmt.format(start.time)} - ${fmtY.format(end.time)} Donemi"
+        else
+            "${fmtY.format(start.time)} - ${fmtY.format(end.time)} Donemi"
+    }
+
+    fun currentPeriodRecords(context: Context, salaryDay: Int): List<OvertimeRecord> {
+        if (salaryDay <= 0) return thisMonthRecords(context)
+        val startMillis = currentPeriodStart(salaryDay).timeInMillis
+        return loadAll(context).filter { it.dateMillis >= startMillis }
+    }
+
+    fun currentPeriodTotalNet(context: Context, salaryDay: Int): Double =
+        currentPeriodRecords(context, salaryDay).sumOf { it.netAmount }
+
     fun groupedByMonth(context: Context): Map<String, List<OvertimeRecord>> {
         val all = loadAll(context).sortedByDescending { it.dateMillis }
         val fmt = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale("tr"))

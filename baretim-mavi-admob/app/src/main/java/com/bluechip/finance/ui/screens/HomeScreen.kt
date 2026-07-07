@@ -3,6 +3,11 @@ package com.bluechip.finance.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -794,30 +799,65 @@ private fun SalaryCard(context: android.content.Context, onNavigate: (String) ->
 
     val (moodEmoji, moodText) = getMoodInfo(daysToSalary, daysToAdvance, nearestPaymentDay, dayOfYear)
 
+    // Işık taraması — gradient header üzerinde diagonal shine kayar
+    val shineTr = rememberInfiniteTransition(label = "shine")
+    val shineX by shineTr.animateFloat(
+        initialValue = -1.4f, targetValue = 2.4f,
+        animationSpec = infiniteRepeatable(
+            tween(2800, easing = LinearEasing, delayMillis = 2500),
+            RepeatMode.Restart
+        ), label = "sx"
+    )
+    // Avatar nabzı
+    val pulseTr = rememberInfiniteTransition(label = "pulse")
+    val pulseA by pulseTr.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        "pa"
+    )
+
     Card(
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(6.dp),
+        elevation = CardDefaults.cardElevation(10.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardBg),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
 
-            // Gradient Header
+            // Gradient Header — ışık taramalı
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                        brush = Brush.linearGradient(
                             colors = listOf(
-                                com.bluechip.finance.ui.theme.PurplePrimaryDark,
+                                com.bluechip.finance.ui.theme.IndigoDeep,
                                 com.bluechip.finance.ui.theme.PurplePrimary,
-                                com.bluechip.finance.ui.theme.PurplePrimaryLight.copy(alpha = 0.85f)
+                                com.bluechip.finance.ui.theme.FuchsiaAccent.copy(alpha = 0.85f)
                             )
                         ),
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(
                             topStart = 20.dp, topEnd = 20.dp
                         )
                     )
+                    .drawWithContent {
+                        drawContent()
+                        // Diagonal ışık taraması
+                        drawRect(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    androidx.compose.ui.graphics.Color.Transparent,
+                                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f),
+                                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.20f),
+                                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f),
+                                    androidx.compose.ui.graphics.Color.Transparent
+                                ),
+                                start = androidx.compose.ui.geometry.Offset(shineX * size.width, 0f),
+                                end = androidx.compose.ui.geometry.Offset(
+                                    (shineX + 0.45f) * size.width, size.height)
+                            )
+                        )
+                    }
                     .clickable { onNavigate("profile") }
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
@@ -825,11 +865,26 @@ private fun SalaryCard(context: android.content.Context, onNavigate: (String) ->
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Avatar — nabız atan çift halka ile
                     Box(
                         modifier = Modifier
                             .size(58.dp)
+                            .drawBehind {
+                                val cx = size.width / 2f; val cy = size.height / 2f
+                                // Dış nabız halkası
+                                drawCircle(
+                                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = pulseA * 0.30f),
+                                    radius = size.minDimension * 0.62f,
+                                    style = Stroke(3.dp.toPx())
+                                )
+                                drawCircle(
+                                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = pulseA * 0.18f),
+                                    radius = size.minDimension * 0.78f,
+                                    style = Stroke(2.dp.toPx())
+                                )
+                            }
                             .background(
-                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.18f),
+                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.20f),
                                 shape = androidx.compose.foundation.shape.CircleShape
                             ),
                         contentAlignment = Alignment.Center

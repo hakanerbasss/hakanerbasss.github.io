@@ -44,7 +44,6 @@ object UnityAdsManager {
                 override fun onInitializationFailed(
                     error: UnityAds.UnityAdsInitializationError, message: String) {
                     Log.e(TAG, "Unity Ads baslanamadi: $message")
-                    android.widget.Toast.makeText(context, "Unity init FAIL: $message", android.widget.Toast.LENGTH_LONG).show()
                     initialized = false
                 }
             })
@@ -132,13 +131,11 @@ object UnityAdsManager {
             override fun onUnityAdsFailedToLoad(placementId: String,
                 error: UnityAds.UnityAdsLoadError, message: String) {
                 Log.e(TAG, "Rewarded FAIL: $error | $message")
-                android.widget.Toast.makeText(appContext, "LOAD FAIL: $error | $message", android.widget.Toast.LENGTH_LONG).show()
             }
         })
     }
 
     fun showRewarded(activity: Activity, onRewarded: () -> Unit, onNotReady: () -> Unit) {
-        android.widget.Toast.makeText(activity, "isInit:${UnityAds.isInitialized} rewardedReady:$rewardedReady", android.widget.Toast.LENGTH_LONG).show()
         if (rewardedReady) {
             rewardedReady = false
             UnityAds.show(activity, REWARDED_ID, UnityAdsShowOptions(),

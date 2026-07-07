@@ -51,7 +51,13 @@ fun ToolsScreen(onNavigate: (String) -> Unit) {
         ToolItem("rights", "Hakkımı Arıyorum", "Tazminatlı ayrılabilir miyim?", Icons.Default.Gavel, Color(0xFFC62828)),
         ToolItem("payments", "Ödeme Takip", "Fatura ve kira takibi", Icons.Default.Payment, Color(0xFF00838F)),
         ToolItem("special_days", "Özel Günler", "Doğum günü, yıldönümü takip et", Icons.Default.Celebration, Color(0xFFAD1457)),
-        ToolItem("savings",  "Birikimlerim", "Kripto, metal ve doviz", Icons.Default.Savings, Color(0xFF7C3AED)),
+        ToolItem("savings",  "Birikimlerim", "Kripto, metal ve döviz", Icons.Default.Savings, Color(0xFF7C3AED)),
+        // Yeni özellikler
+        ToolItem("earnings_ticker", "Anlık Kazanç", "Saniye saniye ne kazandım?", Icons.Default.Speed, Color(0xFF00897B)),
+        ToolItem("salary_coach",   "Maaş Koçu", "Sektör maaşınla karşılaştır", Icons.Default.TrendingUp, Color(0xFF5E35B1)),
+        ToolItem("budget",         "Bütçe & Acil Fon", "50/30/20 kuralı, finansal skor", Icons.Default.AccountBalanceWallet, Color(0xFF2E7D32)),
+        ToolItem("rights_chat",    "Haklarım Chatbot", "Hızlı hak sorgulama", Icons.Default.Chat, Color(0xFFC62828)),
+        ToolItem("ai_assistant",   "AI Asistan", "DeepSeek ile finansal koç", Icons.Default.SmartToy, Color(0xFF1565C0)),
     )
 
     val context2b = LocalContext.current

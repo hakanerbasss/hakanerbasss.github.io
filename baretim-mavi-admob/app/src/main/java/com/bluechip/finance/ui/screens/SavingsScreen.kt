@@ -24,7 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.bluechip.finance.UnityAdsManager
+import com.bluechip.finance.AdManager
 import com.bluechip.finance.data.*
 import com.bluechip.finance.data.AdFreeManager
 import com.bluechip.finance.ui.components.CurrencyField
@@ -121,7 +121,7 @@ fun SavingsScreen() {
                             // Reklamsız modda direkt yenile
                             refreshPrices()
                         } else {
-                            UnityAdsManager.showRewarded(
+                            AdManager.showSavingsRewarded(
                                 activity = context as Activity,
                                 onRewarded = { refreshPrices() },
                                 onNotReady = { showAdSnack = true }
