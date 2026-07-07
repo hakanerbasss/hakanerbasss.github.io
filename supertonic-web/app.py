@@ -1022,6 +1022,40 @@ Rules:
     sources = gnews_data.get("sources", [])
     source_text = ("Kaynak: " + ", ".join(sources)) if sources else ""
 
+    # Instagram için tam haber açıklaması — video senaryosu değil, gerçek haber özeti
+    ig_caption_desc = ""
+    try:
+        cap_context = gnews_data.get("context_text", "") if gnews_data.get("found") else ""
+        cap_lang_note = "Türkçe" if lang == "tr" else "English"
+        cap_prompt = (
+            f"Aşağıdaki haber için Instagram açıklama metni yaz.\n"
+            f"Dil: {cap_lang_note}\n"
+            f"Başlık: {generated_title}\n"
+            f"\nVideo senaryosu (kısa özet):\n{full_script}\n"
+            + (f"\nGüncel haber kaynakları:\n{cap_context}\n" if cap_context else "")
+            + """
+Kurallar:
+- 3-4 paragraf, toplamda 900-1400 karakter
+- Haberin tüm önemli detaylarını ver: kim, ne, nerede, ne zaman, neden
+- Sadece doğrulanmış bilgileri kullan; spekülasyon yapma
+- Haber dili: net, akıcı, merak uyandıran ama sensasyonel değil
+- Kişi adlarını, yerleri ve rakamları değiştirme
+- "..." ile KESME — her cümle tam bitişin
+- Emoji yok, hashtag yok, başlık tekrarlama
+- Sadece açıklama paragraflarını döndür
+"""
+        )
+        cap_resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": cap_prompt}],
+            temperature=0.4,
+            max_tokens=700,
+        )
+        ig_caption_desc = cap_resp.choices[0].message.content.strip()
+    except Exception as _cap_e:
+        print(f"[CAPTION-GEN] Açıklama üretilemedi: {_cap_e}", flush=True)
+        ig_caption_desc = full_script
+
     return {
         "video": f"/api/video/{output_file.name}",
         "thumbnail": thumb_path,
@@ -1029,7 +1063,7 @@ Rules:
         "title": generated_title,
         "scene_count": len(scenes),
         "suggested_tags": video_tags,
-        "suggested_description": _smart_truncate(full_script, limit=300),
+        "suggested_description": ig_caption_desc,
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
         "source_text": source_text,
     }
@@ -4127,7 +4161,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     existing_lower = suggested_tags.lower()
     extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
     full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
-    desc_excerpt = _smart_truncate(description, limit=500) if description else ""
+    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
     parts = [title]
     if desc_excerpt:
         parts.append(desc_excerpt)
@@ -4136,6 +4170,9 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     parts.append("Siz ne düşünüyorsunuz? 👇")
     parts.append(full_tags)
     caption = "\n\n".join(parts)
+    # Instagram caption limiti 2200 karakter — güvenli taraf
+    if len(caption) > 2180:
+        caption = caption[:2177] + "..."
 
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
     # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
@@ -5585,7 +5622,7 @@ async def shorts_send_instagram(request: Request):
     existing_lower = tags.lower()
     extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
     full_tags = f"{tags} {extra}".strip() if extra else tags
-    desc_excerpt = _smart_truncate(description, limit=500) if description else ""
+    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
     if title and desc_excerpt:
         caption = f"{title}\n\n{desc_excerpt}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
     elif title:
