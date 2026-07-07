@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block title %}İletişim | Hakan Erbaş{% endblock %}
+{% block metadesc %}<meta name="description" content="Görüş, öneri veya iş birliği teklifleriniz için Hakan Erbaş'a ulaşın.">{% endblock %}
+{% block content %}
+<div class="page-narrow">
+  <h1>İletişim</h1>
+  <p>Görüş, düzeltme talebi veya iş birliği teklifleriniz için aşağıdaki kanallardan ulaşabilirsiniz:</p>
+  <ul class="contact-list">
+    <li>📧 <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></li>
+    <li>💬 <a href="https://wa.me/{{ contact_whatsapp }}" target="_blank" rel="noopener">WhatsApp'tan yaz</a></li>
+    <li>📷 <a href="https://www.instagram.com/hakanerbasss" target="_blank" rel="noopener">Instagram: @hakanerbasss</a></li>
+    <li>🧵 <a href="https://www.threads.net/@hakanerbasss" target="_blank" rel="noopener">Threads: @hakanerbasss</a></li>
+  </ul>
+</div>
+{% endblock %}

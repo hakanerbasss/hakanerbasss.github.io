@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsTube — Instagram</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>📸 Instagram</h1>
+  <div class="sub">Videoyu üret, kontrol et, sadece Instagram Reels olarak yayınla.</div>
+  <div id="nav" class="nav"></div>
+  <div id="badges" class="badges"></div>
+
+  <!-- Üretim -->
+  <div class="card">
+    <label>Konu (boş bırakırsan trend haberden seçer)</label>
+    <input id="topic" placeholder="örn. yapay zeka, deprem, ekonomi…">
+    <div class="row">
+      <div><label>Dil</label>
+        <select id="lang">
+          <option value="tr">Türkçe</option><option value="en">English</option>
+          <option value="de">Deutsch</option><option value="fr">Français</option>
+          <option value="es">Español</option><option value="ar">العربية</option>
+        </select></div>
+      <div><label>Ses</label>
+        <select id="voice">
+          <option value="M1">M1 (Erkek)</option><option value="M2">M2 (Erkek)</option>
+          <option value="M3">M3 (Erkek)</option><option value="F1">F1 (Kadın)</option>
+          <option value="F2">F2 (Kadın)</option><option value="F3">F3 (Kadın)</option>
+        </select></div>
+      <div><label>Bölge</label>
+        <select id="region">
+          <option value="TR">Türkiye</option><option value="US">ABD</option>
+          <option value="GB">İngiltere</option><option value="DE">Almanya</option>
+        </select></div>
+    </div>
+    <div style="margin-top:16px">
+      <button class="btn-primary" id="genBtn" onclick="runGenerate()">▶ Üret (Test)</button>
+      <span class="hint" style="margin-left:8px">Sadece üretir, yayınlamaz.</span>
+    </div>
+    <div id="genMsg"></div>
+  </div>
+
+  <!-- Sonuç + yayın -->
+  <div class="card hide" id="resultCard">
+    <video id="preview" controls playsinline></video>
+    <label>Başlık</label><input id="r_title">
+    <label>Etiketler</label><input id="r_tags">
+    <label>Açıklama (Instagram caption'a eklenmez, sadece referans)</label><textarea id="r_desc"></textarea>
+    <div id="warnMsg"></div>
+    <div style="margin-top:16px">
+      <button class="btn-primary" id="igBtn" onclick="publishInstagram()">📸 Instagram'a Yayınla</button>
+    </div>
+    <div id="pubMsg"></div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+renderNav('ig'); renderBadges(); setInterval(renderBadges, 30000);
+resumeActiveJob();
+
+async function publishInstagram() {
+  const cur = requireGenerated(); if (!cur) return;
+  const btn = document.getElementById('igBtn'); const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Yayınlanıyor…';
+  msg('pubMsg', 'info', 'Instagram\'a gönderiliyor… işleme birkaç dakika sürebilir.');
+  const fd = new FormData();
+  fd.append('filename', cur.filename);
+  fd.append('title', document.getElementById('r_title').value);
+  fd.append('tags', document.getElementById('r_tags').value);
+  const { j } = await api('/api/publish/instagram', { method: 'POST', body: fd });
+  btn.disabled = false; btn.innerHTML = orig;
+  showPublishResult(j);
+}
+</script>
+</body>
+</html>

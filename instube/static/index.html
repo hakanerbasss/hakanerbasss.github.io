@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsTube</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>InsTube</h1>
+  <div class="sub">Sade yayın paneli — her iş ayrı sayfada, hata olunca erken görürsün.</div>
+  <div id="nav" class="nav"></div>
+  <div id="badges" class="badges"></div>
+
+  <div class="card">
+    <h2>Ne yapmak istersin?</h2>
+    <div class="nav" style="margin-top:12px">
+      <a href="/instagram.html">📸 Sadece Instagram</a>
+      <a href="/youtube.html">▶️ YouTube + Instagram</a>
+      <a href="/settings.html">⚙️ Ayarlar</a>
+    </div>
+    <p class="hint" style="margin-top:14px">
+      Her sayfada önce <b>Üret (Test)</b> ile videoyu yayınlamadan üretip kontrol
+      edebilir, sonra ilgili butonla yayınlayabilirsin. v1'de otomatik zamanlayıcı yok.
+    </p>
+  </div>
+</div>
+<script src="/common.js"></script>
+<script>renderNav('home'); renderBadges(); setInterval(renderBadges, 30000);</script>
+</body>
+</html>

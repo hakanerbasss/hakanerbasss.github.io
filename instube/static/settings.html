@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsTube — Ayarlar</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ Ayarlar</h1>
+  <div class="sub">Anahtarlar burada saklanır. Boş bıraktığın alanın mevcut değeri korunur.</div>
+  <div id="nav" class="nav"></div>
+  <div id="badges" class="badges"></div>
+
+  <!-- supertonic-web'den içe aktar -->
+  <div class="card">
+    <h2>⬇️ supertonic-web'den içe aktar</h2>
+    <p class="hint">Eski projedeki Instagram, DeepSeek, Pexels, OpenAI anahtarlarını
+      ve YouTube token'larını tek tıkla kopyalar — hiçbirini elle girmene gerek kalmaz.
+      Sadece disk dosyalarını okur, o servisin açık olması gerekmez.</p>
+    <label>Kaynak klasör (boş = otomatik: ../supertonic-web)</label>
+    <input id="src_dir" placeholder="/root/hakanerbasss.github.io/supertonic-web">
+    <div style="margin-top:14px"><button class="btn-primary" onclick="importSupertonic()">İçe Aktar</button></div>
+    <div id="importMsg"></div>
+  </div>
+
+  <!-- API anahtarları -->
+  <div class="card">
+    <h2>API Anahtarları</h2>
+    <label>DeepSeek API anahtarı <span class="hint">(içerik üretimi — zorunlu)</span></label>
+    <input id="deepseek_key" type="password" placeholder="Kayıtlıysa boş bırak">
+    <div class="hint" id="dsHint"></div>
+
+    <label>Pexels API anahtarı <span class="hint">(sahne görselleri)</span></label>
+    <input id="pexels_key" type="password" placeholder="Kayıtlıysa boş bırak">
+    <div class="hint" id="pxHint"></div>
+
+    <label>OpenAI API anahtarı <span class="hint">(opsiyonel — DALL-E görsel; boş bırakılırsa Wikimedia/Pexels kullanılır)</span></label>
+    <input id="openai_key" type="password" placeholder="İstersen boş bırak">
+    <div class="hint" id="oaHint"></div>
+
+    <div style="margin-top:16px"><button class="btn-primary" onclick="saveKeys()">Anahtarları Kaydet</button></div>
+    <div id="keysMsg"></div>
+  </div>
+
+  <!-- Instagram -->
+  <div class="card">
+    <h2>Instagram</h2>
+    <label>Instagram Business User ID</label>
+    <input id="ig_user_id" placeholder="örn. 178414…">
+    <label>Instagram Access Token (uzun ömürlü)</label>
+    <input id="ig_access_token" type="password" placeholder="Kayıtlıysa boş bırak">
+    <div class="hint" id="igHint"></div>
+    <div style="margin-top:16px"><button class="btn-primary" onclick="saveInstagram()">Instagram'ı Kaydet</button></div>
+    <div id="igMsg"></div>
+  </div>
+
+  <!-- YouTube -->
+  <div class="card">
+    <h2>YouTube</h2>
+    <div class="hint" id="ytStatus"></div>
+    <label>Client ID</label>
+    <input id="yt_client_id" placeholder="…apps.googleusercontent.com">
+    <label>Client Secret</label>
+    <input id="yt_client_secret" type="password" placeholder="GOCSPX-…">
+    <div style="margin-top:12px"><button class="btn-primary" onclick="saveYt()">YouTube Bilgilerini Kaydet</button></div>
+    <div id="ytMsg"></div>
+    <div class="hint" style="margin-top:12px">
+      Not: Google Cloud konsolunda <b>yetkili yönlendirme URI</b> olarak şunu eklemelisin:<br>
+      <code id="redirectHint"></code>
+    </div>
+    <div class="nav" style="margin-top:12px">
+      <a href="/auth/youtube">▶️ TR kanalını yetkilendir</a>
+      <a href="/auth/youtube/en">▶️ EN kanalını yetkilendir</a>
+    </div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+renderNav('settings'); renderBadges(); setInterval(renderBadges, 30000);
+
+document.getElementById('redirectHint').textContent = location.origin + '/auth/youtube/callback';
+
+async function loadSettings() {
+  const { j } = await api('/api/settings');
+  document.getElementById('ig_user_id').value = j.ig_user_id || '';
+  document.getElementById('dsHint').textContent = j.deepseek_set ? 'Kayıtlı: ' + j.deepseek_masked : 'Henüz ayarlanmadı';
+  document.getElementById('pxHint').textContent = j.pexels_set ? 'Kayıtlı: ' + j.pexels_masked : 'Henüz ayarlanmadı';
+  document.getElementById('oaHint').textContent = j.openai_set ? 'Kayıtlı: ' + j.openai_masked : 'Ayarlanmadı (opsiyonel)';
+  document.getElementById('igHint').textContent = j.ig_token_set ? 'Token kayıtlı: ' + j.ig_token_masked : 'Token ayarlanmadı';
+  const { j: st } = await api('/api/status');
+  document.getElementById('ytStatus').textContent =
+    'Durum: ' + (st.youtube_configured ? 'bilgiler kayıtlı' : 'bilgiler yok') +
+    ' · TR ' + (st.youtube_tr ? '✓ bağlı' : '✗') + ' · EN ' + (st.youtube_en ? '✓ bağlı' : '✗');
+}
+
+async function postForm(fields, msgId, okText) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+  const { j } = await api('/api/settings', { method: 'POST', body: fd });
+  msg(msgId, j.ok ? 'ok' : 'err', j.ok ? okText : (j.error || 'Hata'));
+  loadSettings(); renderBadges();
+}
+function saveKeys() {
+  postForm({
+    deepseek_key: document.getElementById('deepseek_key').value,
+    pexels_key: document.getElementById('pexels_key').value,
+    openai_key: document.getElementById('openai_key').value,
+  }, 'keysMsg', 'Anahtarlar kaydedildi ✓');
+  document.getElementById('deepseek_key').value = '';
+  document.getElementById('pexels_key').value = '';
+  document.getElementById('openai_key').value = '';
+}
+function saveInstagram() {
+  postForm({
+    ig_user_id: document.getElementById('ig_user_id').value,
+    ig_access_token: document.getElementById('ig_access_token').value,
+  }, 'igMsg', 'Instagram kaydedildi ✓');
+  document.getElementById('ig_access_token').value = '';
+}
+async function saveYt() {
+  const fd = new FormData();
+  fd.append('client_id', document.getElementById('yt_client_id').value);
+  fd.append('client_secret', document.getElementById('yt_client_secret').value);
+  const { j } = await api('/api/yt/config', { method: 'POST', body: fd });
+  msg('ytMsg', j.ok ? 'ok' : 'err', j.ok ? 'Kaydedildi ✓ — şimdi kanalı yetkilendir.' : (j.error || 'Hata'));
+  loadSettings(); renderBadges();
+}
+async function importSupertonic() {
+  msg('importMsg', 'info', 'İçe aktarılıyor…');
+  const fd = new FormData();
+  fd.append('src_dir', document.getElementById('src_dir').value);
+  const { j } = await api('/api/import-supertonic', { method: 'POST', body: fd });
+  if (!j.ok) {
+    msg('importMsg', 'err', j.error || 'İçe aktarma başarısız');
+    return;
+  }
+  const lines = [];
+  if (j.imported && j.imported.length) lines.push('✓ Aktarıldı: ' + j.imported.join(', '));
+  if (j.skipped && j.skipped.length) lines.push('• Bulunamadı/atlandı: ' + j.skipped.join(', '));
+  lines.push('Kaynak: ' + j.source);
+  msg('importMsg', 'ok', lines.join('\n'));
+  loadSettings(); renderBadges();
+}
+loadSettings();
+</script>
+</body>
+</html>

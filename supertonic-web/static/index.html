@@ -1,0 +1,3943 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supertonic TTS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid #222;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  header span { font-size: 12px; color: #666; }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #222;
+    padding: 0 32px;
+  }
+
+  .tab {
+    padding: 14px 24px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .tab.active { color: #fff; border-bottom-color: #7c3aed; }
+  .tab:hover { color: #ccc; }
+
+  .panel { display: none; padding: 32px; max-width: 800px; }
+  .panel.active { display: block; }
+
+  .field { margin-bottom: 20px; }
+  label { display: block; font-size: 13px; color: #888; margin-bottom: 8px; }
+
+  textarea, select, input[type="range"] {
+    width: 100%;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 14px;
+    padding: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  textarea:focus, select:focus { border-color: #7c3aed; }
+  textarea { resize: vertical; min-height: 140px; }
+
+  select { padding: 10px 12px; cursor: pointer; }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .speed-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .speed-row input { flex: 1; accent-color: #7c3aed; }
+  .speed-val { font-size: 13px; color: #888; min-width: 36px; }
+
+  button {
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  button:hover { background: #6d28d9; }
+  button:disabled { background: #333; color: #555; cursor: not-allowed; }
+
+  .result {
+    margin-top: 24px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 20px;
+    display: none;
+  }
+
+  .result.show { display: block; }
+  .result audio, .result video { width: 100%; margin-top: 12px; border-radius: 6px; }
+  .result video { max-height: 360px; }
+
+  .result p { font-size: 13px; color: #888; margin-bottom: 8px; }
+  .result .transcript {
+    font-size: 14px; color: #ccc; line-height: 1.6;
+    background: #111; padding: 12px; border-radius: 6px; margin-top: 8px;
+  }
+
+  .upload-area {
+    border: 2px dashed #2a2a2a;
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .upload-area:hover, .upload-area.drag { border-color: #7c3aed; }
+  .upload-area p { color: #555; font-size: 14px; margin-top: 8px; }
+  .upload-area strong { color: #888; }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid #ffffff44;
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: none;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error {
+    background: #1f0a0a;
+    border: 1px solid #5a1a1a;
+    color: #f87171;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-top: 16px;
+    display: none;
+  }
+
+  .translate-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 20px;
+  }
+
+  .translate-row .arrow {
+    color: #555; font-size: 20px; padding-bottom: 10px; text-align: center;
+  }
+
+  .dl-btn {
+    display: inline-block;
+    margin-top: 12px;
+    background: #1a1a2e;
+    color: #a78bfa;
+    border: 1px solid #3b2d6e;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13px;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+
+  .dl-btn:hover { background: #2a1a4e; }
+
+  .filename-badge {
+    display: inline-block;
+    background: #1f1433;
+    color: #a78bfa;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-top: 8px;
+  }
+
+  @media (max-width: 640px) {
+    header { padding: 16px; }
+    header h1 { font-size: 17px; }
+
+    .tabs { padding: 0 8px; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { padding: 12px 14px; font-size: 13px; white-space: nowrap; }
+
+    .panel { padding: 16px; }
+
+    .controls { grid-template-columns: 1fr 1fr; }
+    .controls .field:last-child { grid-column: span 2; }
+
+    .translate-row { grid-template-columns: 1fr 1fr; }
+    .translate-row .arrow { display: none; }
+
+    button { width: 100%; justify-content: center; padding: 14px; font-size: 15px; }
+
+    .upload-area { padding: 24px 16px; }
+
+    .result video { max-height: 280px; }
+
+    #yt-upload-form button { width: auto; }
+
+    /* Modal tam ekran mobilde */
+    #yt-modal > div {
+      width: 100% !important;
+      max-width: 100% !important;
+      border-radius: 16px 16px 0 0 !important;
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      max-height: 92vh !important;
+      overflow-y: auto !important;
+    }
+    #yt-modal { align-items: flex-end !important; }
+
+    /* Ayarlar butonu */
+    div[style*="position:fixed;top:16px;right:16px"] {
+      top: auto !important;
+      bottom: 16px !important;
+    }
+  }
+
+  /* Accordion */
+  .acc-item { border-bottom: 1px solid #1e1e1e; }
+  .acc-item:last-child { border-bottom: none; }
+  .acc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 20px; cursor: pointer; user-select: none;
+    transition: background 0.12s;
+  }
+  .acc-header:hover { background: #212121; }
+  .acc-title { font-size: 14px; font-weight: 600; color: #d4d4d4; }
+  .acc-right { display: flex; align-items: center; gap: 8px; }
+  .acc-badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    font-weight: 600; white-space: nowrap;
+  }
+  .acc-badge.ok  { background: #14532d; color: #4ade80; }
+  .acc-badge.err { background: #450a0a; color: #f87171; }
+  .acc-badge.run { background: #422006; color: #facc15; }
+  .acc-badge.off { background: #1c1c1c; color: #555; }
+  .acc-chevron {
+    color: #555; font-size: 18px; line-height: 1;
+    display: inline-block; transition: transform 0.2s;
+  }
+  .acc-chevron.open { transform: rotate(90deg); }
+  .acc-body { display: none; padding: 4px 20px 20px; }
+  .acc-body.open { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Supertonic TTS</h1>
+  <span>yerel · hızlı · çok dilli</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('text')">Metin → Ses</div>
+  <div class="tab" onclick="switchTab('video')">Video Seslendirme</div>
+  <div class="tab" onclick="switchTab('translate')">Çeviri + Seslendir</div>
+  <div class="tab" onclick="switchTab('shorts')">Shorts Üret</div>
+  <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
+  <div class="tab" onclick="switchTab('tnlv')">Trend Haber LV</div>
+  <div class="tab" onclick="switchTab('analytics')">📊 Analitik</div>
+  <div class="tab" onclick="switchTab('iganalytics')">📸 IG Analitik</div>
+  <div class="tab" onclick="switchTab('comedy')">📰 Komik Haber</div>
+</div>
+
+<!-- TEXT TO SPEECH -->
+<div class="panel active" id="tab-text">
+  <div class="field">
+    <label>Metin</label>
+    <textarea id="tts-text" placeholder="Seslendirilecek metni girin...&#10;&#10;&lt;laugh&gt; gülen ses&#10;&lt;breath&gt; nefes&#10;&lt;sigh&gt; iç çekme"></textarea>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="tts-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="tts-voice"></select>
+    </div>
+    <div class="field">
+      <label>Hız: <span id="speed-val-1">1.0</span>x</label>
+      <div class="speed-row">
+        <input type="range" id="tts-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          oninput="document.getElementById('speed-val-1').textContent = parseFloat(this.value).toFixed(2)">
+      </div>
+    </div>
+  </div>
+
+  <button onclick="synthesize()" id="btn-synth">
+    <div class="spinner" id="spin-synth"></div>
+    Seslendir
+  </button>
+
+  <div class="error" id="err-synth"></div>
+
+  <div class="result" id="result-synth">
+    <p>Oluşturulan ses</p>
+    <audio id="audio-synth" controls></audio>
+    <a id="dl-synth" class="dl-btn" download="ses.wav">İndir</a>
+  </div>
+</div>
+
+<!-- VIDEO VOICING -->
+<div class="panel" id="tab-video">
+  <div class="field">
+    <label>Video Yükle</label>
+    <div class="upload-area" id="drop-zone" onclick="document.getElementById('video-file').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <strong>Tıkla veya sürükle bırak</strong>
+      <p>MP4, MOV, AVI, MKV, WEBM</p>
+      <div id="file-badge"></div>
+    </div>
+    <input type="file" id="video-file" accept="video/*" style="display:none" onchange="showFilename(this)">
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Hedef Dil</label>
+      <select id="vid-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="vid-voice"></select>
+    </div>
+    <div class="field">
+      <label>Hız: <span id="speed-val-2">1.0</span>x</label>
+      <div class="speed-row">
+        <input type="range" id="vid-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          oninput="document.getElementById('speed-val-2').textContent = parseFloat(this.value).toFixed(2)">
+      </div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Çeviri (opsiyonel — boş bırakırsan orijinal dilde seslendirir)</label>
+    <select id="vid-translate">
+      <option value="">Çeviri yapma</option>
+    </select>
+  </div>
+
+  <button onclick="voiceVideo()" id="btn-video">
+    <div class="spinner" id="spin-video"></div>
+    Seslendir
+  </button>
+
+  <div class="error" id="err-video"></div>
+
+  <div class="result" id="result-video">
+    <p>Transkript</p>
+    <div class="transcript" id="video-transcript"></div>
+    <p style="margin-top:16px">Seslendirilmiş Video</p>
+    <video id="video-out" controls></video>
+    <a id="dl-video" class="dl-btn" download="video.mp4">İndir</a>
+  </div>
+</div>
+
+<!-- TRANSLATE + TTS -->
+<div class="panel" id="tab-translate">
+  <div class="field">
+    <label>Kaynak Metin</label>
+    <textarea id="tr-text" placeholder="Çevrilecek metni girin..."></textarea>
+  </div>
+
+  <div class="translate-row">
+    <div class="field">
+      <label>Kaynak Dil</label>
+      <select id="tr-source">
+        <option value="auto">Otomatik Algıla</option>
+      </select>
+    </div>
+    <div class="arrow">→</div>
+    <div class="field">
+      <label>Hedef Dil</label>
+      <select id="tr-target"></select>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Ses</label>
+      <select id="tr-voice"></select>
+    </div>
+    <div class="field" style="grid-column: span 2">
+      <label>Hız: <span id="speed-val-3">1.0</span>x</label>
+      <div class="speed-row">
+        <input type="range" id="tr-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          oninput="document.getElementById('speed-val-3').textContent = parseFloat(this.value).toFixed(2)">
+      </div>
+    </div>
+  </div>
+
+  <button onclick="translateAndSynth()" id="btn-tr">
+    <div class="spinner" id="spin-tr"></div>
+    Çevir ve Seslendir
+  </button>
+
+  <div class="error" id="err-tr"></div>
+
+  <div class="result" id="result-tr">
+    <p>Çeviri</p>
+    <div class="transcript" id="tr-translated"></div>
+    <p style="margin-top:16px">Oluşturulan ses</p>
+    <audio id="audio-tr" controls></audio>
+    <a id="dl-tr" class="dl-btn" download="ceviri.wav">İndir</a>
+  </div>
+</div>
+
+<!-- SHORTS -->
+<div class="panel" id="tab-shorts">
+
+  <div class="field">
+    <label>DeepSeek API Key</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="password" id="shorts-apikey" placeholder="sk-..." style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+      <button onclick="saveApiKey()" style="padding:12px 16px;font-size:13px;white-space:nowrap;">Kaydet</button>
+      <button onclick="clearApiKey()" style="padding:12px 16px;font-size:13px;background:#2a1a1a;white-space:nowrap;">Temizle</button>
+    </div>
+    <div id="apikey-status" style="font-size:12px;color:#444;margin-top:6px;">Tarayıcıda saklanır, sunucuya gönderilmez.</div>
+  </div>
+
+  <div class="field">
+    <label>Konu</label>
+    <textarea id="shorts-topic" placeholder="Örn: Yapay zekanın geleceği, Mars'a yolculuk, Kuantum fiziği nedir..." style="min-height:90px;"></textarea>
+  </div>
+
+  <div style="margin-bottom:20px;">
+    <button onclick="fetchTrends()" id="btn-trends" style="background:#1a3a1a;font-size:13px;padding:10px 18px;">
+      <div class="spinner" id="spin-trends"></div>
+      Günün Trendlerini Getir
+    </button>
+    <div id="trends-box" style="display:none;margin-top:12px;background:#111;border:1px solid #222;border-radius:8px;padding:14px;">
+      <div style="font-size:12px;color:#666;margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
+      <div id="trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <div style="font-size:11px;color:#444;margin-top:10px;" id="trends-time"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="shorts-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="shorts-voice"></select>
+    </div>
+    <div class="field">
+      <label>Hız: <span id="speed-val-4">1.0</span>x</label>
+      <div class="speed-row">
+        <input type="range" id="shorts-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          oninput="document.getElementById('speed-val-4').textContent = parseFloat(this.value).toFixed(2)">
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <label class="toggle-switch" style="margin:0;">
+      <input type="checkbox" id="use-video-mode">
+      <span class="toggle-slider"></span>
+    </label>
+    <div>
+      <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎬 Videolu İçerik Üret</div>
+      <div style="font-size:11px;color:#555;margin-top:2px;">Pexels'tan stock video klip kullanır, bulamazsa fotoğrafa döner</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch" style="margin:0;">
+        <input type="checkbox" id="use-custom-images" onchange="document.getElementById('custom-images-wrap').style.display = this.checked ? 'block' : 'none';">
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🖼️ Kendi Görsellerimi Kullan</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">Ör. kendi uygulamanın/ürününün tanıtımı — stok fotoğraf yerine yüklediğin görseller sahnelerde sırayla kullanılır</div>
+      </div>
+    </div>
+    <div id="custom-images-wrap" style="display:none;margin-top:10px;">
+      <input type="file" id="custom-images-input" accept="image/*" multiple style="font-size:12px;color:#999;">
+      <div style="font-size:11px;color:#555;margin-top:6px;">Sahne sayısından az görsel yüklersen, kalan sahnelerde baştan tekrarlanır.</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button onclick="generateShorts()" id="btn-shorts">
+      <div class="spinner" id="spin-shorts"></div>
+      Shorts Üret
+    </button>
+    <button onclick="generateFromTrend()" id="btn-trend-gen" style="background:#1a3a1a;">
+      <div class="spinner" id="spin-trend-gen"></div>
+      Trend Haberden Üret
+    </button>
+  </div>
+
+  <div id="shorts-progress" style="display:none;margin-top:12px;padding:10px 14px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:8px;color:#6dbf6d;font-size:13px;">
+    ⏱ Sunucuda üretiliyor... <span id="shorts-elapsed">0</span> &nbsp;<span style="color:#555;font-size:11px;">— Sayfayı kapatabilirsiniz</span>
+    <button onclick="resetShortsGeneration()" style="margin-left:12px;padding:4px 10px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:6px;color:#f87171;font-size:12px;cursor:pointer;">Sıfırla</button>
+  </div>
+
+  <div class="error" id="err-shorts"></div>
+
+  <div class="result" id="result-shorts">
+    <p>Script</p>
+    <div class="transcript" id="shorts-script"></div>
+    <p style="margin-top:16px">Video</p>
+    <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
+    <a id="dl-shorts" class="dl-btn" download="shorts.mp4">İndir</a>
+
+    <div id="shorts-thumb-wrap" style="display:none;margin-top:16px;">
+      <p>Kapak Fotoğrafı</p>
+      <img id="shorts-thumb" style="max-width:180px;border-radius:8px;margin-top:8px;display:block;border:1px solid #333;">
+      <a id="dl-shorts-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
+    </div>
+
+    <div id="yt-upload-form" style="margin-top:24px;border-top:1px solid #222;padding-top:20px;">
+      <p style="margin-bottom:16px;color:#fff;font-size:14px;">YouTube'a Yükle</p>
+
+      <div id="yt-not-linked" style="display:none;">
+        <p style="font-size:13px;color:#888;margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
+        <button onclick="window.location='/auth/youtube'" style="background:#c00;">Google ile Bağlan</button>
+      </div>
+
+      <div id="yt-linked" style="display:none;">
+        <div class="field">
+          <label>Başlık</label>
+          <input type="text" id="yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Açıklama</label>
+          <textarea id="yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Hashtagler (virgülle ayır)</label>
+          <input type="text" id="yt-tags" placeholder="#shorts, #yapay zeka, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="field">
+            <label>Gizlilik</label>
+            <select id="yt-privacy">
+              <option value="public">Herkese Açık</option>
+              <option value="unlisted">Listelenmemiş</option>
+              <option value="private">Gizli</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="yt-category">
+              <option value="25">Haberler & Politika</option>
+              <option value="24">Eğlence</option>
+              <option value="22">İnsanlar & Bloglar</option>
+              <option value="28">Bilim & Teknoloji</option>
+              <option value="27">Eğitim</option>
+              <option value="17">Spor</option>
+              <option value="19">Seyahat & Etkinlikler</option>
+              <option value="23">Komedi</option>
+              <option value="26">Nasıl Yapılır & Stil</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#888;font-size:13px;">
+            <input type="checkbox" id="yt-age" style="width:16px;height:16px;accent-color:#7c3aed;">
+            Yetişkin içerik (18+ yaş kısıtlaması)
+          </label>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+          <button onclick="uploadToYouTube()" id="btn-yt-upload" style="background:#c00;">
+            <div class="spinner" id="spin-yt"></div>
+            YouTube'a Yükle
+          </button>
+          <button onclick="sendShortsToInstagram()" id="btn-shorts-ig" style="background:linear-gradient(135deg,#e1306c,#c13584);">
+            <div class="spinner" id="spin-shorts-ig"></div>
+            Instagram'da Paylaş
+          </button>
+        </div>
+        <div class="error" id="err-yt"></div>
+        <div id="yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
+          Yüklendi! → <a id="yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
+        </div>
+        <div id="shorts-ig-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- UZUN VİDEO -->
+<div class="panel" id="tab-longvideo">
+
+  <div class="field">
+    <label>Kategori (opsiyonel — trend konu bulmak için)</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="lv-category" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:10px 12px;">
+        <option value="">— Kategori seç —</option>
+        <option value="Teknoloji">Teknoloji</option>
+        <option value="Yapay Zeka">Yapay Zeka</option>
+        <option value="Uzay ve Astronomi">Uzay &amp; Astronomi</option>
+        <option value="Tarih">Tarih</option>
+        <option value="Bilim">Bilim</option>
+        <option value="Doğa ve Çevre">Doğa &amp; Çevre</option>
+        <option value="Sağlık ve Tıp">Sağlık &amp; Tıp</option>
+        <option value="Ekonomi ve Finans">Ekonomi &amp; Finans</option>
+        <option value="Spor">Spor</option>
+        <option value="Sinema ve Kültür">Sinema &amp; Kültür</option>
+      </select>
+      <button onclick="fetchLVCategoryTrend()" id="btn-lv-trend" style="padding:10px 16px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:8px;color:#f5c518;font-size:13px;cursor:pointer;white-space:nowrap;">
+        <div class="spinner" id="spin-lv-trend"></div>
+        Trend Konu Bul
+      </button>
+    </div>
+    <div id="lv-trend-hook" style="display:none;margin-top:6px;padding:8px 12px;background:#1a1a1a;border:1px solid #2a4a1a;border-radius:8px;color:#4ade80;font-size:12px;"></div>
+  </div>
+
+  <div class="field">
+    <label>Konu</label>
+    <textarea id="lv-topic" placeholder="Örn: Pamukkale travertenleri nasıl oluşur, Kuantum bilgisayarlar nedir, Osmanlı İmparatorluğu'nun çöküşü..." style="min-height:90px;"></textarea>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="lv-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="lv-voice"></select>
+    </div>
+    <div class="field">
+      <label>Süre (dakika)</label>
+      <select id="lv-duration">
+        <option value="3">~3 dakika</option>
+        <option value="5" selected>~5 dakika</option>
+        <option value="8">~8 dakika</option>
+        <option value="10">~10 dakika</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Hız: <span id="speed-val-5">1.0</span>x</label>
+    <div class="speed-row">
+      <input type="range" id="lv-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+        oninput="document.getElementById('speed-val-5').textContent = parseFloat(this.value).toFixed(2)">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>DeepSeek API Key</label>
+    <div id="lv-apikey-status" style="font-size:13px;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#888;">
+      Kontrol ediliyor...
+    </div>
+  </div>
+
+  <div class="field" style="display:flex;align-items:center;gap:10px;">
+    <input type="checkbox" id="lv-use-video" style="width:18px;height:18px;accent-color:#f5c518;cursor:pointer;">
+    <label for="lv-use-video" style="cursor:pointer;margin:0;">Pexels video klipleri kullan (görseller yerine)</label>
+  </div>
+
+  <button onclick="generateLongVideo()" id="btn-lv">
+    <div class="spinner" id="spin-lv"></div>
+    Video Üret
+  </button>
+
+  <div class="error" id="err-lv"></div>
+  <div id="lv-progress-msg" style="display:none;margin-top:10px;padding:10px 14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#f5c518;font-size:13px;"></div>
+  <button id="btn-lv-reset" onclick="resetLVGeneration()" style="display:none;margin-top:8px;padding:8px 16px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:8px;color:#f87171;font-size:13px;cursor:pointer;">Sıfırla / İptal Et</button>
+
+  <div class="result" id="result-lv">
+    <p>Başlık</p>
+    <div class="transcript" id="lv-title-out" style="font-size:16px;font-weight:600;color:#fff;"></div>
+    <p style="margin-top:12px">Video</p>
+    <video id="lv-video" controls style="width:100%;margin-top:8px;border-radius:6px;"></video>
+    <a id="dl-lv" class="dl-btn" download="video.mp4">İndir</a>
+    <p style="margin-top:12px;font-size:12px;color:#666;" id="lv-duration-out"></p>
+
+    <div id="lv-thumb-wrap" style="display:none;margin-top:16px;">
+      <p>Kapak Fotoğrafı</p>
+      <img id="lv-thumb" style="max-width:320px;border-radius:8px;margin-top:8px;display:block;border:1px solid #333;">
+      <a id="dl-lv-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
+    </div>
+
+    <div id="lv-yt-upload-section" style="display:none;margin-top:24px;border-top:1px solid #222;padding-top:20px;">
+      <p style="margin-bottom:16px;color:#fff;font-size:14px;">YouTube'a Yükle</p>
+      <div id="lv-yt-not-linked" style="display:none;">
+        <p style="font-size:13px;color:#888;margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
+        <button onclick="window.location='/auth/youtube'" style="background:#c00;">Google ile Bağlan</button>
+      </div>
+      <div id="lv-yt-linked" style="display:none;">
+        <div class="field">
+          <label>Başlık</label>
+          <input type="text" id="lv-yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Açıklama</label>
+          <textarea id="lv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Hashtagler (virgülle ayır)</label>
+          <input type="text" id="lv-yt-tags" placeholder="#belgesel, #eğitim, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="field">
+            <label>Gizlilik</label>
+            <select id="lv-yt-privacy">
+              <option value="public">Herkese Açık</option>
+              <option value="unlisted">Listelenmemiş</option>
+              <option value="private">Gizli</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="lv-yt-category">
+              <option value="27">Eğitim</option>
+              <option value="28">Bilim & Teknoloji</option>
+              <option value="25">Haberler & Politika</option>
+              <option value="22">İnsanlar & Bloglar</option>
+              <option value="19">Seyahat & Etkinlikler</option>
+              <option value="17">Spor</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="uploadLVToYouTube()" id="btn-lv-yt-upload" style="margin-top:16px;background:#c00;">
+          <div class="spinner" id="spin-lv-yt"></div>
+          YouTube'a Yükle
+        </button>
+        <div class="error" id="err-lv-yt"></div>
+        <div id="lv-yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
+          Yüklendi! → <a id="lv-yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="tab-tnlv">
+
+  <p style="color:#888;font-size:13px;margin-bottom:20px;">Günün trend haberlerini otomatik olarak çekip tüm konuları kapsayan bir uzun video üretir.</p>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="tnlv-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="tnlv-voice"></select>
+    </div>
+    <div class="field">
+      <label>Hız: <span id="speed-val-tnlv">1.0</span>x</label>
+      <input type="range" id="tnlv-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+        oninput="document.getElementById('speed-val-tnlv').textContent = parseFloat(this.value).toFixed(2)">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>DeepSeek API Key</label>
+    <div id="tnlv-apikey-status" style="font-size:13px;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#888;">
+      Kontrol ediliyor...
+    </div>
+  </div>
+
+  <button onclick="generateTrendLongVideo()" id="btn-tnlv">
+    <div class="spinner" id="spin-tnlv"></div>
+    Trend Video Üret
+  </button>
+
+  <div class="error" id="err-tnlv"></div>
+
+  <div class="result" id="result-tnlv">
+    <p>Başlık</p>
+    <div class="transcript" id="tnlv-title-out" style="font-size:16px;font-weight:600;color:#fff;"></div>
+    <p style="margin-top:8px;font-size:12px;color:#666;" id="tnlv-topics-out"></p>
+    <p style="margin-top:12px">Video</p>
+    <video id="tnlv-video" controls style="width:100%;margin-top:8px;border-radius:6px;"></video>
+    <a id="dl-tnlv" class="dl-btn" download="trend-haber-video.mp4">İndir</a>
+    <p style="margin-top:12px;font-size:12px;color:#666;" id="tnlv-duration-out"></p>
+
+    <div id="tnlv-thumb-wrap" style="display:none;margin-top:16px;">
+      <p>Kapak Fotoğrafı</p>
+      <img id="tnlv-thumb" style="max-width:320px;border-radius:8px;margin-top:8px;display:block;border:1px solid #333;">
+      <a id="dl-tnlv-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
+    </div>
+
+    <div id="tnlv-yt-upload-section" style="display:none;margin-top:24px;border-top:1px solid #222;padding-top:20px;">
+      <p style="margin-bottom:16px;color:#fff;font-size:14px;">YouTube'a Yükle</p>
+      <div id="tnlv-yt-not-linked" style="display:none;">
+        <p style="font-size:13px;color:#888;margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
+        <button onclick="window.location='/auth/youtube'" style="background:#c00;">Google ile Bağlan</button>
+      </div>
+      <div id="tnlv-yt-linked" style="display:none;">
+        <div class="field">
+          <label>Başlık</label>
+          <input type="text" id="tnlv-yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Açıklama</label>
+          <textarea id="tnlv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Hashtagler (virgülle ayır)</label>
+          <input type="text" id="tnlv-yt-tags" placeholder="#gündem, #haberler, #trendler" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="field">
+            <label>Gizlilik</label>
+            <select id="tnlv-yt-privacy">
+              <option value="public">Herkese Açık</option>
+              <option value="unlisted">Listelenmemiş</option>
+              <option value="private">Gizli</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="tnlv-yt-category">
+              <option value="25" selected>Haberler & Politika</option>
+              <option value="27">Eğitim</option>
+              <option value="28">Bilim & Teknoloji</option>
+              <option value="22">İnsanlar & Bloglar</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="uploadTNLVToYouTube()" id="btn-tnlv-yt-upload" style="margin-top:16px;background:#c00;">
+          <div class="spinner" id="spin-tnlv-yt"></div>
+          YouTube'a Yükle
+        </button>
+        <div class="error" id="err-tnlv-yt"></div>
+        <div id="tnlv-yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
+          Yüklendi! → <a id="tnlv-yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="tab-analytics">
+  <!-- Başlık + filtreler -->
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+    <h2 style="color:#fff;font-size:18px;margin:0;flex:1;">📊 Kanal Analitik</h2>
+    <select id="analytics-channel" onchange="loadAnalytics()" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:8px;outline:none;">
+      <option value="tr">🇹🇷 TR Kanal</option>
+      <option value="en">🇬🇧 EN Kanal</option>
+    </select>
+    <select id="analytics-period" onchange="loadAnalytics()" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:8px;outline:none;">
+      <option value="7">Son 7 gün</option>
+      <option value="28" selected>Son 28 gün</option>
+      <option value="90">Son 90 gün</option>
+      <option value="365">Son 365 gün</option>
+    </select>
+    <button onclick="loadAnalytics()" style="font-size:12px;padding:8px 14px;">↻ Yenile</button>
+  </div>
+
+  <div id="analytics-error" style="display:none;color:#f87171;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:16px;"></div>
+  <div id="analytics-loading" style="display:none;color:#888;font-size:14px;text-align:center;padding:40px;">Yükleniyor...</div>
+
+  <div id="analytics-summary" style="display:none;">
+
+    <!-- Kanal geneli -->
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+      <div style="color:#888;font-size:12px;">Kanal Toplamı</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <span style="color:#ccc;font-size:13px;">Abone: <b id="ch-subs" style="color:#facc15;">-</b></span>
+        <span style="color:#ccc;font-size:13px;">Toplam İzlenme: <b id="ch-total-views" style="color:#7c3aed;">-</b></span>
+        <span style="color:#ccc;font-size:13px;">Video Sayısı: <b id="ch-videos" style="color:#4ade80;">-</b></span>
+      </div>
+    </div>
+
+    <!-- 8 metrik kart -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#7c3aed;" id="an-views">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Görüntüleme</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#4ade80;" id="an-hours">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">İzlenme Saati</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#4ade80;" id="an-subs-net">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Net Abone (±)</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#f97316;" id="an-likes">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Beğeni</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#38bdf8;" id="an-comments">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Yorum</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#a78bfa;" id="an-shares">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Paylaşım</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#34d399;" id="an-subs-gained">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Kazanılan Abone</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:bold;color:#f87171;" id="an-subs-lost">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Kaybedilen Abone</div>
+      </div>
+    </div>
+
+    <!-- Günlük görüntüleme chart -->
+    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center;">
+        <span style="color:#ccc;font-size:13px;font-weight:bold;flex:1;">Günlük Görüntüleme</span>
+        <select id="chart-metric" onchange="redrawChart()" style="background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:12px;padding:4px 8px;outline:none;">
+          <option value="views">Görüntüleme</option>
+          <option value="subs_gained">Abone</option>
+          <option value="likes">Beğeni</option>
+        </select>
+      </div>
+      <div id="an-daily-chart" style="display:flex;align-items:flex-end;gap:2px;height:100px;overflow-x:auto;padding-bottom:2px;"></div>
+      <div id="an-daily-labels" style="display:flex;gap:2px;margin-top:4px;overflow-x:auto;"></div>
+    </div>
+
+    <!-- İkili alt panel: Trafik + Cihazlar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+      <div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
+        <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:10px;">Trafik Kaynağı</div>
+        <div id="an-traffic"></div>
+      </div>
+      <div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
+        <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:10px;">Cihaz</div>
+        <div id="an-devices"></div>
+      </div>
+    </div>
+
+    <!-- Top ülkeler -->
+    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;margin-bottom:16px;">
+      <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:10px;">Top Ülkeler</div>
+      <div id="an-countries"></div>
+    </div>
+
+    <!-- Top videolar tablosu -->
+    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
+      <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:10px;">En İyi Videolar</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;" id="an-top-videos-table">
+          <thead>
+            <tr style="color:#666;border-bottom:1px solid #222;">
+              <th style="text-align:left;padding:6px 8px;font-weight:normal;">#</th>
+              <th style="text-align:left;padding:6px 8px;font-weight:normal;">Başlık</th>
+              <th style="text-align:right;padding:6px 8px;font-weight:normal;">İzlenme</th>
+              <th style="text-align:right;padding:6px 8px;font-weight:normal;">Saat</th>
+              <th style="text-align:right;padding:6px 8px;font-weight:normal;">Ort. Süre</th>
+              <th style="text-align:right;padding:6px 8px;font-weight:normal;">% İzl.</th>
+              <th style="text-align:right;padding:6px 8px;font-weight:normal;">Beğeni</th>
+            </tr>
+          </thead>
+          <tbody id="an-top-videos"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ayarlar Modal -->
+<div id="yt-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;width:460px;max-width:95vw;position:relative;max-height:90vh;overflow-y:auto;overflow-x:hidden;">
+
+    <!-- Sticky başlık -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #2a2a2a;position:sticky;top:0;background:#1a1a1a;z-index:2;">
+      <span style="font-size:15px;font-weight:700;color:#fff;">⚙ Ayarlar</span>
+      <button onclick="closeYTModal()" style="background:#2a2a2a;border-radius:6px;padding:4px 10px;font-size:16px;line-height:1;">✕</button>
+    </div>
+
+    <!-- Durdur (her zaman görünür) -->
+    <div style="padding:10px 16px;border-bottom:1px solid #1e1e1e;">
+      <div style="background:#1a0a0a;border:1px solid #7f1d1d;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="color:#f87171;font-weight:700;font-size:13px;">⛔ Tüm İşlemleri Durdur</div>
+          <div style="color:#555;font-size:11px;margin-top:2px;">Çalışan video üretimlerini ve FFmpeg işlemlerini anında durdurur</div>
+        </div>
+        <button onclick="stopAllJobs()" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:7px 12px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;">Durdur</button>
+      </div>
+    </div>
+
+    <!-- 1. TR Otomatik Short -->
+    <div class="acc-item" id="acc-tr-short">
+      <div class="acc-header" onclick="toggleAcc('tr-short')">
+        <span class="acc-title">⚡ TR Otomatik Short</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-short"></span><span class="acc-chevron" id="acc-chev-tr-short">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-tr-short">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Belirlenen saatlerde trend haberden Short üretip YouTube'a yükler</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveScheduler()">
+            Otomatik yayını etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:#555;font-size:11px;">(virgülle ayır — örn: 09:22,14:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="sched-times-mon" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="sched-times-tue" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="sched-times-wed" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="sched-times-thu" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="sched-times-fri" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="sched-times-sat" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="sched-times-sun" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="field">
+            <label>Seslendirme Dili</label>
+            <select id="sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="tr" selected>Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="F1" selected>F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+              <option value="M1">M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runNow()" id="btn-run-now" style="background:#1a3a1a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="sched-next" style="color:#888;"></div>
+          <div id="sched-last-status"></div>
+          <div id="sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="sched-last-url"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. TR Uzun Video -->
+    <div class="acc-item" id="acc-tr-lv">
+      <div class="acc-header" onclick="toggleAcc('tr-lv')">
+        <span class="acc-title">📹 TR Uzun Video</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-lv"></span><span class="acc-chevron" id="acc-chev-tr-lv">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-tr-lv">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Her gün belirlenen kategorilerden AI konu seçer, belgesel üretir, YouTube'a yükler</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="lv-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveLVScheduler()">
+            Otomatik uzun videoyu etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Kategoriler (virgülle ayır)</label>
+          <textarea id="lv-sched-categories" style="min-height:64px;font-size:13px;">teknoloji, bilim, tarih, uzay, doğa, yapay zeka</textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="field">
+            <label>Yayın saati</label>
+            <input type="text" id="lv-sched-time" value="10:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          </div>
+          <div class="field">
+            <label>Video süresi</label>
+            <select id="lv-sched-duration" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="3">~3 dakika</option>
+              <option value="5" selected>~5 dakika</option>
+              <option value="8">~8 dakika</option>
+              <option value="10">~10 dakika</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Dil</label>
+            <select id="lv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="tr" selected>Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="lv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="F1" selected>F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+              <option value="M1">M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runLVNow()" id="btn-lv-run-now" style="background:#1a2a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-lv-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="lv-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="lv-sched-next" style="color:#888;"></div>
+          <div id="lv-sched-last-status"></div>
+          <div id="lv-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="lv-sched-last-url"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Trend Haber LV -->
+    <div class="acc-item" id="acc-tr-tnlv">
+      <div class="acc-header" onclick="toggleAcc('tr-tnlv')">
+        <span class="acc-title">📰 Trend Haber LV</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-tnlv"></span><span class="acc-chevron" id="acc-chev-tr-tnlv">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-tr-tnlv">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Günde 2 kez trend haberlerden otomatik uzun video üretir ve YouTube'a yükler</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="tnlv-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveTNLVScheduler()">
+            Otomatik trend haber LV'yi etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
+          <input type="text" id="tnlv-sched-times" value="08:00,20:00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="field">
+            <label>Dil</label>
+            <select id="tnlv-sched-lang" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="tr" selected>Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="tnlv-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="F1" selected>F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+              <option value="M1">M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveTNLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runTNLVNow()" id="btn-tnlv-run-now" style="background:#2a1a0a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-tnlv-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="tnlv-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="tnlv-sched-next" style="color:#888;"></div>
+          <div id="tnlv-sched-last-status"></div>
+          <div id="tnlv-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="tnlv-sched-last-url"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. EN Belgesel -->
+    <div class="acc-item" id="acc-en-belgesel">
+      <div class="acc-header" onclick="toggleAcc('en-belgesel')">
+        <span class="acc-title">🎬 EN Belgesel</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-en-belgesel"></span><span class="acc-chevron" id="acc-chev-en-belgesel">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-en-belgesel">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce belgesel kanalı — ayrı YouTube hesabı, her gün 1 video</p>
+        <div id="yt-en-not-linked" style="background:#1a1010;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#f87171;font-size:13px;margin-bottom:8px;">✗ EN kanal bağlı değil</div>
+          <p style="color:#888;font-size:12px;margin-bottom:8px;">Bağlamadan önce YouTube'da 2. kanalınıza geçin, sonra tıklayın:</p>
+          <button onclick="window.location='/auth/youtube/en'" style="background:#c00;font-size:12px;padding:8px 16px;">EN Kanal Bağla</button>
+        </div>
+        <div id="yt-en-linked" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ EN kanal bağlı</div>
+          <button onclick="window.location='/auth/youtube/en'" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Yeniden Bağla</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="lv-en-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveLVENScheduler()">
+            Otomatik EN belgesel videoyu etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Kategoriler (virgülle ayır, İngilizce)</label>
+          <textarea id="lv-en-sched-categories" style="min-height:64px;font-size:13px;">history, science, space, technology, nature, ancient civilizations, physics</textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="field">
+            <label>Yayın saati (İstanbul)</label>
+            <input type="text" id="lv-en-sched-time" value="14:00" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+          </div>
+          <div class="field">
+            <label>Video süresi</label>
+            <select id="lv-en-sched-duration" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="3">~3 dakika</option>
+              <option value="5" selected>~5 dakika</option>
+              <option value="8">~8 dakika</option>
+              <option value="10">~10 dakika</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="lv-en-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="M1" selected>M1 (Erkek)</option>
+              <option value="M2">M2 (Erkek)</option>
+              <option value="M3">M3 (Erkek)</option>
+              <option value="F1">F1 (Kadın)</option>
+              <option value="F2">F2 (Kadın)</option>
+              <option value="F3">F3 (Kadın)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveLVENScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runLVENNow()" id="btn-lv-en-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-lv-en-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="lv-en-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="lv-en-sched-next" style="color:#888;"></div>
+          <div id="lv-en-sched-last-status"></div>
+          <div id="lv-en-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="lv-en-sched-last-url"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. EN Short -->
+    <div class="acc-item" id="acc-en-short">
+      <div class="acc-header" onclick="toggleAcc('en-short')">
+        <span class="acc-title">⚡ EN Otomatik Short</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-en-short"></span><span class="acc-chevron" id="acc-chev-en-short">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-en-short">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">İngilizce kanalına otomatik trend haberden Short üretip yükler (ABD trendleri)</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="en-shorts-sched-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
+            EN otomatik shortu etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:#555;font-size:11px;">(virgülle ayır — örn: 10:22,15:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="en-shorts-times-mon" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="en-shorts-times-tue" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="en-shorts-times-wed" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="en-shorts-times-thu" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="en-shorts-times-fri" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="en-shorts-times-sat" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="en-shorts-times-sun" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Ses</label>
+          <select id="en-shorts-sched-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+            <option value="M1" selected>M1 (Erkek)</option>
+            <option value="M2">M2 (Erkek)</option>
+            <option value="M3">M3 (Erkek)</option>
+            <option value="F1">F1 (Kadın)</option>
+            <option value="F2">F2 (Kadın)</option>
+            <option value="F3">F3 (Kadın)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="en-shorts-ig-enabled" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveENShortsScheduler()">
+            Instagram'a da paylaş
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveENShortsScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runENShortsNow()" id="btn-en-shorts-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-en-shorts-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="en-shorts-sched-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="en-shorts-sched-next" style="color:#888;"></div>
+          <div id="en-shorts-sched-last-status"></div>
+          <div id="en-shorts-sched-last-msg" style="color:#888;word-break:break-all;"></div>
+          <div id="en-shorts-sched-last-url"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. TR Instagram-Only -->
+    <div class="acc-item" id="acc-tr-ig-only">
+      <div class="acc-header" onclick="toggleAcc('tr-ig-only')">
+        <span class="acc-title">📸 TR Instagram-Only</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-ig-only"></span><span class="acc-chevron" id="acc-chev-tr-ig-only">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-tr-ig-only">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Sadece Instagram'a gönderir — YouTube'a yüklenmez. TR trend haberlerinden video üretir.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;">
+            <input type="checkbox" id="ig-only-tr-enabled" style="width:18px;height:18px;accent-color:#e1306c;" onchange="saveIGOnlyTRScheduler()">
+            Instagram-Only otomatiği etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:#555;font-size:11px;">(virgülle ayır — örn: 09:22,12:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="ig-times-mon" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="ig-times-tue" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="ig-times-wed" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="ig-times-thu" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="ig-times-fri" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="ig-times-sat" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:#888;font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="ig-times-sun" style="width:100%;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Ses</label>
+          <select id="ig-only-tr-voice" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+            <option value="F1" selected>F1 (Kadın)</option>
+            <option value="F2">F2 (Kadın)</option>
+            <option value="F3">F3 (Kadın)</option>
+            <option value="M1">M1 (Erkek)</option>
+            <option value="M2">M2 (Erkek)</option>
+            <option value="M3">M3 (Erkek)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-ig-only-tr-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="ig-only-tr-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="ig-only-tr-next" style="color:#888;"></div>
+          <div id="ig-only-tr-last-status"></div>
+          <div id="ig-only-tr-last-msg" style="color:#888;word-break:break-all;"></div>
+        </div>
+        <div class="error" id="err-cfg" style="margin-top:8px;"></div>
+
+        <!-- Başarısız Instagram Yüklemeleri -->
+        <div id="ig-failed-panel" style="display:none;margin-top:14px;">
+          <div style="color:#e1306c;font-size:12px;font-weight:600;margin-bottom:8px;">⚠️ Bekleyen Yüklemeler</div>
+          <div id="ig-failed-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Instagram API -->
+    <div class="acc-item" id="acc-ig-api">
+      <div class="acc-header" onclick="toggleAcc('ig-api')">
+        <span class="acc-title">📸 Instagram API</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-ig-api"></span><span class="acc-chevron" id="acc-chev-ig-api">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-ig-api">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Short yüklendikten sonra otomatik Instagram Reels ve Story atar. Facebook Graph API v21.0 kullanır.</p>
+        <div id="ig-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
+        <div class="field">
+          <label>Instagram Kullanıcı ID</label>
+          <input type="text" id="ig-user-id" placeholder="17841400000000000" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <div class="field">
+          <label>Access Token (90 günlük)</label>
+          <input type="password" id="ig-access-token" placeholder="EAABs..." style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <div style="display:flex;gap:20px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:13px;margin:0;">
+            <input type="checkbox" id="ig-post-reels" checked style="width:16px;height:16px;accent-color:#7c3aed;">
+            Reels olarak paylaş
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:13px;margin:0;">
+            <input type="checkbox" id="ig-post-story" checked style="width:16px;height:16px;accent-color:#7c3aed;">
+            Story olarak paylaş
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button onclick="saveInstagramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="testInstagram()" style="font-size:12px;padding:8px 16px;background:#1a3a1a;">Bağlantıyı Test Et</button>
+        </div>
+        <div id="ig-test-result" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
+        <div id="ig-last-log" style="font-size:12px;color:#888;margin-bottom:4px;"></div>
+      </div>
+    </div>
+
+    <!-- 8. API Bağlantıları -->
+    <div class="acc-item" id="acc-api-keys">
+      <div class="acc-header" onclick="toggleAcc('api-keys')">
+        <span class="acc-title">🔑 API Bağlantıları</span>
+        <span class="acc-right"><span class="acc-chevron" id="acc-chev-api-keys">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-api-keys">
+
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">YouTube OAuth</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">Google Cloud Console → API &amp; Services → Credentials → OAuth 2.0 Client</p>
+        <div id="yt-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Kayıtlı — bağlantı aktif</div>
+          <button onclick="resetYTConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir / Sıfırla</button>
+        </div>
+        <div id="yt-input-state">
+          <div class="field">
+            <label>Client ID</label>
+            <input type="text" id="cfg-client-id" placeholder="337037...apps.googleusercontent.com" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <label>Client Secret</label>
+            <input type="password" id="cfg-client-secret" placeholder="GOCSPX-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+          </div>
+          <div style="display:flex;gap:12px;margin-top:16px;margin-bottom:4px;">
+            <button onclick="saveYTConfig()">Kaydet ve Bağlan</button>
+            <button onclick="document.getElementById('yt-modal').style.display='none'" style="background:#333;">İptal</button>
+          </div>
+        </div>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Pexels API</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">pexels.com → Üye ol → API Key</p>
+        <div id="pexels-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ Pexels bağlı</div>
+          <button onclick="resetPexelsConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
+        </div>
+        <div id="pexels-input-state">
+          <input type="password" id="cfg-pexels-key" placeholder="Pexels API Key..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+          <button onclick="savePexelsConfig()">Kaydet</button>
+        </div>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">DeepSeek API</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">Otomatik video üretimi için sunucuda saklanır</p>
+        <div id="ds-saved-state" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:#4ade80;font-size:13px;margin-bottom:8px;">✓ DeepSeek key sunucuda kayıtlı</div>
+          <button onclick="resetDSConfig()" style="background:#2a1a1a;font-size:12px;padding:6px 12px;">Değiştir</button>
+        </div>
+        <div id="ds-input-state">
+          <input type="password" id="cfg-ds-key" placeholder="sk-..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+          <button onclick="saveDSConfig()">Kaydet</button>
+        </div>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🎨 OpenAI DALL-E (Opsiyonel)</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">DALL-E 3 API key — varsa görseller DALL-E ile üretilir, yoksa Wikimedia → Pexels kullanılır</p>
+        <div id="openai-key-status" style="font-size:13px;margin-bottom:10px;color:#888;">Kontrol ediliyor...</div>
+        <div class="field">
+          <label>OpenAI API Key</label>
+          <input type="password" id="openai-api-key" placeholder="sk-..." style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <button onclick="saveOpenAIKey()" style="font-size:12px;padding:8px 16px;margin-bottom:4px;">Kaydet</button>
+
+        <hr style="border-color:#222;margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📨 Telegram Bildirimleri</div>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">Hata olduğunda (Instagram, Pexels, DeepSeek, YouTube) anında Telegram mesajı gönderir.</p>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Bot Token</label>
+          <input type="password" id="cfg-tg-token" placeholder="123456:ABC-DEF..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Chat ID</label>
+          <input type="text" id="cfg-tg-chatid" placeholder="-100123456789 veya @username" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <button onclick="saveTelegramConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="testTelegram()" id="btn-tg-test" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">Test Gönder</button>
+        </div>
+        <div id="tg-status" style="font-size:12px;margin-top:6px;color:#888;"></div>
+      </div>
+    </div>
+
+    <!-- 9. Sistem -->
+    <div class="acc-item" id="acc-sistem">
+      <div class="acc-header" onclick="toggleAcc('sistem')">
+        <span class="acc-title">💾 Sistem / Yedek</span>
+        <span class="acc-right"><span class="acc-chevron" id="acc-chev-sistem">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-sistem">
+
+        <!-- Şifre Değiştir -->
+        <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🔒 Panel Şifresi</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+          <input type="password" id="old-pw" placeholder="Mevcut şifre" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#e0e0e0;font-size:13px;outline:none;">
+          <input type="password" id="new-pw" placeholder="Yeni şifre (min 6 karakter)" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#e0e0e0;font-size:13px;outline:none;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button onclick="changePassword()" style="background:#e1306c;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">Şifreyi Güncelle</button>
+            <span id="pw-status" style="font-size:12px;color:#888;"></span>
+          </div>
+        </div>
+
+        <div style="height:1px;background:#1e1e1e;margin-bottom:16px;"></div>
+
+        <!-- Script Hook Stili -->
+        <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🎣 Script Hook Stili</p>
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Yeni videoların ilk sahnesi nasıl yazılsın. Performans düşerse tek tıkla eskiye dön.</p>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="hook-btn-eski" onclick="setHookStyle('eski')" style="background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">Eski</button>
+          <button id="hook-btn-yeni" onclick="setHookStyle('yeni')" style="background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">Yeni (kısa kanca + kişisel etki)</button>
+          <span id="hook-style-status" style="font-size:12px;color:#888;"></span>
+        </div>
+
+        <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
+
+        <!-- Yedek -->
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">Tüm API key'leri ve ayarları ZIP olarak indir. Sunucu değişirse geri yükle.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+          <button onclick="downloadBackup()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">⬇ Yedek İndir</button>
+          <button onclick="sendBackupTelegram(this)" style="background:#1a2a1e;color:#4ade80;border:1px solid #1a4a2e;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">📨 Telegrama Gönder</button>
+          <label style="background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+            ⬆ Yedek Yükle
+            <input type="file" accept=".zip" style="display:none;" onchange="restoreBackup(this)">
+          </label>
+        </div>
+        <div id="backup-status" style="font-size:12px;color:#888;margin-top:6px;"></div>
+
+        <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
+
+        <!-- Biriken Videolar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <p style="color:#888;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0;">🗄️ Biriken Videolar</p>
+          <button onclick="loadOutputVideos()" style="background:#1a1a1a;color:#888;border:1px solid #2a2a2a;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;">↻ Yenile</button>
+        </div>
+        <p style="color:#666;font-size:12px;margin-bottom:10px;">Otomatik temizlik her gece çalışır (3 günden eski videolar). Çalışmazsa buradan elle silebilirsin.</p>
+        <div id="output-videos-summary" style="font-size:12px;color:#888;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button onclick="deleteSelectedVideos()" style="background:#1a1a3a;color:#e0e0e0;border:1px solid #333;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;">Seçilenleri Sil</button>
+          <button onclick="deleteAllVideos()" style="background:#2a0a0a;color:#f87171;border:1px solid #5a1a1a;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;">🗑 Tümünü Sil</button>
+        </div>
+        <div id="output-videos-list" style="max-height:320px;overflow-y:auto;"></div>
+
+        <!-- Çıkış -->
+        <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
+        <button onclick="window.location='/logout'" style="background:#1a1a1a;color:#f87171;border:1px solid #3a1a1a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">⏻ Çıkış Yap</button>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="position:fixed;top:16px;right:16px;">
+  <button onclick="openSettings()" style="background:#222;font-size:12px;padding:8px 14px;">⚙ Ayarlar</button>
+</div>
+
+<script>
+let voices = [], langs = {};
+
+async function loadMeta() {
+  const r = await fetch('/api/voices');
+  const d = await r.json();
+  voices = d.voices;
+  langs = d.languages;
+
+  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice', 'lv-voice', 'tnlv-voice'];
+  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang', 'lv-lang', 'tnlv-lang'];
+  const translateSelect = document.getElementById('vid-translate');
+  const sourceSelect = document.getElementById('tr-source');
+
+  voiceSelects.forEach(id => {
+    const el = document.getElementById(id);
+    voices.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      el.appendChild(o);
+    });
+  });
+
+  langSelects.forEach(id => {
+    const el = document.getElementById(id);
+    Object.entries(langs).forEach(([code, name]) => {
+      const o = document.createElement('option');
+      o.value = code; o.textContent = name;
+      if (code === 'tr') o.selected = true;
+      el.appendChild(o);
+    });
+  });
+
+  Object.entries(langs).forEach(([code, name]) => {
+    const o1 = document.createElement('option');
+    o1.value = code; o1.textContent = name;
+    translateSelect.appendChild(o1);
+
+    const o2 = document.createElement('option');
+    o2.value = code; o2.textContent = name;
+    sourceSelect.appendChild(o2);
+  });
+}
+
+function switchTab(name) {
+  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy'];
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'tnlv') updateTNLVApiKeyStatus();
+  if (name === 'longvideo') { updateLVApiKeyStatus(); checkLVStatusOnLoad(); }
+  if (name === 'analytics') loadAnalytics();
+  if (name === 'iganalytics') loadIGAnalytics();
+}
+
+let _lvPollTimer = null;
+
+function _fmtElapsed(sec) {
+  const s = sec || 0;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m > 0 ? `${m} dakika ${r} saniye` : `${r} saniye`;
+}
+
+async function checkLVStatusOnLoad() {
+  if (_lvPollTimer) return; // zaten polling var
+  try {
+    const s = await fetch('/api/manual-lv/status').then(r => r.json());
+    if (s.status === 'running') {
+      setLoading('btn-lv', 'spin-lv', true);
+      _showLVProgress(`Üretim devam ediyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz.`, true);
+      _startLVPolling();
+    } else if (s.status === 'done' && s.result) {
+      _showLVProgress('', false);
+      _displayLVResult(s.result);
+    }
+  } catch(e) { /* ignore */ }
+}
+
+function _showLVProgress(msg, isRunning) {
+  const el = document.getElementById('lv-progress-msg');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+  document.getElementById('btn-lv-reset').style.display = isRunning ? 'block' : 'none';
+}
+
+async function resetLVGeneration() {
+  if (_lvPollTimer) { clearInterval(_lvPollTimer); _lvPollTimer = null; }
+  await fetch('/api/manual-lv/reset', { method: 'POST' });
+  setLoading('btn-lv', 'spin-lv', false);
+  _showLVProgress('', false);
+  showError('err-lv', '');
+}
+
+function _displayLVResult(d) {
+  document.getElementById('lv-title-out').textContent = d.title;
+  document.getElementById('lv-video').src = d.video;
+  document.getElementById('dl-lv').href = d.video;
+  document.getElementById('dl-lv').download = `${d.title || 'video'}.mp4`;
+  const mins = Math.floor(d.duration_sec / 60);
+  const secs = Math.round(d.duration_sec % 60);
+  document.getElementById('lv-duration-out').textContent = `Süre: ${mins}:${secs.toString().padStart(2,'0')} · ${d.scene_count} sahne`;
+  currentLVFilename = d.video.split('/').pop();
+  currentLVThumbnailFilename = null;
+  if (d.thumbnail) {
+    currentLVThumbnailFilename = d.thumbnail.split('/').pop();
+    document.getElementById('lv-thumb').src = d.thumbnail;
+    document.getElementById('dl-lv-thumb').href = d.thumbnail;
+    document.getElementById('lv-thumb-wrap').style.display = 'block';
+  } else {
+    document.getElementById('lv-thumb-wrap').style.display = 'none';
+  }
+  document.getElementById('lv-yt-title').value = d.title || '';
+  document.getElementById('lv-yt-desc').value = d.description || '';
+  document.getElementById('lv-yt-tags').value = d.suggested_tags || '';
+  document.getElementById('lv-yt-upload-section').style.display = 'block';
+  document.getElementById('result-lv').classList.add('show');
+  checkYTStatus();
+}
+
+function _startLVPolling() {
+  if (_lvPollTimer) clearInterval(_lvPollTimer);
+  _lvPollTimer = setInterval(async () => {
+    try {
+      const s = await fetch('/api/manual-lv/status').then(r => r.json());
+      if (s.status === 'running') {
+        _showLVProgress(`Üretiliyor... ${_fmtElapsed(s.elapsed)} geçti. Sayfa kapatabilirsiniz, arka planda devam eder.`, true);
+      } else if (s.status === 'done' && s.result) {
+        clearInterval(_lvPollTimer);
+        _lvPollTimer = null;
+        _showLVProgress('', false);
+        setLoading('btn-lv', 'spin-lv', false);
+        _displayLVResult(s.result);
+      } else if (s.status === 'error') {
+        clearInterval(_lvPollTimer);
+        _lvPollTimer = null;
+        _showLVProgress('', false);
+        setLoading('btn-lv', 'spin-lv', false);
+        showError('err-lv', s.error || 'Üretim hatası');
+      }
+    } catch(e) { /* network blip, keep polling */ }
+  }, 4000);
+}
+
+async function generateLongVideo() {
+  const apiKey = localStorage.getItem('ds_api_key') || document.getElementById('shorts-apikey').value.trim();
+  const topic = document.getElementById('lv-topic').value.trim();
+  if (!apiKey) return showError('err-lv', 'Önce "Shorts Üret" sekmesinden DeepSeek API key kaydedin.');
+  if (!topic) return showError('err-lv', 'Konu boş olamaz.');
+  showError('err-lv', '');
+  document.getElementById('result-lv').classList.remove('show');
+
+  const fd = new FormData();
+  fd.append('topic', topic);
+  fd.append('api_key', apiKey);
+  fd.append('lang', document.getElementById('lv-lang').value);
+  fd.append('voice', document.getElementById('lv-voice').value);
+  fd.append('speed', document.getElementById('lv-speed').value);
+  fd.append('duration_min', document.getElementById('lv-duration').value);
+  fd.append('use_video', document.getElementById('lv-use-video').checked ? 'true' : 'false');
+
+  try {
+    const r = await fetch('/api/generate-long-video', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    setLoading('btn-lv', 'spin-lv', true);
+    _showLVProgress('Üretim başladı. Sayfa kapatabilirsiniz, arka planda devam eder.', true);
+    _startLVPolling();
+  } catch(e) {
+    showError('err-lv', e.message);
+  }
+}
+
+async function fetchLVCategoryTrend() {
+  const apiKey = localStorage.getItem('ds_api_key') || document.getElementById('shorts-apikey').value.trim();
+  const category = document.getElementById('lv-category').value;
+  if (!apiKey) return showError('err-lv', 'Önce API key kaydedin.');
+  if (!category) return showError('err-lv', 'Önce bir kategori seçin.');
+  setLoading('btn-lv-trend', 'spin-lv-trend', true);
+  document.getElementById('lv-trend-hook').style.display = 'none';
+  try {
+    const fd = new FormData();
+    fd.append('category', category);
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('lv-lang').value);
+    const r = await fetch('/api/lv-category-trend', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || 'Hata');
+    const d = await r.json();
+    if (d.topic) {
+      document.getElementById('lv-topic').value = d.topic;
+      if (d.hook) {
+        document.getElementById('lv-trend-hook').textContent = d.hook;
+        document.getElementById('lv-trend-hook').style.display = 'block';
+      }
+    }
+  } catch(e) {
+    showError('err-lv', e.message);
+  } finally {
+    setLoading('btn-lv-trend', 'spin-lv-trend', false);
+  }
+}
+
+function setLoading(btnId, spinId, loading) {
+  const btn = document.getElementById(btnId);
+  const spin = document.getElementById(spinId);
+  btn.disabled = loading;
+  spin.style.display = loading ? 'block' : 'none';
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function synthesize() {
+  const text = document.getElementById('tts-text').value.trim();
+  if (!text) return showError('err-synth', 'Metin boş olamaz.');
+  showError('err-synth', '');
+  setLoading('btn-synth', 'spin-synth', true);
+
+  try {
+    const fd = new FormData();
+    fd.append('text', text);
+    fd.append('lang', document.getElementById('tts-lang').value);
+    fd.append('voice', document.getElementById('tts-voice').value);
+    fd.append('speed', document.getElementById('tts-speed').value);
+
+    const r = await fetch('/api/synthesize', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+
+    document.getElementById('audio-synth').src = d.file;
+    document.getElementById('dl-synth').href = d.file;
+    document.getElementById('result-synth').classList.add('show');
+    document.getElementById('audio-synth').play();
+  } catch(e) {
+    showError('err-synth', e.message);
+  } finally {
+    setLoading('btn-synth', 'spin-synth', false);
+  }
+}
+
+function showFilename(input) {
+  const badge = document.getElementById('file-badge');
+  badge.innerHTML = input.files[0]
+    ? `<span class="filename-badge">${input.files[0].name}</span>` : '';
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const input = document.getElementById('video-file');
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  input.files = dt.files;
+  showFilename(input);
+}
+
+async function voiceVideo() {
+  const file = document.getElementById('video-file').files[0];
+  if (!file) return showError('err-video', 'Video seçin.');
+  showError('err-video', '');
+  setLoading('btn-video', 'spin-video', true);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('lang', document.getElementById('vid-lang').value);
+    fd.append('voice', document.getElementById('vid-voice').value);
+    fd.append('speed', document.getElementById('vid-speed').value);
+    fd.append('translate_to', document.getElementById('vid-translate').value);
+
+    const r = await fetch('/api/voice-video', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail);
+    const d = await r.json();
+
+    document.getElementById('video-transcript').textContent = d.transcript;
+    document.getElementById('video-out').src = d.video;
+    document.getElementById('dl-video').href = d.video;
+    document.getElementById('result-video').classList.add('show');
+  } catch(e) {
+    showError('err-video', e.message);
+  } finally {
+    setLoading('btn-video', 'spin-video', false);
+  }
+}
+
+async function translateAndSynth() {
+  const text = document.getElementById('tr-text').value.trim();
+  if (!text) return showError('err-tr', 'Metin boş olamaz.');
+  showError('err-tr', '');
+  setLoading('btn-tr', 'spin-tr', true);
+
+  try {
+    const tfd = new FormData();
+    tfd.append('text', text);
+    tfd.append('source', document.getElementById('tr-source').value);
+    tfd.append('target', document.getElementById('tr-target').value);
+
+    const tr = await fetch('/api/translate', { method: 'POST', body: tfd });
+    if (!tr.ok) throw new Error((await tr.json()).detail);
+    const td = await tr.json();
+
+    document.getElementById('tr-translated').textContent = td.translated;
+
+    const sfd = new FormData();
+    sfd.append('text', td.translated);
+    sfd.append('lang', document.getElementById('tr-target').value);
+    sfd.append('voice', document.getElementById('tr-voice').value);
+    sfd.append('speed', document.getElementById('tr-speed').value);
+
+    const sr = await fetch('/api/synthesize', { method: 'POST', body: sfd });
+    if (!sr.ok) throw new Error((await sr.json()).detail);
+    const sd = await sr.json();
+
+    document.getElementById('audio-tr').src = sd.file;
+    document.getElementById('dl-tr').href = sd.file;
+    document.getElementById('result-tr').classList.add('show');
+    document.getElementById('audio-tr').play();
+  } catch(e) {
+    showError('err-tr', e.message);
+  } finally {
+    setLoading('btn-tr', 'spin-tr', false);
+  }
+}
+
+let currentVideoFilename = null;
+let currentThumbnailFilename = null;
+let currentLVFilename = null;
+let currentLVThumbnailFilename = null;
+let currentTNLVFilename = null;
+let currentTNLVThumbnailFilename = null;
+
+async function checkYTStatus() {
+  try {
+    const pr = await fetch('/api/pexels/config');
+    const pd = await pr.json();
+    if (pd.configured) {
+      document.getElementById('pexels-saved-state').style.display = 'block';
+      document.getElementById('pexels-input-state').style.display = 'none';
+    }
+  } catch(e) {}
+  try {
+    const r = await fetch('/api/yt/config');
+    const d = await r.json();
+    const authorized = d.authorized;
+    // Shorts upload bölümü
+    if (authorized) {
+      document.getElementById('yt-linked').style.display = 'block';
+      document.getElementById('yt-not-linked').style.display = 'none';
+    } else {
+      document.getElementById('yt-linked').style.display = 'none';
+      document.getElementById('yt-not-linked').style.display = 'block';
+    }
+    // Uzun video upload bölümü
+    if (authorized) {
+      document.getElementById('lv-yt-linked').style.display = 'block';
+      document.getElementById('lv-yt-not-linked').style.display = 'none';
+    } else {
+      document.getElementById('lv-yt-linked').style.display = 'none';
+      document.getElementById('lv-yt-not-linked').style.display = 'block';
+    }
+    // Modal durumu
+    if (d.configured) {
+      document.getElementById('yt-saved-state').style.display = 'block';
+      document.getElementById('yt-input-state').style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+const _ACC_IDS = ['tr-short','tr-lv','tr-tnlv','en-belgesel','en-short','tr-ig-only','ig-api','api-keys','sistem'];
+
+function toggleAcc(id) {
+  const body = document.getElementById('acc-body-' + id);
+  const chev = document.getElementById('acc-chev-' + id);
+  if (!body) return;
+  const open = body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open', open);
+  const state = JSON.parse(localStorage.getItem('acc_state') || '{}');
+  state[id] = open;
+  localStorage.setItem('acc_state', JSON.stringify(state));
+}
+
+function initAccordions() {
+  const state = JSON.parse(localStorage.getItem('acc_state') || '{}');
+  _ACC_IDS.forEach(id => {
+    const body = document.getElementById('acc-body-' + id);
+    const chev = document.getElementById('acc-chev-' + id);
+    if (!body) return;
+    const open = !!state[id];
+    body.classList.toggle('open', open);
+    if (chev) chev.classList.toggle('open', open);
+  });
+}
+
+function setAccBadge(id, log, enabled) {
+  const badge = document.getElementById('acc-badge-' + id);
+  if (!badge) return;
+  if (!enabled) { badge.className = 'acc-badge off'; badge.textContent = '○ kapalı'; return; }
+  if (!log || !log.status) { badge.className = 'acc-badge'; badge.textContent = ''; return; }
+  if (log.status === 'error')   { badge.className = 'acc-badge err'; badge.textContent = '✗ hata'; }
+  else if (log.status === 'running') { badge.className = 'acc-badge run'; badge.textContent = '▶ çalışıyor'; }
+  else if (log.status === 'success') { badge.className = 'acc-badge ok';  badge.textContent = '✓ ok'; }
+  else { badge.className = 'acc-badge'; badge.textContent = ''; }
+}
+
+async function openSettings() {
+  document.getElementById('yt-modal').style.display = 'flex';
+  history.pushState({modal:'yt'}, '', '');
+  initAccordions();
+  checkYTStatus();
+  // DeepSeek sunucu key durumu
+  try {
+    const r = await fetch('/api/deepseek/config');
+    const d = await r.json();
+    if (d.configured) {
+      document.getElementById('ds-saved-state').style.display = 'block';
+      document.getElementById('ds-input-state').style.display = 'none';
+    }
+  } catch(e) {}
+  loadSchedulerStatus();
+  loadLVSchedulerStatus();
+  loadTNLVSchedulerStatus();
+  updateTNLVApiKeyStatus();
+  checkYTENStatus();
+  loadLVENSchedulerStatus();
+  loadENShortsSchedulerStatus();
+  loadIGOnlyTRStatus();
+  loadIGFailedUploads();
+  loadTelegramConfig();
+  checkOpenAIStatus();
+  checkInstagramStatus();
+  loadInstagramLog();
+}
+
+function closeYTModal() {
+  document.getElementById('yt-modal').style.display = 'none';
+}
+
+window.addEventListener('popstate', function(e) {
+  document.getElementById('yt-modal').style.display = 'none';
+});
+
+// Geri tuşu modal'ı kapat
+document.getElementById('yt-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeYTModal();
+});
+
+async function savePexelsConfig() {
+  const key = document.getElementById('cfg-pexels-key').value.trim();
+  if (!key) return showError('err-cfg', 'API key girin.');
+  const fd = new FormData();
+  fd.append('api_key', key);
+  const r = await fetch('/api/pexels/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('pexels-saved-state').style.display = 'block';
+    document.getElementById('pexels-input-state').style.display = 'none';
+    document.getElementById('cfg-pexels-key').value = '';
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+function resetPexelsConfig() {
+  document.getElementById('pexels-saved-state').style.display = 'none';
+  document.getElementById('pexels-input-state').style.display = 'block';
+}
+
+function resetYTConfig() {
+  document.getElementById('yt-saved-state').style.display = 'none';
+  document.getElementById('yt-input-state').style.display = 'block';
+  document.getElementById('cfg-client-id').value = '';
+  document.getElementById('cfg-client-secret').value = '';
+}
+
+async function saveYTConfig() {
+  const client_id = document.getElementById('cfg-client-id').value.trim();
+  const client_secret = document.getElementById('cfg-client-secret').value.trim();
+  if (!client_id || !client_secret) return showError('err-cfg', 'Her iki alanı doldurun.');
+  const fd = new FormData();
+  fd.append('client_id', client_id);
+  fd.append('client_secret', client_secret);
+  const r = await fetch('/api/yt/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('yt-modal').style.display = 'none';
+    window.location = '/auth/youtube';
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+async function uploadToYouTube() {
+  if (!currentVideoFilename) return;
+  showError('err-yt', '');
+  setLoading('btn-yt-upload', 'spin-yt', true);
+  document.getElementById('yt-success').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentVideoFilename);
+    fd.append('title', document.getElementById('yt-title').value || 'Shorts');
+    fd.append('description', document.getElementById('yt-desc').value);
+    fd.append('tags', document.getElementById('yt-tags').value);
+    fd.append('privacy', document.getElementById('yt-privacy').value);
+    fd.append('category_id', document.getElementById('yt-category').value);
+    fd.append('age_restricted', document.getElementById('yt-age').checked ? 'true' : 'false');
+    if (currentThumbnailFilename) fd.append('thumbnail_filename', currentThumbnailFilename);
+
+    const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+    const link = document.getElementById('yt-link');
+    link.href = d.url;
+    link.textContent = d.url;
+    document.getElementById('yt-success').style.display = 'block';
+  } catch(e) {
+    showError('err-yt', e.message);
+  } finally {
+    setLoading('btn-yt-upload', 'spin-yt', false);
+  }
+}
+
+async function sendShortsToInstagram() {
+  if (!currentVideoFilename) { alert('Önce video oluştur'); return; }
+  const res = document.getElementById('shorts-ig-result');
+  res.style.display = 'none';
+  setLoading('btn-shorts-ig', 'spin-shorts-ig', true);
+  try {
+    const r = await fetch('/api/shorts/send-instagram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: currentVideoFilename,
+        title: document.getElementById('yt-title').value || '',
+        tags: document.getElementById('yt-tags').value || '',
+        description: document.getElementById('yt-desc').value || ''
+      })
+    });
+    const d = await r.json();
+    res.style.display = 'block';
+    if (d.ok) {
+      res.style.background = '#0a1f0a';
+      res.style.border = '1px solid #1a5a1a';
+      res.style.color = '#4ade80';
+      res.textContent = 'Instagram\'a yüklendi! ✓';
+    } else {
+      res.style.background = '#1a0a0a';
+      res.style.border = '1px solid #5a1a1a';
+      res.style.color = '#f87171';
+      res.textContent = 'Hata: ' + (d.error || 'Bilinmeyen hata');
+    }
+  } catch(e) {
+    res.style.display = 'block';
+    res.style.color = '#f87171';
+    res.textContent = 'Hata: ' + e.message;
+  } finally {
+    setLoading('btn-shorts-ig', 'spin-shorts-ig', false);
+  }
+}
+
+async function fetchTrends() {
+  setLoading('btn-trends', 'spin-trends', true);
+  try {
+    const lang = document.getElementById('shorts-lang').value || 'tr';
+    const r = await fetch(`/api/trends/refresh`, { method: 'POST' });
+    if (!r.ok) throw new Error('Trend verisi alınamadı');
+    const d = await r.json();
+
+    const list = document.getElementById('trends-list');
+    list.innerHTML = '';
+    (d.topics || []).forEach(topic => {
+      const btn = document.createElement('button');
+      btn.textContent = topic;
+      btn.style.cssText = 'background:#1a2a1a;border:1px solid #2a4a2a;border-radius:20px;padding:6px 14px;font-size:13px;color:#86efac;cursor:pointer;';
+      btn.onclick = () => {
+        document.getElementById('shorts-topic').value = topic;
+        btn.style.background = '#2a4a2a';
+      };
+      list.appendChild(btn);
+    });
+
+    const ts = new Date(d.ts * 1000).toLocaleTimeString('tr-TR');
+    document.getElementById('trends-time').textContent = `Son güncelleme: ${ts}`;
+    document.getElementById('trends-box').style.display = 'block';
+  } catch(e) {
+    alert(e.message);
+  } finally {
+    setLoading('btn-trends', 'spin-trends', false);
+  }
+}
+
+async function generateFromTrend() {
+  const apiKey = document.getElementById('shorts-apikey').value.trim();
+  if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
+  // Konu alanını boş bırak — backend trend haberlerden seçecek
+  const prev = document.getElementById('shorts-topic').value;
+  document.getElementById('shorts-topic').value = '';
+  document.getElementById('btn-trend-gen').disabled = true;
+  document.getElementById('spin-trend-gen').style.display = 'block';
+  try {
+    await generateShorts(true);
+  } finally {
+    document.getElementById('shorts-topic').value = prev;
+    document.getElementById('btn-trend-gen').disabled = false;
+    document.getElementById('spin-trend-gen').style.display = 'none';
+  }
+}
+
+let _shortsPollInterval = null;
+let _shortsTimerInterval = null;
+
+function _startShortsPolling() {
+  const timerEl = document.getElementById('shorts-elapsed');
+  const progressEl = document.getElementById('shorts-progress');
+  progressEl.style.display = 'block';
+  setLoading('btn-shorts', 'spin-shorts', true);
+
+  _shortsPollInterval = setInterval(async () => {
+    try {
+      const r = await fetch('/api/manual-shorts/status');
+      if (!r.ok) return;
+      const j = await r.json();
+      timerEl.textContent = _fmtElapsed(j.elapsed ?? 0);
+
+      if (j.status === 'done') {
+        _stopShortsPolling();
+        _showShortsResult(j.result);
+      } else if (j.status === 'error') {
+        _stopShortsPolling();
+        showError('err-shorts', j.error || 'Bilinmeyen hata');
+      }
+    } catch(e) { /* ağ hatası — bir sonraki poll'da tekrar dene */ }
+  }, 3000);
+}
+
+function _stopShortsPolling() {
+  clearInterval(_shortsPollInterval);
+  clearInterval(_shortsTimerInterval);
+  _shortsPollInterval = null;
+  document.getElementById('shorts-progress').style.display = 'none';
+  setLoading('btn-shorts', 'spin-shorts', false);
+}
+
+async function resetShortsGeneration() {
+  _stopShortsPolling();
+  await fetch('/api/manual-shorts/reset', { method: 'POST' });
+  showError('err-shorts', '');
+}
+
+function _showShortsResult(d) {
+  if (!d) return;
+  document.getElementById('shorts-script').textContent = d.script;
+  document.getElementById('shorts-video').src = d.video;
+  document.getElementById('dl-shorts').href = d.video;
+  currentVideoFilename = d.video.split('/').pop();
+  document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
+  if (d.title) document.getElementById('yt-title').value = d.title;
+  if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
+  if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
+  currentThumbnailFilename = null;
+  if (d.thumbnail) {
+    currentThumbnailFilename = d.thumbnail.split('/').pop();
+    document.getElementById('shorts-thumb').src = d.thumbnail;
+    document.getElementById('dl-shorts-thumb').href = d.thumbnail;
+    document.getElementById('shorts-thumb-wrap').style.display = 'block';
+  } else {
+    document.getElementById('shorts-thumb-wrap').style.display = 'none';
+  }
+  document.getElementById('result-shorts').classList.add('show');
+  checkYTStatus();
+}
+
+// Sayfa yüklenince aktif üretim varsa otomatik bağlan
+(async () => {
+  try {
+    const r = await fetch('/api/manual-shorts/status');
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.status === 'running') {
+      document.getElementById('shorts-elapsed').textContent = _fmtElapsed(j.elapsed ?? 0);
+      _startShortsPolling();
+    } else if (j.status === 'error') {
+      showError('err-shorts', j.error || 'Üretim hatası — sıfırlayıp tekrar deneyin.');
+    }
+  } catch(e) {}
+})();
+
+async function generateShorts(allowEmpty = false) {
+  const apiKey = document.getElementById('shorts-apikey').value.trim();
+  const topic = document.getElementById('shorts-topic').value.trim();
+  if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
+  if (!topic && !allowEmpty) return showError('err-shorts', 'Konu boş olamaz.');
+  showError('err-shorts', '');
+  document.getElementById('result-shorts').classList.remove('show');
+
+  try {
+    const fd = new FormData();
+    fd.append('topic', topic);
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('shorts-lang').value);
+    fd.append('voice', document.getElementById('shorts-voice').value);
+    fd.append('speed', document.getElementById('shorts-speed').value);
+    fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
+
+    if (document.getElementById('use-custom-images').checked) {
+      const files = document.getElementById('custom-images-input').files;
+      for (let i = 0; i < files.length; i++) fd.append('custom_images', files[i]);
+    }
+
+    const startR = await fetch('/api/generate-shorts-async', { method: 'POST', body: fd });
+    if (!startR.ok) {
+      const ct = startR.headers.get('content-type') || '';
+      throw new Error(ct.includes('json') ? (await startR.json()).detail : await startR.text());
+    }
+
+    document.getElementById('shorts-elapsed').textContent = '0';
+    _startShortsPolling();
+  } catch(e) {
+    showError('err-shorts', e.message);
+  }
+}
+
+async function uploadLVToYouTube() {
+  if (!currentLVFilename) return;
+  showError('err-lv-yt', '');
+  setLoading('btn-lv-yt-upload', 'spin-lv-yt', true);
+  document.getElementById('lv-yt-success').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentLVFilename);
+    fd.append('title', document.getElementById('lv-yt-title').value || 'Video');
+    fd.append('description', document.getElementById('lv-yt-desc').value);
+    fd.append('tags', document.getElementById('lv-yt-tags').value);
+    fd.append('privacy', document.getElementById('lv-yt-privacy').value);
+    fd.append('category_id', document.getElementById('lv-yt-category').value);
+    fd.append('age_restricted', 'false');
+    if (currentLVThumbnailFilename) fd.append('thumbnail_filename', currentLVThumbnailFilename);
+
+    const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+    const link = document.getElementById('lv-yt-link');
+    link.href = d.url;
+    link.textContent = d.url;
+    document.getElementById('lv-yt-success').style.display = 'block';
+  } catch(e) {
+    showError('err-lv-yt', e.message);
+  } finally {
+    setLoading('btn-lv-yt-upload', 'spin-lv-yt', false);
+  }
+}
+
+// DeepSeek key
+const dsKey = document.getElementById('shorts-apikey');
+dsKey.value = localStorage.getItem('ds_api_key') || '';
+
+function updateLVApiKeyStatus() {
+  const el = document.getElementById('lv-apikey-status');
+  if (localStorage.getItem('ds_api_key')) {
+    el.innerHTML = '✓ API Key kayıtlı &nbsp;<span style="color:#555;font-size:11px;">· Shorts sekmesinden değiştirebilirsin</span>';
+    el.style.color = '#4ade80';
+    el.style.borderColor = '#1a4a1a';
+  } else {
+    el.textContent = '⚠ API Key yok — "Shorts Üret" sekmesinden kaydet';
+    el.style.color = '#f87171';
+    el.style.borderColor = '#4a1a1a';
+  }
+}
+updateLVApiKeyStatus();
+updateTNLVApiKeyStatus();
+
+function saveApiKey() {
+  const v = dsKey.value.trim();
+  if (!v) return;
+  localStorage.setItem('ds_api_key', v);
+  const s = document.getElementById('apikey-status');
+  s.textContent = '✓ Kaydedildi';
+  s.style.color = '#4ade80';
+  updateLVApiKeyStatus();
+  updateTNLVApiKeyStatus();
+  setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
+}
+function clearApiKey() {
+  localStorage.removeItem('ds_api_key');
+  dsKey.value = '';
+  const s = document.getElementById('apikey-status');
+  s.textContent = 'Temizlendi.'; s.style.color = '#f87171';
+  updateLVApiKeyStatus();
+  updateTNLVApiKeyStatus();
+  setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
+}
+
+// ── Uzun Video Scheduler ──────────────────────────────────────────────────────
+async function loadLVSchedulerStatus() {
+  try {
+    const r = await fetch('/api/lv-scheduler/config');
+    const d = await r.json();
+    document.getElementById('lv-sched-enabled').checked = d.enabled || false;
+    if (d.categories) document.getElementById('lv-sched-categories').value = d.categories;
+    if (d.time) document.getElementById('lv-sched-time').value = d.time;
+    if (d.duration_min) document.getElementById('lv-sched-duration').value = d.duration_min;
+    if (d.lang)  document.getElementById('lv-sched-lang').value  = d.lang;
+    if (d.voice) document.getElementById('lv-sched-voice').value = d.voice;
+
+    const statusEl = document.getElementById('lv-sched-status');
+    statusEl.style.display = 'block';
+    document.getElementById('lv-sched-next').textContent =
+      d.next_run ? `Sıradaki yayın: ${d.next_run}` : (d.enabled ? 'Hesaplanıyor…' : 'Otomasyon kapalı');
+
+    const log = d.log || {};
+    if (log.status) {
+      const colors  = { success: '#4ade80', error: '#f87171', running: '#facc15' };
+      const labels  = { success: '✓ Başarılı', error: '✗ Hata', running: '⟳ Çalışıyor…' };
+      document.getElementById('lv-sched-last-status').innerHTML =
+        `<span style="color:${colors[log.status]||'#888'}">${labels[log.status]||log.status}</span>` +
+        (log.ts ? ` · ${new Date(log.ts*1000).toLocaleString('tr-TR')}` : '');
+      _setMsg('lv-sched-last-msg', log, '/api/lv-scheduler/run-now', 'loadLVSchedulerStatus');
+      document.getElementById('lv-sched-last-url').innerHTML = log.url
+        ? `<a href="${log.url}" target="_blank" style="color:#a78bfa;">${log.url}</a>` : '';
+    }
+    setAccBadge('tr-lv', d.log, d.enabled);
+  } catch(e) {}
+}
+
+async function saveLVScheduler() {
+  const fd = new FormData();
+  fd.append('enabled',      document.getElementById('lv-sched-enabled').checked ? 'true' : 'false');
+  fd.append('time',         document.getElementById('lv-sched-time').value.trim());
+  fd.append('categories',   document.getElementById('lv-sched-categories').value.trim());
+  fd.append('duration_min', document.getElementById('lv-sched-duration').value);
+  fd.append('lang',  document.getElementById('lv-sched-lang').value);
+  fd.append('voice', document.getElementById('lv-sched-voice').value);
+  const r = await fetch('/api/lv-scheduler/config', { method: 'POST', body: fd });
+  if (r.ok) { await loadLVSchedulerStatus(); showError('err-cfg', ''); }
+  else showError('err-cfg', 'Uzun video ayarı kaydedilemedi.');
+}
+
+async function runLVNow() {
+  setLoading('btn-lv-run-now', 'spin-lv-run-now', true);
+  try {
+    await fetch('/api/lv-scheduler/run-now', { method: 'POST' });
+    showError('err-cfg', '');
+    let tries = 0;
+    const poll = setInterval(async () => {
+      await loadLVSchedulerStatus();
+      const txt = document.getElementById('lv-sched-last-status').textContent;
+      if (txt.includes('✓') || txt.includes('✗') || ++tries > 60) {
+        clearInterval(poll);
+        setLoading('btn-lv-run-now', 'spin-lv-run-now', false);
+      }
+    }, 5000);
+  } catch(e) {
+    setLoading('btn-lv-run-now', 'spin-lv-run-now', false);
+    showError('err-cfg', e.message);
+  }
+}
+
+// ── Trend Haber LV ───────────────────────────────────────────────────────────
+function updateTNLVApiKeyStatus() {
+  const key = localStorage.getItem('ds_api_key') || '';
+  const el = document.getElementById('tnlv-apikey-status');
+  if (!el) return;
+  el.innerHTML = key
+    ? '<span style="color:#4ade80;">✓ API key var (Ayarlar\'dan değiştirilebilir)</span>'
+    : '<span style="color:#f87171;">⚠ API key girilmedi — Ayarlar\'dan ekle</span>';
+}
+
+async function generateTrendLongVideo() {
+  const apiKey = localStorage.getItem('ds_api_key') || '';
+  if (!apiKey) { document.getElementById('err-tnlv').textContent = 'DeepSeek API key girilmedi. Ayarlardan ekleyin.'; return; }
+
+  document.getElementById('err-tnlv').textContent = '';
+  document.getElementById('result-tnlv').style.display = 'none';
+  document.getElementById('spin-tnlv').style.display = 'inline-block';
+  document.getElementById('btn-tnlv').disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('tnlv-lang').value);
+    fd.append('voice', document.getElementById('tnlv-voice').value);
+    fd.append('speed', document.getElementById('tnlv-speed').value);
+    fd.append('region', 'TR');
+
+    const r = await fetch('/api/generate-trend-long-video', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('err-tnlv').textContent = d.detail || 'Hata oluştu'; return; }
+
+    currentTNLVFilename = d.video.split('/').pop();
+    currentTNLVThumbnailFilename = d.thumbnail ? d.thumbnail.split('/').pop() : null;
+
+    document.getElementById('tnlv-title-out').textContent = d.title;
+    document.getElementById('tnlv-topics-out').textContent = d.topics ? 'Konular: ' + d.topics.join(' • ') : '';
+    document.getElementById('tnlv-duration-out').textContent = `Süre: ${Math.round(d.duration_sec)}s • ${d.scene_count} sahne`;
+    document.getElementById('tnlv-video').src = d.video;
+    document.getElementById('dl-tnlv').href = d.video;
+
+    if (d.thumbnail) {
+      document.getElementById('tnlv-thumb').src = d.thumbnail;
+      document.getElementById('dl-tnlv-thumb').href = d.thumbnail;
+      document.getElementById('tnlv-thumb-wrap').style.display = 'block';
+    } else {
+      document.getElementById('tnlv-thumb-wrap').style.display = 'none';
+    }
+
+    document.getElementById('tnlv-yt-title').value = d.title;
+    document.getElementById('tnlv-yt-desc').value = d.description || '';
+    document.getElementById('tnlv-yt-tags').value = d.suggested_tags || '';
+
+    document.getElementById('tnlv-yt-upload-section').style.display = 'block';
+    document.getElementById('tnlv-yt-success').style.display = 'none';
+    checkYTStatusTNLV();
+
+    document.getElementById('result-tnlv').style.display = 'block';
+  } catch(e) {
+    document.getElementById('err-tnlv').textContent = 'İstek hatası: ' + e.message;
+  } finally {
+    document.getElementById('spin-tnlv').style.display = 'none';
+    document.getElementById('btn-tnlv').disabled = false;
+  }
+}
+
+async function checkYTStatusTNLV() {
+  try {
+    const r = await fetch('/api/yt/config');
+    const d = await r.json();
+    const linked = d.authorized;
+    document.getElementById('tnlv-yt-linked').style.display = linked ? 'block' : 'none';
+    document.getElementById('tnlv-yt-not-linked').style.display = linked ? 'none' : 'block';
+  } catch(e) {}
+}
+
+async function uploadTNLVToYouTube() {
+  if (!currentTNLVFilename) return;
+  document.getElementById('err-tnlv-yt').textContent = '';
+  document.getElementById('spin-tnlv-yt').style.display = 'inline-block';
+  document.getElementById('btn-tnlv-yt-upload').disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentTNLVFilename);
+    fd.append('title', document.getElementById('tnlv-yt-title').value);
+    fd.append('description', document.getElementById('tnlv-yt-desc').value);
+    fd.append('tags', document.getElementById('tnlv-yt-tags').value);
+    fd.append('privacy', document.getElementById('tnlv-yt-privacy').value);
+    fd.append('category_id', document.getElementById('tnlv-yt-category').value);
+    fd.append('age_restricted', 'false');
+    if (currentTNLVThumbnailFilename) fd.append('thumbnail_filename', currentTNLVThumbnailFilename);
+
+    const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('err-tnlv-yt').textContent = d.detail || 'Yükleme hatası'; return; }
+
+    document.getElementById('tnlv-yt-link').href = d.url;
+    document.getElementById('tnlv-yt-link').textContent = d.url;
+    document.getElementById('tnlv-yt-success').style.display = 'block';
+  } catch(e) {
+    document.getElementById('err-tnlv-yt').textContent = 'İstek hatası: ' + e.message;
+  } finally {
+    document.getElementById('spin-tnlv-yt').style.display = 'none';
+    document.getElementById('btn-tnlv-yt-upload').disabled = false;
+  }
+}
+
+async function loadTNLVSchedulerStatus() {
+  try {
+    const r = await fetch('/api/tnlv-scheduler/config');
+    const d = await r.json();
+    document.getElementById('tnlv-sched-enabled').checked = d.enabled;
+    document.getElementById('tnlv-sched-times').value = (d.times || ['08:00','20:00']).join(',');
+    if (d.lang) document.getElementById('tnlv-sched-lang').value = d.lang;
+    if (d.voice) document.getElementById('tnlv-sched-voice').value = d.voice;
+
+    const st = document.getElementById('tnlv-sched-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('tnlv-sched-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#facc15';
+      const label = log.status === 'success' ? 'Başarılı' : log.status === 'error' ? 'Hata' : 'Çalışıyor';
+      document.getElementById('tnlv-sched-last-status').innerHTML = log.status ? `<span style="color:${color}">${label}</span>` : '';
+      _setMsg('tnlv-sched-last-msg', log, '/api/tnlv-scheduler/run-now', 'loadTNLVSchedulerStatus');
+      document.getElementById('tnlv-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
+    }
+    setAccBadge('tr-tnlv', d.log, d.enabled);
+  } catch(e) {}
+}
+
+async function saveTNLVScheduler() {
+  const enabled = document.getElementById('tnlv-sched-enabled').checked;
+  const fd = new FormData();
+  fd.append('enabled', enabled ? 'true' : 'false');
+  fd.append('times', document.getElementById('tnlv-sched-times').value);
+  fd.append('lang', document.getElementById('tnlv-sched-lang').value);
+  fd.append('voice', document.getElementById('tnlv-sched-voice').value);
+  await fetch('/api/tnlv-scheduler/config', { method: 'POST', body: fd });
+  await loadTNLVSchedulerStatus();
+}
+
+async function runTNLVNow() {
+  document.getElementById('spin-tnlv-run-now').style.display = 'inline-block';
+  document.getElementById('btn-tnlv-run-now').disabled = true;
+  await fetch('/api/tnlv-scheduler/run-now', { method: 'POST' });
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/tnlv-scheduler/config');
+    const d = await r.json();
+    const log = d.log || {};
+    if (log.status && log.status !== 'running') {
+      clearInterval(poll);
+      document.getElementById('spin-tnlv-run-now').style.display = 'none';
+      document.getElementById('btn-tnlv-run-now').disabled = false;
+      loadTNLVSchedulerStatus();
+    }
+  }, 5000);
+}
+
+async function checkYTENStatus() {
+  try {
+    const r = await fetch('/api/yt/en/config');
+    const d = await r.json();
+    document.getElementById('yt-en-linked').style.display = d.authorized ? 'block' : 'none';
+    document.getElementById('yt-en-not-linked').style.display = d.authorized ? 'none' : 'block';
+  } catch(e) {}
+}
+
+async function loadLVENSchedulerStatus() {
+  try {
+    const r = await fetch('/api/lv-en-scheduler/config');
+    const d = await r.json();
+    document.getElementById('lv-en-sched-enabled').checked = d.enabled;
+    document.getElementById('lv-en-sched-time').value = d.time || '14:00';
+    document.getElementById('lv-en-sched-categories').value = d.categories || 'history, science, space, technology, nature';
+    const durEl = document.getElementById('lv-en-sched-duration');
+    if (d.duration_min) durEl.value = String(d.duration_min);
+    if (d.voice) document.getElementById('lv-en-sched-voice').value = d.voice;
+
+    const st = document.getElementById('lv-en-sched-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('lv-en-sched-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#facc15';
+      const label = log.status === 'success' ? 'Başarılı' : log.status === 'error' ? 'Hata' : 'Çalışıyor';
+      document.getElementById('lv-en-sched-last-status').innerHTML = log.status ? `<span style="color:${color}">${label}</span>` : '';
+      _setMsg('lv-en-sched-last-msg', log, '/api/lv-en-scheduler/run-now', 'loadLVENSchedulerStatus');
+      document.getElementById('lv-en-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
+    }
+    setAccBadge('en-belgesel', d.log, d.enabled);
+  } catch(e) {}
+}
+
+async function saveLVENScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('lv-en-sched-enabled').checked ? 'true' : 'false');
+  fd.append('time', document.getElementById('lv-en-sched-time').value);
+  fd.append('categories', document.getElementById('lv-en-sched-categories').value);
+  fd.append('duration_min', document.getElementById('lv-en-sched-duration').value);
+  fd.append('voice', document.getElementById('lv-en-sched-voice').value);
+  await fetch('/api/lv-en-scheduler/config', { method: 'POST', body: fd });
+  await loadLVENSchedulerStatus();
+}
+
+async function runLVENNow() {
+  document.getElementById('spin-lv-en-run-now').style.display = 'inline-block';
+  document.getElementById('btn-lv-en-run-now').disabled = true;
+  await fetch('/api/lv-en-scheduler/run-now', { method: 'POST' });
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/lv-en-scheduler/config');
+    const d = await r.json();
+    const log = d.log || {};
+    if (log.status && log.status !== 'running') {
+      clearInterval(poll);
+      document.getElementById('spin-lv-en-run-now').style.display = 'none';
+      document.getElementById('btn-lv-en-run-now').disabled = false;
+      loadLVENSchedulerStatus();
+    }
+  }, 5000);
+}
+
+// ── EN Shorts Scheduler ───────────────────────────────────────────────────────
+async function loadENShortsSchedulerStatus() {
+  try {
+    const r = await fetch('/api/en-shorts-scheduler/config');
+    const d = await r.json();
+    document.getElementById('en-shorts-sched-enabled').checked = d.enabled;
+    const enWeekly = d.weekly || {};
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+      const el = document.getElementById(`en-shorts-times-${day}`);
+      if (el) el.value = (enWeekly[day] || []).join(',');
+    });
+    if (d.voice) document.getElementById('en-shorts-sched-voice').value = d.voice;
+    document.getElementById('en-shorts-ig-enabled').checked = !!d.ig_enabled;
+
+    const st = document.getElementById('en-shorts-sched-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('en-shorts-sched-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const statusEl = document.getElementById('en-shorts-sched-last-status');
+      statusEl.textContent = log.status ? `Durum: ${log.status}` : '';
+      statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
+      _setMsg('en-shorts-sched-last-msg', log, '/api/en-shorts-scheduler/run-now', 'loadENShortsSchedulerStatus');
+      const urlEl = document.getElementById('en-shorts-sched-last-url');
+      urlEl.innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:#7c3aed;">${log.url}</a>` : '';
+    }
+    setAccBadge('en-short', d.log, d.enabled);
+  } catch(e) {}
+}
+
+async function saveENShortsScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('en-shorts-sched-enabled').checked ? 'true' : 'false');
+  fd.append('voice', document.getElementById('en-shorts-sched-voice').value);
+  fd.append('ig_enabled', document.getElementById('en-shorts-ig-enabled').checked ? 'true' : 'false');
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+    fd.append(day, document.getElementById(`en-shorts-times-${day}`).value);
+  });
+  await fetch('/api/en-shorts-scheduler/config', { method: 'POST', body: fd });
+  await loadENShortsSchedulerStatus();
+}
+
+async function runENShortsNow() {
+  document.getElementById('spin-en-shorts-run-now').style.display = 'inline-block';
+  document.getElementById('btn-en-shorts-run-now').disabled = true;
+  await fetch('/api/en-shorts-scheduler/run-now', { method: 'POST' });
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/en-shorts-scheduler/config');
+    const d = await r.json();
+    const log = d.log || {};
+    if (log.status && log.status !== 'running') {
+      clearInterval(poll);
+      document.getElementById('spin-en-shorts-run-now').style.display = 'none';
+      document.getElementById('btn-en-shorts-run-now').disabled = false;
+      loadENShortsSchedulerStatus();
+    }
+  }, 5000);
+}
+
+// ── TR Instagram-Only Scheduler ───────────────────────────────────────────────
+// ── Servis Yeniden Başlatma Yardımcıları ─────────────────────────────────────
+let _svcStart = 0;
+
+(async () => {
+  try {
+    const r = await fetch('/api/status/service-start');
+    _svcStart = (await r.json()).ts || 0;
+  } catch(e) {}
+})();
+
+function _restartBtnHTML(runNowUrl, refreshFn) {
+  return `<button onclick="(async function(b){b.disabled=true;b.textContent='⏳...';await fetch('${runNowUrl}',{method:'POST'});setTimeout(${refreshFn},2000);})(this)" style="margin-left:8px;font-size:11px;padding:3px 10px;background:#1a1a2a;border:1px solid #fbbf24;border-radius:4px;color:#fbbf24;cursor:pointer;">↻ Yeniden Başlat</button>`;
+}
+
+function _setMsg(elementId, log, runNowUrl, refreshFn) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const msg = log.message || '';
+  if (log.status === 'error' && msg.includes('kesildi')) {
+    el.innerHTML = msg.replace(/&/g,'&amp;').replace(/</g,'&lt;') + _restartBtnHTML(runNowUrl, refreshFn);
+  } else {
+    el.textContent = msg;
+  }
+}
+
+let _igOnlyTRPolling = null;
+
+async function loadIGOnlyTRStatus() {
+  try {
+    const r = await fetch('/api/ig-only-tr/config');
+    const d = await r.json();
+    document.getElementById('ig-only-tr-enabled').checked = d.enabled;
+    const weekly = d.weekly || {};
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+      const el = document.getElementById(`ig-times-${day}`);
+      if (el) el.value = (weekly[day] || []).join(',');
+    });
+    if (d.voice) document.getElementById('ig-only-tr-voice').value = d.voice;
+
+    const st = document.getElementById('ig-only-tr-status');
+    if (d.next_run || d.log?.ts) {
+      st.style.display = 'block';
+      document.getElementById('ig-only-tr-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
+      const log = d.log || {};
+      const statusEl = document.getElementById('ig-only-tr-last-status');
+      let statusText = log.status ? `Durum: ${log.status}` : '';
+      if (log.ts) {
+        const startTime = new Date(log.ts * 1000).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+        statusText += ` — Başladı: ${startTime}`;
+      }
+      if (log.status === 'running' && log.ts) {
+        const mins = Math.round((Date.now()/1000 - log.ts) / 60);
+        if (mins > 0) statusText += ` (${mins} dk)`;
+      }
+      statusEl.textContent = statusText;
+      statusEl.style.color = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#fbbf24';
+      _setMsg('ig-only-tr-last-msg', log, '/api/ig-only-tr/run-now', 'loadIGOnlyTRStatus');
+      setAccBadge('tr-ig-only', log, d.enabled);
+
+      if (log.status === 'running') {
+        // Job devam ediyorsa her 8 saniyede bir yenile
+        if (!_igOnlyTRPolling) {
+          _igOnlyTRPolling = setInterval(loadIGOnlyTRStatus, 8000);
+        }
+      } else {
+        // Bitti — polling durdur, butonu serbest bırak
+        if (_igOnlyTRPolling) { clearInterval(_igOnlyTRPolling); _igOnlyTRPolling = null; }
+        const btn = document.getElementById('btn-ig-only-tr-run-now');
+        const spin = document.getElementById('spin-ig-only-tr-run-now');
+        if (btn) btn.disabled = false;
+        if (spin) spin.style.display = 'none';
+      }
+    }
+  } catch(e) {}
+}
+
+async function saveIGOnlyTRScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('ig-only-tr-enabled').checked ? 'true' : 'false');
+  fd.append('voice', document.getElementById('ig-only-tr-voice').value);
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+    fd.append(day, document.getElementById(`ig-times-${day}`).value);
+  });
+  await fetch('/api/ig-only-tr/config', { method: 'POST', body: fd });
+  await loadIGOnlyTRStatus();
+}
+
+async function runIGOnlyTRNow() {
+  document.getElementById('spin-ig-only-tr-run-now').style.display = 'inline-block';
+  document.getElementById('btn-ig-only-tr-run-now').disabled = true;
+  await fetch('/api/ig-only-tr/run-now', { method: 'POST' });
+  setTimeout(loadIGOnlyTRStatus, 2000);
+}
+
+// ── Başarısız Instagram Yüklemeleri ──────────────────────────────────────────
+async function loadIGFailedUploads() {
+  try {
+    const r = await fetch('/api/ig/failed-uploads');
+    const d = await r.json();
+    const items = d.items || [];
+    const panel = document.getElementById('ig-failed-panel');
+    const list = document.getElementById('ig-failed-list');
+    if (!items.length) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    list.innerHTML = items.map(item => {
+      const dt = new Date(item.ts * 1000).toLocaleString('tr-TR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const errShort = (item.error || '').slice(0, 80);
+      const isDedup = (item.error || '').startsWith('dedup:');
+      const retryLabel = isDedup ? '⚠️ Aynı başlıkla önceden atılmış — yine de gönder' : '↻ Yeniden Dene';
+      return `<div style="background:#1a0a0a;border:1px solid #5a1a1a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="color:#e0e0e0;font-size:12px;font-weight:600;margin-bottom:4px;">${item.title || item.filename}</div>
+        <div style="color:#888;font-size:11px;margin-bottom:6px;">${dt} — ${errShort}</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="retryIGUpload('${item.filename}', this)"
+            style="font-size:11px;padding:5px 12px;background:#1a1a3a;border:1px solid #333;border-radius:6px;color:#e0e0e0;cursor:pointer;">
+            ${retryLabel}
+          </button>
+          <button onclick="deleteIGFailed('${item.filename}', this)"
+            style="font-size:11px;padding:5px 12px;background:#2a0a0a;border:1px solid #5a1a1a;border-radius:6px;color:#f87171;cursor:pointer;">
+            🗑 Sil
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function retryIGUpload(filename, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ Yükleniyor...';
+  try {
+    const fd = new FormData();
+    fd.append('filename', filename);
+    const r = await fetch('/api/ig/retry-upload', { method: 'POST', body: fd });
+    if (r.ok) {
+      btn.textContent = '✓ Başlatıldı';
+      btn.style.color = '#4ade80';
+      setTimeout(loadIGFailedUploads, 2000);
+    } else {
+      const j = await r.json().catch(() => ({}));
+      btn.textContent = '✗ Hata';
+      btn.style.color = '#f87171';
+      btn.title = j.detail || 'Bilinmeyen hata';
+      btn.disabled = false;
+      setTimeout(() => { btn.textContent = '↻ Yeniden Dene'; btn.style.color = ''; }, 4000);
+    }
+  } catch(e) {
+    btn.textContent = '↻ Yeniden Dene';
+    btn.disabled = false;
+  }
+}
+
+async function deleteIGFailed(filename, btn) {
+  btn.disabled = true;
+  try {
+    await fetch(`/api/ig/failed-upload/${filename}`, { method: 'DELETE' });
+    await loadIGFailedUploads();
+  } catch(e) {
+    btn.disabled = false;
+  }
+}
+
+// ── Yedekleme ────────────────────────────────────────────────────────────────
+async function changePassword() {
+  const oldPw = document.getElementById('old-pw').value.trim();
+  const newPw = document.getElementById('new-pw').value.trim();
+  const st = document.getElementById('pw-status');
+  if (!oldPw || !newPw) { st.style.color='#f87171'; st.textContent='Alanlar boş olamaz'; return; }
+  if (newPw.length < 6) { st.style.color='#f87171'; st.textContent='En az 6 karakter'; return; }
+  st.style.color='#888'; st.textContent='Güncelleniyor...';
+  const r = await fetch('/api/auth/change-password', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({old_password: oldPw, new_password: newPw})
+  });
+  if (r.ok) {
+    st.style.color='#4ade80'; st.textContent='Şifre güncellendi!';
+    document.getElementById('old-pw').value='';
+    document.getElementById('new-pw').value='';
+  } else {
+    const d = await r.json();
+    st.style.color='#f87171'; st.textContent = d.detail || 'Hata';
+  }
+}
+
+async function downloadBackup() {
+  const status = document.getElementById('backup-status');
+  // Try File System Access API (Android Chrome 86+) to let user pick folder
+  if (window.showSaveFilePicker) {
+    try {
+      const today = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
+      const fname = `supertonic_backup_${today}.zip`;
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fname,
+        types: [{ description: 'ZIP Yedek', accept: { 'application/zip': ['.zip'] } }],
+      });
+      status.style.color = '#888'; status.textContent = 'İndiriliyor...';
+      const resp = await fetch('/api/backup/download');
+      const blob = await resp.blob();
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      status.style.color = '#4ade80'; status.textContent = '✓ Kaydedildi';
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // user cancelled picker
+      // fall through to normal download
+    }
+  }
+  // Fallback: normal browser download
+  const a = document.createElement('a');
+  a.href = '/api/backup/download';
+  a.download = '';
+  a.click();
+}
+
+function _renderHookStyle(style) {
+  const eskiBtn = document.getElementById('hook-btn-eski');
+  const yeniBtn = document.getElementById('hook-btn-yeni');
+  if (!eskiBtn || !yeniBtn) return;
+  const active = '#e1306c', activeBorder = '#e1306c', inactive = '#1a1a1a', inactiveBorder = '#2a2a2a';
+  eskiBtn.style.background = style === 'eski' ? active : inactive;
+  eskiBtn.style.borderColor = style === 'eski' ? activeBorder : inactiveBorder;
+  yeniBtn.style.background = style === 'yeni' ? active : inactive;
+  yeniBtn.style.borderColor = style === 'yeni' ? activeBorder : inactiveBorder;
+}
+
+async function loadHookStyle() {
+  try {
+    const r = await fetch('/api/hook-style');
+    const d = await r.json();
+    _renderHookStyle(d.style);
+  } catch(e) {}
+}
+
+async function setHookStyle(style) {
+  const status = document.getElementById('hook-style-status');
+  status.style.color = '#888'; status.textContent = 'Kaydediliyor...';
+  try {
+    const fd = new FormData(); fd.append('style', style);
+    const r = await fetch('/api/hook-style', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.ok) {
+      _renderHookStyle(d.style);
+      status.style.color = '#4ade80';
+      status.textContent = `✓ ${style === 'eski' ? 'Eski' : 'Yeni'} stil aktif`;
+    } else {
+      status.style.color = '#f87171'; status.textContent = 'Hata';
+    }
+  } catch(e) {
+    status.style.color = '#f87171'; status.textContent = 'Bağlantı hatası';
+  }
+}
+loadHookStyle();
+loadOutputVideos();
+
+function _fmtAge(hours) {
+  if (hours < 1) return `${Math.round(hours * 60)} dk`;
+  if (hours < 48) return `${Math.round(hours)} sa`;
+  return `${Math.round(hours / 24)} gün`;
+}
+
+async function loadOutputVideos() {
+  const list = document.getElementById('output-videos-list');
+  const summary = document.getElementById('output-videos-summary');
+  list.innerHTML = '<span style="color:#666;font-size:12px;">Yükleniyor...</span>';
+  try {
+    const r = await fetch('/api/output-videos');
+    const d = await r.json();
+    summary.textContent = `${d.count} dosya — toplam ${d.total_mb} MB`;
+    if (!d.items.length) {
+      list.innerHTML = '<span style="color:#666;font-size:12px;">Biriken video yok.</span>';
+      return;
+    }
+    list.innerHTML = d.items.map(it => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1e1e1e;">
+        <input type="checkbox" class="output-video-cb" value="${it.filename}" style="flex-shrink:0;">
+        <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#ccc;">
+          ${it.filename}${it.pending ? ' <span style="color:#f87171;">(bekliyor)</span>' : ''}
+        </div>
+        <div style="font-size:11px;color:#888;flex-shrink:0;">${it.size_mb} MB · ${_fmtAge(it.age_hours)}</div>
+        <button onclick="deleteOneVideo('${it.filename}')" style="background:#2a0a0a;color:#f87171;border:1px solid #5a1a1a;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;flex-shrink:0;">Sil</button>
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = '<span style="color:#f87171;font-size:12px;">Yüklenemedi.</span>';
+  }
+}
+
+async function deleteOneVideo(filename) {
+  await fetch(`/api/output-videos/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+  loadOutputVideos();
+}
+
+async function deleteSelectedVideos() {
+  const boxes = Array.from(document.querySelectorAll('.output-video-cb:checked'));
+  if (!boxes.length) return;
+  if (!confirm(`${boxes.length} video silinsin mi?`)) return;
+  const fd = new FormData();
+  fd.append('filenames', boxes.map(b => b.value).join(','));
+  await fetch('/api/output-videos/bulk-delete', { method: 'POST', body: fd });
+  loadOutputVideos();
+}
+
+async function deleteAllVideos() {
+  const boxes = Array.from(document.querySelectorAll('.output-video-cb'));
+  if (!boxes.length) return;
+  if (!confirm(`Tüm biriken videolar (${boxes.length} dosya) silinsin mi? Bu işlem geri alınamaz.`)) return;
+  const fd = new FormData();
+  fd.append('filenames', boxes.map(b => b.value).join(','));
+  await fetch('/api/output-videos/bulk-delete', { method: 'POST', body: fd });
+  loadOutputVideos();
+}
+
+async function sendBackupTelegram(btn) {
+  const status = document.getElementById('backup-status');
+  btn.disabled = true;
+  status.style.color = '#888'; status.textContent = '📨 Telegram\'a gönderiliyor...';
+  try {
+    const r = await fetch('/api/backup/send-telegram', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = '#4ade80'; status.textContent = `✓ Telegram\'a gönderildi: ${d.filename}`;
+    } else {
+      status.style.color = '#f87171'; status.textContent = d.detail || 'Hata';
+    }
+  } catch(e) {
+    status.style.color = '#f87171'; status.textContent = 'Bağlantı hatası';
+  }
+  btn.disabled = false;
+}
+
+async function restoreBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('backup-status');
+  status.style.color = '#888';
+  status.textContent = 'Yükleniyor...';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch('/api/backup/restore', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = '#4ade80';
+      status.textContent = `✓ Geri yüklendi: ${d.restored.join(', ')}`;
+    } else {
+      status.style.color = '#f87171';
+      status.textContent = 'Hata: ' + (d.detail || JSON.stringify(d));
+    }
+  } catch(e) {
+    status.style.color = '#f87171';
+    status.textContent = 'Hata: ' + e.message;
+  }
+  input.value = '';
+}
+
+// ── Telegram Bildirimleri ─────────────────────────────────────────────────────
+async function loadTelegramConfig() {
+  try {
+    const r = await fetch('/api/telegram/config');
+    const d = await r.json();
+    if (d.bot_token) document.getElementById('cfg-tg-token').value = d.bot_token;
+    if (d.chat_id) document.getElementById('cfg-tg-chatid').value = d.chat_id;
+    if (d.bot_token && d.chat_id) {
+      document.getElementById('tg-status').textContent = '✓ Telegram yapılandırılmış';
+      document.getElementById('tg-status').style.color = '#4ade80';
+    }
+  } catch(e) {}
+}
+
+async function saveTelegramConfig() {
+  const fd = new FormData();
+  fd.append('bot_token', document.getElementById('cfg-tg-token').value.trim());
+  fd.append('chat_id', document.getElementById('cfg-tg-chatid').value.trim());
+  const r = await fetch('/api/telegram/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('tg-status').textContent = '✓ Kaydedildi';
+    document.getElementById('tg-status').style.color = '#4ade80';
+  }
+}
+
+async function testTelegram() {
+  const btn = document.getElementById('btn-tg-test');
+  const st = document.getElementById('tg-status');
+  btn.disabled = true;
+  st.textContent = 'Gönderiliyor...';
+  st.style.color = '#fbbf24';
+  try {
+    const r = await fetch('/api/telegram/test', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      st.textContent = '✅ Test mesajı gönderildi!';
+      st.style.color = '#4ade80';
+    } else {
+      st.textContent = '❌ Hata: ' + (d.error || 'Bilinmeyen hata');
+      st.style.color = '#f87171';
+    }
+  } catch(e) {
+    st.textContent = '❌ Bağlantı hatası';
+    st.style.color = '#f87171';
+  }
+  btn.disabled = false;
+}
+
+// ── DeepSeek sunucu config ────────────────────────────────────────────────────
+async function saveDSConfig() {
+  const key = document.getElementById('cfg-ds-key').value.trim();
+  if (!key) return showError('err-cfg', 'API key girin.');
+  const fd = new FormData(); fd.append('api_key', key);
+  const r = await fetch('/api/deepseek/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('ds-saved-state').style.display = 'block';
+    document.getElementById('ds-input-state').style.display = 'none';
+    document.getElementById('cfg-ds-key').value = '';
+    showError('err-cfg', '');
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+function resetDSConfig() {
+  document.getElementById('ds-saved-state').style.display = 'none';
+  document.getElementById('ds-input-state').style.display = 'block';
+}
+
+// ── OpenAI DALL-E config ──────────────────────────────────────────────────────
+async function checkOpenAIStatus() {
+  try {
+    const r = await fetch('/api/openai/config');
+    const d = await r.json();
+    const el = document.getElementById('openai-key-status');
+    if (el) el.innerHTML = d.configured
+      ? `<span style="color:#4ade80">✓ DALL-E aktif (${d.key_preview})</span>`
+      : '<span style="color:#888">✗ API key girilmedi — Wikimedia + Pexels kullanılacak</span>';
+  } catch(e) {}
+}
+
+async function saveOpenAIKey() {
+  const key = document.getElementById('openai-api-key').value.trim();
+  if (!key) return;
+  const fd = new FormData();
+  fd.append('api_key', key);
+  await fetch('/api/openai/config', { method: 'POST', body: fd });
+  document.getElementById('openai-api-key').value = '';
+  await checkOpenAIStatus();
+}
+
+// ── Instagram config ──────────────────────────────────────────────────────────
+async function checkInstagramStatus() {
+  try {
+    const r = await fetch('/api/instagram/config');
+    const d = await r.json();
+    const el = document.getElementById('ig-status');
+    if (!el) return;
+    if (d.configured) {
+      el.innerHTML = `<span style="color:#4ade80">✓ Bağlı — ID: ${d.ig_user_id} · Token: ${d.token_preview}</span>`;
+      document.getElementById('ig-post-reels').checked = d.post_reels !== false;
+      document.getElementById('ig-post-story').checked = d.post_story === true;
+    } else {
+      el.innerHTML = '<span style="color:#888">✗ Henüz bağlanmadı</span>';
+    }
+  } catch(e) {}
+}
+
+async function stopAllJobs() {
+  if (!confirm('Çalışan tüm video işlemleri durdurulacak. Emin misin?')) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Durduruluyor...';
+  try {
+    const r = await fetch('/api/stop-all', { method: 'POST' });
+    const d = await r.json();
+    btn.textContent = `Durduruldu (${d.killed_ffmpeg} FFmpeg)`;
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Durdur'; }, 3000);
+    // Tüm log alanlarını yenile
+    if (typeof loadSchedulerStatus === 'function') loadSchedulerStatus();
+    if (typeof loadLvSchedulerStatus === 'function') loadLvSchedulerStatus();
+  } catch(e) {
+    btn.textContent = 'Hata'; btn.disabled = false;
+  }
+}
+
+async function saveInstagramConfig() {
+  const userId = document.getElementById('ig-user-id').value.trim();
+  const token = document.getElementById('ig-access-token').value.trim();
+  const fd = new FormData();
+  fd.append('ig_user_id', userId);
+  fd.append('access_token', token);
+  fd.append('post_reels', document.getElementById('ig-post-reels').checked ? 'true' : 'false');
+  fd.append('post_story', document.getElementById('ig-post-story').checked ? 'true' : 'false');
+  const r = await fetch('/api/instagram/config', { method: 'POST', body: fd });
+  if (!r.ok) { const d = await r.json(); alert(d.detail || 'Kayıt hatası'); return; }
+  document.getElementById('ig-access-token').value = '';
+  await checkInstagramStatus();
+}
+
+async function testInstagram() {
+  const el = document.getElementById('ig-test-result');
+  el.textContent = 'Test ediliyor...';
+  try {
+    const r = await fetch('/api/instagram/test', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      el.innerHTML = `<span style="color:#4ade80">✓ Bağlantı başarılı — @${d.username}</span>`;
+    } else {
+      el.innerHTML = `<span style="color:#f87171">✗ Hata: ${d.error}</span>`;
+    }
+  } catch(e) { el.textContent = 'Test başarısız: ' + e; }
+}
+
+async function loadInstagramLog() {
+  try {
+    const r = await fetch('/api/instagram/log');
+    const d = await r.json();
+    const el = document.getElementById('ig-last-log');
+    if (el && d.msg) {
+      const ts = d.ts ? new Date(d.ts * 1000).toLocaleString('tr-TR') : '';
+      el.textContent = `Son: ${d.msg}${ts ? ' · ' + ts : ''}`;
+    }
+  } catch(e) {}
+}
+
+// ── Otomasyon / Scheduler ─────────────────────────────────────────────────────
+async function loadSchedulerStatus() {
+  try {
+    const r = await fetch('/api/scheduler/config');
+    const d = await r.json();
+
+    document.getElementById('sched-enabled').checked = d.enabled || false;
+    const schedWeekly = d.weekly || {};
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+      const el = document.getElementById(`sched-times-${day}`);
+      if (el) el.value = (schedWeekly[day] || []).join(',');
+    });
+    if (d.lang)   document.getElementById('sched-lang').value   = d.lang;
+    if (d.voice)  document.getElementById('sched-voice').value  = d.voice;
+
+    const statusEl = document.getElementById('sched-status');
+    statusEl.style.display = 'block';
+
+    document.getElementById('sched-next').textContent =
+      d.next_run ? `Sıradaki yayın: ${d.next_run}` : (d.enabled ? 'Sıradaki yayın hesaplanıyor…' : 'Otomasyon kapalı');
+
+    const log = d.log || {};
+    if (log.status) {
+      const statusColors = { success: '#4ade80', error: '#f87171', running: '#facc15' };
+      const statusLabels = { success: '✓ Başarılı', error: '✗ Hata', running: '⟳ Çalışıyor…' };
+      document.getElementById('sched-last-status').innerHTML =
+        `<span style="color:${statusColors[log.status] || '#888'}">${statusLabels[log.status] || log.status}</span>` +
+        (log.ts ? ` · ${new Date(log.ts * 1000).toLocaleString('tr-TR')}` : '');
+      _setMsg('sched-last-msg', log, '/api/scheduler/run-now', 'loadSchedulerStatus');
+      document.getElementById('sched-last-url').innerHTML = log.url
+        ? `<a href="${log.url}" target="_blank" style="color:#a78bfa;">${log.url}</a>` : '';
+    }
+    setAccBadge('tr-short', d.log, d.enabled);
+  } catch(e) {}
+}
+
+async function saveScheduler() {
+  const fd = new FormData();
+  fd.append('enabled', document.getElementById('sched-enabled').checked ? 'true' : 'false');
+  fd.append('lang',    document.getElementById('sched-lang').value);
+  fd.append('voice',   document.getElementById('sched-voice').value);
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+    fd.append(day, document.getElementById(`sched-times-${day}`).value);
+  });
+  const r = await fetch('/api/scheduler/config', { method: 'POST', body: fd });
+  if (r.ok) { await loadSchedulerStatus(); showError('err-cfg', ''); }
+  else showError('err-cfg', 'Kaydedilemedi.');
+}
+
+async function runNow() {
+  setLoading('btn-run-now', 'spin-run-now', true);
+  try {
+    await fetch('/api/scheduler/run-now', { method: 'POST' });
+    showError('err-cfg', '');
+    // Poll log for ~2 min
+    let tries = 0;
+    const poll = setInterval(async () => {
+      await loadSchedulerStatus();
+      const log = document.getElementById('sched-last-status').textContent;
+      if (log.includes('✓') || log.includes('✗') || ++tries > 40) {
+        clearInterval(poll);
+        setLoading('btn-run-now', 'spin-run-now', false);
+      }
+    }, 3000);
+  } catch(e) {
+    setLoading('btn-run-now', 'spin-run-now', false);
+    showError('err-cfg', e.message);
+  }
+}
+
+loadMeta();
+if (new URLSearchParams(window.location.search).get('yt') === 'ok') {
+  switchTab('shorts');
+  checkYTStatus();
+}
+
+// ── YouTube Analytics ─────────────────────────────────────────────────────────
+let analyticsLoaded = false;
+let _anData = null;
+
+async function loadAnalytics() {
+  const period  = document.getElementById('analytics-period')?.value || '28';
+  const channel = document.getElementById('analytics-channel')?.value || 'tr';
+  document.getElementById('analytics-loading').style.display = 'block';
+  document.getElementById('analytics-summary').style.display = 'none';
+  document.getElementById('analytics-error').style.display = 'none';
+
+  try {
+    const r = await fetch(`/api/yt/analytics?days=${period}&channel=${channel}`);
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Veri alınamadı'); }
+    const d = await r.json();
+    _anData = d;
+
+    // Kanal geneli
+    const ch = d.channel || {};
+    document.getElementById('ch-subs').textContent        = formatNum(ch.subscriber_count || 0);
+    document.getElementById('ch-total-views').textContent = formatNum(ch.total_views || 0);
+    document.getElementById('ch-videos').textContent      = ch.video_count || 0;
+
+    // Özet kartlar
+    const s = d.summary;
+    document.getElementById('an-views').textContent      = formatNum(s.views);
+    document.getElementById('an-hours').textContent      = s.watch_hours + 's';
+    document.getElementById('an-subs-net').textContent   = (s.subs_net >= 0 ? '+' : '') + s.subs_net;
+    document.getElementById('an-likes').textContent      = formatNum(s.likes);
+    document.getElementById('an-comments').textContent   = formatNum(s.comments);
+    document.getElementById('an-shares').textContent     = formatNum(s.shares);
+    document.getElementById('an-subs-gained').textContent = '+' + s.subs_gained;
+    document.getElementById('an-subs-lost').textContent   = '-' + s.subs_lost;
+
+    // Grafik
+    redrawChart();
+
+    // Trafik kaynağı
+    const maxTr = Math.max(...(d.traffic||[]).map(x=>x.views), 1);
+    document.getElementById('an-traffic').innerHTML = (d.traffic||[]).map(x => {
+      const pct = Math.round(x.views / maxTr * 100);
+      return `<div style="margin-bottom:7px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#aaa;margin-bottom:2px;">
+          <span>${x.source}</span><span>${formatNum(x.views)}</span>
+        </div>
+        <div style="background:#222;border-radius:3px;height:5px;">
+          <div style="background:#7c3aed;height:5px;border-radius:3px;width:${pct}%;"></div>
+        </div>
+      </div>`;
+    }).join('') || '<div style="color:#555;font-size:12px;">Veri yok</div>';
+
+    // Cihazlar
+    const maxDv = Math.max(...(d.devices||[]).map(x=>x.views), 1);
+    document.getElementById('an-devices').innerHTML = (d.devices||[]).map(x => {
+      const pct = Math.round(x.views / maxDv * 100);
+      return `<div style="margin-bottom:7px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#aaa;margin-bottom:2px;">
+          <span>${x.device}</span><span>${formatNum(x.views)}</span>
+        </div>
+        <div style="background:#222;border-radius:3px;height:5px;">
+          <div style="background:#4ade80;height:5px;border-radius:3px;width:${pct}%;"></div>
+        </div>
+      </div>`;
+    }).join('') || '<div style="color:#555;font-size:12px;">Veri yok</div>';
+
+    // Ülkeler
+    const maxCo = Math.max(...(d.countries||[]).map(x=>x.views), 1);
+    document.getElementById('an-countries').innerHTML = (d.countries||[]).map(x => {
+      const pct = Math.round(x.views / maxCo * 100);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <div style="color:#aaa;font-size:11px;width:32px;">${x.country}</div>
+        <div style="flex:1;background:#222;border-radius:3px;height:5px;">
+          <div style="background:#f97316;height:5px;border-radius:3px;width:${pct}%;"></div>
+        </div>
+        <div style="color:#888;font-size:11px;width:50px;text-align:right;">${formatNum(x.views)}</div>
+      </div>`;
+    }).join('') || '<div style="color:#555;font-size:12px;">Veri yok</div>';
+
+    // Top videolar tablosu
+    document.getElementById('an-top-videos').innerHTML = (d.top_videos||[]).map((v, i) => {
+      const mins = Math.floor(v.avg_view_sec / 60);
+      const secs = v.avg_view_sec % 60;
+      return `<tr style="border-bottom:1px solid #1a1a1a;">
+        <td style="padding:7px 8px;color:#555;">${i+1}</td>
+        <td style="padding:7px 8px;color:#ddd;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <a href="https://youtu.be/${v.id}" target="_blank" style="color:#ddd;text-decoration:none;">${v.title} ↗</a>
+        </td>
+        <td style="padding:7px 8px;text-align:right;color:#7c3aed;">${formatNum(v.views)}</td>
+        <td style="padding:7px 8px;text-align:right;color:#4ade80;">${Math.round(v.watch_min/60*10)/10}s</td>
+        <td style="padding:7px 8px;text-align:right;color:#ccc;">${mins}:${String(secs).padStart(2,'0')}</td>
+        <td style="padding:7px 8px;text-align:right;color:#ccc;">%${v.avg_view_pct}</td>
+        <td style="padding:7px 8px;text-align:right;color:#f97316;">${formatNum(v.likes)}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('analytics-loading').style.display = 'none';
+    document.getElementById('analytics-summary').style.display = 'block';
+    analyticsLoaded = true;
+  } catch(e) {
+    document.getElementById('analytics-loading').style.display = 'none';
+    const el = document.getElementById('analytics-error');
+    el.style.display = 'block';
+    const channel = document.getElementById('analytics-channel')?.value || 'tr';
+    const authPath = channel === 'en' ? '/auth/youtube/en' : '/auth/youtube';
+    if (e.message === 'token_expired' || e.message.includes('bağlı değil')) {
+      el.innerHTML = '🔑 YouTube token süresi dolmuş — <a href="' + authPath + '" style="color:#7c3aed;font-weight:bold;">Yeniden Bağlan ↗</a>';
+    } else {
+      el.textContent = '⚠ ' + e.message;
+    }
+  }
+}
+
+function redrawChart() {
+  if (!_anData) return;
+  const metric = document.getElementById('chart-metric')?.value || 'views';
+  const colors  = { views: '#7c3aed', subs_gained: '#4ade80', likes: '#f97316' };
+  renderBarChart('an-daily-chart', 'an-daily-labels',
+    _anData.daily.map(x => x[metric] || 0),
+    _anData.daily.map(x => x.date.slice(5)),
+    colors[metric] || '#7c3aed', 100
+  );
+}
+
+function renderBarChart(chartId, labelId, values, labels, color, height) {
+  const max = Math.max(...values, 1);
+  const chart = document.getElementById(chartId);
+  const labelEl = document.getElementById(labelId);
+  if (!chart) return;
+  chart.innerHTML = values.map((v, i) => {
+    const h = Math.max(2, Math.round((v / max) * height));
+    return `<div title="${labels[i]}: ${formatNum(v)}" style="flex:1;min-width:5px;height:${h}px;background:${color};border-radius:2px 2px 0 0;opacity:0.85;cursor:default;"></div>`;
+  }).join('');
+  if (labelEl) {
+    const step = values.length > 20 ? 4 : (values.length > 10 ? 2 : 1);
+    labelEl.innerHTML = labels.map((l, i) =>
+      `<div style="flex:1;min-width:5px;font-size:9px;color:#555;text-align:center;">${i % step === 0 ? l : ''}</div>`
+    ).join('');
+  }
+}
+
+function formatNum(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+  return String(n);
+}
+
+// ─── INSTAGRAM ANALİTİK ─────────────────────────────────────────────────────
+let _igAnData = null;
+
+function downloadIGAnalyticsJSON() {
+  if (!_igAnData) return;
+  const blob = new Blob([JSON.stringify(_igAnData, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ig_analytics_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function _views(p) { return p.views || p.plays || 0; }
+function _engScore(p) {
+  return (p.likes||0) + (p.comments||0)*2 + (p.shares||0)*10 + (p.saved||0)*3 + Math.round(_views(p)/100);
+}
+
+function buildTimeAnalysis(posts) {
+  const slots = [
+    {label:'00:00–06:00', min:0,  max:6,  emoji:'🌙'},
+    {label:'06:00–09:00', min:6,  max:9,  emoji:'🌅'},
+    {label:'09:00–12:00', min:9,  max:12, emoji:'☀️'},
+    {label:'12:00–15:00', min:12, max:15, emoji:'🌤'},
+    {label:'15:00–18:00', min:15, max:18, emoji:'🌇'},
+    {label:'18:00–21:00', min:18, max:21, emoji:'🌆'},
+    {label:'21:00–24:00', min:21, max:24, emoji:'🌃'},
+  ];
+  slots.forEach(s => {
+    const sp = posts.filter(p => {
+      if (!p.timestamp) return false;
+      const h = new Date(p.timestamp).getHours();
+      return h >= s.min && h < s.max;
+    });
+    s.count = sp.length;
+    s.avgLikes  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.likes||0),0)/s.count) : 0;
+    s.avgViews  = s.count ? Math.round(sp.reduce((a,p)=>a+_views(p),0)/s.count) : 0;
+    s.avgReach  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.reach||0),0)/s.count) : 0;
+    s.avgShares = s.count ? Math.round(sp.reduce((a,p)=>a+(p.shares||0),0)/s.count) : 0;
+    s.avgSaved  = s.count ? Math.round(sp.reduce((a,p)=>a+(p.saved||0),0)/s.count) : 0;
+    s.score     = s.avgLikes + s.avgShares*10 + s.avgSaved*3 + Math.round(s.avgViews/100);
+  });
+  const active = slots.filter(s => s.count > 0);
+  if (!active.length) return '';
+  const maxScore = Math.max(...active.map(s => s.score), 1);
+  const bestScore = Math.max(...active.map(s => s.score));
+  return `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="color:#facc15;font-size:13px;font-weight:700;margin-bottom:12px;">⏰ Saat Dilimi Analizi</div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${active.map(s => {
+      const pct = Math.round(s.score / maxScore * 100);
+      const isBest = s.score === bestScore && bestScore > 0;
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:92px;color:#888;font-size:11px;flex-shrink:0;">${s.emoji} ${s.label}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:16px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${isBest?'#7c3aed':'#2a2a5a'};border-radius:4px;"></div>
+        </div>
+        <div style="width:24px;color:#666;font-size:10px;text-align:right;">${s.count}x</div>
+        <div style="width:70px;text-align:right;font-size:11px;${isBest?'color:#7c3aed;font-weight:700;':'color:#444;'}">👁 ${formatNum(s.avgViews)}</div>
+        <div style="width:58px;text-align:right;font-size:11px;${isBest?'color:#a78bfa;font-weight:700;':'color:#555;'}">❤ ${s.avgLikes}</div>
+      </div>`;
+    }).join('')}
+    </div>
+    <div style="color:#444;font-size:10px;margin-top:8px;">x = paylaşım sayısı · 👁 ort. görüntüleme · ❤ ort. beğeni</div>
+  </div>`;
+}
+
+function buildTopicAnalysis(posts) {
+  const tagMap = {};
+  posts.forEach(p => {
+    const tags = (p.caption || '').match(/#[\wışğİüöçâîûÀ-ɏ]+/g) || [];
+    const score = _engScore(p);
+    const uniq = [...new Set(tags.map(t => t.toLowerCase()))];
+    uniq.forEach(tag => {
+      if (!tagMap[tag]) tagMap[tag] = {count:0, totalScore:0, totalLikes:0, totalReach:0};
+      tagMap[tag].count++;
+      tagMap[tag].totalScore += score;
+      tagMap[tag].totalLikes += p.likes||0;
+      tagMap[tag].totalReach += p.reach||0;
+    });
+  });
+  const tags = Object.entries(tagMap)
+    .map(([tag, v]) => ({tag, count:v.count, avgScore:Math.round(v.totalScore/v.count), avgLikes:Math.round(v.totalLikes/v.count), avgReach:Math.round(v.totalReach/v.count)}))
+    .filter(t => t.count >= 2)
+    .sort((a,b) => b.avgScore - a.avgScore)
+    .slice(0, 10);
+  if (!tags.length) return '';
+  const maxScore = Math.max(...tags.map(t => t.avgScore), 1);
+  return `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="color:#38bdf8;font-size:13px;font-weight:700;margin-bottom:12px;">🏷 Konu / Hashtag Analizi <span style="color:#444;font-weight:400;font-size:11px;">(en az 2 paylaşım)</span></div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${tags.map((t, i) => {
+      const pct = Math.round(t.avgScore / maxScore * 100);
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:120px;color:${i<3?'#a78bfa':'#666'};font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.tag}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:14px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${i===0?'#0369a1':i<3?'#1d4ed8':'#1e3a5f'};border-radius:4px;"></div>
+        </div>
+        <div style="width:24px;color:#555;font-size:10px;text-align:right;">${t.count}x</div>
+        <div style="width:50px;text-align:right;font-size:11px;color:${i<3?'#f97316':'#555'};">❤ ${t.avgLikes}</div>
+      </div>`;
+    }).join('')}
+    </div>
+  </div>`;
+}
+
+function buildRecommendations(posts) {
+  if (!posts.length) return '';
+  const slots = [
+    {label:'00:00–06:00', min:0,  max:6},
+    {label:'06:00–09:00', min:6,  max:9},
+    {label:'09:00–12:00', min:9,  max:12},
+    {label:'12:00–15:00', min:12, max:15},
+    {label:'15:00–18:00', min:15, max:18},
+    {label:'18:00–21:00', min:18, max:21},
+    {label:'21:00–24:00', min:21, max:24},
+  ];
+  slots.forEach(s => {
+    const sp = posts.filter(p => {
+      if (!p.timestamp) return false;
+      const h = new Date(p.timestamp).getHours();
+      return h >= s.min && h < s.max;
+    });
+    s.count = sp.length;
+    s.score = s.count ? Math.round(sp.reduce((a,p)=>a+_engScore(p),0)/s.count) : 0;
+  });
+  const bestSlots = slots.filter(s => s.count > 0).sort((a,b) => b.score - a.score).slice(0,2);
+
+  const withTime = posts.filter(p => p.timestamp);
+  let freqText = '';
+  if (withTime.length >= 2) {
+    const times = withTime.map(p => new Date(p.timestamp).getTime()).sort((a,b)=>a-b);
+    const spanDays = (times[times.length-1] - times[0]) / 86400000;
+    const perDay = spanDays > 0 ? (withTime.length / spanDays).toFixed(1) : '?';
+    freqText = `Mevcut sıklık: günde ~<b style="color:#facc15;">${perDay}</b> paylaşım`;
+  }
+
+  const tagMap = {};
+  posts.forEach(p => {
+    const tags = (p.caption||'').match(/#[\wışğİüöçâîûÀ-ɏ]+/g) || [];
+    const score = _engScore(p);
+    [...new Set(tags.map(t=>t.toLowerCase()))].forEach(tag => {
+      if (!tagMap[tag]) tagMap[tag] = {count:0, total:0};
+      tagMap[tag].count++; tagMap[tag].total += score;
+    });
+  });
+  const topTags = Object.entries(tagMap).filter(([,v])=>v.count>=2)
+    .map(([tag,v])=>({tag,avg:v.total/v.count}))
+    .sort((a,b)=>b.avg-a.avg).slice(0,3).map(t=>t.tag);
+
+  const lines = [];
+  if (bestSlots.length) lines.push(`📅 En iyi paylaşım saati: <b style="color:#facc15;">${bestSlots.map(s=>s.label).join('</b> ve <b style="color:#facc15;">')}</b>`);
+  if (topTags.length) lines.push(`🏷 En çok etkileşim alan konular: <b style="color:#a78bfa;">${topTags.join(', ')}</b>`);
+  if (freqText) lines.push(`📊 ${freqText}`);
+  if (bestSlots.length >= 2) lines.push(`💡 Öneri: günde 2 paylaşım — <b style="color:#4ade80;">${bestSlots[0].label}</b> ve <b style="color:#4ade80;">${bestSlots[1].label}</b> arasında`);
+  else if (bestSlots.length === 1) lines.push(`💡 Öneri: <b style="color:#4ade80;">${bestSlots[0].label}</b> saatlerinde paylaş`);
+
+  return `<div style="background:#0d1f12;border:1px solid #1a4a2a;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="color:#4ade80;font-size:13px;font-weight:700;margin-bottom:10px;">💡 Öneriler</div>
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#ccc;line-height:1.6;">
+      ${lines.map(l=>`<div>${l}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
+async function loadIGAnalytics() {
+  document.getElementById('ig-an-error').style.display = 'none';
+  document.getElementById('ig-an-content').style.display = 'none';
+  document.getElementById('ig-an-loading').style.display = 'block';
+  try {
+    const r = await fetch('/api/instagram/analytics?limit=25');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    _igAnData = d;
+
+    const p = d.profile;
+    document.getElementById('ig-an-username').textContent = '@' + (p.username || '?');
+    document.getElementById('ig-an-followers').textContent = formatNum(p.followers_count || 0);
+    document.getElementById('ig-an-media-count').textContent = p.media_count || 0;
+
+    let totPlays = 0, totReach = 0, totLikes = 0, totComments = 0, totShares = 0, totSaved = 0;
+    d.posts.forEach(post => {
+      totPlays    += post.views || post.plays || 0;
+      totReach    += post.reach    || 0;
+      totLikes    += post.likes    || 0;
+      totComments += post.comments || 0;
+      totShares   += post.shares   || 0;
+      totSaved    += post.saved    || 0;
+    });
+    document.getElementById('ig-an-total-plays').textContent    = formatNum(totPlays);
+    document.getElementById('ig-an-total-reach').textContent    = formatNum(totReach);
+    document.getElementById('ig-an-total-likes').textContent    = formatNum(totLikes);
+    document.getElementById('ig-an-total-comments').textContent = formatNum(totComments);
+    document.getElementById('ig-an-total-shares').textContent   = formatNum(totShares);
+    document.getElementById('ig-an-total-saved').textContent    = formatNum(totSaved);
+
+    // En iyi gönderi
+    const best = [...d.posts].sort((a,b) => ((b.views||b.plays||0)+(b.shares||0)*10) - ((a.views||a.plays||0)+(a.shares||0)*10))[0];
+    if (best) {
+      document.getElementById('ig-an-best').style.display = 'block';
+      document.getElementById('ig-an-best-thumb').src = best.thumb;
+      document.getElementById('ig-an-best-caption').textContent = best.caption || '(altyazı yok)';
+      document.getElementById('ig-an-best-stats').textContent =
+        `👁 ${formatNum(best.views||best.plays||0)}  ❤ ${formatNum(best.likes)}  ↗ ${formatNum(best.shares||0)}  🔖 ${formatNum(best.saved||0)}`;
+    }
+
+    // Analiz bölümleri
+    document.getElementById('ig-an-time-analysis').innerHTML = buildTimeAnalysis(d.posts);
+    document.getElementById('ig-an-topic-analysis').innerHTML = buildTopicAnalysis(d.posts);
+    document.getElementById('ig-an-recommendations').innerHTML = buildRecommendations(d.posts);
+
+    // Gönderi listesi
+    const container = document.getElementById('ig-an-posts');
+    container.innerHTML = d.posts.map(post => {
+      const dt = post.timestamp ? new Date(post.timestamp).toLocaleString('tr-TR', {
+        day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'
+      }) : '';
+      const vw = post.views || post.plays || 0;
+      const bar = vw > 0
+        ? `<span style="color:#7c3aed;">👁 ${formatNum(vw)}</span>`
+        : `<span style="color:#444;">👁 0</span>`;
+      return `<div style="background:#111;border:1px solid #222;border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;">
+        <img src="${post.thumb}" style="width:36px;height:64px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
+        <div style="flex:1;min-width:0;">
+          <div style="color:#ccc;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${post.caption || '(altyazı yok)'}</div>
+          <div style="color:#555;font-size:11px;margin-top:2px;">${dt}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;white-space:nowrap;flex-shrink:0;">
+          ${bar} &nbsp;
+          <span style="color:#f97316;">❤ ${formatNum(post.likes)}</span> &nbsp;
+          <span style="color:#34d399;">🔖 ${formatNum(post.saved||0)}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('ig-an-loading').style.display = 'none';
+    document.getElementById('ig-an-content').style.display = 'block';
+  } catch(e) {
+    document.getElementById('ig-an-loading').style.display = 'none';
+    document.getElementById('ig-an-error').style.display = 'block';
+    document.getElementById('ig-an-error').textContent = 'Hata: ' + e.message;
+  }
+}
+
+// ─── KOMİK HABER ────────────────────────────────────────────────────────────
+let _comedySessionId = null;
+let _comedyUid = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('comedy-photos');
+  if (input) input.addEventListener('change', () => {
+    const thumbs = document.getElementById('comedy-thumbs');
+    thumbs.innerHTML = '';
+    const btn = document.getElementById('comedy-upload-btn');
+    if (!input.files.length) { btn.style.display = 'none'; return; }
+    for (let i = 0; i < input.files.length; i++) {
+      const f = input.files[i];
+      const url = URL.createObjectURL(f);
+      thumbs.innerHTML += `<div style="text-align:center;">
+        <img src="${url}" style="width:70px;height:95px;object-fit:cover;border-radius:6px;border:2px solid #3b2d6e;">
+        <div style="color:#a78bfa;font-size:11px;margin-top:2px;">${i+1}</div>
+      </div>`;
+    }
+    document.getElementById('comedy-upload-status').textContent = `${input.files.length} fotoğraf seçildi — sırayı kontrol et, sonra yükle.`;
+    btn.style.display = 'flex';
+  });
+});
+
+async function uploadComedyPhotos() {
+  const input = document.getElementById('comedy-photos');
+  if (!input.files.length) { alert('Önce fotoğraf seç'); return; }
+  const status = document.getElementById('comedy-upload-status');
+  status.textContent = 'Yükleniyor...';
+  document.getElementById('comedy-upload-btn').disabled = true;
+  const fd = new FormData();
+  for (const f of input.files) fd.append('files', f);
+  try {
+    const r = await fetch('/api/comedy/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    _comedySessionId = d.session_id;
+    status.textContent = `✓ ${d.count} fotoğraf yüklendi`;
+    document.getElementById('comedy-session-id').textContent = d.session_id;
+    document.getElementById('comedy-session-info').style.display = 'block';
+    document.getElementById('comedy-create-section').style.display = 'block';
+    document.getElementById('comedy-upload-btn').style.display = 'none';
+  } catch(e) {
+    status.textContent = 'Hata: ' + e.message;
+    document.getElementById('comedy-upload-btn').disabled = false;
+  }
+}
+
+async function createComedyVideo() {
+  if (!_comedySessionId) { alert('Önce fotoğraf yükle'); return; }
+  const jsonText = document.getElementById('comedy-scenes-json').value.trim();
+  if (!jsonText) { alert('JSON alanı boş — Claude\'dan aldığın metni yapıştır'); return; }
+  let parsed;
+  try { parsed = JSON.parse(jsonText); } catch(e) { alert('JSON geçersiz: ' + e.message); return; }
+  const status = document.getElementById('comedy-video-status');
+  status.textContent = 'Video oluşturuluyor... (birkaç dakika sürebilir)';
+  document.getElementById('comedy-create-btn').disabled = true;
+  try {
+    const r = await fetch('/api/comedy/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: _comedySessionId,
+        scenes: parsed.scenes || parsed,
+        voice: parsed.voice || 'M3',
+        title: parsed.title || '',
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    _comedyUid = d.uid;
+    status.textContent = '✓ Video hazır!';
+    document.getElementById('comedy-video-player').src = d.video;
+    document.getElementById('comedy-preview-section').style.display = 'block';
+  } catch(e) {
+    status.textContent = 'Hata: ' + e.message;
+  } finally {
+    document.getElementById('comedy-create-btn').disabled = false;
+  }
+}
+
+async function sendComedyToInstagram() {
+  if (!_comedyUid) { alert('Önce video oluştur'); return; }
+  const caption = document.getElementById('comedy-caption').value.trim();
+  const status = document.getElementById('comedy-send-status');
+  status.textContent = 'Instagram\'a gönderiliyor...';
+  try {
+    const r = await fetch('/api/comedy/send-instagram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: _comedyUid, caption })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = '#4ade80';
+      status.textContent = '✓ Instagram\'a gönderildi! Media ID: ' + d.media_id;
+    } else {
+      status.style.color = '#f87171';
+      status.textContent = 'Hata: ' + d.error;
+    }
+  } catch(e) {
+    status.style.color = '#f87171';
+    status.textContent = 'Hata: ' + e.message;
+  }
+}
+
+function deleteComedyVideo() {
+  document.getElementById('comedy-video-player').src = '';
+  document.getElementById('comedy-preview-section').style.display = 'none';
+  document.getElementById('comedy-send-status').textContent = '';
+  _comedyUid = null;
+}
+</script>
+
+<!-- INSTAGRAM ANALİTİK PANELİ -->
+<div class="panel" id="tab-iganalytics">
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+    <h2 style="color:#fff;font-size:18px;margin:0;flex:1;">📸 Instagram Analitik</h2>
+    <button onclick="loadIGAnalytics()" style="font-size:12px;padding:8px 14px;">↻ Yenile</button>
+    <button onclick="downloadIGAnalyticsJSON()" style="font-size:12px;padding:8px 14px;background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;">⬇ JSON İndir</button>
+  </div>
+  <div id="ig-an-error" style="display:none;color:#f87171;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:16px;"></div>
+  <div id="ig-an-loading" style="display:none;color:#888;font-size:14px;text-align:center;padding:40px;">Yükleniyor...</div>
+
+  <div id="ig-an-content" style="display:none;">
+    <!-- Profil özeti -->
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+      <div>
+        <div style="color:#888;font-size:11px;margin-bottom:2px;">Hesap</div>
+        <div style="color:#a78bfa;font-weight:700;font-size:15px;" id="ig-an-username">-</div>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <span style="color:#ccc;font-size:13px;">Takipçi: <b id="ig-an-followers" style="color:#facc15;">-</b></span>
+        <span style="color:#ccc;font-size:13px;">Gönderi: <b id="ig-an-media-count" style="color:#4ade80;">-</b></span>
+      </div>
+    </div>
+
+    <!-- Toplam metrikler -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#7c3aed;" id="ig-an-total-plays">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Görüntüleme</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#4ade80;" id="ig-an-total-reach">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Erişim</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#f97316;" id="ig-an-total-likes">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Beğeni</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#38bdf8;" id="ig-an-total-comments">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Yorum</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#a78bfa;" id="ig-an-total-shares">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Paylaşım</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:bold;color:#34d399;" id="ig-an-total-saved">-</div>
+        <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Kaydedilen</div>
+      </div>
+    </div>
+
+    <!-- En iyi gönderi -->
+    <div id="ig-an-best" style="display:none;background:#0d1f0d;border:1px solid #1a4a1a;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
+      <div style="color:#4ade80;font-size:12px;font-weight:700;margin-bottom:8px;">🏆 En İyi Gönderi (Görüntüleme + Paylaşım)</div>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <img id="ig-an-best-thumb" src="" style="width:54px;height:96px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">
+        <div>
+          <div id="ig-an-best-caption" style="color:#ccc;font-size:12px;line-height:1.5;margin-bottom:6px;"></div>
+          <div id="ig-an-best-stats" style="color:#888;font-size:11px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analiz bölümleri -->
+    <div id="ig-an-recommendations"></div>
+    <div id="ig-an-time-analysis"></div>
+    <div id="ig-an-topic-analysis"></div>
+
+    <!-- Gönderi listesi -->
+    <h3 style="color:#aaa;font-size:13px;margin-bottom:10px;">Son Gönderiler</h3>
+    <div id="ig-an-posts" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+
+<!-- KOMİK HABER PANELİ -->
+<div class="panel" id="tab-comedy">
+  <h2 style="color:#fff;margin-bottom:6px;">📰 Komik Haber Video</h2>
+  <p style="color:#666;font-size:13px;margin-bottom:24px;">Fotoğraflarını yükle → bana gönder → ben haberi yazarım → video hazır → beğenirsen Instagram'a gönder</p>
+
+  <div style="background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:20px;">
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:10px;">1. Fotoğrafları Seç &amp; Yükle</h3>
+    <p style="color:#888;font-size:12px;margin-bottom:14px;">Yeniden isimlendirmeye gerek yok. Galeride <strong style="color:#ccc;">sırayla tıklayarak</strong> seç — o sıra sahne sırası olur.</p>
+    <input type="file" id="comedy-photos" multiple style="display:none">
+    <div onclick="document.getElementById('comedy-photos').click()" style="border:2px dashed #3b2d6e;border-radius:10px;padding:28px;text-align:center;cursor:pointer;background:#0d0d1e;margin-bottom:12px;" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#3b2d6e'">
+      <div style="font-size:36px;margin-bottom:8px;">📷</div>
+      <div style="color:#a78bfa;font-size:15px;font-weight:600;">Fotoğraf Seç</div>
+      <div style="color:#555;font-size:12px;margin-top:4px;">Birden fazla seçebilirsin</div>
+    </div>
+    <button id="comedy-upload-btn" onclick="uploadComedyPhotos()" style="display:none;width:100%;justify-content:center;">📤 Yükle</button>
+    <div id="comedy-upload-status" style="color:#888;margin-top:10px;font-size:13px;"></div>
+    <div id="comedy-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+    <div id="comedy-session-info" style="display:none;margin-top:12px;background:#1a1a2e;padding:8px 12px;border-radius:8px;font-size:11px;color:#666;">
+      Session: <span id="comedy-session-id" style="color:#a78bfa;font-family:monospace;"></span>
+    </div>
+  </div>
+
+  <div id="comedy-create-section" style="display:none;background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:20px;">
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:10px;">2. Haber Metnini Yapıştır</h3>
+    <p style="color:#888;font-size:12px;margin-bottom:10px;">Claude'dan aldığın JSON'u buraya yapıştır, sonra "Video Oluştur"a bas.</p>
+    <textarea id="comedy-scenes-json" placeholder='{"scenes":[{"photo":"1.jpg","text":"...","tts":"..."}], "title":"...", "voice":"M3"}' style="width:100%;min-height:160px;background:#0a0a1a;border:1px solid #333;color:#ccc;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;resize:vertical;margin-bottom:10px;"></textarea>
+    <button id="comedy-create-btn" onclick="createComedyVideo()">▶ Video Oluştur</button>
+    <div id="comedy-video-status" style="color:#888;font-size:13px;margin-top:10px;"></div>
+  </div>
+
+  <div id="comedy-preview-section" style="display:none;background:#111;border:1px solid #222;border-radius:10px;padding:20px;">
+    <h3 style="color:#a78bfa;font-size:14px;margin-bottom:12px;">3. İzle &amp; Gönder</h3>
+    <video id="comedy-video-player" controls style="width:100%;max-width:360px;border-radius:8px;background:#000;display:block;margin-bottom:14px;"></video>
+    <input type="text" id="comedy-caption" placeholder="Instagram alt yazısı (opsiyonel — boş bırakırsan varsayılan kullanılır)" style="width:100%;padding:10px 12px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:8px;font-size:13px;margin-bottom:10px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button onclick="sendComedyToInstagram()" style="background:#059669;">📤 Instagram'a Gönder</button>
+      <button onclick="deleteComedyVideo()" style="background:#333;color:#ccc;">🗑 Sil</button>
+    </div>
+    <div id="comedy-send-status" style="margin-top:10px;font-size:13px;"></div>
+  </div>
+</div>
+
+</body>
+</html>

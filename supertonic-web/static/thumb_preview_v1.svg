@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640" viewBox="0 0 360 640">
+  <defs>
+    <linearGradient id="photoBg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#1c1c1c"/>
+      <stop offset="40%" stop-color="#2a2218"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="darkFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.65"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Koyu fotoğraf simülasyonu — tam frame -->
+  <rect width="360" height="640" fill="url(#photoBg)"/>
+
+  <!-- Sahte ışık/doku -->
+  <ellipse cx="100" cy="200" rx="160" ry="130" fill="#3a2e1a" opacity="0.4"/>
+  <ellipse cx="280" cy="420" rx="120" ry="100" fill="#1a1a2a" opacity="0.5"/>
+  <rect width="360" height="640" fill="url(#darkFade)"/>
+
+  <!-- ═══ ÜST BANT — küçük kategori etiketi ═══ -->
+  <rect x="0" y="52" width="360" height="44" fill="#FFD000"/>
+  <!-- sol ve sağ siyah ok dekorasyon -->
+  <text x="24" y="81" font-family="Arial Black,sans-serif" font-size="22" font-weight="900" fill="#111">»»</text>
+  <text x="180" y="82" font-family="Arial Black,sans-serif" font-size="18" font-weight="900"
+        fill="#111" text-anchor="middle" letter-spacing="2">İNGİLTERE'DE</text>
+  <text x="336" y="81" font-family="Arial Black,sans-serif" font-size="22" font-weight="900" fill="#111" text-anchor="end">««</text>
+  <rect x="0" y="52" width="360" height="3" fill="#111"/>
+  <rect x="0" y="93" width="360" height="3" fill="#111"/>
+
+  <!-- ═══ BÜYÜK BAŞLIK SATIRI 1 ═══ -->
+  <!-- Sarı vurgu bant (brush-stroke gibi, tam genişlik değil) -->
+  <rect x="18" y="125" width="324" height="80" rx="4" fill="#FFD000"/>
+  <rect x="18" y="125" width="324" height="3" fill="#111"/>
+  <rect x="18" y="202" width="324" height="3" fill="#111"/>
+  <text x="180" y="185" font-family="Arial Black,sans-serif" font-size="68" font-weight="900"
+        fill="#111" text-anchor="middle">İKİ</text>
+
+  <!-- ═══ ORTA SATIR — koyu üstüne sarı yazı ═══ -->
+  <text x="180" y="258" font-family="Arial Black,sans-serif" font-size="32" font-weight="900"
+        fill="#FFD000" text-anchor="middle">TREN ÇARPIŞTI!</text>
+  <!-- altına ince çizgi -->
+  <rect x="40" y="267" width="280" height="3" fill="#FFD000" opacity="0.5"/>
+
+  <!-- ═══ BÜYÜK SATIR 2 ═══ -->
+  <rect x="18" y="288" width="324" height="72" rx="4" fill="#FFD000"/>
+  <rect x="18" y="288" width="324" height="3" fill="#111"/>
+  <rect x="18" y="357" width="324" height="3" fill="#111"/>
+  <text x="180" y="345" font-family="Arial Black,sans-serif" font-size="60" font-weight="900"
+        fill="#111" text-anchor="middle">FECİ KAZA!</text>
+
+  <!-- ═══ ALT ORTA SATIR ═══ -->
+  <text x="180" y="402" font-family="Arial Black,sans-serif" font-size="26" font-weight="700"
+        fill="#fff" text-anchor="middle" opacity="0.9">Çok sayıda yaralı var</text>
+  <rect x="80" y="410" width="200" height="2" fill="#fff" opacity="0.3"/>
+
+  <!-- ═══ SON DAKİKA ═══ -->
+  <rect x="0" y="440" width="360" height="62" fill="#D50000"/>
+  <rect x="0" y="440" width="360" height="4" fill="#FF1744"/>
+  <!-- kırmızı iç yatay çizgi -->
+  <rect x="0" y="498" width="360" height="4" fill="#9B0000"/>
+  <!-- sol şerit -->
+  <rect x="0" y="440" width="8" height="62" fill="#FF1744"/>
+  <rect x="352" y="440" width="8" height="62" fill="#FF1744"/>
+  <text x="180" y="482" font-family="Arial Black,sans-serif" font-size="30" font-weight="900"
+        fill="#fff" text-anchor="middle" letter-spacing="5">SON DAKİKA</text>
+
+  <!-- ═══ ALT ALAN — kanal adı ═══ -->
+  <text x="180" y="560" font-family="Arial,sans-serif" font-size="13" font-weight="400"
+        fill="#888" text-anchor="middle" letter-spacing="1">@belmolysoft</text>
+
+</svg>
