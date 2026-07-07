@@ -173,25 +173,7 @@ fun HomeScreen(onNavigate: (String) -> Unit) {
             }
         }
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxWidth()
-        ) { page ->
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-            when (page) {
-                0 -> {
-                    // ── Profil Sekmesi ─────────────────────────────────
-                    SalaryCard(context, onNavigate)
-                    UpcomingPaymentsCard(context = context, onNavigate = onNavigate)
-                    SavingsHomeCard(context = context, onNavigate = onNavigate)
-                    OvertimeHomeCard(context = context, onNavigate = onNavigate)
-                    UpcomingSpecialDaysCard(context = context, onNavigate = onNavigate)
-                }
-                1 -> {
-                    // ── Kesfet Sekmesi ─────────────────────────────────
+        val kesfetSection: @Composable () -> Unit = {
         // ── 1. Piyasa Karti (Collapsible) ────────────────────────
         Card(
             shape  = RoundedCornerShape(16.dp),
@@ -387,8 +369,32 @@ fun HomeScreen(onNavigate: (String) -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-                } // end when page 1
-            } // end when
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth()
+        ) { page ->
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+            when (page) {
+                0 -> {
+                    // ── Profil Sekmesi ─────────────────────────────────
+                    SalaryCard(context, onNavigate)
+                    UpcomingPaymentsCard(context = context, onNavigate = onNavigate)
+                    SavingsHomeCard(context = context, onNavigate = onNavigate)
+                    OvertimeHomeCard(context = context, onNavigate = onNavigate)
+                    UpcomingSpecialDaysCard(context = context, onNavigate = onNavigate)
+                    // Kesfet icerigi Profil'in devami gibi altina eklenir
+                    kesfetSection()
+                }
+                1 -> {
+                    // ── Kesfet Sekmesi ─────────────────────────────────
+                    kesfetSection()
+                }
+            }
             } // end inner Column
         } // end HorizontalPager
 
