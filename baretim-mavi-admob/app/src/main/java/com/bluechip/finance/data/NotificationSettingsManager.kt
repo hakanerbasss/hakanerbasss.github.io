@@ -30,6 +30,9 @@ object NotificationSettingsManager {
     const val KEY_BACKUP_REMINDER  = "notif_backup_reminder"
     const val KEY_LAST_BACKUP_DATE = "last_backup_date"
 
+    // Haber bildirimi
+    private const val KEY_NEWS = "notif_news"
+
     data class NotifSettings(
         val salaryEnabled: Boolean = true,
         val advanceEnabled: Boolean = true,
@@ -45,7 +48,8 @@ object NotificationSettingsManager {
         val specialDaysBefore: Int = 3,
         val hour: Int = 9,
         val minute: Int = 0,
-        val backupReminderEnabled: Boolean = true
+        val backupReminderEnabled: Boolean = true,
+        val newsEnabled: Boolean = true
     )
 
     fun get(context: Context): NotifSettings {
@@ -65,7 +69,8 @@ object NotificationSettingsManager {
             specialDaysBefore = p.getInt(KEY_SPECIAL_DAYS, 3),
             hour   = p.getInt(KEY_HOUR, 9),
             minute = p.getInt(KEY_MINUTE, 0),
-            backupReminderEnabled = p.getBoolean(KEY_BACKUP_REMINDER, true)
+            backupReminderEnabled = p.getBoolean(KEY_BACKUP_REMINDER, true),
+            newsEnabled = p.getBoolean(KEY_NEWS, true)
         )
     }
 
@@ -86,6 +91,7 @@ object NotificationSettingsManager {
             .putInt(KEY_HOUR, s.hour)
             .putInt(KEY_MINUTE, s.minute)
             .putBoolean(KEY_BACKUP_REMINDER, s.backupReminderEnabled)
+            .putBoolean(KEY_NEWS, s.newsEnabled)
             .apply()
     }
 }

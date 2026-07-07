@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bluechip.finance.NotificationWorker
+import com.bluechip.finance.NewsNotificationWorker
 import com.bluechip.finance.data.NotificationSettingsManager
 import com.bluechip.finance.data.SpecialDayManager
 
@@ -202,6 +203,35 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                         Switch(
                             checked = settings.backupReminderEnabled,
                             onCheckedChange = { settings = settings.copy(backupReminderEnabled = it); save() }
+                        )
+                    }
+                }
+            }
+
+            // Haber bildirimi
+            item {
+                Card(shape = RoundedCornerShape(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Newspaper, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text("Haber Bildirimleri", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("Yeni haber yayinlaninca bildirim gonder", fontSize = 12.sp, color = Color.Gray)
+                            }
+                        }
+                        Switch(
+                            checked = settings.newsEnabled,
+                            onCheckedChange = { checked ->
+                                settings = settings.copy(newsEnabled = checked)
+                                save()
+                                if (checked) NewsNotificationWorker.schedule(context)
+                                else NewsNotificationWorker.cancel(context)
+                            }
                         )
                     }
                 }
