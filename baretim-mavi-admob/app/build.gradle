@@ -37,6 +37,12 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.4'
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
 }
 
 dependencies {
@@ -94,8 +100,10 @@ dependencies {
 }
 
 // Protobuf surum catismasini onler (Firebase BOM 33 + Unity Ads 4.16.4)
+// graphics-path 1.0.1 16KB uyumsuz - 1.1.0-rc01'e sabitler
 configurations.all {
     resolutionStrategy {
         force 'com.google.protobuf:protobuf-javalite:3.25.3'
+        force 'androidx.graphics:graphics-path:1.1.0-rc01'
     }
 }
