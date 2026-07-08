@@ -790,9 +790,16 @@ async def _generate_shorts_core(
     news_context_instruction = ""
     if gnews_data.get("found"):
         news_context_instruction = (
-            f"\n\nREAL NEWS VERIFICATION — Use these verified facts (exact names, ages, locations MUST match):\n"
+            f"\n\nREAL NEWS VERIFICATION — Use these verified facts (exact names, titles, locations MUST match):\n"
             f"{gnews_data['context_text']}\n"
-            f"CRITICAL: Do NOT invent or change names, ages, or locations. Use what is written above.\n"
+            f"CRITICAL RULES FOR FACTS:\n"
+            f"- Do NOT use your training data for names, titles or positions — it is OUTDATED.\n"
+            f"- Use ONLY the names and titles written in the news context above.\n"
+            f"- Political positions change: a person who was a leader in the past may no longer be. "
+            f"Use the title given in the news context, not what you remember from training.\n"
+            f"- Example of forbidden error: calling Assad 'Suriye Devlet Başkanı' — he fled in Dec 2024; "
+            f"the news context will name the correct current leader.\n"
+            f"- If the news context does not mention a title for a person, describe them by their action only.\n"
         )
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -837,6 +844,7 @@ Rules:
 - 5 to 7 scenes
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly. Example: write "Yükseköğretim Kurumları Sınavı" not "YKS", "Amerika Birleşik Devletleri" not "ABD".
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
+- POLITICAL TITLES: Your training data is outdated. NEVER assume someone still holds a position from your training. Use ONLY the title given in the news context above. If no title is given, use only the person's name. Known outdated facts to avoid: Assad is no longer Syria's president (fled Dec 2024), Biden is no longer US president.
 {get_hook_rule()}
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
