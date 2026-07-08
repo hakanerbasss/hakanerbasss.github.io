@@ -6,6 +6,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
 import com.bluechip.finance.data.NotificationSettingsManager
 import com.bluechip.finance.data.WizNewsApiService
@@ -62,18 +64,44 @@ class NewsAlarmReceiver : BroadcastReceiver() {
                 context, article.id, viewIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            val n = NotificationCompat.Builder(context, NotificationReceiver.CHANNEL_NEWS)
+            val bitmap = loadBitmap(article.thumbnail)
+            val builder = NotificationCompat.Builder(context, NotificationReceiver.CHANNEL_NEWS)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
                 .setContentTitle("📰 ${article.title}")
                 .setContentText("Detaylar icin dokun")
-                .setStyle(NotificationCompat.BigTextStyle().bigText(article.title))
                 .setAutoCancel(true)
                 .setContentIntent(pi)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .build()
-            nm.notify(NOTIF_ID_BASE + article.id, n)
+
+            if (bitmap != null) {
+                builder
+                    .setLargeIcon(bitmap)
+                    .setStyle(
+                        NotificationCompat.BigPictureStyle()
+                            .bigPicture(bitmap)
+                            .bigLargeIcon(null as Bitmap?)
+                            .setBigContentTitle("📰 ${article.title}")
+                            .setSummaryText("Detaylar icin dokun")
+                    )
+            } else {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(article.title))
+            }
+
+            nm.notify(NOTIF_ID_BASE + article.id, builder.build())
         }
         prefs.edit().putInt(KEY_LAST_SEEN_ID, newOnes.maxOf { it.id }).apply()
+    }
+
+    private suspend fun loadBitmap(url: String?): Bitmap? {
+        if (url.isNullOrEmpty()) return null
+        return try {
+            val conn = java.net.URL(url).openConnection()
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            conn.getInputStream().use { BitmapFactory.decodeStream(it) }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     companion object {
