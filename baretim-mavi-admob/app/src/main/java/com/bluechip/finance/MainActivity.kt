@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
         NotificationWorker.createChannels(this)
         NotificationWorker.schedule(this)
         if (com.bluechip.finance.data.NotificationSettingsManager.get(this).newsEnabled) {
-            NewsNotificationWorker.schedule(this)
+            NewsAlarmScheduler.schedule(this)
         }
         // Android 13+ bildirim izni iste
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {

@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bluechip.finance.NotificationWorker
-import com.bluechip.finance.NewsNotificationWorker
+import com.bluechip.finance.NewsAlarmScheduler
 import com.bluechip.finance.data.NotificationSettingsManager
 import com.bluechip.finance.data.SpecialDayManager
 
@@ -229,8 +229,8 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                             onCheckedChange = { checked ->
                                 settings = settings.copy(newsEnabled = checked)
                                 save()
-                                if (checked) NewsNotificationWorker.schedule(context)
-                                else NewsNotificationWorker.cancel(context)
+                                if (checked) NewsAlarmScheduler.schedule(context)
+                                else NewsAlarmScheduler.cancel(context)
                             }
                         )
                     }
