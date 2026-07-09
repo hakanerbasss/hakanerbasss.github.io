@@ -1450,8 +1450,8 @@ THUMB_DIR = Path("thumbnails")
 THUMB_DIR.mkdir(exist_ok=True)
 
 
-def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720), lang="tr"):
-    """Haber kanalı stili thumbnail: koyu fotoğraf + sarı bantlar + SON DAKİKA."""
+def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720), lang="tr", news_style=True):
+    """Haber kanalı stili thumbnail: koyu fotoğraf + sarı bantlar. news_style=False → SON DAKİKA ve bantlar olmadan belgesel stili."""
     from PIL import Image, ImageDraw, ImageFont
     import io, textwrap
 
@@ -1580,14 +1580,15 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
             y += band4_h + int(H * 0.018)
 
         # ⑤ SON DAKİKA kırmızı bant — alt
-        badge_h = badge_fs + int(H * 0.028)
-        by = H - badge_h - int(H * 0.04)
-        draw.rectangle([(0, by), (W, by + badge_h)], fill=RED)
-        draw.rectangle([(0, by), (W, by + 5)], fill=(255, 23, 68))
-        draw.rectangle([(0, by), (8, by + badge_h)], fill=(255, 23, 68))
-        draw.rectangle([(W - 8, by), (W, by + badge_h)], fill=(255, 23, 68))
-        bw = text_w(draw, badge_text, badge_font)
-        draw.text(((W - bw) / 2, by + (badge_h - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
+        if news_style:
+            badge_h = badge_fs + int(H * 0.028)
+            by = H - badge_h - int(H * 0.04)
+            draw.rectangle([(0, by), (W, by + badge_h)], fill=RED)
+            draw.rectangle([(0, by), (W, by + 5)], fill=(255, 23, 68))
+            draw.rectangle([(0, by), (8, by + badge_h)], fill=(255, 23, 68))
+            draw.rectangle([(W - 8, by), (W, by + badge_h)], fill=(255, 23, 68))
+            bw = text_w(draw, badge_text, badge_font)
+            draw.text(((W - bw) / 2, by + (badge_h - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
 
     else:
         # ── Landscape (uzun video 1280×720) ──
@@ -1628,14 +1629,15 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
                 y += mid_fs + int(H * 0.015)
 
         # SON DAKİKA
-        badge_band = badge_fs + int(H * 0.04)
-        by = H - badge_band - int(H * 0.03)
-        draw.rectangle([(0, by), (W, by + badge_band)], fill=RED)
-        draw.rectangle([(0, by), (W, by + 4)], fill=(255, 23, 68))
-        draw.rectangle([(0, by), (8, by + badge_band)], fill=(255, 23, 68))
-        draw.rectangle([(W - 8, by), (W, by + badge_band)], fill=(255, 23, 68))
-        bw = text_w(draw, badge_text, badge_font)
-        draw.text(((W - bw) / 2, by + (badge_band - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
+        if news_style:
+            badge_band = badge_fs + int(H * 0.04)
+            by = H - badge_band - int(H * 0.03)
+            draw.rectangle([(0, by), (W, by + badge_band)], fill=RED)
+            draw.rectangle([(0, by), (W, by + 4)], fill=(255, 23, 68))
+            draw.rectangle([(0, by), (8, by + badge_band)], fill=(255, 23, 68))
+            draw.rectangle([(W - 8, by), (W, by + badge_band)], fill=(255, 23, 68))
+            bw = text_w(draw, badge_text, badge_font)
+            draw.text(((W - bw) / 2, by + (badge_band - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
 
     img.save(str(out_path), "JPEG", quality=92)
     return out_path
@@ -2111,10 +2113,7 @@ def overlay_lv_title_banner(photo_path: Path, title: str) -> None:
         od.rectangle([(0, 0), (1920, 200)], fill=(10, 10, 20, 210))
         img.paste(PILImage.new("RGB", (1920, 200), (10, 10, 20)),
                   (0, 0), mask=overlay.split()[3])
-        # SON DAKİKA rozeti
-        draw.rectangle([(40, 20), (240, 60)], fill=(200, 0, 0))
-        draw.text((50, 22), "SON DAKİKA", fill=(255, 255, 255), font=font_sm)
-        # Başlık (max 2 satır)
+        # Başlık (max 2 satır) — belgesel modda SON DAKİKA rozeti yok
         words = title.split()
         line1, line2 = [], []
         for w in words:
@@ -2122,10 +2121,10 @@ def overlay_lv_title_banner(photo_path: Path, title: str) -> None:
                 line1.append(w)
             else:
                 line2.append(w)
-        draw.text((40, 70), " ".join(line1), fill=(255, 220, 0), font=font_big,
+        draw.text((40, 20), " ".join(line1), fill=(255, 220, 0), font=font_big,
                   stroke_width=2, stroke_fill=(0, 0, 0))
         if line2:
-            draw.text((40, 135), " ".join(line2[:8]), fill=(255, 220, 0), font=font_big,
+            draw.text((40, 90), " ".join(line2[:8]), fill=(255, 220, 0), font=font_big,
                       stroke_width=2, stroke_fill=(0, 0, 0))
         img.save(str(photo_path), "JPEG", quality=90)
     except Exception:
@@ -2375,7 +2374,7 @@ Rules:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
             thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-            create_thumbnail(first_img.read_bytes(), lv_title, thumb_out, size=(1280, 720), lang=lang)
+            create_thumbnail(first_img.read_bytes(), lv_title, thumb_out, size=(1280, 720), lang=lang, news_style=False)
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
@@ -2763,7 +2762,7 @@ Rules:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
             thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-            create_thumbnail(first_img.read_bytes(), tnlv_title, thumb_out, size=(1280, 720), lang=lang)
+            create_thumbnail(first_img.read_bytes(), tnlv_title, thumb_out, size=(1280, 720), lang=lang, news_style=False)
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
