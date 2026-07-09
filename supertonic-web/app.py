@@ -201,6 +201,35 @@ COMEDY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 AVATAR_FILE = UPLOAD_DIR / "avatar_photo.jpg"
 LONGCAT_SPACE = "https://victor-longcat-video-avatar-1-5.hf.space"
 
+BANNED_TOPICS_FILE = Path("banned_topics.json")
+
+
+def load_banned_topics() -> list[str]:
+    if not BANNED_TOPICS_FILE.exists():
+        return []
+    try:
+        data = json.loads(BANNED_TOPICS_FILE.read_text())
+        return [t.strip().lower() for t in data if t.strip()]
+    except Exception:
+        return []
+
+
+def save_banned_topics(topics: list[str]):
+    BANNED_TOPICS_FILE.write_text(json.dumps(topics, ensure_ascii=False, indent=2))
+
+
+def _is_banned_topic(title: str) -> bool:
+    """Başlık yasaklı kelimelerden herhangi birini içeriyorsa True döner."""
+    banned = load_banned_topics()
+    if not banned:
+        return False
+    title_lower = title.lower()
+    for kw in banned:
+        if kw in title_lower:
+            print(f"[BANNED] '{title[:60]}' yasaklı kelime içeriyor: '{kw}'", flush=True)
+            return True
+    return False
+
 tts_model = None
 whisper_model = None
 
@@ -1374,6 +1403,19 @@ async def get_avatar_status():
     if AVATAR_FILE.exists():
         return {"has_avatar": True, "path": f"/api/avatar-photo"}
     return {"has_avatar": False}
+
+
+@app.get("/api/settings/banned-topics")
+async def get_banned_topics():
+    return {"topics": load_banned_topics()}
+
+
+@app.post("/api/settings/banned-topics")
+async def set_banned_topics(request: Request):
+    body = await request.json()
+    topics = [t.strip().lower() for t in body.get("topics", []) if t.strip()]
+    save_banned_topics(topics)
+    return {"ok": True, "count": len(topics)}
 
 
 @app.get("/api/manual-shorts/status")
@@ -4277,7 +4319,11 @@ async def auto_shorts_job():
         s_voice = shorts_cfg.get("voice", "F1")
 
         used_topics = get_shorts_used_topics()
+        banned = load_banned_topics()
+        banned_str = " | ".join(banned) if banned else ""
         exclude_str = " | ".join(used_topics) if used_topics else ""
+        if banned_str:
+            exclude_str = f"{exclude_str} | YASAKLI KONULAR (kesinlikle yapma): {banned_str}" if exclude_str else f"YASAKLI KONULAR (kesinlikle yapma): {banned_str}"
 
         async with httpx.AsyncClient(timeout=900) as client:
             _MAX_DEDUP_RETRY = 3
@@ -4294,6 +4340,15 @@ async def auto_shorts_job():
                     return
                 d = r.json()
                 gen_title = d.get("title", "")
+
+                # Banned topic kontrolü
+                if _is_banned_topic(gen_title):
+                    print(f"[BANNED-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] Yasaklı konu: '{gen_title[:60]}'", flush=True)
+                    if _attempt < _MAX_DEDUP_RETRY - 1:
+                        continue
+                    else:
+                        save_sched_log("error", f"Yasaklı konu: {_MAX_DEDUP_RETRY} denemede uygun konu bulunamadı")
+                        return
 
                 # Dedup: video üretildi ama Instagram'a zaten atılmış konu mu?
                 if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
@@ -5014,7 +5069,11 @@ async def auto_ig_only_tr_job():
         cfg = load_ig_only_tr_config()
         s_voice = cfg.get("voice", "F1")
         used_topics = get_ig_only_tr_used_topics()
+        banned = load_banned_topics()
+        banned_str = " | ".join(banned) if banned else ""
         exclude_str = " | ".join(used_topics) if used_topics else ""
+        if banned_str:
+            exclude_str = f"{exclude_str} | YASAKLI KONULAR (kesinlikle yapma): {banned_str}" if exclude_str else f"YASAKLI KONULAR (kesinlikle yapma): {banned_str}"
 
         _MAX_DEDUP_RETRY = 3
         d = None
@@ -5030,6 +5089,15 @@ async def auto_ig_only_tr_job():
                     return
                 d = r.json()
                 gen_title = d.get("title", "")
+
+                # Banned topic kontrolü
+                if _is_banned_topic(gen_title):
+                    print(f"[BANNED-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] Yasaklı konu: '{gen_title[:60]}'", flush=True)
+                    if _attempt < _MAX_DEDUP_RETRY - 1:
+                        continue
+                    else:
+                        save_ig_only_tr_log("error", f"Yasaklı konu: {_MAX_DEDUP_RETRY} denemede uygun konu bulunamadı")
+                        return
 
                 # Dedup: video üretilmeden önce Instagram konu kontrolü
                 if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):

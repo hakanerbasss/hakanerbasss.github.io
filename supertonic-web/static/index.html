@@ -1574,6 +1574,16 @@
         </div>
         <div id="output-videos-list" style="max-height:320px;overflow-y:auto;"></div>
 
+        <!-- Yasaklı Konular -->
+        <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
+        <p style="color:#888;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">🚫 Yasaklı Konular</p>
+        <p style="color:#555;font-size:12px;margin-bottom:10px;">Bot bu kelimeleri içeren haberleri otomatik olarak atlayacak. Her satıra bir kelime yaz (Türkçe, küçük harf).</p>
+        <textarea id="banned-topics-input" placeholder="nato&#10;f-35&#10;erdoğan&#10;..." style="width:100%;min-height:120px;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+          <button onclick="saveBannedTopics()" style="font-size:12px;padding:7px 16px;">Kaydet</button>
+          <span id="banned-save-msg" style="font-size:12px;color:#4ade80;display:none;">✓ Kaydedildi</span>
+        </div>
+
         <!-- Çıkış -->
         <div style="height:1px;background:#1e1e1e;margin:16px 0;"></div>
         <button onclick="window.location='/logout'" style="background:#1a1a1a;color:#f87171;border:1px solid #3a1a1a;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">⏻ Çıkış Yap</button>
@@ -2033,6 +2043,32 @@ async function openSettings() {
   checkOpenAIStatus();
   checkInstagramStatus();
   loadInstagramLog();
+  loadBannedTopics();
+}
+
+async function loadBannedTopics() {
+  try {
+    const r = await fetch('/api/settings/banned-topics');
+    const d = await r.json();
+    document.getElementById('banned-topics-input').value = (d.topics || []).join('\n');
+  } catch(e) {}
+}
+
+async function saveBannedTopics() {
+  const raw = document.getElementById('banned-topics-input').value;
+  const topics = raw.split('\n').map(t => t.trim().toLowerCase()).filter(Boolean);
+  try {
+    await fetch('/api/settings/banned-topics', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topics})
+    });
+    const msg = document.getElementById('banned-save-msg');
+    msg.style.display = 'inline';
+    setTimeout(() => msg.style.display = 'none', 2000);
+  } catch(e) {
+    alert('Kaydetme hatası: ' + e.message);
+  }
 }
 
 function closeYTModal() {
