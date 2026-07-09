@@ -520,6 +520,101 @@ app.post('/api/send/document', customerAuth, rateLimit, async (req, res) => {
   }
 });
 
+// Ses gönder
+app.post('/api/send/audio', customerAuth, rateLimit, async (req, res) => {
+  const { to, url } = req.body;
+  if (!to || !url) return res.status(400).json({ error: 'to ve url gerekli' });
+
+  const allowed = db.checkAndIncrementUsage(req.customer.id, req.customer.daily_limit);
+  if (!allowed) {
+    notifyLimitExceeded(req.customer).catch(() => {});
+    return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  }
+
+  try {
+    await wa.sendMessage(req.customer.id, to, { audio: { url }, mimetype: 'audio/mp4', ptt: false });
+    db.logMessage(req.customer.id, to, 'audio', 'sent');
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Konum gönder
+app.post('/api/send/location', customerAuth, rateLimit, async (req, res) => {
+  const { to, latitude, longitude, name, address } = req.body;
+  if (!to || latitude == null || longitude == null) return res.status(400).json({ error: 'to, latitude ve longitude gerekli' });
+
+  const allowed = db.checkAndIncrementUsage(req.customer.id, req.customer.daily_limit);
+  if (!allowed) {
+    notifyLimitExceeded(req.customer).catch(() => {});
+    return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  }
+
+  try {
+    await wa.sendMessage(req.customer.id, to, {
+      location: { degreesLatitude: parseFloat(latitude), degreesLongitude: parseFloat(longitude), name: name || '', address: address || '' }
+    });
+    db.logMessage(req.customer.id, to, 'location', 'sent');
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Kişi kartı gönder
+app.post('/api/send/contact', customerAuth, rateLimit, async (req, res) => {
+  const { to, contact_name, contact_phone } = req.body;
+  if (!to || !contact_name || !contact_phone) return res.status(400).json({ error: 'to, contact_name ve contact_phone gerekli' });
+
+  const allowed = db.checkAndIncrementUsage(req.customer.id, req.customer.daily_limit);
+  if (!allowed) {
+    notifyLimitExceeded(req.customer).catch(() => {});
+    return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  }
+
+  try {
+    const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${contact_name}\nTEL;type=CELL;type=VOICE;waid=${contact_phone.replace(/\D/g,'')}:+${contact_phone.replace(/\D/g,'')}\nEND:VCARD`;
+    await wa.sendMessage(req.customer.id, to, {
+      contacts: { displayName: contact_name, contacts: [{ vcard }] }
+    });
+    db.logMessage(req.customer.id, to, 'contact', 'sent');
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Tepki gönder
+app.post('/api/send/reaction', customerAuth, async (req, res) => {
+  const { to, message_id, emoji } = req.body;
+  if (!to || !message_id || !emoji) return res.status(400).json({ error: 'to, message_id ve emoji gerekli' });
+
+  try {
+    let jid = to.toString().replace(/\D/g, '');
+    if (jid.startsWith('0')) jid = '90' + jid.slice(1);
+    jid = jid + '@s.whatsapp.net';
+    const conn = wa.getConn(req.customer.id);
+    if (!conn) return res.status(400).json({ error: 'WhatsApp bağlı değil' });
+    await conn.sendMessage(jid, { react: { text: emoji, key: { remoteJid: jid, id: message_id } } });
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Webhook URL ayarla
+app.post('/api/webhook', customerAuth, (req, res) => {
+  const { url } = req.body;
+  db.updateCustomer(req.customer.id, { webhook_url: url || null });
+  res.json({ ok: true, webhook_url: url || null });
+});
+
+// Webhook URL sorgula
+app.get('/api/webhook', customerAuth, (req, res) => {
+  res.json({ webhook_url: req.customer.webhook_url || null });
+});
+
 // Numara kontrolü
 app.post('/api/check', customerAuth, async (req, res) => {
   const { phones } = req.body;

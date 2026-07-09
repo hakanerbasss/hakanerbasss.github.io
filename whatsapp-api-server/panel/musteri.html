@@ -221,6 +221,26 @@ input:focus{border-color:var(--accent);}
 </div>
 
 <script>
+async function saveWebhook() {
+  const url = document.getElementById('webhook-input').value.trim();
+  const st = document.getElementById('webhook-status');
+  st.textContent = 'Kaydediliyor...';
+  try {
+    const r = await fetch('/api/webhook', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken }, body: JSON.stringify({ url }) });
+    const d = await r.json();
+    st.textContent = d.ok ? '✅ Webhook kaydedildi' : '❌ ' + d.error;
+    st.style.color = d.ok ? 'var(--accent)' : 'var(--red)';
+  } catch(e) { st.textContent = '❌ Hata: ' + e.message; st.style.color = 'var(--red)'; }
+}
+
+async function loadWebhook() {
+  try {
+    const r = await fetch('/api/webhook', { headers: { 'x-api-token': currentToken } });
+    const d = await r.json();
+    if (d.webhook_url) document.getElementById('webhook-input').value = d.webhook_url;
+  } catch(e) {}
+}
+
 function copyToClipboard(text){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));}else{fallbackCopy(text);}}
 function fallbackCopy(text){var el=document.createElement("textarea");el.value=text;el.style.position="fixed";el.style.opacity="0";document.body.appendChild(el);el.focus();el.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(el);}
 
@@ -264,6 +284,7 @@ async function loadDashboard(token) {
     document.getElementById('dashboard').style.display = 'block';
     document.getElementById('toplu-link').href = '/toplu?token=' + token;
     renderDashboard(data, token);
+    loadWebhook();
   } catch(e) {
     document.getElementById('login-wrap').style.display = 'flex';
     document.getElementById('login-err').textContent = '❌ Bağlantı hatası: ' + e.message;
@@ -330,11 +351,36 @@ function renderDashboard(d, token) {
              onclick="copyToClipboard('${token}');this.style.borderColor='var(--accent)'">${token} 📋</div>
       </div>
       <div style="font-family:monospace;font-size:11px;background:var(--surface);padding:10px;border-radius:6px;border:1px solid var(--border);line-height:2;margin-bottom:10px">
-        POST /api/send → Mesaj gönder<br>
+        POST /api/send → Metin gönder<br>
         POST /api/send/image → Resim gönder<br>
+        POST /api/send/audio → Ses gönder<br>
+        POST /api/send/document → Dosya gönder<br>
+        POST /api/send/location → Konum gönder<br>
+        POST /api/send/contact → Kişi kartı gönder<br>
+        POST /api/send/reaction → Tepki gönder<br>
         POST /api/send/bulk → Toplu mesaj<br>
+        POST /api/webhook → Webhook URL ayarla<br>
+        GET  /api/webhook → Webhook URL sorgula<br>
         POST /api/check → Numara kontrolü<br>
         GET  /api/status → Durum
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--accent2);margin-bottom:6px;font-weight:700">🔔 Webhook Ayarla (Gelen Mesaj & Durum)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Gelen mesajlar ve mesaj durumları (iletildi/okundu) bu URL'e POST edilir.</div>
+        <div style="display:flex;gap:6px">
+          <input id="webhook-input" type="url" placeholder="https://siteniz.com/webhook" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+          <button onclick="saveWebhook()" style="padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:12px">Kaydet</button>
+        </div>
+        <div id="webhook-status" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+        <div style="font-family:monospace;font-size:10px;background:var(--surface);padding:8px;border-radius:6px;border:1px solid var(--border);margin-top:8px;line-height:1.8;color:var(--muted)">
+          Gelen mesaj payload:<br>
+          { "event": "message", "from": "905551234567",<br>
+          &nbsp;&nbsp;"type": "text", "message": "Merhaba!",<br>
+          &nbsp;&nbsp;"timestamp": 1234567890 }<br><br>
+          Mesaj durumu payload:<br>
+          { "event": "message_status", "message_id": "...",<br>
+          &nbsp;&nbsp;"to": "905551234567", "status": "read" }
+        </div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Google Sheets Örneği</div>
       <div style="font-family:monospace;font-size:11px;background:var(--surface);padding:10px;border-radius:6px;border:1px solid var(--border);line-height:1.8;cursor:pointer;white-space:pre-wrap"

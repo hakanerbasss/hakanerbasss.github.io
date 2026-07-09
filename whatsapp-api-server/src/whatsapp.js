@@ -3,6 +3,8 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLat
 const { Boom } = require('@hapi/boom');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
+const http = require('http');
 const QRCode = require('qrcode');
 const db = require('./database');
 const EventEmitter = require('events');
@@ -13,6 +15,26 @@ if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
 const connections = {};
 const waEvents = new EventEmitter();
 waEvents.setMaxListeners(100);
+
+function fireWebhook(webhookUrl, payload) {
+  if (!webhookUrl) return;
+  try {
+    const body = JSON.stringify(payload);
+    const url = new URL(webhookUrl);
+    const lib = url.protocol === 'https:' ? https : http;
+    const req = lib.request({
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname + url.search,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    });
+    req.on('error', () => {});
+    req.setTimeout(5000, () => req.destroy());
+    req.write(body);
+    req.end();
+  } catch(e) {}
+}
 
 async function startConnection(customerId, method = 'qr', phoneNumber = null) {
   // Zaten bağlıysa döndür
@@ -135,13 +157,52 @@ async function startConnection(customerId, method = 'qr', phoneNumber = null) {
   sock.ev.on('messages.upsert', ({ messages, type }) => {
     if (type !== 'notify') return;
     messages.forEach(msg => {
-      if (!msg.key.fromMe) {
-        waEvents.emit(`message_${customerId}`, {
-          from: msg.key.remoteJid?.replace('@s.whatsapp.net', ''),
-          message: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '',
-          timestamp: msg.messageTimestamp
-        });
-      }
+      if (msg.key.fromMe) return;
+      const from = msg.key.remoteJid?.replace('@s.whatsapp.net', '').replace('@g.us', '');
+      const isGroup = msg.key.remoteJid?.endsWith('@g.us');
+      const m = msg.message;
+      const text = m?.conversation || m?.extendedTextMessage?.text
+        || m?.imageMessage?.caption || m?.videoMessage?.caption || '';
+      const msgType = m?.imageMessage ? 'image'
+        : m?.videoMessage ? 'video'
+        : m?.audioMessage ? 'audio'
+        : m?.documentMessage ? 'document'
+        : m?.locationMessage ? 'location'
+        : m?.contactMessage ? 'contact'
+        : m?.stickerMessage ? 'sticker'
+        : 'text';
+
+      const payload = {
+        event: 'message',
+        customer_id: customerId,
+        from,
+        is_group: isGroup,
+        type: msgType,
+        message: text,
+        timestamp: msg.messageTimestamp,
+        message_id: msg.key.id
+      };
+
+      waEvents.emit(`message_${customerId}`, payload);
+
+      const customer = db.getCustomerById(customerId);
+      if (customer?.webhook_url) fireWebhook(customer.webhook_url, payload);
+    });
+  });
+
+  sock.ev.on('message-receipt.update', updates => {
+    updates.forEach(({ key, receipt }) => {
+      const customer = db.getCustomerById(customerId);
+      if (!customer?.webhook_url) return;
+      const status = receipt?.readTimestamp ? 'read'
+        : receipt?.receiptTimestamp ? 'delivered' : 'sent';
+      fireWebhook(customer.webhook_url, {
+        event: 'message_status',
+        customer_id: customerId,
+        message_id: key.id,
+        to: key.remoteJid?.replace('@s.whatsapp.net', ''),
+        status
+      });
     });
   });
 
@@ -206,4 +267,8 @@ async function restoreConnections() {
   }
 }
 
-module.exports = { startConnection, sendMessage, disconnectCustomer, getStatus, waEvents, restoreConnections };
+function getConn(customerId) {
+  return connections[customerId]?.socket || null;
+}
+
+module.exports = { startConnection, sendMessage, disconnectCustomer, getStatus, getConn, waEvents, restoreConnections };

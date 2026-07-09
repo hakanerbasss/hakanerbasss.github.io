@@ -55,7 +55,7 @@ function all(sql, params = []) {
 function createTables() {
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
-    CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE, phone TEXT, token TEXT UNIQUE NOT NULL, plan TEXT DEFAULT 'basic', daily_limit INTEGER DEFAULT 100, status TEXT DEFAULT 'active', expires_at TEXT, created_at TEXT DEFAULT (datetime('now')), notes TEXT);
+    CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE, phone TEXT, token TEXT UNIQUE NOT NULL, plan TEXT DEFAULT 'basic', daily_limit INTEGER DEFAULT 100, status TEXT DEFAULT 'active', expires_at TEXT, created_at TEXT DEFAULT (datetime('now')), notes TEXT, webhook_url TEXT);
     CREATE TABLE IF NOT EXISTS connections (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, wa_number TEXT, status TEXT DEFAULT 'disconnected', connected_at TEXT, last_seen TEXT);
     CREATE TABLE IF NOT EXISTS message_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, to_number TEXT NOT NULL, message_type TEXT DEFAULT 'text', status TEXT DEFAULT 'pending', error TEXT, sent_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS daily_usage (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, date TEXT NOT NULL, count INTEGER DEFAULT 0, UNIQUE(customer_id, date));
