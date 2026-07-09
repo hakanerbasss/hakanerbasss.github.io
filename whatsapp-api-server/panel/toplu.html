@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Toplu Mesaj — WhatsApp API</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{--bg:#0a0e14;--surface:#0f1419;--card:#111820;--border:#1e2733;--accent:#25D366;--accent2:#00d4ff;--red:#ff4444;--yellow:#ffd700;--text:#e8f4f8;--muted:#4a6070;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -215,25 +217,54 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 
       <!-- Konum -->
       <div id="type-location" style="display:none">
-        <div class="field">
-          <label>Konum Adı</label>
-          <input type="text" id="loc-name" placeholder="Örn: Ofisimiz">
+        <div class="tabs" style="margin-bottom:10px">
+          <button class="tab active" onclick="setLocTab('map',this)">🗺 Harita</button>
+          <button class="tab" onclick="setLocTab('gps',this)">📡 Konumum</button>
+          <button class="tab" onclick="setLocTab('live',this)">🔴 Canlı</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="field">
-            <label>Enlem (Latitude) *</label>
-            <input type="number" id="loc-lat" placeholder="41.0082" step="any">
+
+        <!-- Harita -->
+        <div id="loc-tab-map">
+          <div style="position:relative;margin-bottom:8px">
+            <input type="text" id="loc-search" placeholder="🔍 Adres veya yer ara..." style="margin-bottom:6px" oninput="clearSearchTimeout()" onkeyup="searchLocDebounce()">
+            <div id="loc-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;z-index:9999;max-height:180px;overflow-y:auto"></div>
           </div>
-          <div class="field">
-            <label>Boylam (Longitude) *</label>
-            <input type="number" id="loc-lng" placeholder="28.9784" step="any">
+          <div id="leaflet-map" style="height:240px;border-radius:10px;overflow:hidden;border:1px solid var(--border)"></div>
+          <div id="map-selected" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">Haritaya tıklayarak veya arama yaparak konum seçin</div>
+        </div>
+
+        <!-- GPS -->
+        <div id="loc-tab-gps" style="display:none;text-align:center;padding:12px 0">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Cihazın GPS'ini kullanarak anlık konumunu gönder</div>
+          <button onclick="getGPS()" style="padding:12px 24px;border-radius:50px;border:none;background:var(--accent2);color:#000;font-size:14px;font-weight:700;cursor:pointer">📡 Konumumu Al</button>
+          <div id="gps-result" style="margin-top:10px;font-size:12px"></div>
+          <div id="gps-map" style="height:180px;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-top:8px;display:none"></div>
+        </div>
+
+        <!-- Canlı Konum -->
+        <div id="loc-tab-live" style="display:none;text-align:center;padding:12px 0">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Alıcıya canlı konum olarak görünür</div>
+          <div style="font-size:11px;color:var(--yellow);margin-bottom:12px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px">⚠️ Canlı konum gönderildikten sonra güncellenmez — anlık konumunuzu paylaşır</div>
+          <div class="field" style="text-align:left">
+            <label>Süre</label>
+            <select id="live-duration" style="margin-bottom:10px">
+              <option value="900">15 Dakika</option>
+              <option value="3600" selected>1 Saat</option>
+              <option value="28800">8 Saat</option>
+            </select>
           </div>
+          <button onclick="getGPSForLive()" style="padding:12px 24px;border-radius:50px;border:none;background:var(--red);color:#fff;font-size:14px;font-weight:700;cursor:pointer">📡 Konumumu Al ve Hazırla</button>
+          <div id="live-result" style="margin-top:10px;font-size:12px"></div>
         </div>
-        <div class="field">
-          <label>Adres (opsiyonel)</label>
-          <input type="text" id="loc-address" placeholder="Örn: Levent, İstanbul">
+
+        <!-- Ortak alanlar -->
+        <div style="margin-top:10px">
+          <div class="field"><label>Konum Adı (opsiyonel)</label><input type="text" id="loc-name" placeholder="Örn: Ofisimiz"></div>
+          <div class="field"><label>Adres (opsiyonel)</label><input type="text" id="loc-address" placeholder="Örn: Levent, İstanbul"></div>
+          <input type="hidden" id="loc-lat">
+          <input type="hidden" id="loc-lng">
+          <div id="loc-coords" style="font-size:11px;color:var(--muted);text-align:center"></div>
         </div>
-        <div style="font-size:11px;color:var(--muted)">💡 Google Maps'te yere sağ tıklayıp koordinatları kopyalayabilirsiniz.</div>
       </div>
     </div>
 
@@ -344,6 +375,112 @@ let audioRecordBlob = null;
 let mediaRecorder = null;
 let recordChunks = [];
 let recordInterval = null;
+let locMode = 'map';
+let leafletMap = null, leafletMarker = null;
+let gpsMap = null, gpsMarker = null;
+let searchTimer = null;
+
+// ── KONUM ────────────────────────────────────────────────────────
+function setLocTab(mode, el) {
+  locMode = mode;
+  ['map','gps','live'].forEach(t => {
+    document.getElementById('loc-tab-' + t).style.display = t === mode ? 'block' : 'none';
+  });
+  document.querySelectorAll('#type-location .tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (mode === 'map') setTimeout(initLeaflet, 100);
+}
+
+function initLeaflet() {
+  if (leafletMap) { leafletMap.invalidateSize(); return; }
+  const lat = parseFloat(document.getElementById('loc-lat').value) || 39.9;
+  const lng = parseFloat(document.getElementById('loc-lng').value) || 32.8;
+  leafletMap = L.map('leaflet-map').setView([lat, lng], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(leafletMap);
+  leafletMap.on('click', (e) => setMapCoords(e.latlng.lat, e.latlng.lng));
+}
+
+function setMapCoords(lat, lng, label) {
+  lat = parseFloat(lat).toFixed(6); lng = parseFloat(lng).toFixed(6);
+  document.getElementById('loc-lat').value = lat;
+  document.getElementById('loc-lng').value = lng;
+  document.getElementById('loc-coords').textContent = `📍 ${lat}, ${lng}`;
+  document.getElementById('map-selected').textContent = label || `📍 ${lat}, ${lng}`;
+  document.getElementById('map-selected').style.color = 'var(--accent)';
+  if (leafletMap) {
+    if (leafletMarker) leafletMap.removeLayer(leafletMarker);
+    leafletMarker = L.marker([lat, lng]).addTo(leafletMap);
+    leafletMap.setView([lat, lng], 15);
+  }
+}
+
+function clearSearchTimeout() { clearTimeout(searchTimer); }
+
+function searchLocDebounce() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(searchLocation, 600);
+}
+
+async function searchLocation() {
+  const q = document.getElementById('loc-search').value.trim();
+  if (q.length < 3) { document.getElementById('loc-search-results').style.display = 'none'; return; }
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=tr`);
+    const results = await r.json();
+    const el = document.getElementById('loc-search-results');
+    if (!results.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = results.map(res => `
+      <div onclick="selectSearchResult(${res.lat},${res.lon},'${res.display_name.replace(/'/g,'\\'').substring(0,60)}')"
+        style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;line-height:1.4"
+        onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
+        📍 ${res.display_name.substring(0,80)}
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function selectSearchResult(lat, lng, label) {
+  setMapCoords(lat, lng, label);
+  document.getElementById('loc-search').value = label;
+  document.getElementById('loc-search-results').style.display = 'none';
+}
+
+function getGPS() {
+  const el = document.getElementById('gps-result');
+  el.innerHTML = '<span style="color:var(--muted)">📡 Konum alınıyor...</span>';
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    document.getElementById('loc-lat').value = lat;
+    document.getElementById('loc-lng').value = lng;
+    document.getElementById('loc-coords').textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    el.innerHTML = `<span style="color:var(--accent)">✅ Konum alındı: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>`;
+    const mapDiv = document.getElementById('gps-map');
+    mapDiv.style.display = 'block';
+    if (!gpsMap) {
+      gpsMap = L.map('gps-map').setView([lat, lng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(gpsMap);
+    } else { gpsMap.setView([lat, lng], 15); if (gpsMarker) gpsMap.removeLayer(gpsMarker); }
+    gpsMarker = L.marker([lat, lng]).addTo(gpsMap);
+  }, err => {
+    el.innerHTML = `<span style="color:var(--red)">❌ Konum alınamadı: ${err.message}</span>`;
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function getGPSForLive() {
+  const el = document.getElementById('live-result');
+  el.innerHTML = '<span style="color:var(--muted)">📡 Konum alınıyor...</span>';
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    document.getElementById('loc-lat').value = lat;
+    document.getElementById('loc-lng').value = lng;
+    document.getElementById('loc-coords').textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const dur = document.getElementById('live-duration');
+    const durLabel = dur.options[dur.selectedIndex].text;
+    el.innerHTML = `<span style="color:var(--accent)">✅ Hazır — ${lat.toFixed(5)}, ${lng.toFixed(5)}<br><span style="color:var(--muted)">Süre: ${durLabel} · Toplu Gönder butonuna bas</span></span>`;
+  }, err => {
+    el.innerHTML = `<span style="color:var(--red)">❌ Konum alınamadı: ${err.message}</span>`;
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
 
 // ── BAŞLANGIÇ ────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -805,11 +942,14 @@ async function startSending() {
         const lng = document.getElementById('loc-lng').value;
         const name = document.getElementById('loc-name').value.trim();
         const address = document.getElementById('loc-address').value.trim();
-        if (!lat || !lng) throw new Error('Enlem ve boylam gerekli');
-        const r = await fetch('/api/send/location', {
+        if (!lat || !lng) throw new Error(locMode === 'live' ? 'Önce "Konumumu Al ve Hazırla" butonuna bas' : 'Konum seçilmedi');
+        const endpoint = locMode === 'live' ? '/api/send/live-location' : '/api/send/location';
+        const body = { to: contact.phone, latitude: parseFloat(lat), longitude: parseFloat(lng), name, address };
+        if (locMode === 'live') body.duration_seconds = parseInt(document.getElementById('live-duration').value);
+        const r = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
-          body: JSON.stringify({ to: contact.phone, latitude: parseFloat(lat), longitude: parseFloat(lng), name, address })
+          body: JSON.stringify(body)
         });
         const data = await r.json();
         if (!data.ok) throw new Error(data.error);

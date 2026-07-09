@@ -562,6 +562,41 @@ app.post('/api/send/location', customerAuth, rateLimit, async (req, res) => {
   }
 });
 
+// Canlı konum gönder
+app.post('/api/send/live-location', customerAuth, rateLimit, async (req, res) => {
+  const { to, latitude, longitude, name, address, duration_seconds } = req.body;
+  if (!to || latitude == null || longitude == null) return res.status(400).json({ error: 'to, latitude ve longitude gerekli' });
+
+  const allowed = db.checkAndIncrementUsage(req.customer.id, req.customer.daily_limit);
+  if (!allowed) {
+    notifyLimitExceeded(req.customer).catch(() => {});
+    return res.status(429).json({ error: 'Günlük limit aşıldı' });
+  }
+
+  try {
+    await wa.sendMessage(req.customer.id, to, {
+      liveLocation: {
+        degreesLatitude: parseFloat(latitude),
+        degreesLongitude: parseFloat(longitude),
+        accuracyInMeters: 10,
+        speedInMps: 0,
+        degreesClockwiseFromMagneticNorth: 0,
+        name: name || '',
+        address: address || ''
+      },
+      caption: '',
+      jpegThumbnail: null,
+      sequenceNumber: BigInt(0),
+      timeOffset: 0,
+      duration: duration_seconds || 3600
+    });
+    db.logMessage(req.customer.id, to, 'live_location', 'sent');
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Kişi kartı gönder
 app.post('/api/send/contact', customerAuth, rateLimit, async (req, res) => {
   const { to, contact_name, contact_phone } = req.body;
