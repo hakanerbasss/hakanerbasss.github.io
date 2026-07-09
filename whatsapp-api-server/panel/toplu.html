@@ -805,11 +805,14 @@ async function startSending() {
         const lng = document.getElementById('loc-lng').value;
         const name = document.getElementById('loc-name').value.trim();
         const address = document.getElementById('loc-address').value.trim();
-        if (!lat || !lng) throw new Error('Enlem ve boylam gerekli');
-        const r = await fetch('/api/send/location', {
+        if (!lat || !lng) throw new Error(locMode === 'live' ? 'Önce "Konumumu Al ve Hazırla" butonuna bas' : 'Konum seçilmedi');
+        const endpoint = locMode === 'live' ? '/api/send/live-location' : '/api/send/location';
+        const body = { to: contact.phone, latitude: parseFloat(lat), longitude: parseFloat(lng), name, address };
+        if (locMode === 'live') body.duration_seconds = parseInt(document.getElementById('live-duration').value);
+        const r = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
-          body: JSON.stringify({ to: contact.phone, latitude: parseFloat(lat), longitude: parseFloat(lng), name, address })
+          body: JSON.stringify(body)
         });
         const data = await r.json();
         if (!data.ok) throw new Error(data.error);
