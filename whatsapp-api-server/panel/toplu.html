@@ -145,11 +145,49 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 
       <!-- Ses -->
       <div id="type-audio" style="display:none">
-        <div class="field">
-          <label>Ses Dosyası URL *</label>
-          <input type="url" id="audio-url" placeholder="https://orneksite.com/ses.mp3">
+        <div class="tabs" style="margin-bottom:10px">
+          <button class="tab active" onclick="setAudioTab('url',this)">🔗 URL</button>
+          <button class="tab" onclick="setAudioTab('file',this)">📁 Dosya</button>
+          <button class="tab" onclick="setAudioTab('record',this)">🎙 Kaydet</button>
         </div>
-        <div style="font-size:11px;color:var(--muted)">💡 MP3, OGG, AAC formatları desteklenir. Dosya halka açık bir URL'de olmalı.</div>
+
+        <!-- URL -->
+        <div id="audio-tab-url">
+          <div class="field">
+            <label>Ses Dosyası URL *</label>
+            <input type="url" id="audio-url" placeholder="https://orneksite.com/ses.mp3">
+          </div>
+          <div style="font-size:11px;color:var(--muted)">💡 MP3, OGG, AAC formatları. URL halka açık olmalı.</div>
+        </div>
+
+        <!-- Dosya -->
+        <div id="audio-tab-file" style="display:none">
+          <div class="field">
+            <div class="upload-area" id="audio-upload-area" onclick="document.getElementById('audio-file').click()">
+              <div style="font-size:32px;margin-bottom:8px">🔊</div>
+              <div style="font-size:13px;color:var(--muted)">Ses dosyası seç (MP3, OGG, AAC, WAV)</div>
+              <input type="file" id="audio-file" accept="audio/*" style="display:none" onchange="onAudioFileSelect()">
+            </div>
+            <div id="audio-file-preview" style="margin-top:8px"></div>
+          </div>
+        </div>
+
+        <!-- Kaydet -->
+        <div id="audio-tab-record" style="display:none">
+          <div style="text-align:center;padding:16px 0">
+            <div id="rec-status" style="font-size:13px;color:var(--muted);margin-bottom:12px">Kayda başlamak için butona bas</div>
+            <div id="rec-timer" style="font-size:28px;font-weight:800;color:var(--accent);margin-bottom:12px;display:none">0:00</div>
+            <div style="display:flex;justify-content:center;gap:10px">
+              <button id="rec-btn" onclick="toggleRecord()" style="padding:12px 24px;border-radius:50px;border:none;background:var(--accent);color:#000;font-size:14px;font-weight:700;cursor:pointer">
+                🎙 Kaydet
+              </button>
+              <button id="rec-stop-btn" onclick="stopRecord()" style="display:none;padding:12px 24px;border-radius:50px;border:none;background:var(--red);color:#fff;font-size:14px;font-weight:700;cursor:pointer">
+                ⏹ Durdur
+              </button>
+            </div>
+            <div id="rec-preview" style="margin-top:12px"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Konum -->
@@ -273,6 +311,13 @@ let currentToken = '';
 let contacts = [];
 let msgType = 'text';
 let selectedFile = null;
+let audioMode = 'url';
+let audioFileBlob = null;
+let audioFileName = '';
+let audioRecordBlob = null;
+let mediaRecorder = null;
+let recordChunks = [];
+let recordInterval = null;
 
 // ── BAŞLANGIÇ ────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -314,6 +359,72 @@ async function checkWaStatus() {
   } else {
     el.innerHTML = `<span style="color:var(--red)">⚪ Bağlı Değil</span>`;
   }
+}
+
+// ── SES SEKME & KAYIT ────────────────────────────────────────────
+function setAudioTab(mode, el) {
+  audioMode = mode;
+  ['url','file','record'].forEach(t => {
+    document.getElementById('audio-tab-' + t).style.display = t === mode ? 'block' : 'none';
+  });
+  document.querySelectorAll('#type-audio .tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function onAudioFileSelect() {
+  const input = document.getElementById('audio-file');
+  const file = input.files[0];
+  if (!file) return;
+  audioFileBlob = file;
+  audioFileName = file.name;
+  const area = document.getElementById('audio-upload-area');
+  area.classList.add('has-file');
+  const preview = document.getElementById('audio-file-preview');
+  const url = URL.createObjectURL(file);
+  preview.innerHTML = `<audio controls style="width:100%;margin-top:4px"><source src="${url}"></audio><div style="font-size:11px;color:var(--accent);margin-top:4px">✅ ${file.name} (${(file.size/1024).toFixed(0)}KB)</div>`;
+}
+
+async function toggleRecord() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordChunks = [];
+    audioRecordBlob = null;
+    document.getElementById('rec-preview').innerHTML = '';
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      audioRecordBlob = new Blob(recordChunks, { type: 'audio/ogg; codecs=opus' });
+      const url = URL.createObjectURL(audioRecordBlob);
+      document.getElementById('rec-preview').innerHTML = `<audio controls style="width:100%;margin-top:8px"><source src="${url}"></audio><div style="font-size:11px;color:var(--accent);margin-top:4px">✅ Kayıt hazır (${(audioRecordBlob.size/1024).toFixed(0)}KB)</div>`;
+      document.getElementById('rec-status').textContent = 'Kayıt tamamlandı. Göndermek için Toplu Gönder\'e bas.';
+      document.getElementById('rec-status').style.color = 'var(--accent)';
+      clearInterval(recordInterval);
+      document.getElementById('rec-timer').style.display = 'none';
+      document.getElementById('rec-btn').style.display = 'inline-block';
+      document.getElementById('rec-stop-btn').style.display = 'none';
+    };
+    mediaRecorder.start();
+    let secs = 0;
+    document.getElementById('rec-timer').style.display = 'block';
+    document.getElementById('rec-btn').style.display = 'none';
+    document.getElementById('rec-stop-btn').style.display = 'inline-block';
+    document.getElementById('rec-status').textContent = 'Kaydediliyor...';
+    document.getElementById('rec-status').style.color = 'var(--red)';
+    recordInterval = setInterval(() => {
+      secs++;
+      const m = Math.floor(secs/60), s = secs%60;
+      document.getElementById('rec-timer').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    }, 1000);
+  } catch(e) {
+    document.getElementById('rec-status').textContent = '❌ Mikrofon erişimi reddedildi';
+    document.getElementById('rec-status').style.color = 'var(--red)';
+  }
+}
+
+function stopRecord() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
 }
 
 // ── MESAJ TİPİ ───────────────────────────────────────────────────
@@ -584,15 +695,30 @@ async function startSending() {
         const data = await r.json();
         if (!data.ok) throw new Error(data.error);
       } else if (msgType === 'audio') {
-        const url = document.getElementById('audio-url').value.trim();
-        if (!url) throw new Error('Ses URL gerekli');
-        const r = await fetch('/api/send/audio', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
-          body: JSON.stringify({ to: contact.phone, url })
-        });
-        const data = await r.json();
-        if (!data.ok) throw new Error(data.error);
+        if (audioMode === 'url') {
+          const url = document.getElementById('audio-url').value.trim();
+          if (!url) throw new Error('Ses URL gerekli');
+          const r = await fetch('/api/send/audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
+            body: JSON.stringify({ to: contact.phone, url })
+          });
+          const data = await r.json();
+          if (!data.ok) throw new Error(data.error);
+        } else {
+          const blob = audioMode === 'file' ? audioFileBlob : audioRecordBlob;
+          if (!blob) throw new Error(audioMode === 'file' ? 'Dosya seçilmedi' : 'Ses kaydedilmedi');
+          const fd = new FormData();
+          fd.append('file', blob, audioMode === 'file' ? (audioFileName || 'ses.mp3') : 'kayit.ogg');
+          fd.append('to', contact.phone);
+          const r = await fetch('/api/send/media', {
+            method: 'POST',
+            headers: { 'x-api-token': currentToken },
+            body: fd
+          });
+          const data = await r.json();
+          if (!data.ok) throw new Error(data.error);
+        }
       } else if (msgType === 'location') {
         const lat = document.getElementById('loc-lat').value;
         const lng = document.getElementById('loc-lng').value;
