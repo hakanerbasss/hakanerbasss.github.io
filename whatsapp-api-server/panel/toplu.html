@@ -50,6 +50,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .tabs{display:flex;gap:4px;margin-bottom:12px;background:var(--surface);border-radius:8px;padding:4px;}
 .tab{flex:1;padding:7px;border-radius:6px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;transition:all .2s;}
 .tab.active{background:var(--card);color:var(--text);font-weight:600;}
+.loc-type-btn{flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;}
+.loc-type-btn.active{background:rgba(37,211,102,.15);color:var(--accent);border-color:var(--accent);}
+.loc-type-btn.live.active{background:rgba(255,68,68,.15);color:var(--red);border-color:var(--red);}
 </style>
 </head>
 <body>
@@ -215,53 +218,41 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 
       <!-- Konum -->
       <div id="type-location" style="display:none">
-        <div class="tabs" style="margin-bottom:10px">
-          <button class="tab active" onclick="setLocTab('map',this)">🗺 Harita</button>
-          <button class="tab" onclick="setLocTab('gps',this)">📡 Konumum</button>
-          <button class="tab" onclick="setLocTab('live',this)">🔴 Canlı</button>
+        <!-- Arama -->
+        <div style="position:relative;margin-bottom:8px">
+          <input type="text" id="loc-search" placeholder="🔍 Adres veya yer ara..." oninput="clearSearchTimeout()" onkeyup="searchLocDebounce()">
+          <div id="loc-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;z-index:9999;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.4)"></div>
         </div>
 
         <!-- Harita -->
-        <div id="loc-tab-map">
-          <div style="position:relative;margin-bottom:8px">
-            <input type="text" id="loc-search" placeholder="🔍 Adres veya yer ara..." style="margin-bottom:6px" oninput="clearSearchTimeout()" onkeyup="searchLocDebounce()">
-            <div id="loc-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;z-index:9999;max-height:180px;overflow-y:auto"></div>
-          </div>
-          <div id="leaflet-map" style="height:240px;border-radius:10px;overflow:hidden;border:1px solid var(--border)"></div>
-          <div id="map-selected" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">Haritaya tıklayarak veya arama yaparak konum seçin</div>
+        <div style="position:relative">
+          <div id="leaflet-map" style="height:280px;border-radius:10px;overflow:hidden;border:1px solid var(--border)"></div>
+          <button id="gps-map-btn" onclick="goToMyLocation()" style="position:absolute;bottom:10px;right:10px;z-index:999;padding:8px 14px;border-radius:50px;border:none;background:rgba(15,20,25,.85);color:var(--accent2);font-size:12px;font-weight:700;cursor:pointer;backdrop-filter:blur(4px)">📡 Konumuma Git</button>
         </div>
+        <div id="map-selected" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;min-height:16px">Haritaya tıklayın veya adres arayın</div>
 
-        <!-- GPS -->
-        <div id="loc-tab-gps" style="display:none;text-align:center;padding:12px 0">
-          <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Cihazın GPS'ini kullanarak anlık konumunu gönder</div>
-          <button onclick="getGPS()" style="padding:12px 24px;border-radius:50px;border:none;background:var(--accent2);color:#000;font-size:14px;font-weight:700;cursor:pointer">📡 Konumumu Al</button>
-          <div id="gps-result" style="margin-top:10px;font-size:12px"></div>
-          <div id="gps-map" style="height:180px;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-top:8px;display:none"></div>
-        </div>
-
-        <!-- Canlı Konum -->
-        <div id="loc-tab-live" style="display:none;text-align:center;padding:12px 0">
-          <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Alıcıya canlı konum olarak görünür</div>
-          <div style="font-size:11px;color:var(--yellow);margin-bottom:12px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px">⚠️ Canlı konum gönderildikten sonra güncellenmez — anlık konumunuzu paylaşır</div>
-          <div class="field" style="text-align:left">
-            <label>Süre</label>
-            <select id="live-duration" style="margin-bottom:10px">
-              <option value="900">15 Dakika</option>
-              <option value="3600" selected>1 Saat</option>
-              <option value="28800">8 Saat</option>
-            </select>
-          </div>
-          <button onclick="getGPSForLive()" style="padding:12px 24px;border-radius:50px;border:none;background:var(--red);color:#fff;font-size:14px;font-weight:700;cursor:pointer">📡 Konumumu Al ve Hazırla</button>
-          <div id="live-result" style="margin-top:10px;font-size:12px"></div>
-        </div>
-
-        <!-- Ortak alanlar -->
+        <!-- Konum Adı / Adres -->
         <div style="margin-top:10px">
           <div class="field"><label>Konum Adı (opsiyonel)</label><input type="text" id="loc-name" placeholder="Örn: Ofisimiz"></div>
           <div class="field"><label>Adres (opsiyonel)</label><input type="text" id="loc-address" placeholder="Örn: Levent, İstanbul"></div>
           <input type="hidden" id="loc-lat">
           <input type="hidden" id="loc-lng">
           <div id="loc-coords" style="font-size:11px;color:var(--muted);text-align:center"></div>
+        </div>
+
+        <!-- Normal / Canlı seçim -->
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="loc-type-btn active" onclick="setLocType('normal',this)">📍 Normal Konum</button>
+          <button class="loc-type-btn live" onclick="setLocType('live',this)">🔴 Canlı Konum</button>
+        </div>
+        <div id="live-opts" style="display:none;margin-top:10px">
+          <div style="font-size:11px;color:var(--yellow);background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px;margin-bottom:8px">⚠️ Alıcıda canlı konum olarak görünür — gönderildikten sonra güncellenmez</div>
+          <label>Süre</label>
+          <select id="live-duration">
+            <option value="900">15 Dakika</option>
+            <option value="3600" selected>1 Saat</option>
+            <option value="28800">8 Saat</option>
+          </select>
         </div>
       </div>
     </div>
@@ -373,29 +364,45 @@ let audioRecordBlob = null;
 let mediaRecorder = null;
 let recordChunks = [];
 let recordInterval = null;
-let locMode = 'map';
+let locMode = 'normal';
 let leafletMap = null, leafletMarker = null;
-let gpsMap = null, gpsMarker = null;
 let searchTimer = null;
 
 // ── KONUM ────────────────────────────────────────────────────────
-function setLocTab(mode, el) {
-  locMode = mode;
-  ['map','gps','live'].forEach(t => {
-    document.getElementById('loc-tab-' + t).style.display = t === mode ? 'block' : 'none';
-  });
-  document.querySelectorAll('#type-location .tab').forEach(b => b.classList.remove('active'));
+function setLocType(type, el) {
+  locMode = type;
+  document.querySelectorAll('.loc-type-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  if (mode === 'map') setTimeout(initLeaflet, 100);
+  document.getElementById('live-opts').style.display = type === 'live' ? 'block' : 'none';
 }
 
 function initLeaflet() {
   if (leafletMap) { leafletMap.invalidateSize(); return; }
-  const lat = parseFloat(document.getElementById('loc-lat').value) || 39.9;
-  const lng = parseFloat(document.getElementById('loc-lng').value) || 32.8;
-  leafletMap = L.map('leaflet-map').setView([lat, lng], 6);
+  leafletMap = L.map('leaflet-map', { zoomControl: true }).setView([39.9, 32.8], 6);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(leafletMap);
   leafletMap.on('click', (e) => setMapCoords(e.latlng.lat, e.latlng.lng));
+  // Açılışta GPS konumuna git
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      leafletMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
+    }, () => {}, { timeout: 6000 });
+  }
+}
+
+function goToMyLocation() {
+  const btn = document.getElementById('gps-map-btn');
+  btn.textContent = '⏳ Alınıyor...';
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    leafletMap.setView([lat, lng], 16);
+    setMapCoords(lat, lng, 'Mevcut Konumum');
+    btn.textContent = '📡 Konumuma Git';
+    btn.disabled = false;
+  }, err => {
+    btn.textContent = '❌ Alınamadı';
+    setTimeout(() => { btn.textContent = '📡 Konumuma Git'; btn.disabled = false; }, 2000);
+  }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
 function setMapCoords(lat, lng, label) {
@@ -403,13 +410,12 @@ function setMapCoords(lat, lng, label) {
   document.getElementById('loc-lat').value = lat;
   document.getElementById('loc-lng').value = lng;
   document.getElementById('loc-coords').textContent = `📍 ${lat}, ${lng}`;
-  document.getElementById('map-selected').textContent = label || `📍 ${lat}, ${lng}`;
-  document.getElementById('map-selected').style.color = 'var(--accent)';
-  if (leafletMap) {
-    if (leafletMarker) leafletMap.removeLayer(leafletMarker);
-    leafletMarker = L.marker([lat, lng]).addTo(leafletMap);
-    leafletMap.setView([lat, lng], 15);
-  }
+  const sel = document.getElementById('map-selected');
+  sel.textContent = label || `📍 ${lat}, ${lng}`;
+  sel.style.color = 'var(--accent)';
+  if (leafletMarker) leafletMap.removeLayer(leafletMarker);
+  leafletMarker = L.marker([lat, lng]).addTo(leafletMap);
+  if (!label) leafletMap.setView([lat, lng], 15);
 }
 
 function clearSearchTimeout() { clearTimeout(searchTimer); }
@@ -421,16 +427,16 @@ function searchLocDebounce() {
 
 async function searchLocation() {
   const q = document.getElementById('loc-search').value.trim();
-  if (q.length < 3) { document.getElementById('loc-search-results').style.display = 'none'; return; }
+  const resEl = document.getElementById('loc-search-results');
+  if (q.length < 3) { resEl.style.display = 'none'; return; }
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=tr`);
     const results = await r.json();
-    const el = document.getElementById('loc-search-results');
-    if (!results.length) { el.style.display = 'none'; return; }
-    el.style.display = 'block';
-    el.innerHTML = results.map(res => `
+    if (!results.length) { resEl.style.display = 'none'; return; }
+    resEl.style.display = 'block';
+    resEl.innerHTML = results.map(res => `
       <div onclick="selectSearchResult(${res.lat},${res.lon},${JSON.stringify(res.display_name.substring(0,60))})"
-        style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;line-height:1.4"
+        style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;line-height:1.5"
         onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
         📍 ${res.display_name.substring(0,80)}
       </div>`).join('');
@@ -438,46 +444,10 @@ async function searchLocation() {
 }
 
 function selectSearchResult(lat, lng, label) {
-  setMapCoords(lat, lng, label);
   document.getElementById('loc-search').value = label;
   document.getElementById('loc-search-results').style.display = 'none';
-}
-
-function getGPS() {
-  const el = document.getElementById('gps-result');
-  el.innerHTML = '<span style="color:var(--muted)">📡 Konum alınıyor...</span>';
-  navigator.geolocation.getCurrentPosition(pos => {
-    const lat = pos.coords.latitude, lng = pos.coords.longitude;
-    document.getElementById('loc-lat').value = lat;
-    document.getElementById('loc-lng').value = lng;
-    document.getElementById('loc-coords').textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    el.innerHTML = `<span style="color:var(--accent)">✅ Konum alındı: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>`;
-    const mapDiv = document.getElementById('gps-map');
-    mapDiv.style.display = 'block';
-    if (!gpsMap) {
-      gpsMap = L.map('gps-map').setView([lat, lng], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(gpsMap);
-    } else { gpsMap.setView([lat, lng], 15); if (gpsMarker) gpsMap.removeLayer(gpsMarker); }
-    gpsMarker = L.marker([lat, lng]).addTo(gpsMap);
-  }, err => {
-    el.innerHTML = `<span style="color:var(--red)">❌ Konum alınamadı: ${err.message}</span>`;
-  }, { enableHighAccuracy: true, timeout: 10000 });
-}
-
-function getGPSForLive() {
-  const el = document.getElementById('live-result');
-  el.innerHTML = '<span style="color:var(--muted)">📡 Konum alınıyor...</span>';
-  navigator.geolocation.getCurrentPosition(pos => {
-    const lat = pos.coords.latitude, lng = pos.coords.longitude;
-    document.getElementById('loc-lat').value = lat;
-    document.getElementById('loc-lng').value = lng;
-    document.getElementById('loc-coords').textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    const dur = document.getElementById('live-duration');
-    const durLabel = dur.options[dur.selectedIndex].text;
-    el.innerHTML = `<span style="color:var(--accent)">✅ Hazır — ${lat.toFixed(5)}, ${lng.toFixed(5)}<br><span style="color:var(--muted)">Süre: ${durLabel} · Toplu Gönder butonuna bas</span></span>`;
-  }, err => {
-    el.innerHTML = `<span style="color:var(--red)">❌ Konum alınamadı: ${err.message}</span>`;
-  }, { enableHighAccuracy: true, timeout: 10000 });
+  setMapCoords(lat, lng, label);
+  leafletMap.setView([lat, lng], 15);
 }
 
 // ── BAŞLANGIÇ ────────────────────────────────────────────────────
@@ -652,6 +622,7 @@ function setType(type, el) {
     document.getElementById('type-' + t).style.display = t === type ? 'block' : 'none';
   });
   selectedFile = null;
+  if (type === 'location') setTimeout(initLeaflet, 150);
 }
 
 function onFileSelect(prefix) {
