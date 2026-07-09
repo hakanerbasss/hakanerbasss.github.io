@@ -429,7 +429,7 @@ async function searchLocation() {
     if (!results.length) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerHTML = results.map(res => `
-      <div onclick="selectSearchResult(${res.lat},${res.lon},'${res.display_name.replace(/'/g,'\\'').substring(0,60)}')"
+      <div onclick="selectSearchResult(${res.lat},${res.lon},${JSON.stringify(res.display_name.substring(0,60))})"
         style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;line-height:1.4"
         onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
         📍 ${res.display_name.substring(0,80)}
