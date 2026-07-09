@@ -1,0 +1,19 @@
+{
+  "name": "WhatsApp API Panel",
+  "short_name": "WA Panel",
+  "description": "WhatsApp toplu mesaj ve müşteri yönetim paneli",
+  "start_url": "/musteri",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#25D366",
+  "orientation": "portrait",
+  "lang": "tr",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

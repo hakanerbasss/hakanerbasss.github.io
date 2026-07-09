@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard — WhatsApp API</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#25D366">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WA Panel">
+<link rel="apple-touch-icon" href="/icons/icon.svg">
 <style>
 :root{--bg:#0a0e14;--surface:#0f1419;--card:#111820;--border:#1e2733;--accent:#25D366;--accent2:#00d4ff;--red:#ff4444;--yellow:#ffd700;--text:#e8f4f8;--muted:#4a6070;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -603,6 +610,11 @@ async function startConnect(method) {
 function logout() {
   localStorage.removeItem('wa_customer_token');
   window.location.href = '/musteri';
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 </script>
 </body>
