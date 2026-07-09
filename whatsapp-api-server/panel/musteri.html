@@ -385,7 +385,60 @@ function renderDashboard(d, token) {
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Google Sheets Örneği</div>
       <div style="font-family:monospace;font-size:11px;background:var(--surface);padding:10px;border-radius:6px;border:1px solid var(--border);line-height:1.8;cursor:pointer;white-space:pre-wrap"
            onclick="copyToClipboard(this.dataset.code);this.style.borderColor='var(--accent)'"
-           data-code="${sheets.replace(/"/g,'&quot;')}">${sheets} 📋</div>`;
+           data-code="${sheets.replace(/"/g,'&quot;')}">${sheets} 📋</div>
+
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--accent2);margin-bottom:10px;font-weight:700;letter-spacing:1px">📚 TÜM ENDPOINT'LER</div>
+
+        ${[
+          { title:'📝 Metin Gönder', method:'POST', path:'/api/send',
+            body:'{ "to": "905551234567", "message": "Merhaba {isim}!" }',
+            note:'to: Telefon numarası (başında 90 ile). message: Gönderilecek metin.' },
+          { title:'🖼 Resim Gönder', method:'POST', path:'/api/send/image',
+            body:'{ "to": "905551234567", "url": "https://site.com/resim.jpg", "caption": "Açıklama" }',
+            note:'url: Halka açık resim linki. caption: İsteğe bağlı açıklama.' },
+          { title:'🔊 Ses Gönder', method:'POST', path:'/api/send/audio',
+            body:'{ "to": "905551234567", "url": "https://site.com/ses.mp3" }',
+            note:'MP3, OGG, AAC formatları desteklenir. URL halka açık olmalı.' },
+          { title:'📄 Dosya Gönder', method:'POST', path:'/api/send/document',
+            body:'{ "to": "905551234567", "url": "https://site.com/dosya.pdf", "filename": "fatura.pdf", "mimetype": "application/pdf" }',
+            note:'filename ve mimetype isteğe bağlı.' },
+          { title:'📍 Konum Gönder', method:'POST', path:'/api/send/location',
+            body:'{ "to": "905551234567", "latitude": 41.0082, "longitude": 28.9784, "name": "Ofisimiz", "address": "Levent, İstanbul" }',
+            note:'name ve address isteğe bağlı. Google Maps\'ten koordinat alabilirsiniz.' },
+          { title:'👤 Kişi Kartı Gönder', method:'POST', path:'/api/send/contact',
+            body:'{ "to": "905551234567", "contact_name": "Ahmet Yılmaz", "contact_phone": "905559876543" }',
+            note:'Alıcıya bir rehber kartı gönderir.' },
+          { title:'👍 Tepki Gönder', method:'POST', path:'/api/send/reaction',
+            body:'{ "to": "905551234567", "message_id": "MESAJ_ID", "emoji": "👍" }',
+            note:'message_id: Tepki verilecek mesajın ID\'si. Webhook\'tan alınır.' },
+          { title:'📤 Toplu Mesaj', method:'POST', path:'/api/send/bulk',
+            body:'{ "messages": [{ "to": "905551234567", "message": "Merhaba!" }, { "to": "905559876543", "message": "Selam!" }] }',
+            note:'Maksimum 50 mesaj. Her mesaj arasında 3 saniye beklenir.' },
+          { title:'🔔 Webhook Ayarla', method:'POST', path:'/api/webhook',
+            body:'{ "url": "https://siteniz.com/webhook" }',
+            note:'Gelen mesajlar ve durum bildirimleri bu URL\'e POST edilir. Silmek için url: null gönderin.' },
+          { title:'📊 Durum Sorgula', method:'GET', path:'/api/status',
+            body:null,
+            note:'WhatsApp bağlantı durumu, plan ve kota bilgisi döner.' },
+        ].map(ep => `
+        <div style="margin-bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)">
+            <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(37,211,102,.2);color:var(--accent)">${ep.method}</span>
+            <span style="font-family:monospace;font-size:12px;color:var(--accent2)">${ep.path}</span>
+            <span style="margin-left:auto;font-size:12px">${ep.title}</span>
+          </div>
+          ${ep.body ? `<div onclick="copyToClipboard('${ep.body.replace(/'/g,'"')}');this.style.borderColor='var(--accent)'"
+            style="font-family:monospace;font-size:11px;padding:8px 10px;cursor:pointer;line-height:1.7;color:var(--muted);white-space:pre-wrap">${ep.body} 📋</div>` : ''}
+          <div style="font-size:11px;color:var(--muted);padding:6px 10px;border-top:1px solid var(--border)">${ep.note}</div>
+        </div>`).join('')}
+
+        <div style="margin-top:4px;padding:10px;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.8">
+          <strong style="color:var(--accent2)">Header (tüm isteklerde):</strong><br>
+          x-api-token: ${token}<br>
+          Content-Type: application/json
+        </div>
+      </div>`;
   }
 
   // Plan kartı

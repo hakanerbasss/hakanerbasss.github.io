@@ -78,11 +78,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <!-- Mesaj Bölümü -->
     <div class="card">
       <div class="card-title">Mesaj</div>
-      <div class="type-btns">
+      <div class="type-btns" style="flex-wrap:wrap">
         <div class="type-btn active" onclick="setType('text',this)">📝 Metin</div>
         <div class="type-btn" onclick="setType('image',this)">🖼 Resim</div>
         <div class="type-btn" onclick="setType('video',this)">🎬 Video</div>
         <div class="type-btn" onclick="setType('document',this)">📄 Dosya</div>
+        <div class="type-btn" onclick="setType('audio',this)">🔊 Ses</div>
+        <div class="type-btn" onclick="setType('location',this)">📍 Konum</div>
       </div>
 
       <!-- Metin -->
@@ -139,6 +141,38 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
           </div>
           <div id="doc-preview" style="margin-top:8px"></div>
         </div>
+      </div>
+
+      <!-- Ses -->
+      <div id="type-audio" style="display:none">
+        <div class="field">
+          <label>Ses Dosyası URL *</label>
+          <input type="url" id="audio-url" placeholder="https://orneksite.com/ses.mp3">
+        </div>
+        <div style="font-size:11px;color:var(--muted)">💡 MP3, OGG, AAC formatları desteklenir. Dosya halka açık bir URL'de olmalı.</div>
+      </div>
+
+      <!-- Konum -->
+      <div id="type-location" style="display:none">
+        <div class="field">
+          <label>Konum Adı</label>
+          <input type="text" id="loc-name" placeholder="Örn: Ofisimiz">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="field">
+            <label>Enlem (Latitude) *</label>
+            <input type="number" id="loc-lat" placeholder="41.0082" step="any">
+          </div>
+          <div class="field">
+            <label>Boylam (Longitude) *</label>
+            <input type="number" id="loc-lng" placeholder="28.9784" step="any">
+          </div>
+        </div>
+        <div class="field">
+          <label>Adres (opsiyonel)</label>
+          <input type="text" id="loc-address" placeholder="Örn: Levent, İstanbul">
+        </div>
+        <div style="font-size:11px;color:var(--muted)">💡 Google Maps'te yere sağ tıklayıp koordinatları kopyalayabilirsiniz.</div>
       </div>
     </div>
 
@@ -287,7 +321,7 @@ function setType(type, el) {
   msgType = type;
   document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  ['text','image','video','document'].forEach(t => {
+  ['text','image','video','document','audio','location'].forEach(t => {
     document.getElementById('type-' + t).style.display = t === type ? 'block' : 'none';
   });
   selectedFile = null;
@@ -546,6 +580,29 @@ async function startSending() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
           body: JSON.stringify({ to: contact.phone, message: text })
+        });
+        const data = await r.json();
+        if (!data.ok) throw new Error(data.error);
+      } else if (msgType === 'audio') {
+        const url = document.getElementById('audio-url').value.trim();
+        if (!url) throw new Error('Ses URL gerekli');
+        const r = await fetch('/api/send/audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
+          body: JSON.stringify({ to: contact.phone, url })
+        });
+        const data = await r.json();
+        if (!data.ok) throw new Error(data.error);
+      } else if (msgType === 'location') {
+        const lat = document.getElementById('loc-lat').value;
+        const lng = document.getElementById('loc-lng').value;
+        const name = document.getElementById('loc-name').value.trim();
+        const address = document.getElementById('loc-address').value.trim();
+        if (!lat || !lng) throw new Error('Enlem ve boylam gerekli');
+        const r = await fetch('/api/send/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-token': currentToken },
+          body: JSON.stringify({ to: contact.phone, latitude: parseFloat(lat), longitude: parseFloat(lng), name, address })
         });
         const data = await r.json();
         if (!data.ok) throw new Error(data.error);
