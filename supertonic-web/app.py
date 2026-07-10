@@ -1053,8 +1053,8 @@ Rules:
 
         png_files.append(png_path)
 
-    # İlk sahneye haber overlay ekle
-    if png_files:
+    # İlk sahneye haber overlay ekle — Bilgi Shorts modunda atla
+    if png_files and not info_format:
         try:
             first_title = data.get("title", topic or scenes[0]["text"][:60])
             overlay_first_scene_banner(png_files[0], first_title, lang=lang)
