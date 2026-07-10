@@ -2723,6 +2723,56 @@ async def reset_manual_lv():
     return {"ok": True}
 
 
+@app.post("/api/info-shorts-trend")
+async def info_shorts_trend(
+    category: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    info_format: str = Form("biliyormuydunuz"),
+):
+    """Bilgi Shorts için seçilen kategori ve formata uygun konu öner."""
+    from openai import OpenAI
+    from datetime import datetime
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    if not category.strip():
+        raise HTTPException(400, "Kategori boş olamaz")
+    lang_name = LANG_MAP.get(lang, "Turkish")
+    today = datetime.now().strftime("%d.%m.%Y")
+    format_labels = {
+        "biliyormuydunuz": "Bunu biliyor muydunuz? (shocking fact)",
+        "aklinizda": "Aklınızda bulunsun (practical tip)",
+        "30saniye": "30 saniyede öğren (quick explainer)",
+        "cogusinsan": "Çoğu insan bilmiyor (insider secret)",
+    }
+    fmt_label = format_labels.get(info_format, format_labels["biliyormuydunuz"])
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    prompt = f"""Today is {today}. You are helping create a YouTube Shorts informational video in {lang_name}.
+
+Category: {category}
+Format style: {fmt_label}
+
+Suggest ONE compelling short video topic (45-60 seconds) that:
+- Fits the format style perfectly
+- Is surprising, useful, or counterintuitive — something that makes people say "I didn't know that!"
+- Targets general audience aged 35-65
+- Is specific (not "health tips" but "Why you should never drink coffee before 10am")
+
+Return ONLY a JSON object, no markdown:
+{{"topic": "the specific topic in {lang_name}", "hook": "one sentence that captures the hook in {lang_name}"}}"""
+    try:
+        resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.9,
+            max_tokens=200,
+        )
+        data = _parse_llm_json(resp.choices[0].message.content)
+        return {"topic": data.get("topic", ""), "hook": data.get("hook", "")}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.post("/api/lv-category-trend")
 async def lv_category_trend(
     category: str = Form(...),

@@ -2654,6 +2654,36 @@ function updateInfoApiKeyStatus() {
 
 let _infoShortsPollTimer = null;
 
+async function fetchInfoShortsTrend() {
+  const apiKey = localStorage.getItem('ds_api_key') || '';
+  const category = document.getElementById('info-category').value;
+  if (!apiKey) return showError('err-infoshorts', 'Önce API key kaydedin.');
+  if (!category) return showError('err-infoshorts', 'Önce bir kategori seçin.');
+  setLoading('btn-info-trend', 'spin-info-trend', true);
+  document.getElementById('info-trend-hook').style.display = 'none';
+  try {
+    const fd = new FormData();
+    fd.append('category', category);
+    fd.append('api_key', apiKey);
+    fd.append('lang', document.getElementById('info-lang').value);
+    fd.append('info_format', _infoSelectedFormat);
+    const r = await fetch('/api/info-shorts-trend', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || 'Hata');
+    const d = await r.json();
+    if (d.topic) {
+      document.getElementById('info-topic').value = d.topic;
+      if (d.hook) {
+        document.getElementById('info-trend-hook').textContent = '💡 ' + d.hook;
+        document.getElementById('info-trend-hook').style.display = 'block';
+      }
+    }
+  } catch(e) {
+    showError('err-infoshorts', e.message);
+  } finally {
+    setLoading('btn-info-trend', 'spin-info-trend', false);
+  }
+}
+
 async function generateInfoShorts() {
   const apiKey = localStorage.getItem('ds_api_key') || '';
   const topic = document.getElementById('info-topic').value.trim();
@@ -4222,6 +4252,30 @@ function deleteComedyVideo() {
         🔍 Çoğu insan bilmiyor
       </button>
     </div>
+  </div>
+
+  <div class="field">
+    <label>Kategori (opsiyonel — trend konu bulmak için)</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="info-category" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:10px 12px;">
+        <option value="">— Kategori seç —</option>
+        <option value="Sağlık ve Tıp">Sağlık &amp; Tıp</option>
+        <option value="Dolandırıcılık ve Güvenlik">Dolandırıcılık &amp; Güvenlik</option>
+        <option value="Emeklilik ve Haklar">Emeklilik &amp; Haklar</option>
+        <option value="Teknoloji İpuçları">Teknoloji İpuçları</option>
+        <option value="Para ve Finans">Para &amp; Finans</option>
+        <option value="Psikoloji ve Davranış">Psikoloji &amp; Davranış</option>
+        <option value="Tarih ve Bilinmeyenler">Tarih &amp; Bilinmeyenler</option>
+        <option value="Hukuk ve Haklar">Hukuk &amp; Haklar</option>
+        <option value="Beslenme ve Diyet">Beslenme &amp; Diyet</option>
+        <option value="Bilim ve Doğa">Bilim &amp; Doğa</option>
+      </select>
+      <button onclick="fetchInfoShortsTrend()" id="btn-info-trend" style="padding:10px 16px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:8px;color:#f5c518;font-size:13px;cursor:pointer;white-space:nowrap;">
+        <div class="spinner" id="spin-info-trend"></div>
+        Konu Öner
+      </button>
+    </div>
+    <div id="info-trend-hook" style="display:none;margin-top:6px;padding:8px 12px;background:#1a1a1a;border:1px solid #2a4a1a;border-radius:8px;color:#4ade80;font-size:12px;"></div>
   </div>
 
   <div class="field">
