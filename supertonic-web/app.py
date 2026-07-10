@@ -831,6 +831,13 @@ Rules:
                 if attempt == 2:
                     raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
         scenes = data["scenes"]
+        # Son sahne CTA'sını zorla override — DeepSeek "haberler" yazmasın
+        _info_cta = {
+            "tr": {"youtube": "Beğenmek ve abone olmak için 2 saniye ver!", "instagram": "Takip et ve beğen! 2 saniye yeter!"},
+            "en": {"youtube": "Like and subscribe! Just 2 seconds!", "instagram": "Follow and like! 2 seconds is all it takes!"},
+        }
+        if scenes:
+            scenes[-1]["text"] = _info_cta.get(lang, _info_cta["tr"]).get(platform, "Beğenmek ve abone olmak için 2 saniye ver!")
 
     else:
         # HABER SHORTS — mevcut trend/haber akışı
