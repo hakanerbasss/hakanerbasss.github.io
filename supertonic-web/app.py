@@ -3319,12 +3319,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
                 )
                 if rp.status_code == 200:
                     permalink = rp.json().get("permalink", "")
-            article_id = news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink)
-            news_site.send_push_all(
-                title=title,
-                body=description[:120] if description else title,
-                url=f"{news_site.SITE_URL}/haber/{article_id}",
-            )
+            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink)
         except Exception:
             pass
         return

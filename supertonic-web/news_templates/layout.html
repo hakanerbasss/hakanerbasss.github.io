@@ -60,13 +60,6 @@
     font-size:14px; font-weight:600; color:var(--sub); margin-left:22px;
   }
   nav.top a:hover{ color:var(--ink); }
-  .notif-btn{
-    background:none; border:none; cursor:pointer; font-size:18px;
-    margin-left:14px; padding:2px 4px; line-height:1; opacity:.55;
-    transition:opacity .15s; vertical-align:middle;
-  }
-  .notif-btn:hover{ opacity:1; }
-  .notif-btn.on{ opacity:1; }
   main{ max-width:1080px; margin:0 auto; padding:24px 20px 60px; }
   footer{
     border-top:1px solid var(--line); margin-top:40px; padding:26px 20px;
@@ -153,25 +146,6 @@
   }
   @media (max-width:700px){ .footer-grid{ grid-template-columns:1fr 1fr; } }
 
-  .notif-bar{
-    position:fixed; bottom:0; left:0; right:0; z-index:200;
-    background:#d5000a; color:#fff;
-    display:flex; align-items:center; gap:12px;
-    padding:14px 18px; box-shadow:0 -4px 20px rgba(0,0,0,.18);
-    transform:translateY(100%); transition:transform .35s ease;
-  }
-  .notif-bar.show{ transform:translateY(0); }
-  .notif-bar .nb-txt{ flex:1; font-size:14px; font-weight:600; line-height:1.3; }
-  .notif-bar .nb-txt small{ display:block; font-size:11px; font-weight:400; opacity:.8; margin-top:2px; }
-  .notif-bar .nb-ok{
-    background:#fff; color:#d5000a; border:none; border-radius:8px;
-    padding:9px 18px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;
-  }
-  .notif-bar .nb-x{
-    background:none; border:none; color:#fff; font-size:22px; cursor:pointer;
-    padding:0 4px; line-height:1; opacity:.7;
-  }
-  .notif-bar .nb-x:hover{ opacity:1; }
 </style>
 </head>
 <body>
@@ -185,7 +159,6 @@
       <a href="/haberler">Haberler</a>
       <a href="/hakkinda">Hakkında</a>
       <a href="/iletisim">İletişim</a>
-      <button class="notif-btn" id="notifBtn" title="Bildirim Al" aria-label="Bildirim aç/kapat">🔕</button>
     </nav>
   </div>
 </header>
@@ -219,155 +192,11 @@
   </div>
 </footer>
 
-<div class="notif-bar" id="notifBar" role="banner" aria-live="polite">
-  <div class="nb-txt">
-    🔔 Yeni haberlerden anında haberdar ol!
-    <small>Bildirim açık olunca her yeni haber sana ulaşır.</small>
-  </div>
-  <button class="nb-ok" id="notifBarOk">Aç</button>
-  <button class="nb-x" id="notifBarX" aria-label="Kapat">×</button>
-</div>
-
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/news-sw.js').catch(() => {});
   }
 
-  (function() {
-    const DISMISSED = 'hb-notif-dismissed';
-    const btn  = document.getElementById('notifBtn');
-    const bar  = document.getElementById('notifBar');
-    const barOk = document.getElementById('notifBarOk');
-    const barX  = document.getElementById('notifBarX');
-
-    const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
-    if (!supported) {
-      if (btn) btn.style.display = 'none';
-      return;
-    }
-
-    function urlB64ToUint8(b64) {
-      const pad = '='.repeat((4 - b64.length % 4) % 4);
-      const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
-      return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
-    }
-
-    function setBtn(on) {
-      if (!btn) return;
-      btn.textContent = on ? '🔔' : '🔕';
-      btn.title = on ? 'Bildirimleri kapat' : 'Bildirimleri aç';
-      btn.classList.toggle('on', on);
-    }
-
-    function showBar(denied) {
-      if (!bar) return;
-      if (!denied && localStorage.getItem(DISMISSED)) return;
-      if (denied) {
-        // İzin engellendi — tarayıcı ayarlarına yönlendir
-        bar.querySelector('.nb-txt').innerHTML =
-          '🔕 Bildirimler bu sitede engellenmiş.<small>Adres çubuğundaki 🔒 simgesine tıkla → Bildirimler → İzin Ver</small>';
-        if (barOk) barOk.style.display = 'none';
-      }
-      setTimeout(() => bar.classList.add('show'), 1000);
-    }
-
-    function hideBar() {
-      if (bar) bar.classList.remove('show');
-    }
-
-    async function subscribe() {
-      if (Notification.permission === 'denied') {
-        showBar(true);
-        return false;
-      }
-      try {
-        const reg = await navigator.serviceWorker.ready;
-
-        // İzin iste
-        const perm = await Notification.requestPermission();
-        if (perm === 'denied') { showBar(true); return false; }
-        if (perm !== 'granted') return false;
-
-        // VAPID public key
-        const kr = await fetch('/api/push/vapid-key');
-        if (!kr.ok) { alert('Bildirim servisi şu an aktif değil, lütfen daha sonra deneyin.'); return false; }
-        const { publicKey } = await kr.json();
-
-        // Push aboneliği
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8(publicKey),
-        });
-
-        // Sunucuya kaydet
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sub.toJSON()),
-        });
-
-        setBtn(true);
-        hideBar();
-        localStorage.setItem(DISMISSED, '1');
-        return true;
-      } catch (e) {
-        console.error('Push subscribe hatası:', e);
-        return false;
-      }
-    }
-
-    async function unsubscribe() {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await fetch('/api/push/unsubscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
-          }).catch(() => {});
-          await sub.unsubscribe();
-        }
-        setBtn(false);
-        localStorage.removeItem(DISMISSED);
-      } catch (e) {
-        console.error('Push unsubscribe hatası:', e);
-      }
-    }
-
-    // Başlangıç durumu
-    navigator.serviceWorker.ready.then(async reg => {
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        setBtn(true);
-      } else {
-        setBtn(false);
-        const perm = Notification.permission;
-        if (perm === 'denied') showBar(true);
-        else showBar(false); // 'default' veya 'granted' ama abonelik yoksa banner göster
-      }
-    });
-
-    // Banner butonları
-    if (barOk) barOk.addEventListener('click', subscribe);
-    if (barX)  barX.addEventListener('click', () => { localStorage.setItem(DISMISSED, '1'); hideBar(); });
-
-    // Header zil butonu — her zaman abonelik akışını tetikler
-    if (btn) {
-      btn.addEventListener('click', async () => {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await unsubscribe();
-        } else {
-          // localStorage flag'ini temizle, ban yoksa banner çıkar; yoksa direkt dene
-          localStorage.removeItem(DISMISSED);
-          const ok = await subscribe();
-          if (!ok && Notification.permission === 'default') showBar(false);
-        }
-      });
-    }
-  })();
 </script>
 </body>
 </html>

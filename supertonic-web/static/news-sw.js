@@ -20,31 +20,6 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
-self.addEventListener('push', (e) => {
-  const data = e.data ? e.data.json() : {};
-  e.waitUntil(
-    self.registration.showNotification(data.title || 'Yeni Haber', {
-      body: data.body || '',
-      icon: data.icon || '/static/news-icons/icon-192.png',
-      badge: '/static/news-icons/icon-192.png',
-      data: { url: data.url || '/haberler' },
-    })
-  );
-});
-
-self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
-  const url = e.notification.data?.url || '/haberler';
-  e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
-      for (const w of wins) {
-        if (w.url.includes(url) && 'focus' in w) return w.focus();
-      }
-      if (clients.openWindow) return clients.openWindow(url);
-    })
-  );
-});
-
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
