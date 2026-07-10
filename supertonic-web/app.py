@@ -767,6 +767,7 @@ async def _generate_shorts_core(
     custom_image_paths: list = None,
     spiker_mode: bool = False,
     avatar_path: Path = None,
+    info_format: str = None,
 ):
     import json
     import httpx
@@ -779,88 +780,136 @@ async def _generate_shorts_core(
     pexels_key = get_pexels_key()
 
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
-
-    # Trend verileri al
-    trend_data = get_trends(region_code=region.upper(), lang=lang)
-    trend_topics = ", ".join(trend_data["topics"][:12])
-    yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
-    trend_tags = ", ".join(trend_data["hashtags"][:10])
-
     lang_name = LANG_MAP.get(lang, "Turkish")
-    exclude_instruction = ""
-    if exclude_topics.strip():
-        exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
+    data = None
+    scenes = []
 
-    # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
-    # Konu belirlenmemişse trend listesinin en üstünden seç — Google Trends zaten
-    # popülerlik sırasıyla veriyor, yapay öncelik eklemeye gerek yok
-    gnews_data = {}
-    search_query = topic.strip()
-    if not search_query:
-        try:
-            sel_prompt = (
-                f"From this list of trending topics, pick ONE to make a breaking news Short video about. "
-                f"The list is already sorted by popularity — prefer topics near the top. "
-                f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
-                + (f"\n\nAvoid (already posted today): {exclude_topics}" if exclude_topics.strip() else "")
-            )
-            sel_resp = client.chat.completions.create(
+    if info_format:
+        # BİLGİ SHORTS — eğitici/bilgilendirici format, trend/haber atlanır
+        _format_hooks = {
+            "biliyormuydunuz": "FIRST scene MUST start with 'Bunu biliyor muydunuz?' — open with a shocking or surprising fact that stops the scroll.",
+            "aklinizda": "FIRST scene MUST start with 'Aklınızda bulunsun' — give a practical, life-saving tip the viewer can use today.",
+            "30saniye": "FIRST scene MUST start with '30 saniyede öğrenin' — rapid-fire, one key fact per scene, punchy and fast.",
+            "cogusinsan": "FIRST scene MUST start with 'Çoğu insan bunu bilmiyor' — revelation format, viewer feels they're learning an insider secret.",
+        }
+        format_rule = _format_hooks.get(info_format, _format_hooks["biliyormuydunuz"])
+        info_prompt = f"""Create a YouTube Shorts informational/educational video in {lang_name}.
+
+Topic: {topic}
+
+Return ONLY valid JSON, no markdown:
+{{
+  "title": "catchy YouTube title (max 80 chars, in {lang_name})",
+  "hashtags": ["Shorts", "bilgi", "keşfet", "topic", "tags"],
+  "scenes": [
+    {{
+      "text": "narration text (1-2 short punchy sentences)",
+      "keyword": "english search keyword for stock photo (2-3 words)"
+    }}
+  ]
+}}
+
+Rules:
+- 5 to 7 scenes, total narration under 55 seconds
+- {format_rule}
+- NEVER use abbreviations; write full names for text-to-speech
+- NEVER reference real footage or photos in narration — storytelling and facts only
+- LAST scene MUST end with (in {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!"
+- hashtags: 10-15 tags. Always include "bilgi", "öğrendim", "keşfet", "viral", "Shorts". No # symbol, NO spaces within a tag.
+- keyword: English, 2-3 words, visual and specific"""
+        for attempt in range(3):
+            _resp = client.chat.completions.create(
                 model="deepseek-chat",
-                messages=[{"role": "user", "content": sel_prompt}],
-                temperature=0.3,
-                max_tokens=60,
+                messages=[{"role": "user", "content": info_prompt}],
+                temperature=0.7,
             )
-            search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
-        except Exception:
-            search_query = trend_data["topics"][0] if trend_data["topics"] else ""
-    if search_query:
-        gnews_data = await fetch_gnews_summary(search_query, lang)
+            try:
+                data = _parse_llm_json(_resp.choices[0].message.content)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
+        scenes = data["scenes"]
 
-    news_context_instruction = ""
-    if gnews_data.get("found"):
-        news_context_instruction = (
-            f"\n\nREAL NEWS VERIFICATION — Use these verified facts (exact names, titles, locations MUST match):\n"
-            f"{gnews_data['context_text']}\n"
-            f"CRITICAL RULES FOR FACTS:\n"
-            f"- Do NOT use your training data for names, titles or positions — it is OUTDATED.\n"
-            f"- Use ONLY the names and titles written in the news context above.\n"
-            f"- Political positions change: a person who was a leader in the past may no longer be. "
-            f"Use the title given in the news context, not what you remember from training.\n"
-            f"- Example of forbidden error: calling Assad 'Suriye Devlet Başkanı' — he fled in Dec 2024; "
-            f"the news context will name the correct current leader.\n"
-            f"- If the news context does not mention a title for a person, describe them by their action only.\n"
-        )
-    # ─────────────────────────────────────────────────────────────────────────
-
-    if topic.strip():
-        topic_instruction = (
-            f"Make a Short video ONLY about this specific topic: {topic}\n"
-            f"IMPORTANT: Cover ONLY this topic in depth. Do NOT include or mention other news stories."
-        )
-    elif lang == "en":
-        topic_instruction = (
-            f"Choose ONE of these TODAY'S trending news topics for a US/English-speaking audience:\n{trend_topics}\n"
-            f"PRIORITY ORDER: 1) Trump or US President news  2) US politics / Congress / White House  "
-            f"3) Major US foreign policy (wars, sanctions, NATO)  4) Breaking global news that impacts the US  "
-            f"5) Any other trending topic.\n"
-            f"Always pick the HIGHEST priority category available in the list above."
-        )
     else:
-        topic_instruction = (
-            f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}\n"
-            f"PRIORITY ORDER (always pick the highest available priority):\n"
-            f"1) Gurbetçi / yurt dışında yaşayan Türkleri doğrudan etkileyen haberler "
-            f"(askerlik erteleme/muafiyet, emeklilik müjdesi, SGK yurt dışı, pasaport/vize, "
-            f"çifte vatandaşlık, döviz/transfer, yurt dışı düzenleme/kanun)\n"
-            f"2) Türkiye ekonomisini doğrudan etkileyen haberler (enflasyon, döviz kuru, zam, maaş, emekli maaşı)\n"
-            f"3) Afet / doğal felaket / kritik uyarı haberleri\n"
-            f"4) Listede en üstte olan popüler trend haber\n"
-            f"If the trending list has NO topics matching priority 1, 2 or 3, pick by popularity as usual.\n"
-            f"Do NOT force a gurbetçi angle if the topic is not genuinely about expats.\n"
-            f"{get_diversity_instruction()}"
-        )
-    yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
-    prompt = f"""Create a YouTube Shorts video.
+        # HABER SHORTS — mevcut trend/haber akışı
+        trend_data = get_trends(region_code=region.upper(), lang=lang)
+        trend_topics = ", ".join(trend_data["topics"][:12])
+        yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
+        trend_tags = ", ".join(trend_data["hashtags"][:10])
+
+        exclude_instruction = ""
+        if exclude_topics.strip():
+            exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
+
+        # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
+        gnews_data = {}
+        search_query = topic.strip()
+        if not search_query:
+            try:
+                sel_prompt = (
+                    f"From this list of trending topics, pick ONE to make a breaking news Short video about. "
+                    f"The list is already sorted by popularity — prefer topics near the top. "
+                    f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
+                    + (f"\n\nAvoid (already posted today): {exclude_topics}" if exclude_topics.strip() else "")
+                )
+                sel_resp = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[{"role": "user", "content": sel_prompt}],
+                    temperature=0.3,
+                    max_tokens=60,
+                )
+                search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
+            except Exception:
+                search_query = trend_data["topics"][0] if trend_data["topics"] else ""
+        if search_query:
+            gnews_data = await fetch_gnews_summary(search_query, lang)
+
+        news_context_instruction = ""
+        if gnews_data.get("found"):
+            news_context_instruction = (
+                f"\n\nREAL NEWS VERIFICATION — Use these verified facts (exact names, titles, locations MUST match):\n"
+                f"{gnews_data['context_text']}\n"
+                f"CRITICAL RULES FOR FACTS:\n"
+                f"- Do NOT use your training data for names, titles or positions — it is OUTDATED.\n"
+                f"- Use ONLY the names and titles written in the news context above.\n"
+                f"- Political positions change: a person who was a leader in the past may no longer be. "
+                f"Use the title given in the news context, not what you remember from training.\n"
+                f"- Example of forbidden error: calling Assad 'Suriye Devlet Başkanı' — he fled in Dec 2024; "
+                f"the news context will name the correct current leader.\n"
+                f"- If the news context does not mention a title for a person, describe them by their action only.\n"
+            )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        if topic.strip():
+            topic_instruction = (
+                f"Make a Short video ONLY about this specific topic: {topic}\n"
+                f"IMPORTANT: Cover ONLY this topic in depth. Do NOT include or mention other news stories."
+            )
+        elif lang == "en":
+            topic_instruction = (
+                f"Choose ONE of these TODAY'S trending news topics for a US/English-speaking audience:\n{trend_topics}\n"
+                f"PRIORITY ORDER: 1) Trump or US President news  2) US politics / Congress / White House  "
+                f"3) Major US foreign policy (wars, sanctions, NATO)  4) Breaking global news that impacts the US  "
+                f"5) Any other trending topic.\n"
+                f"Always pick the HIGHEST priority category available in the list above."
+            )
+        else:
+            topic_instruction = (
+                f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}\n"
+                f"PRIORITY ORDER (always pick the highest available priority):\n"
+                f"1) Gurbetçi / yurt dışında yaşayan Türkleri doğrudan etkileyen haberler "
+                f"(askerlik erteleme/muafiyet, emeklilik müjdesi, SGK yurt dışı, pasaport/vize, "
+                f"çifte vatandaşlık, döviz/transfer, yurt dışı düzenleme/kanun)\n"
+                f"2) Türkiye ekonomisini doğrudan etkileyen haberler (enflasyon, döviz kuru, zam, maaş, emekli maaşı)\n"
+                f"3) Afet / doğal felaket / kritik uyarı haberleri\n"
+                f"4) Listede en üstte olan popüler trend haber\n"
+                f"If the trending list has NO topics matching priority 1, 2 or 3, pick by popularity as usual.\n"
+                f"Do NOT force a gurbetçi angle if the topic is not genuinely about expats.\n"
+                f"{get_diversity_instruction()}"
+            )
+        yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
+        prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
 {topic_instruction}
 {exclude_instruction}{news_context_instruction}Suggested hashtags: {trend_tags}{yt_tag_instruction}
@@ -889,42 +938,41 @@ Rules:
 - hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
 """
 
-    data = None
-    for attempt in range(3):
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-        )
-        try:
-            data = _parse_llm_json(response.choices[0].message.content)
-            break
-        except Exception:
-            if attempt == 2:
-                raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
+        for attempt in range(3):
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+            )
+            try:
+                data = _parse_llm_json(response.choices[0].message.content)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
 
-    scenes = data["scenes"]
+        scenes = data["scenes"]
 
-    if lang == "tr":
-        try:
-            add_recent_category(news_site.guess_category(data.get("title", ""))[0])
-        except Exception:
-            pass
+        if lang == "tr":
+            try:
+                add_recent_category(news_site.guess_category(data.get("title", ""))[0])
+            except Exception:
+                pass
 
-    # Son sahne TTS metnini platforma göre sabit CTA ile değiştir
-    if scenes:
-        _cta = {
-            "tr": {
-                "youtube": "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
-                "instagram": "Takip et ve beğen! Her haberi ilk sen gör! İki saniye yeterli!",
-            },
-            "en": {
-                "youtube": "Like, subscribe and drop a comment! Just 2 seconds!",
-                "instagram": "Follow and like! Be the first to see every update!",
-            },
-        }
-        _lang_cta = _cta.get(lang, _cta["tr"])
-        scenes[-1]["text"] = _lang_cta.get(platform, _lang_cta["youtube"])
+        # Son sahne TTS metnini platforma göre sabit CTA ile değiştir (haber shorts)
+        if scenes:
+            _cta = {
+                "tr": {
+                    "youtube": "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
+                    "instagram": "Takip et ve beğen! Her haberi ilk sen gör! İki saniye yeterli!",
+                },
+                "en": {
+                    "youtube": "Like, subscribe and drop a comment! Just 2 seconds!",
+                    "instagram": "Follow and like! Be the first to see every update!",
+                },
+            }
+            _lang_cta = _cta.get(lang, _cta["tr"])
+            scenes[-1]["text"] = _lang_cta.get(platform, _lang_cta["youtube"])
 
     uid = uuid.uuid4().hex
     scene_dir = UPLOAD_DIR / uid
@@ -1333,10 +1381,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -1403,6 +1451,35 @@ async def generate_shorts_async_endpoint(
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
     asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path))
+    return {"ok": True}
+
+
+@app.post("/api/generate-info-shorts-async")
+async def generate_info_shorts_async(
+    topic: str = Form(...),
+    info_format: str = Form("biliyormuydunuz"),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    use_video: str = Form("false"),
+    platform: str = Form("youtube"),
+):
+    global _manual_shorts_lock
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    if not topic.strip():
+        raise HTTPException(400, "Konu boş olamaz")
+    if _manual_shorts_lock:
+        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+
+    _manual_shorts_lock = True
+    started_at = time.time()
+    _save_manual_shorts_log("running", started_at=started_at)
+    asyncio.create_task(_shorts_job_runner(
+        topic, api_key, lang, voice, speed, "", "TR", use_video, platform,
+        spiker_mode=False, avatar_path=None, info_format=info_format,
+    ))
     return {"ok": True}
 
 

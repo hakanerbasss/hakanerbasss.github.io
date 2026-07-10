@@ -287,6 +287,7 @@
   <div class="tab" onclick="switchTab('analytics')">📊 Analitik</div>
   <div class="tab" onclick="switchTab('iganalytics')">📸 IG Analitik</div>
   <div class="tab" onclick="switchTab('comedy')">📰 Komik Haber</div>
+  <div class="tab" onclick="switchTab('infoshorts')">💡 Bilgi Shorts</div>
 </div>
 
 <!-- TEXT TO SPEECH -->
@@ -1633,8 +1634,8 @@ async function loadMeta() {
   voices = d.voices;
   langs = d.languages;
 
-  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice', 'lv-voice', 'tnlv-voice'];
-  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang', 'lv-lang', 'tnlv-lang'];
+  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice', 'lv-voice', 'tnlv-voice', 'info-voice'];
+  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang', 'lv-lang', 'tnlv-lang', 'info-lang'];
   const translateSelect = document.getElementById('vid-translate');
   const sourceSelect = document.getElementById('tr-source');
 
@@ -1669,7 +1670,7 @@ async function loadMeta() {
 }
 
 function switchTab(name) {
-  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy'];
+  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy','infoshorts'];
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', names[i] === name);
   });
@@ -1677,6 +1678,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'tnlv') updateTNLVApiKeyStatus();
   if (name === 'longvideo') { updateLVApiKeyStatus(); checkLVStatusOnLoad(); }
+  if (name === 'infoshorts') updateInfoApiKeyStatus();
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
 }
@@ -2526,6 +2528,7 @@ function updateLVApiKeyStatus() {
 }
 updateLVApiKeyStatus();
 updateTNLVApiKeyStatus();
+updateInfoApiKeyStatus();
 
 function saveApiKey() {
   const v = dsKey.value.trim();
@@ -2536,6 +2539,7 @@ function saveApiKey() {
   s.style.color = '#4ade80';
   updateLVApiKeyStatus();
   updateTNLVApiKeyStatus();
+  updateInfoApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
 }
 function clearApiKey() {
@@ -2545,6 +2549,7 @@ function clearApiKey() {
   s.textContent = 'Temizlendi.'; s.style.color = '#f87171';
   updateLVApiKeyStatus();
   updateTNLVApiKeyStatus();
+  updateInfoApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = '#444'; }, 2000);
 }
 
@@ -2621,6 +2626,92 @@ function updateTNLVApiKeyStatus() {
   el.innerHTML = key
     ? '<span style="color:#4ade80;">✓ API key var (Ayarlar\'dan değiştirilebilir)</span>'
     : '<span style="color:#f87171;">⚠ API key girilmedi — Ayarlar\'dan ekle</span>';
+}
+
+// ── Bilgi Shorts ──────────────────────────────────────────────────────────────
+let _infoSelectedFormat = 'biliyormuydunuz';
+
+function selectInfoFormat(btn) {
+  document.querySelectorAll('.info-fmt-btn').forEach(b => {
+    b.style.borderColor = '#2a2a2a';
+    b.style.background = '#111';
+    b.style.color = '#aaa';
+  });
+  btn.style.borderColor = '#f5c518';
+  btn.style.background = '#1a1a00';
+  btn.style.color = '#f5c518';
+  _infoSelectedFormat = btn.dataset.fmt;
+}
+
+function updateInfoApiKeyStatus() {
+  const key = localStorage.getItem('ds_api_key') || '';
+  const el = document.getElementById('info-apikey-status');
+  if (!el) return;
+  el.innerHTML = key
+    ? '<span style="color:#4ade80;">✓ API key var (Ayarlar\'dan değiştirilebilir)</span>'
+    : '<span style="color:#f87171;">⚠ API key girilmedi — Ayarlar\'dan ekle</span>';
+}
+
+let _infoShortsPollTimer = null;
+
+async function generateInfoShorts() {
+  const apiKey = localStorage.getItem('ds_api_key') || '';
+  const topic = document.getElementById('info-topic').value.trim();
+  if (!apiKey) return showError('err-infoshorts', 'Önce "Shorts Üret" sekmesinden DeepSeek API key kaydedin.');
+  if (!topic) return showError('err-infoshorts', 'Konu boş olamaz.');
+  showError('err-infoshorts', '');
+  document.getElementById('result-infoshorts').classList.remove('show');
+
+  const fd = new FormData();
+  fd.append('topic', topic);
+  fd.append('info_format', _infoSelectedFormat);
+  fd.append('api_key', apiKey);
+  fd.append('lang', document.getElementById('info-lang').value);
+  fd.append('voice', document.getElementById('info-voice').value);
+  fd.append('speed', document.getElementById('info-speed').value);
+  fd.append('use_video', document.getElementById('info-use-video').checked ? 'true' : 'false');
+
+  try {
+    setLoading('btn-infoshorts', 'spin-infoshorts', true);
+    const r = await fetch('/api/generate-info-shorts-async', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    document.getElementById('infoshorts-progress').style.display = 'block';
+    document.getElementById('infoshorts-progress').textContent = 'Üretim başladı. Arka planda devam eder…';
+    _startInfoShortsPolling();
+  } catch(e) {
+    setLoading('btn-infoshorts', 'spin-infoshorts', false);
+    showError('err-infoshorts', e.message);
+  }
+}
+
+function _startInfoShortsPolling() {
+  if (_infoShortsPollTimer) return;
+  _infoShortsPollTimer = setInterval(async () => {
+    try {
+      const s = await fetch('/api/manual-shorts/status').then(r => r.json());
+      if (s.status === 'done' && s.result) {
+        clearInterval(_infoShortsPollTimer); _infoShortsPollTimer = null;
+        document.getElementById('infoshorts-progress').style.display = 'none';
+        setLoading('btn-infoshorts', 'spin-infoshorts', false);
+        document.getElementById('infoshorts-title-out').textContent = s.result.title || '';
+        document.getElementById('infoshorts-video').src = s.result.video || '';
+        document.getElementById('dl-infoshorts').href = s.result.video || '';
+        document.getElementById('result-infoshorts').classList.add('show');
+      } else if (s.status === 'error') {
+        clearInterval(_infoShortsPollTimer); _infoShortsPollTimer = null;
+        document.getElementById('infoshorts-progress').style.display = 'none';
+        setLoading('btn-infoshorts', 'spin-infoshorts', false);
+        showError('err-infoshorts', s.error || 'Üretim hatası');
+      } else if (s.status === 'running') {
+        const elapsed = s.elapsed ? ` (${Math.round(s.elapsed)}s)` : '';
+        document.getElementById('infoshorts-progress').textContent = `Üretim devam ediyor…${elapsed}`;
+      }
+    } catch(e) {}
+  }, 4000);
 }
 
 async function generateTrendLongVideo() {
@@ -4107,6 +4198,87 @@ function deleteComedyVideo() {
       <button onclick="deleteComedyVideo()" style="background:#333;color:#ccc;">🗑 Sil</button>
     </div>
     <div id="comedy-send-status" style="margin-top:10px;font-size:13px;"></div>
+  </div>
+</div>
+
+<!-- BİLGİ SHORTS PANELİ -->
+<div class="panel" id="tab-infoshorts">
+  <h2 style="color:#fff;margin-bottom:4px;">💡 Bilgi Shorts</h2>
+  <p style="color:#666;font-size:13px;margin-bottom:20px;">Eğitici, bilgilendirici kısa videolar — "Bunu biliyor muydunuz?" formatında. Haber değil, bilgi.</p>
+
+  <div class="field">
+    <label>Format</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="info-format-grid">
+      <button class="info-fmt-btn active" data-fmt="biliyormuydunuz" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid #f5c518;background:#1a1a00;color:#f5c518;font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
+        🤯 Bunu biliyor muydunuz?
+      </button>
+      <button class="info-fmt-btn" data-fmt="aklinizda" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid #2a2a2a;background:#111;color:#aaa;font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
+        📌 Aklınızda bulunsun
+      </button>
+      <button class="info-fmt-btn" data-fmt="30saniye" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid #2a2a2a;background:#111;color:#aaa;font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
+        ⚡ 30 saniyede öğren
+      </button>
+      <button class="info-fmt-btn" data-fmt="cogusinsan" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid #2a2a2a;background:#111;color:#aaa;font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
+        🔍 Çoğu insan bilmiyor
+      </button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Konu</label>
+    <textarea id="info-topic" placeholder="Örn: Telefon dolandırıcılığı, Emeklilik hakları, Sigorta ipuçları, Sağlıklı uyku..." style="min-height:80px;"></textarea>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Dil</label>
+      <select id="info-lang"></select>
+    </div>
+    <div class="field">
+      <label>Ses</label>
+      <select id="info-voice"></select>
+    </div>
+    <div class="field">
+      <label>Hız: <span id="speed-val-info">1.0</span>x</label>
+      <div class="speed-row">
+        <input type="range" id="info-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          oninput="document.getElementById('speed-val-info').textContent = parseFloat(this.value).toFixed(2)">
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <label class="toggle-switch" style="margin:0;">
+      <input type="checkbox" id="info-use-video">
+      <span class="toggle-slider"></span>
+    </label>
+    <div>
+      <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎬 Pexels Video Klip Kullan</div>
+      <div style="font-size:11px;color:#555;margin-top:2px;">Fotoğraf yerine Pexels'tan stock video klipleri kullanır</div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>DeepSeek API Key</label>
+    <div id="info-apikey-status" style="font-size:13px;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#888;">
+      Kontrol ediliyor...
+    </div>
+  </div>
+
+  <button onclick="generateInfoShorts()" id="btn-infoshorts">
+    <div class="spinner" id="spin-infoshorts"></div>
+    Bilgi Videosu Üret
+  </button>
+
+  <div class="error" id="err-infoshorts"></div>
+  <div id="infoshorts-progress" style="display:none;margin-top:10px;padding:10px 14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#f5c518;font-size:13px;"></div>
+
+  <div class="result" id="result-infoshorts">
+    <p>Başlık</p>
+    <div class="transcript" id="infoshorts-title-out" style="font-size:15px;font-weight:600;color:#fff;"></div>
+    <p style="margin-top:12px">Video</p>
+    <video id="infoshorts-video" controls style="width:100%;margin-top:8px;border-radius:6px;max-width:360px;"></video>
+    <a id="dl-infoshorts" class="dl-btn" download="bilgi-short.mp4">İndir</a>
   </div>
 </div>
 
