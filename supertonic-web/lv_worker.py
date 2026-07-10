@@ -275,22 +275,20 @@ def overlay_lv_title_banner(photo_path: Path, title: str) -> None:
         fp = next((f for f in FONT_CANDIDATES if Path(f).exists()), None)
         font_big = ImageFont.truetype(fp, 56) if fp else ImageFont.load_default()
         font_sm  = ImageFont.truetype(fp, 32) if fp else ImageFont.load_default()
-        overlay = PILImage.new("RGBA", (1920, 200), (0, 0, 0, 0))
+        overlay = PILImage.new("RGBA", (1920, 180), (0, 0, 0, 0))
         od = ImageDraw.Draw(overlay)
-        od.rectangle([(0, 0), (1920, 200)], fill=(10, 10, 20, 210))
-        img.paste(PILImage.new("RGB", (1920, 200), (10, 10, 20)), (0, 0), mask=overlay.split()[3])
-        draw.rectangle([(40, 20), (240, 60)], fill=(200, 0, 0))
-        draw.text((50, 22), "SON DAKİKA", fill=(255, 255, 255), font=font_sm)
+        od.rectangle([(0, 0), (1920, 180)], fill=(10, 10, 20, 210))
+        img.paste(PILImage.new("RGB", (1920, 180), (10, 10, 20)), (0, 0), mask=overlay.split()[3])
         words = title.split()
         line1, line2 = [], []
         for w in words:
-            if draw.textlength(" ".join(line1 + [w]), font=font_big) < 1700:
+            if draw.textlength(" ".join(line1 + [w]), font=font_big) < 1800:
                 line1.append(w)
             else:
                 line2.append(w)
-        draw.text((40, 70), " ".join(line1), fill=(255, 220, 0), font=font_big, stroke_width=2, stroke_fill=(0, 0, 0))
+        draw.text((40, 20), " ".join(line1), fill=(255, 220, 0), font=font_big, stroke_width=2, stroke_fill=(0, 0, 0))
         if line2:
-            draw.text((40, 135), " ".join(line2[:8]), fill=(255, 220, 0), font=font_big, stroke_width=2, stroke_fill=(0, 0, 0))
+            draw.text((40, 90), " ".join(line2[:8]), fill=(255, 220, 0), font=font_big, stroke_width=2, stroke_fill=(0, 0, 0))
         img.save(str(photo_path), "JPEG", quality=90)
     except Exception:
         pass
@@ -329,8 +327,6 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path) -> None:
             try: return ImageFont.truetype(fp, sz)
             except Exception: pass
         return ImageFont.load_default()
-    draw.rectangle([(30, 30), (260, 80)], fill=(213, 0, 0))
-    draw.text((42, 36), "SON DAKİKA", fill=(255, 255, 255), font=lf(32))
     words = title.upper().split()
     lines, line = [], []
     for w in words:
@@ -340,7 +336,7 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path) -> None:
             if line: lines.append(" ".join(line))
             line = [w]
     if line: lines.append(" ".join(line))
-    y = 110
+    y = 60
     for ln in lines[:3]:
         draw.text((30, y), ln, fill=(255, 208, 0), font=lf(52), stroke_width=2, stroke_fill=(0, 0, 0))
         y += 70
