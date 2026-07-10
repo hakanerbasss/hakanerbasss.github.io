@@ -343,8 +343,8 @@
       } else {
         setBtn(false);
         const perm = Notification.permission;
-        if (perm === 'default') showBar(false);
-        else if (perm === 'denied') showBar(true);
+        if (perm === 'denied') showBar(true);
+        else showBar(false); // 'default' veya 'granted' ama abonelik yoksa banner göster
       }
     });
 
