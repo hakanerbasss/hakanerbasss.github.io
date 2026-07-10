@@ -152,6 +152,26 @@
     text-align:center; color:var(--sub); font-size:12px;
   }
   @media (max-width:700px){ .footer-grid{ grid-template-columns:1fr 1fr; } }
+
+  .notif-bar{
+    position:fixed; bottom:0; left:0; right:0; z-index:200;
+    background:#d5000a; color:#fff;
+    display:flex; align-items:center; gap:12px;
+    padding:14px 18px; box-shadow:0 -4px 20px rgba(0,0,0,.18);
+    transform:translateY(100%); transition:transform .35s ease;
+  }
+  .notif-bar.show{ transform:translateY(0); }
+  .notif-bar .nb-txt{ flex:1; font-size:14px; font-weight:600; line-height:1.3; }
+  .notif-bar .nb-txt small{ display:block; font-size:11px; font-weight:400; opacity:.8; margin-top:2px; }
+  .notif-bar .nb-ok{
+    background:#fff; color:#d5000a; border:none; border-radius:8px;
+    padding:9px 18px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;
+  }
+  .notif-bar .nb-x{
+    background:none; border:none; color:#fff; font-size:22px; cursor:pointer;
+    padding:0 4px; line-height:1; opacity:.7;
+  }
+  .notif-bar .nb-x:hover{ opacity:1; }
 </style>
 </head>
 <body>
@@ -198,14 +218,30 @@
     &copy; {{ CURRENT_YEAR }} Hakan Erbaş &middot; Bu içerikler yapay zeka destekli olarak üretilmiştir.
   </div>
 </footer>
+
+<div class="notif-bar" id="notifBar" role="banner" aria-live="polite">
+  <div class="nb-txt">
+    🔔 Yeni haberlerden anında haberdar ol!
+    <small>Bildirim açık olunca her yeni haber sana ulaşır.</small>
+  </div>
+  <button class="nb-ok" id="notifBarOk">Aç</button>
+  <button class="nb-x" id="notifBarX" aria-label="Kapat">×</button>
+</div>
+
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/news-sw.js').catch(() => {});
   }
 
   (function() {
-    const btn = document.getElementById('notifBtn');
-    if (!btn || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    const DISMISSED = 'hb-notif-dismissed';
+    const btn  = document.getElementById('notifBtn');
+    const bar  = document.getElementById('notifBar');
+    const barOk = document.getElementById('notifBarOk');
+    const barX  = document.getElementById('notifBarX');
+
+    const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+    if (!supported) {
       if (btn) btn.style.display = 'none';
       return;
     }
@@ -216,48 +252,103 @@
       return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
     }
 
-    function setBtn(subscribed) {
-      btn.textContent = subscribed ? '🔔' : '🔕';
-      btn.title = subscribed ? 'Bildirimleri kapat' : 'Yeni haberlerden haberdar ol';
-      btn.classList.toggle('on', subscribed);
+    function setBtn(on) {
+      if (!btn) return;
+      btn.textContent = on ? '🔔' : '🔕';
+      btn.title = on ? 'Bildirimleri kapat' : 'Bildirimleri aç';
+      btn.classList.toggle('on', on);
     }
 
-    navigator.serviceWorker.ready.then(async reg => {
-      const sub = await reg.pushManager.getSubscription();
-      setBtn(!!sub);
-    });
+    function showBar() {
+      if (!bar || localStorage.getItem(DISMISSED)) return;
+      setTimeout(() => bar.classList.add('show'), 1800);
+    }
 
-    btn.addEventListener('click', async () => {
-      const reg = await navigator.serviceWorker.ready;
-      const existing = await reg.pushManager.getSubscription();
-      if (existing) {
-        await existing.unsubscribe();
-        await fetch('/api/push/unsubscribe', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({endpoint: existing.endpoint}),
-        }).catch(() => {});
-        setBtn(false);
-        return;
-      }
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') return;
+    function hideBar() {
+      if (bar) bar.classList.remove('show');
+    }
+
+    async function subscribe() {
       try {
-        const r = await fetch('/api/push/vapid-key');
-        if (!r.ok) return;
-        const {publicKey} = await r.json();
+        const reg = await navigator.serviceWorker.ready;
+
+        // İzin iste
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return false;
+
+        // VAPID public key
+        const kr = await fetch('/api/push/vapid-key');
+        if (!kr.ok) { console.error('VAPID key alınamadı:', kr.status); return false; }
+        const { publicKey } = await kr.json();
+
+        // Push aboneliği
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlB64ToUint8(publicKey),
         });
-        await fetch('/api/push/subscribe', {
+
+        // Sunucuya kaydet
+        const sr = await fetch('/api/push/subscribe', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(sub.toJSON()),
         });
+        if (!sr.ok) { console.error('Abonelik kaydedilemedi:', sr.status); return false; }
+
         setBtn(true);
-      } catch(e) { console.error('Push subscribe:', e); }
+        hideBar();
+        localStorage.setItem(DISMISSED, '1');
+        return true;
+      } catch (e) {
+        console.error('Push subscribe hatası:', e);
+        return false;
+      }
+    }
+
+    async function unsubscribe() {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch('/api/push/unsubscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          }).catch(() => {});
+          await sub.unsubscribe();
+        }
+        setBtn(false);
+        localStorage.removeItem(DISMISSED);
+      } catch (e) {
+        console.error('Push unsubscribe hatası:', e);
+      }
+    }
+
+    // Başlangıç durumu
+    navigator.serviceWorker.ready.then(async reg => {
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        setBtn(true);
+      } else if (Notification.permission === 'default') {
+        setBtn(false);
+        showBar();
+      } else {
+        setBtn(false);
+      }
     });
+
+    // Banner butonları
+    if (barOk) barOk.addEventListener('click', subscribe);
+    if (barX)  barX.addEventListener('click', () => { localStorage.setItem(DISMISSED, '1'); hideBar(); });
+
+    // Header zil butonu
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) { await unsubscribe(); } else { await subscribe(); }
+      });
+    }
   })();
 </script>
 </body>
