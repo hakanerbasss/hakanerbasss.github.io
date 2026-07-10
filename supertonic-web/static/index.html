@@ -665,8 +665,28 @@
   </div>
 
   <div class="field">
-    <label>Konu</label>
-    <textarea id="lv-topic" placeholder="Örn: Pamukkale travertenleri nasıl oluşur, Kuantum bilgisayarlar nedir, Osmanlı İmparatorluğu'nun çöküşü..." style="min-height:90px;"></textarea>
+    <div style="display:flex;gap:0;margin-bottom:10px;border:1px solid #2a2a2a;border-radius:8px;overflow:hidden;">
+      <button id="lv-mode-topic" onclick="setLVMode('topic')" style="flex:1;padding:9px 12px;background:#f5c518;border:none;border-radius:0;color:#111;font-size:13px;font-weight:700;cursor:pointer;">Konu Yaz</button>
+      <button id="lv-mode-file" onclick="setLVMode('file')" style="flex:1;padding:9px 12px;background:#2a2a2a;border:none;border-radius:0;color:#888;font-size:13px;font-weight:600;cursor:pointer;">Senaryo Dosyası Yükle</button>
+    </div>
+
+    <div id="lv-topic-wrap">
+      <label>Konu</label>
+      <textarea id="lv-topic" placeholder="Örn: Pamukkale travertenleri nasıl oluşur, Kuantum bilgisayarlar nedir, Osmanlı İmparatorluğu'nun çöküşü..." style="min-height:90px;"></textarea>
+    </div>
+
+    <div id="lv-file-wrap" style="display:none;">
+      <label>Senaryo Dosyası (.txt)</label>
+      <div id="lv-drop-zone" onclick="document.getElementById('lv-script-file').click()"
+        style="border:2px dashed #3a3a3a;border-radius:10px;padding:28px 20px;text-align:center;cursor:pointer;color:#888;font-size:13px;transition:border-color .2s,background .2s;"
+        ondragover="event.preventDefault();this.style.borderColor='#f5c518';"
+        ondragleave="this.style.borderColor='#3a3a3a';"
+        ondrop="event.preventDefault();this.style.borderColor='#3a3a3a';handleLVFileDrop(event.dataTransfer.files[0]);">
+        <div style="font-size:28px;margin-bottom:8px;">📄</div>
+        <span id="lv-file-name">Dosya seç veya buraya sürükle</span>
+      </div>
+      <input type="file" id="lv-script-file" accept=".txt" style="display:none;" onchange="handleLVFileSelect(this.files[0])">
+    </div>
   </div>
 
   <div class="controls">
@@ -1750,34 +1770,73 @@ function _startLVPolling() {
   }, 4000);
 }
 
+let _lvMode = 'topic';
+let _lvScriptFile = null;
+
+function setLVMode(mode) {
+  _lvMode = mode;
+  document.getElementById('lv-topic-wrap').style.display = mode === 'topic' ? '' : 'none';
+  document.getElementById('lv-file-wrap').style.display = mode === 'file' ? '' : 'none';
+  document.getElementById('lv-mode-topic').style.background = mode === 'topic' ? '#f5c518' : '#2a2a2a';
+  document.getElementById('lv-mode-topic').style.color = mode === 'topic' ? '#111' : '#888';
+  document.getElementById('lv-mode-file').style.background = mode === 'file' ? '#f5c518' : '#2a2a2a';
+  document.getElementById('lv-mode-file').style.color = mode === 'file' ? '#111' : '#888';
+}
+
+function handleLVFileSelect(file) {
+  if (!file) return;
+  _lvScriptFile = file;
+  document.getElementById('lv-file-name').textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+  document.getElementById('lv-drop-zone').style.borderColor = '#f5c518';
+}
+
+function handleLVFileDrop(file) {
+  if (!file) return;
+  handleLVFileSelect(file);
+}
+
 async function generateLongVideo() {
   const apiKey = localStorage.getItem('ds_api_key') || document.getElementById('shorts-apikey').value.trim();
-  const topic = document.getElementById('lv-topic').value.trim();
   if (!apiKey) return showError('err-lv', 'Önce "Shorts Üret" sekmesinden DeepSeek API key kaydedin.');
-  if (!topic) return showError('err-lv', 'Konu boş olamaz.');
   showError('err-lv', '');
   document.getElementById('result-lv').classList.remove('show');
 
   const fd = new FormData();
-  fd.append('topic', topic);
   fd.append('api_key', apiKey);
   fd.append('lang', document.getElementById('lv-lang').value);
   fd.append('voice', document.getElementById('lv-voice').value);
   fd.append('speed', document.getElementById('lv-speed').value);
-  fd.append('duration_min', document.getElementById('lv-duration').value);
   fd.append('use_video', document.getElementById('lv-use-video').checked ? 'true' : 'false');
 
+  let endpoint = '/api/generate-long-video';
+
+  if (_lvMode === 'file') {
+    if (!_lvScriptFile) return showError('err-lv', 'Önce bir senaryo dosyası seçin.');
+    fd.append('script_file', _lvScriptFile);
+    endpoint = '/api/generate-long-video-from-script';
+  } else {
+    const topic = document.getElementById('lv-topic').value.trim();
+    if (!topic) return showError('err-lv', 'Konu boş olamaz.');
+    fd.append('topic', topic);
+    fd.append('duration_min', document.getElementById('lv-duration').value);
+  }
+
   try {
-    const r = await fetch('/api/generate-long-video', { method: 'POST', body: fd });
+    setLoading('btn-lv', 'spin-lv', true);
+    const r = await fetch(endpoint, { method: 'POST', body: fd });
     if (!r.ok) {
       const ct = r.headers.get('content-type') || '';
       const err = ct.includes('json') ? (await r.json()).detail : await r.text();
       throw new Error(err);
     }
-    setLoading('btn-lv', 'spin-lv', true);
-    _showLVProgress('Üretim başladı. Sayfa kapatabilirsiniz, arka planda devam eder.', true);
+    const d = await r.json();
+    const msg = _lvMode === 'file'
+      ? `Senaryo ${d.scenes} sahneye ayrıldı. Video üretimi başladı. Arka planda devam eder.`
+      : 'Üretim başladı. Sayfa kapatabilirsiniz, arka planda devam eder.';
+    _showLVProgress(msg, true);
     _startLVPolling();
   } catch(e) {
+    setLoading('btn-lv', 'spin-lv', false);
     showError('err-lv', e.message);
   }
 }

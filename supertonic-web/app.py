@@ -2482,6 +2482,119 @@ async def generate_long_video(
     return {"ok": True}
 
 
+@app.post("/api/generate-long-video-from-script")
+async def generate_long_video_from_script(
+    script_file: UploadFile = File(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    use_video: str = Form("false"),
+):
+    content = await script_file.read()
+    try:
+        script_text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        script_text = content.decode("latin-1", errors="replace")
+
+    if not script_text.strip():
+        raise HTTPException(400, "Dosya boş")
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+
+    if MANUAL_LV_LOG.exists():
+        try:
+            existing = json.loads(MANUAL_LV_LOG.read_text())
+            if existing.get("status") == "running":
+                pid = existing.get("pid")
+                if pid:
+                    try:
+                        os.kill(int(pid), 0)
+                        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+                    except OSError:
+                        pass
+                else:
+                    raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    lang_name = LANG_MAP.get(lang, "Turkish")
+
+    parse_prompt = f"""Below is a script text in {lang_name}. Parse it into scenes for a YouTube video narration.
+
+SCRIPT:
+{script_text[:8000]}
+
+Return ONLY valid JSON, no markdown:
+{{
+  "title": "engaging YouTube title based on the script (max 80 chars, in {lang_name})",
+  "description": "detailed video description (3-4 sentences, in {lang_name})",
+  "hashtags": ["relevant", "hashtag", "words", "no", "hash", "symbol"],
+  "scenes": [
+    {{
+      "text": "narration text for this scene (copy exact words from script, 2-4 sentences per scene)",
+      "keyword": "english search keyword for stock photo (2-3 words)"
+    }}
+  ]
+}}
+
+Rules:
+- Split the script naturally into logical scenes of 2-4 sentences each
+- Copy the script's narration text exactly — do NOT paraphrase or summarize
+- Generate an appropriate English image search keyword for each scene
+- hashtags: 8-12 relevant tags. No # symbol, NO spaces within a tag.
+- NEVER use abbreviations in scene text; always write the full name for text-to-speech"""
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "user", "content": parse_prompt}],
+        temperature=0.3,
+        max_tokens=8000,
+    )
+    data = _parse_llm_json(response.choices[0].message.content)
+    if not data.get("scenes"):
+        raise HTTPException(500, "Senaryo sahnelere ayrılamadı")
+
+    started_at = time.time()
+    job = {
+        "topic": data.get("title", script_file.filename or "Senaryo"),
+        "title": data.get("title", ""),
+        "description": data.get("description", ""),
+        "hashtags": data.get("hashtags", []),
+        "scenes": data["scenes"],
+        "api_key": api_key,
+        "lang": lang,
+        "voice": voice,
+        "speed": speed,
+        "duration_min": max(3, len(data["scenes"]) // 2),
+        "use_video": use_video,
+        "started_at": started_at,
+    }
+    LV_JOB_FILE.write_text(json.dumps(job, ensure_ascii=False))
+
+    worker_path = Path(__file__).parent / "lv_worker.py"
+    proc = subprocess.Popen(
+        [sys.executable, str(worker_path)],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=open(Path(__file__).parent / "lv_worker.log", "a"),
+        cwd=str(Path(__file__).parent),
+    )
+    _save_manual_lv_log("running", started_at=started_at)
+    try:
+        existing = json.loads(MANUAL_LV_LOG.read_text())
+        existing["pid"] = proc.pid
+        MANUAL_LV_LOG.write_text(json.dumps(existing, ensure_ascii=False))
+    except Exception:
+        pass
+
+    return {"ok": True, "scenes": len(data["scenes"]), "title": data.get("title", "")}
+
+
 @app.get("/api/manual-lv/status")
 async def get_manual_lv_status():
     if not MANUAL_LV_LOG.exists():
