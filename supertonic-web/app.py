@@ -1005,7 +1005,7 @@ Rules:
 
         if is_last_scene:
             endcard = Path("static/endcard_tr.jpg")
-            if endcard.exists():
+            if endcard.exists() and not info_format:
                 import shutil as _sh
                 _sh.copy2(str(endcard), str(png_path))
                 photo_saved, visual_err = True, ""
@@ -1068,8 +1068,8 @@ Rules:
         except Exception:
             pass
 
-    # Son sahneye platform bandı ekle (endcard kullanılıyorsa atlıyoruz — zaten içinde var)
-    endcard_used = Path("static/endcard_tr.jpg").exists()
+    # Son sahneye platform bandı ekle — Bilgi Shorts'ta endcard atlanır (haber markası var)
+    endcard_used = Path("static/endcard_tr.jpg").exists() and not info_format
     if png_files and not endcard_used:
         try:
             if platform == "instagram":
