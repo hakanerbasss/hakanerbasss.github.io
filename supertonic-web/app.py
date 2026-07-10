@@ -6063,6 +6063,10 @@ async def backup_restore(file: UploadFile = File(...)):
     return {"ok": True, "restored": restored, "skipped": skipped}
 
 
+@app.get("/ads.txt", response_class=PlainTextResponse)
+async def ads_txt():
+    return "google.com, pub-7820582813827252, DIRECT, f08c47fec0942fa0\n"
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
