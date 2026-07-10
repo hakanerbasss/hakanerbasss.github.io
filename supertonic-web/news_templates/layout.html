@@ -352,12 +352,19 @@
     if (barOk) barOk.addEventListener('click', subscribe);
     if (barX)  barX.addEventListener('click', () => { localStorage.setItem(DISMISSED, '1'); hideBar(); });
 
-    // Header zil butonu
+    // Header zil butonu — her zaman abonelik akışını tetikler
     if (btn) {
       btn.addEventListener('click', async () => {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
-        if (sub) { await unsubscribe(); } else { await subscribe(); }
+        if (sub) {
+          await unsubscribe();
+        } else {
+          // localStorage flag'ini temizle, ban yoksa banner çıkar; yoksa direkt dene
+          localStorage.removeItem(DISMISSED);
+          const ok = await subscribe();
+          if (!ok && Notification.permission === 'default') showBar(false);
+        }
       });
     }
   })();
