@@ -1235,11 +1235,15 @@ Rules:
     # Videoya özel hashtag'ler (DeepSeek'ten) + genel engagement tag'leri
     raw_tags = data.get("hashtags", [])
     if raw_tags:
-        video_tags = _format_hashtags(raw_tags, limit=5)
+        tag_limit = 15 if info_format else 5
+        video_tags = _format_hashtags(raw_tags, limit=tag_limit)
     else:
-        # Fallback: trend hashtag'leri + başlık kelimelerinden üret
-        title_tags = [w.lower() for w in generated_title.split()[:3] if len(w) > 3]
-        video_tags = _format_hashtags(["Shorts"] + title_tags + trend_data["hashtags"][1:6], limit=5)
+        if info_format:
+            video_tags = "#bilgi #Shorts #keşfet #öğren #viral"
+        else:
+            # Fallback: trend hashtag'leri + başlık kelimelerinden üret
+            title_tags = [w.lower() for w in generated_title.split()[:3] if len(w) > 3]
+            video_tags = _format_hashtags(["Shorts"] + title_tags + trend_data["hashtags"][1:6], limit=5)
 
     # Thumbnail — overlay'li ilk sahneyi kopyala (ayrıca create_thumbnail gerekmez)
     thumb_path = None
@@ -1286,18 +1290,35 @@ Rules:
     sources = gnews_data.get("sources", [])
     source_text = ("Kaynak: " + ", ".join(sources)) if sources else ""
 
-    # Instagram için tam haber açıklaması — video senaryosu değil, gerçek haber özeti
+    # Açıklama metni — Bilgi Shorts için eğitim odaklı, haber için haber odaklı
     ig_caption_desc = ""
     try:
-        cap_context = gnews_data.get("context_text", "") if gnews_data.get("found") else ""
         cap_lang_note = "Türkçe" if lang == "tr" else "English"
-        cap_prompt = (
-            f"Aşağıdaki haber için Instagram açıklama metni yaz.\n"
-            f"Dil: {cap_lang_note}\n"
-            f"Başlık: {generated_title}\n"
-            f"\nVideo senaryosu (kısa özet):\n{full_script}\n"
-            + (f"\nGüncel haber kaynakları:\n{cap_context}\n" if cap_context else "")
-            + """
+        if info_format:
+            cap_prompt = (
+                f"Aşağıdaki eğitici/bilgilendirici kısa video için YouTube açıklama metni yaz.\n"
+                f"Dil: {cap_lang_note}\n"
+                f"Başlık: {generated_title}\n"
+                f"\nVideo içeriği:\n{full_script}\n"
+                + """
+Kurallar:
+- 2-3 paragraf, toplamda 600-1000 karakter
+- Videoda anlatılan bilgileri özetle, izleyiciye fayda hissettir
+- Merak uyandıran, sade ve akıcı bir dil kullan
+- Emoji yok, hashtag yok, başlık tekrarlama
+- Son cümle: "Beğenin ve abone olun, her hafta yeni bilgiler paylaşıyorum!"
+- Sadece açıklama paragraflarını döndür
+"""
+            )
+        else:
+            cap_context = gnews_data.get("context_text", "") if gnews_data.get("found") else ""
+            cap_prompt = (
+                f"Aşağıdaki haber için Instagram açıklama metni yaz.\n"
+                f"Dil: {cap_lang_note}\n"
+                f"Başlık: {generated_title}\n"
+                f"\nVideo senaryosu (kısa özet):\n{full_script}\n"
+                + (f"\nGüncel haber kaynakları:\n{cap_context}\n" if cap_context else "")
+                + """
 Kurallar:
 - 3-4 paragraf, toplamda 900-1400 karakter
 - Haberin tüm önemli detaylarını ver: kim, ne, nerede, ne zaman, neden
@@ -1308,7 +1329,7 @@ Kurallar:
 - Emoji yok, hashtag yok, başlık tekrarlama
 - Sadece açıklama paragraflarını döndür
 """
-        )
+            )
         cap_resp = client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": cap_prompt}],

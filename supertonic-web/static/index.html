@@ -2730,6 +2730,8 @@ function _startInfoShortsPolling() {
         document.getElementById('infoshorts-title-out').textContent = s.result.title || '';
         document.getElementById('infoshorts-video').src = s.result.video || '';
         document.getElementById('dl-infoshorts').href = s.result.video || '';
+        document.getElementById('infoshorts-desc-out').value = s.result.suggested_description || '';
+        document.getElementById('infoshorts-tags-out').value = s.result.suggested_tags || '';
         document.getElementById('result-infoshorts').classList.add('show');
       } else if (s.status === 'error') {
         clearInterval(_infoShortsPollTimer); _infoShortsPollTimer = null;
@@ -4333,6 +4335,10 @@ function deleteComedyVideo() {
     <p style="margin-top:12px">Video</p>
     <video id="infoshorts-video" controls style="width:100%;margin-top:8px;border-radius:6px;max-width:360px;"></video>
     <a id="dl-infoshorts" class="dl-btn" download="bilgi-short.mp4">İndir</a>
+    <p style="margin-top:14px">YouTube Açıklaması</p>
+    <textarea id="infoshorts-desc-out" rows="5" style="width:100%;background:#1a1a1a;color:#eee;border:1px solid #333;border-radius:6px;padding:10px;font-size:13px;resize:vertical;" readonly></textarea>
+    <p style="margin-top:10px">Etiketler</p>
+    <textarea id="infoshorts-tags-out" rows="3" style="width:100%;background:#1a1a1a;color:#eee;border:1px solid #333;border-radius:6px;padding:10px;font-size:13px;resize:vertical;" readonly></textarea>
   </div>
 </div>
 
