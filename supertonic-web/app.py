@@ -12,7 +12,7 @@ from pathlib import Path
 import shutil
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 import traceback
 import aiofiles
