@@ -84,7 +84,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     host = (request.headers.get("host") or "").split(":")[0]
     # Login sayfası, statik dosyalar ve genel haber sitesi serbest (anonim erişim)
-    if (path in ("/login", "/logout")
+    if (path in ("/login", "/logout", "/ads.txt", "/robots.txt")
             or path.startswith("/static/")
             or path.startswith("/haberler")
             or path.startswith("/haber/")
