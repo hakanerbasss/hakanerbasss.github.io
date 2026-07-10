@@ -783,6 +783,7 @@ async def _generate_shorts_core(
     lang_name = LANG_MAP.get(lang, "Turkish")
     data = None
     scenes = []
+    gnews_data = {}
 
     if info_format:
         # BİLGİ SHORTS — eğitici/bilgilendirici format, trend/haber atlanır
