@@ -848,7 +848,15 @@ async def _generate_shorts_core(
     else:
         topic_instruction = (
             f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}\n"
-            f"The list is sorted by popularity — prefer topics near the top of the list.\n"
+            f"PRIORITY ORDER (always pick the highest available priority):\n"
+            f"1) Gurbetçi / yurt dışında yaşayan Türkleri doğrudan etkileyen haberler "
+            f"(askerlik erteleme/muafiyet, emeklilik müjdesi, SGK yurt dışı, pasaport/vize, "
+            f"çifte vatandaşlık, döviz/transfer, yurt dışı düzenleme/kanun)\n"
+            f"2) Türkiye ekonomisini doğrudan etkileyen haberler (enflasyon, döviz kuru, zam, maaş, emekli maaşı)\n"
+            f"3) Afet / doğal felaket / kritik uyarı haberleri\n"
+            f"4) Listede en üstte olan popüler trend haber\n"
+            f"If the trending list has NO topics matching priority 1, 2 or 3, pick by popularity as usual.\n"
+            f"Do NOT force a gurbetçi angle if the topic is not genuinely about expats.\n"
             f"{get_diversity_instruction()}"
         )
     yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
