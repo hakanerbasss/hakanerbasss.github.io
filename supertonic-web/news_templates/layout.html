@@ -60,6 +60,13 @@
     font-size:14px; font-weight:600; color:var(--sub); margin-left:22px;
   }
   nav.top a:hover{ color:var(--ink); }
+  .notif-btn{
+    background:none; border:none; cursor:pointer; font-size:18px;
+    margin-left:14px; padding:2px 4px; line-height:1; opacity:.55;
+    transition:opacity .15s; vertical-align:middle;
+  }
+  .notif-btn:hover{ opacity:1; }
+  .notif-btn.on{ opacity:1; }
   main{ max-width:1080px; margin:0 auto; padding:24px 20px 60px; }
   footer{
     border-top:1px solid var(--line); margin-top:40px; padding:26px 20px;
@@ -158,6 +165,7 @@
       <a href="/haberler">Haberler</a>
       <a href="/hakkinda">Hakkında</a>
       <a href="/iletisim">İletişim</a>
+      <button class="notif-btn" id="notifBtn" title="Bildirim Al" aria-label="Bildirim aç/kapat">🔕</button>
     </nav>
   </div>
 </header>
@@ -194,6 +202,63 @@
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/news-sw.js').catch(() => {});
   }
+
+  (function() {
+    const btn = document.getElementById('notifBtn');
+    if (!btn || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      if (btn) btn.style.display = 'none';
+      return;
+    }
+
+    function urlB64ToUint8(b64) {
+      const pad = '='.repeat((4 - b64.length % 4) % 4);
+      const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+      return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+    }
+
+    function setBtn(subscribed) {
+      btn.textContent = subscribed ? '🔔' : '🔕';
+      btn.title = subscribed ? 'Bildirimleri kapat' : 'Yeni haberlerden haberdar ol';
+      btn.classList.toggle('on', subscribed);
+    }
+
+    navigator.serviceWorker.ready.then(async reg => {
+      const sub = await reg.pushManager.getSubscription();
+      setBtn(!!sub);
+    });
+
+    btn.addEventListener('click', async () => {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        await existing.unsubscribe();
+        await fetch('/api/push/unsubscribe', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({endpoint: existing.endpoint}),
+        }).catch(() => {});
+        setBtn(false);
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+      try {
+        const r = await fetch('/api/push/vapid-key');
+        if (!r.ok) return;
+        const {publicKey} = await r.json();
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8(publicKey),
+        });
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(sub.toJSON()),
+        });
+        setBtn(true);
+      } catch(e) { console.error('Push subscribe:', e); }
+    });
+  })();
 </script>
 </body>
 </html>

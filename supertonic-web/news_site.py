@@ -7,6 +7,9 @@ gösterilir, sadece küçük thumbnail görseli yerelde saklanır.
 import sqlite3
 import time
 import hashlib
+import json
+import threading
+import base64
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Form, HTTPException
@@ -15,11 +18,34 @@ from fastapi.templating import Jinja2Templates
 
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "news_site.db"
+PUSH_KEYS_PATH = BASE_DIR / "push_keys.json"
 templates = Jinja2Templates(directory=str(BASE_DIR / "news_templates"))
 
 # Haber sitesi bu alt alan adından herkese açık servis edilir (bkz. auth_middleware, index())
 NEWS_SUBDOMAIN = "hakanerbas.wizaicorp.com"
 SITE_URL = f"https://{NEWS_SUBDOMAIN}"
+VAPID_SUBJECT = "mailto:hakanerbasss@gmail.com"
+
+
+def _load_or_generate_vapid_keys() -> tuple[str | None, str | None]:
+    if PUSH_KEYS_PATH.exists():
+        d = json.loads(PUSH_KEYS_PATH.read_text())
+        return d["private_pem"], d["public_b64"]
+    try:
+        from py_vapid import Vapid
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+        v = Vapid()
+        v.generate_keys()
+        private_pem = v.private_pem().decode()
+        pub_bytes = v.public_key.public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+        public_b64 = base64.urlsafe_b64encode(pub_bytes).rstrip(b'=').decode()
+        PUSH_KEYS_PATH.write_text(json.dumps({"private_pem": private_pem, "public_b64": public_b64}))
+        return private_pem, public_b64
+    except Exception:
+        return None, None
+
+
+VAPID_PRIVATE_PEM, VAPID_PUBLIC_B64 = _load_or_generate_vapid_keys()
 
 
 def _timesince(ts: int) -> str:
@@ -107,6 +133,13 @@ def init_db() -> None:
             ip_hash TEXT NOT NULL,
             PRIMARY KEY (article_id, ip_hash)
         )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            endpoint TEXT UNIQUE NOT NULL,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            created_at REAL
+        )""")
 
 
 init_db()
@@ -124,6 +157,42 @@ def _can_comment(ip: str) -> bool:
         return False
     _last_comment_ts[ip] = now
     return True
+
+
+def send_push_all(title: str, body: str, url: str, icon: str = "/static/news-icons/icon-192.png") -> None:
+    """Tüm abone tarayıcılara push bildirimi gönderir (arka planda thread olarak çalışır)."""
+    if not VAPID_PRIVATE_PEM:
+        return
+    with _conn() as c:
+        subs = c.execute("SELECT endpoint, p256dh, auth FROM push_subscriptions").fetchall()
+    if not subs:
+        return
+
+    def _send() -> None:
+        try:
+            from pywebpush import webpush, WebPushException
+        except ImportError:
+            return
+        dead: list[str] = []
+        for s in subs:
+            try:
+                webpush(
+                    subscription_info={"endpoint": s["endpoint"], "keys": {"p256dh": s["p256dh"], "auth": s["auth"]}},
+                    data=json.dumps({"title": title, "body": body, "url": url, "icon": icon}),
+                    vapid_private_key=VAPID_PRIVATE_PEM,
+                    vapid_claims={"sub": VAPID_SUBJECT},
+                )
+            except WebPushException as exc:
+                if exc.response is not None and exc.response.status_code in (404, 410):
+                    dead.append(s["endpoint"])
+            except Exception:
+                pass
+        if dead:
+            with _conn() as c:
+                for ep in dead:
+                    c.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (ep,))
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
 def add_article(title: str, description: str, thumbnail: str, ig_permalink: str) -> int:
@@ -251,6 +320,40 @@ async def api_haberler(limit: int = 3, kategori: str | None = None):
         }
         for r in rows
     ]
+
+
+@router.get("/api/push/vapid-key")
+async def push_vapid_key():
+    if not VAPID_PUBLIC_B64:
+        raise HTTPException(503, "Push bildirimleri devre dışı")
+    return {"publicKey": VAPID_PUBLIC_B64}
+
+
+@router.post("/api/push/subscribe")
+async def push_subscribe(request: Request):
+    data = await request.json()
+    endpoint = (data.get("endpoint") or "").strip()
+    keys = data.get("keys") or {}
+    p256dh = (keys.get("p256dh") or "").strip()
+    auth = (keys.get("auth") or "").strip()
+    if not endpoint or not p256dh or not auth:
+        raise HTTPException(400, "Eksik veri")
+    with _conn() as c:
+        c.execute(
+            "INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?)",
+            (endpoint, p256dh, auth, time.time()),
+        )
+    return {"ok": True}
+
+
+@router.post("/api/push/unsubscribe")
+async def push_unsubscribe(request: Request):
+    data = await request.json()
+    endpoint = (data.get("endpoint") or "").strip()
+    if endpoint:
+        with _conn() as c:
+            c.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))
+    return {"ok": True}
 
 
 @router.get("/haberler", response_class=HTMLResponse)
