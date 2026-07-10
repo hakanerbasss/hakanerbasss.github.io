@@ -259,9 +259,16 @@
       btn.classList.toggle('on', on);
     }
 
-    function showBar() {
-      if (!bar || localStorage.getItem(DISMISSED)) return;
-      setTimeout(() => bar.classList.add('show'), 1800);
+    function showBar(denied) {
+      if (!bar) return;
+      if (!denied && localStorage.getItem(DISMISSED)) return;
+      if (denied) {
+        // İzin engellendi — tarayıcı ayarlarına yönlendir
+        bar.querySelector('.nb-txt').innerHTML =
+          '🔕 Bildirimler bu sitede engellenmiş.<small>Adres çubuğundaki 🔒 simgesine tıkla → Bildirimler → İzin Ver</small>';
+        if (barOk) barOk.style.display = 'none';
+      }
+      setTimeout(() => bar.classList.add('show'), 1000);
     }
 
     function hideBar() {
@@ -269,16 +276,21 @@
     }
 
     async function subscribe() {
+      if (Notification.permission === 'denied') {
+        showBar(true);
+        return false;
+      }
       try {
         const reg = await navigator.serviceWorker.ready;
 
         // İzin iste
         const perm = await Notification.requestPermission();
+        if (perm === 'denied') { showBar(true); return false; }
         if (perm !== 'granted') return false;
 
         // VAPID public key
         const kr = await fetch('/api/push/vapid-key');
-        if (!kr.ok) { console.error('VAPID key alınamadı:', kr.status); return false; }
+        if (!kr.ok) { alert('Bildirim servisi şu an aktif değil, lütfen daha sonra deneyin.'); return false; }
         const { publicKey } = await kr.json();
 
         // Push aboneliği
@@ -288,12 +300,11 @@
         });
 
         // Sunucuya kaydet
-        const sr = await fetch('/api/push/subscribe', {
+        await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(sub.toJSON()),
         });
-        if (!sr.ok) { console.error('Abonelik kaydedilemedi:', sr.status); return false; }
 
         setBtn(true);
         hideBar();
@@ -329,11 +340,11 @@
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
         setBtn(true);
-      } else if (Notification.permission === 'default') {
-        setBtn(false);
-        showBar();
       } else {
         setBtn(false);
+        const perm = Notification.permission;
+        if (perm === 'default') showBar(false);
+        else if (perm === 'denied') showBar(true);
       }
     });
 
