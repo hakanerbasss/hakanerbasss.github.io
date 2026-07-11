@@ -57,6 +57,32 @@ function speak(text) {
   try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'tr-TR'; u.rate = 1.05; window.speechSynthesis.speak(u); } catch(e){}
 }
 
+// ── Sesli giriş (SpeechRecognition) ──────────────────────────────────────────
+function startVoice(inputEl, btnEl) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Sesli giriş bu tarayıcıda desteklenmiyor', 'error', 4000); return; }
+  const recognition = new SR();
+  recognition.lang = 'tr-TR';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  const origLabel = btnEl ? btnEl.textContent : '';
+  if (btnEl) { btnEl.textContent = '🔴 Dinleniyor…'; btnEl.classList.add('recording'); btnEl.disabled = true; }
+  recognition.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    inputEl.value = (inputEl.value.trim() ? inputEl.value.trim() + ' ' : '') + text;
+    inputEl.dispatchEvent(new Event('input'));
+    const preview = text.length > 40 ? text.slice(0, 40) + '…' : text;
+    toast(`🎤 "${preview}"`, 'success', 3500);
+  };
+  recognition.onerror = (e) => {
+    if (e.error !== 'aborted' && e.error !== 'no-speech') toast('Ses alınamadı — ' + e.error, 'error');
+  };
+  recognition.onend = () => {
+    if (btnEl) { btnEl.textContent = origLabel; btnEl.classList.remove('recording'); btnEl.disabled = false; }
+  };
+  try { recognition.start(); } catch(e) {}
+}
+
 function haversine(la1, lo1, la2, lo2) {
   const R = 6371000, r = Math.PI/180;
   const dLa = (la2-la1)*r, dLo = (lo2-lo1)*r;
@@ -987,6 +1013,10 @@ el('resolveNotifCancelBtn').addEventListener('click', () => {
   closeModal('resolveNotifModal');
 });
 
+el('csNoteVoice').addEventListener('click', () => startVoice(el('csNote'), el('csNoteVoice')));
+el('notifNoteVoice').addEventListener('click', () => startVoice(el('notifNote'), el('notifNoteVoice')));
+el('resolveNoteVoice').addEventListener('click', () => startVoice(el('resolveNotifNote'), el('resolveNoteVoice')));
+
 el('resolveNotifSaveBtn').addEventListener('click', async () => {
   const notif = S._resolvingNotif;
   if (!notif) return;
@@ -1040,6 +1070,7 @@ async function toggleComments(nid) {
           </div>`).join('')
       : '<div style="color:var(--muted);font-size:12px;padding:4px 0">Henüz yorum yok</div>';
     html += `<div class="comment-add">
+      <button class="cmt-voice" title="Sesli yorum">🎤</button>
       <input type="text" class="cmt-input" placeholder="Yorum ekle…" maxlength="300">
       <button class="cmt-send">Gönder</button>
     </div>`;
@@ -1047,6 +1078,8 @@ async function toggleComments(nid) {
 
     const input = section.querySelector('.cmt-input');
     const send = section.querySelector('.cmt-send');
+    const voiceBtn = section.querySelector('.cmt-voice');
+    if (voiceBtn) voiceBtn.onclick = () => startVoice(input, voiceBtn);
     const doSend = async () => {
       const text = input.value.trim(); if (!text) return;
       send.disabled = true;

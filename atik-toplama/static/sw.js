@@ -1,4 +1,4 @@
-const CACHE = 'atik-rota-v4';
+const CACHE = 'atik-rota-v5';
 const SHELL = ['/static/css/app.css', '/static/js/app.js', '/static/manifest.json'];
 
 self.addEventListener('install', (e) => {

@@ -81,6 +81,7 @@
     <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
     <label style="margin-top:10px">Not (opsiyonel)</label>
     <textarea id="csNote" placeholder="örn. sokak başından sona süpürüldü"></textarea>
+    <button type="button" class="voice-btn" id="csNoteVoice">🎤 Sesli Not Ekle</button>
     <div class="row">
       <button id="csCancelBtn">Vazgeç</button>
       <button class="primary" id="csSaveBtn" disabled>✅ Kapat & Gönder</button>
@@ -96,6 +97,7 @@
     <div id="resolveNotifStreet" style="font-size:13px;font-weight:600;margin-bottom:10px"></div>
     <label>Not (isteğe bağlı)</label>
     <textarea id="resolveNotifNote" placeholder="Ne yapıldı? Nasıl giderildi?"></textarea>
+    <button type="button" class="voice-btn" id="resolveNoteVoice">🎤 Sesli Not Ekle</button>
     <button class="photo-btn" id="resolvePhotoBtn">📷 Fotoğraf Çek / Seç (isteğe bağlı)</button>
     <img id="resolvePhotoPreview" alt="önizleme" style="width:100%;border-radius:8px;margin-top:8px;display:none">
     <input type="file" id="resolvePhotoInput" accept="image/*" capture="environment" style="display:none">
@@ -116,8 +118,9 @@
       <option value="{{ key }}">{{ icon }} {{ label }}</option>
       {% endfor %}
     </select>
-    <label>Not (opsiyonel, sesli not için aşağıdaki butonu kullan)</label>
+    <label>Not (opsiyonel)</label>
     <textarea id="notifNote" placeholder="Kısa açıklama…"></textarea>
+    <button type="button" class="voice-btn" id="notifNoteVoice">🎤 Sesli Not Ekle</button>
     <div style="color:var(--muted);font-size:12px;margin-top:6px" id="notifLocInfo">📍 Konum: GPS bekleniyor…</div>
     <div class="row">
       <button id="notifCancelBtn">Vazgeç</button>

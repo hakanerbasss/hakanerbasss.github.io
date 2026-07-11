@@ -169,6 +169,8 @@ button{cursor:pointer;font-family:inherit}
 .comment-add{display:flex;gap:6px;margin-top:8px}
 .comment-add input{flex:1;padding:7px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;min-width:0}
 .comment-add button{padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--green);background:var(--green);color:#fff;font-size:12px;font-weight:600;white-space:nowrap}
+.cmt-voice{background:var(--panel2)!important;border-color:var(--border)!important;color:var(--text)!important;flex-shrink:0;padding:7px 9px!important}
+.cmt-voice.recording{border-color:var(--red)!important;color:var(--red)!important;animation:voicepulse 1s ease-in-out infinite}
 
 /* ── Atama çubuğu (haritadan/listeden seçim) ── */
 #assignBar{
@@ -182,6 +184,15 @@ button{cursor:pointer;font-family:inherit}
 }
 #assignBar button.primary{background:var(--green);border-color:var(--green);color:#fff}
 #assignBarInfo{flex:1;font-size:13px;white-space:nowrap;min-width:60px}
+
+/* ── Sesli giriş butonu ── */
+.voice-btn{
+  width:100%;padding:10px;margin-top:6px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--panel2);color:var(--text);
+  font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.voice-btn.recording{border-color:var(--red);color:var(--red);animation:voicepulse 1s ease-in-out infinite}
+@keyframes voicepulse{0%,100%{opacity:1}50%{opacity:.5}}
 
 /* ── Harita düğmeleri üzerine bindirme ── */
 .map-overlay{position:absolute;bottom:80px;right:12px;z-index:50;display:flex;flex-direction:column;gap:8px}
