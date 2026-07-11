@@ -67,10 +67,11 @@ async def _fetch_all_media(uid: str, token: str, client: httpx.AsyncClient) -> l
 
 async def _fetch_media_insights(media_id: str, media_type: str, token: str, client: httpx.AsyncClient) -> dict:
     """Post başına tüm metrikler."""
+    # likes ve comments insights metriği değil, media object field'ı — bunlar 400 hatası çıkarır
     if media_type in ("VIDEO", "REEL"):
-        metrics = "views,reach,likes,comments,shares,saved,total_interactions,impressions"
+        metrics = "views,reach,shares,saved,total_interactions,impressions"
     else:
-        metrics = "impressions,reach,likes,comments,saved,total_interactions"
+        metrics = "impressions,reach,saved,total_interactions"
 
     try:
         r = await client.get(
