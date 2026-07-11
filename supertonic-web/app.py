@@ -768,6 +768,7 @@ async def _generate_shorts_core(
     spiker_mode: bool = False,
     avatar_path: Path = None,
     info_format: str = None,
+    cover_image_path: Path = None,
 ):
     import json
     import httpx
@@ -1014,7 +1015,14 @@ Rules:
                 photo_saved, visual_err = fetch_scene_visual("social media news channel", "portrait", pexels_key, png_path)
         else:
             keyword = scene.get("keyword", topic)
-            if custom_image_paths:
+            if i == 0 and cover_image_path and Path(cover_image_path).exists():
+                try:
+                    import shutil as _sh
+                    _sh.copy2(str(cover_image_path), str(png_path))
+                    photo_saved, visual_err = True, ""
+                except Exception:
+                    photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+            elif custom_image_paths:
                 # Kullanıcının kendi yüklediği görseller (ör. uygulama ekran görüntüleri)
                 try:
                     import shutil as _sh
@@ -1410,10 +1418,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -1429,6 +1437,11 @@ async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics,
         for p in (custom_image_paths or []):
             try:
                 Path(p).unlink(missing_ok=True)
+            except Exception:
+                pass
+        if cover_image_path:
+            try:
+                Path(cover_image_path).unlink(missing_ok=True)
             except Exception:
                 pass
 
@@ -1493,6 +1506,7 @@ async def generate_info_shorts_async(
     speed: float = Form(1.0),
     use_video: str = Form("false"),
     platform: str = Form("youtube"),
+    cover_image: UploadFile = File(None),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -1502,12 +1516,20 @@ async def generate_info_shorts_async(
     if _manual_shorts_lock:
         raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
 
+    saved_cover = None
+    if cover_image and cover_image.filename:
+        data = await cover_image.read()
+        dest = UPLOAD_DIR / f"cover_{uuid.uuid4().hex}.jpg"
+        if _save_as_jpeg(data, dest):
+            saved_cover = dest
+
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
     asyncio.create_task(_shorts_job_runner(
         topic, api_key, lang, voice, speed, "", "TR", use_video, platform,
         spiker_mode=False, avatar_path=None, info_format=info_format,
+        cover_image_path=saved_cover,
     ))
     return {"ok": True}
 

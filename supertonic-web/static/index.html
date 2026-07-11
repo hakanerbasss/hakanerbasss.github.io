@@ -2700,6 +2700,8 @@ async function generateInfoShorts() {
   fd.append('voice', document.getElementById('info-voice').value);
   fd.append('speed', document.getElementById('info-speed').value);
   fd.append('use_video', document.getElementById('info-use-video').checked ? 'true' : 'false');
+  const coverFile = document.getElementById('info-cover-input').files[0];
+  if (coverFile) fd.append('cover_image', coverFile);
 
   try {
     setLoading('btn-infoshorts', 'spin-infoshorts', true);
@@ -2716,6 +2718,33 @@ async function generateInfoShorts() {
     setLoading('btn-infoshorts', 'spin-infoshorts', false);
     showError('err-infoshorts', e.message);
   }
+}
+
+function handleInfoCoverSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  document.getElementById('info-cover-preview').src = url;
+  document.getElementById('info-cover-preview-wrap').style.display = 'block';
+  document.getElementById('info-cover-placeholder').style.display = 'none';
+  document.getElementById('info-cover-drop').style.borderColor = '#f5c518';
+}
+function handleInfoCoverDrop(e) {
+  e.preventDefault();
+  document.getElementById('info-cover-drop').style.borderColor = '#333';
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById('info-cover-input').files = dt.files;
+  handleInfoCoverSelect({ target: { files: [file] } });
+}
+function clearInfoCover() {
+  document.getElementById('info-cover-input').value = '';
+  document.getElementById('info-cover-preview').src = '';
+  document.getElementById('info-cover-preview-wrap').style.display = 'none';
+  document.getElementById('info-cover-placeholder').style.display = 'block';
+  document.getElementById('info-cover-drop').style.borderColor = '#333';
 }
 
 function _startInfoShortsPolling() {
@@ -4312,6 +4341,22 @@ function deleteComedyVideo() {
       <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎬 Pexels Video Klip Kullan</div>
       <div style="font-size:11px;color:#555;margin-top:2px;">Fotoğraf yerine Pexels'tan stock video klipleri kullanır</div>
     </div>
+  </div>
+
+  <div class="field">
+    <label>İlk Sahne Görseli <span style="color:#555;font-weight:400;">(isteğe bağlı)</span></label>
+    <div id="info-cover-drop" onclick="document.getElementById('info-cover-input').click()"
+      style="border:2px dashed #333;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;"
+      ondragover="event.preventDefault();this.style.borderColor='#f5c518'"
+      ondragleave="this.style.borderColor='#333'"
+      ondrop="handleInfoCoverDrop(event)">
+      <div id="info-cover-preview-wrap" style="display:none;margin-bottom:8px;">
+        <img id="info-cover-preview" style="max-height:120px;border-radius:6px;object-fit:cover;">
+        <button onclick="event.stopPropagation();clearInfoCover()" style="display:block;margin:6px auto 0;background:#333;border:none;color:#ccc;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">Kaldır</button>
+      </div>
+      <div id="info-cover-placeholder" style="color:#555;font-size:13px;">📷 Kapak fotoğrafı yükle (ChatGPT görseli vb.)<br><span style="font-size:11px;">Tıkla veya sürükle — ilk sahne bu görsel olur</span></div>
+    </div>
+    <input type="file" id="info-cover-input" accept="image/*" style="display:none" onchange="handleInfoCoverSelect(event)">
   </div>
 
   <div class="field">
