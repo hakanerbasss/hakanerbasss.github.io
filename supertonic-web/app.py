@@ -26,6 +26,7 @@ from deep_translator import GoogleTranslator
 import whisper
 
 import news_site
+from ig_analytics_full import fetch_full_analytics
 
 app = FastAPI()
 app.include_router(news_site.router)
@@ -4039,6 +4040,18 @@ async def instagram_analytics(limit: int = 15):
         "posts":     posts,
     }
 
+
+@app.get("/api/instagram/analytics/full")
+async def instagram_analytics_full(force: bool = False):
+    """Tüm Instagram verileri: tüm postlar, demografi, saat haritası, günlük takipçi."""
+    cfg = get_ig_config()
+    if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+        raise HTTPException(400, "Instagram yapılandırması eksik")
+    try:
+        data = await fetch_full_analytics(cfg["ig_user_id"], cfg["access_token"], force=force)
+        return data
+    except Exception as e:
+        raise HTTPException(502, str(e))
 
 
 def load_yt_config():

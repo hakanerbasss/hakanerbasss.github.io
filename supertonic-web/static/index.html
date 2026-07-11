@@ -4074,6 +4074,206 @@ async function loadIGAnalytics() {
   }
 }
 
+async function loadIGAnalyticsFull(force) {
+  const errEl = document.getElementById('ig-an-error');
+  const loadEl = document.getElementById('ig-an-loading');
+  const fullEl = document.getElementById('ig-an-full-content');
+  errEl.style.display = 'none';
+  fullEl.style.display = 'none';
+  loadEl.style.display = 'block';
+  loadEl.textContent = force ? 'Tüm veriler çekiliyor (bu biraz sürebilir)...' : 'Tam analitik yükleniyor...';
+  try {
+    const r = await fetch('/api/instagram/analytics/full?force=' + force);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    _igAnData = d;
+
+    // Profil
+    const p = d.profile || {};
+    document.getElementById('ig-an-username').textContent = '@' + (p.username || '?');
+    document.getElementById('ig-an-followers').textContent = formatNum(p.followers_count || 0);
+    document.getElementById('ig-an-media-count').textContent = p.media_count || (d.total_posts || 0);
+
+    // Özet
+    const s = d.summary || {};
+    document.getElementById('ig-an-total-plays').textContent    = formatNum(s.total_views || 0);
+    document.getElementById('ig-an-total-reach').textContent    = formatNum((d.posts||[]).reduce((a,x)=>a+(x.reach||0),0));
+    document.getElementById('ig-an-total-likes').textContent    = formatNum(s.total_likes || 0);
+    document.getElementById('ig-an-total-comments').textContent = formatNum(s.total_comments || 0);
+    document.getElementById('ig-an-total-shares').textContent   = formatNum(s.total_shares || 0);
+    document.getElementById('ig-an-total-saved').textContent    = formatNum(s.total_saved || 0);
+
+    // En iyi gönderi
+    const best = (s.top_posts || [])[0];
+    if (best) {
+      document.getElementById('ig-an-best').style.display = 'block';
+      document.getElementById('ig-an-best-thumb').src = best.thumbnail || best.thumb || '';
+      document.getElementById('ig-an-best-caption').textContent = best.caption || '(altyazı yok)';
+      document.getElementById('ig-an-best-stats').textContent =
+        `👁 ${formatNum(best.views||0)}  ❤ ${formatNum(best.likes||0)}  ↗ ${formatNum(best.shares||0)}  🔖 ${formatNum(best.saved||0)}`;
+    }
+
+    // Analiz
+    document.getElementById('ig-an-time-analysis').innerHTML = buildTimeAnalysis(d.posts || []);
+    document.getElementById('ig-an-topic-analysis').innerHTML = buildTopicAnalysis(d.posts || []);
+    document.getElementById('ig-an-recommendations').innerHTML = buildRecommendations(d.posts || []);
+
+    // Post listesi (tüm postlar)
+    const posts = d.posts || [];
+    const container = document.getElementById('ig-an-posts');
+    container.innerHTML = posts.map(post => {
+      const dt = post.timestamp ? new Date(post.timestamp).toLocaleString('tr-TR', {
+        day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'
+      }) : '';
+      const vw = post.views || 0;
+      return `<div style="background:#111;border:1px solid #222;border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;">
+        <img src="${post.thumbnail||post.thumb||''}" style="width:36px;height:64px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
+        <div style="flex:1;min-width:0;">
+          <div style="color:#ccc;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${post.caption || '(altyazı yok)'}</div>
+          <div style="color:#555;font-size:11px;margin-top:2px;">${dt}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;white-space:nowrap;flex-shrink:0;">
+          <span style="color:#7c3aed;">👁 ${formatNum(vw)}</span> &nbsp;
+          <span style="color:#f97316;">❤ ${formatNum(post.likes||0)}</span> &nbsp;
+          <span style="color:#34d399;">🔖 ${formatNum(post.saved||0)}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Demografi ve online saat bölümü
+    fullEl.innerHTML = _buildFullAnalyticsHTML(d);
+    fullEl.style.display = 'block';
+
+    loadEl.style.display = 'none';
+    document.getElementById('ig-an-content').style.display = 'block';
+  } catch(e) {
+    loadEl.style.display = 'none';
+    errEl.style.display = 'block';
+    errEl.textContent = 'Hata: ' + e.message;
+  }
+}
+
+function _buildFullAnalyticsHTML(d) {
+  const demo = d.demographics || {};
+  const onlineH = d.online_followers_by_hour || {};
+  const followerDaily = d.follower_daily || [];
+  const accountDaily = d.account_daily || {};
+  let html = '';
+
+  // Günlük takipçi değişimi
+  if (followerDaily.length) {
+    const vals = followerDaily.map(v => v.value || 0);
+    const total = vals.reduce((a,b) => a+b, 0);
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    html += `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="color:#facc15;font-size:13px;font-weight:700;margin-bottom:8px;">📈 Son 30 Gün Takipçi Değişimi</div>
+      <div style="color:#ccc;font-size:13px;">Toplam: <b style="color:#4ade80;">+${total}</b> &nbsp; Min gün: <b style="color:#f87171;">${minV}</b> &nbsp; Maks gün: <b style="color:#4ade80;">${maxV}</b></div>
+      <div style="display:flex;align-items:flex-end;gap:2px;height:50px;margin-top:10px;">
+        ${vals.map(v => {
+          const h = maxV > 0 ? Math.max(2, Math.round((v/maxV)*50)) : 2;
+          const c = v >= 0 ? '#4ade80' : '#f87171';
+          return `<div style="flex:1;height:${h}px;background:${c};border-radius:2px 2px 0 0;min-width:3px;" title="${v}"></div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Takipçi online saatleri
+  if (Object.keys(onlineH).length) {
+    const days = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+    const allVals = Object.values(onlineH).flatMap(hMap => Object.values(hMap || {}));
+    const maxVal = Math.max(...allVals, 1);
+    let rows = '';
+    for (let day = 0; day < 7; day++) {
+      const dayData = onlineH[day] || {};
+      const cells = Array.from({length:24}, (_,h) => {
+        const v = dayData[h] || 0;
+        const op = Math.max(0.08, v/maxVal);
+        return `<div style="flex:1;aspect-ratio:1;background:rgba(167,139,250,${op});border-radius:2px;" title="${days[day]} ${h}:00 — ${v}"></div>`;
+      }).join('');
+      rows += `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">
+        <div style="color:#888;font-size:10px;width:24px;text-align:right;margin-right:4px;">${days[day]}</div>
+        <div style="display:flex;flex:1;gap:2px;">${cells}</div>
+      </div>`;
+    }
+    const hours = Array.from({length:24},(_,i)=>i).filter(i=>i%3===0).map(i=>`<div style="flex:1;font-size:9px;color:#555;text-align:center;">${i}</div>`).join('');
+    html += `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="color:#a78bfa;font-size:13px;font-weight:700;margin-bottom:10px;">🕐 Takipçi Aktiflik Haritası (En İyi Paylaşım Saatleri)</div>
+      ${rows}
+      <div style="display:flex;margin-left:32px;gap:2px;">${hours}</div>
+    </div>`;
+  }
+
+  // Demografi — cinsiyet/yaş
+  const genderAge = demo.audience_gender_age;
+  if (genderAge && Object.keys(genderAge).length) {
+    const sorted = Object.entries(genderAge).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const total = Object.values(genderAge).reduce((a,b)=>a+b,0) || 1;
+    const bars = sorted.map(([k,v]) => {
+      const pct = Math.round(v/total*100);
+      const c = k.startsWith('M') ? '#60a5fa' : '#f472b6';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <div style="color:#ccc;font-size:12px;width:70px;flex-shrink:0;">${k}</div>
+        <div style="flex:1;height:14px;background:#1a1a2e;border-radius:4px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${c};border-radius:4px;"></div>
+        </div>
+        <div style="color:#888;font-size:11px;width:32px;text-align:right;">${pct}%</div>
+      </div>`;
+    }).join('');
+    html += `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="color:#60a5fa;font-size:13px;font-weight:700;margin-bottom:10px;">👥 Cinsiyet & Yaş Dağılımı</div>
+      ${bars}
+    </div>`;
+  }
+
+  // Demografi — şehir
+  const cities = demo.audience_city;
+  if (cities && Object.keys(cities).length) {
+    const sorted = Object.entries(cities).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const total = sorted.reduce((a,[,v])=>a+v,0) || 1;
+    const items = sorted.map(([k,v]) => {
+      const pct = Math.round(v/total*100);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+        <div style="color:#ccc;font-size:12px;flex:1;">${k}</div>
+        <div style="width:80px;height:12px;background:#1a1a2e;border-radius:4px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:#34d399;border-radius:4px;"></div>
+        </div>
+        <div style="color:#888;font-size:11px;width:28px;text-align:right;">${pct}%</div>
+      </div>`;
+    }).join('');
+    html += `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="color:#34d399;font-size:13px;font-weight:700;margin-bottom:10px;">🏙 En Çok Takipçi Olan Şehirler</div>
+      ${items}
+    </div>`;
+  }
+
+  // Demografi — ülke
+  const countries = demo.audience_country;
+  if (countries && Object.keys(countries).length) {
+    const sorted = Object.entries(countries).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const total = sorted.reduce((a,[,v])=>a+v,0) || 1;
+    const items = sorted.map(([k,v]) => {
+      const pct = Math.round(v/total*100);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+        <div style="color:#ccc;font-size:12px;flex:1;">${k}</div>
+        <div style="width:80px;height:12px;background:#1a1a2e;border-radius:4px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:#fb923c;border-radius:4px;"></div>
+        </div>
+        <div style="color:#888;font-size:11px;width:28px;text-align:right;">${pct}%</div>
+      </div>`;
+    }).join('');
+    html += `<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="color:#fb923c;font-size:13px;font-weight:700;margin-bottom:10px;">🌍 Ülke Dağılımı</div>
+      ${items}
+    </div>`;
+  }
+
+  if (!html) {
+    html = `<div style="color:#888;font-size:13px;padding:12px 0;">Demografi ve saat verisi bulunamadı (hesap yeterli takipçiye sahip olmayabilir veya erişim yetkisi eksik).</div>`;
+  }
+  return html;
+}
+
 // ─── KOMİK HABER ────────────────────────────────────────────────────────────
 let _comedySessionId = null;
 let _comedyUid = null;
@@ -4193,6 +4393,8 @@ function deleteComedyVideo() {
   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
     <h2 style="color:#fff;font-size:18px;margin:0;flex:1;">📸 Instagram Analitik</h2>
     <button onclick="loadIGAnalytics()" style="font-size:12px;padding:8px 14px;">↻ Yenile</button>
+    <button onclick="loadIGAnalyticsFull(false)" style="font-size:12px;padding:8px 14px;background:#0d2d1a;color:#4ade80;border:1px solid #1a5a35;">🔍 Tam Analitik</button>
+    <button onclick="loadIGAnalyticsFull(true)" style="font-size:12px;padding:8px 14px;background:#1a0d00;color:#fb923c;border:1px solid #5a2a00;">⟳ Zorla Çek</button>
     <button onclick="downloadIGAnalyticsJSON()" style="font-size:12px;padding:8px 14px;background:#1a1a2e;color:#a78bfa;border:1px solid #3b2d6e;">⬇ JSON İndir</button>
   </div>
   <div id="ig-an-error" style="display:none;color:#f87171;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:8px;padding:12px;margin-bottom:16px;"></div>
@@ -4255,6 +4457,9 @@ function deleteComedyVideo() {
     <div id="ig-an-recommendations"></div>
     <div id="ig-an-time-analysis"></div>
     <div id="ig-an-topic-analysis"></div>
+
+    <!-- Tam analitik ek veriler (demografi, saat haritası, takipçi büyümesi) -->
+    <div id="ig-an-full-content" style="display:none;margin-bottom:16px;"></div>
 
     <!-- Gönderi listesi -->
     <h3 style="color:#aaa;font-size:13px;margin-bottom:10px;">Son Gönderiler</h3>
