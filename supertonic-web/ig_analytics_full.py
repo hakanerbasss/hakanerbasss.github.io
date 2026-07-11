@@ -42,7 +42,7 @@ async def _fetch_all_media(uid: str, token: str, client: httpx.AsyncClient) -> l
     posts = []
     fields = (
         "id,caption,media_type,timestamp,like_count,comments_count,"
-        "permalink,thumbnail_url,media_url"
+        "permalink,thumbnail_url,media_url,views"
     )
     url = f"{GRAPH}/{uid}/media"
     params = {"fields": fields, "limit": 100, "access_token": token}
@@ -80,14 +80,18 @@ async def _fetch_media_insights(media_id: str, media_type: str, token: str, clie
         )
         if r.status_code == 200:
             items = r.json().get("data", [])
-            return {
-                item["name"]: (
-                    item.get("value")
-                    if "value" in item
-                    else (item.get("values") or [{}])[0].get("value", 0)
-                )
-                for item in items
-            }
+            result = {}
+            for item in items:
+                if "total_value" in item:
+                    val = item["total_value"].get("value", 0)
+                elif "value" in item:
+                    val = item["value"] or 0
+                elif "values" in item:
+                    val = item["values"][0].get("value", 0) if item.get("values") else 0
+                else:
+                    val = 0
+                result[item["name"]] = val if isinstance(val, (int, float)) else 0
+            return result
     except Exception:
         pass
     return {}
@@ -211,7 +215,7 @@ async def fetch_full_analytics(uid: str, token: str, force: bool = False) -> dic
             rp = await client.get(
                 f"{GRAPH}/{uid}",
                 params={
-                    "fields": "username,followers_count,following_count,media_count,biography,website",
+                    "fields": "username,followers_count,media_count,biography",
                     "access_token": token,
                 },
                 timeout=15,
@@ -248,7 +252,7 @@ async def fetch_full_analytics(uid: str, token: str, force: bool = False) -> dic
                     "thumbnail": p.get("thumbnail_url") or p.get("media_url"),
                     "likes": ins.get("likes", p.get("like_count", 0)),
                     "comments": ins.get("comments", p.get("comments_count", 0)),
-                    "views": ins.get("views", 0),
+                    "views": ins.get("views") or p.get("views") or 0,
                     "reach": ins.get("reach", 0),
                     "impressions": ins.get("impressions", 0),
                     "shares": ins.get("shares", 0),
