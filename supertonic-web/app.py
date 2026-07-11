@@ -199,6 +199,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 COMEDY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 AVATAR_FILE = UPLOAD_DIR / "avatar_photo.jpg"
+INFO_ENDCARD_FILE = UPLOAD_DIR / "info_endcard.jpg"
 LONGCAT_SPACE = "https://victor-longcat-video-avatar-1-5.hf.space"
 
 BANNED_TOPICS_FILE = Path("banned_topics.json")
@@ -1006,12 +1007,16 @@ Rules:
 
         if is_last_scene:
             endcard = Path("static/endcard_tr.jpg")
-            if endcard.exists() and not info_format:
+            if info_format and INFO_ENDCARD_FILE.exists():
+                import shutil as _sh
+                _sh.copy2(str(INFO_ENDCARD_FILE), str(png_path))
+                photo_saved, visual_err = True, ""
+            elif endcard.exists() and not info_format:
                 import shutil as _sh
                 _sh.copy2(str(endcard), str(png_path))
                 photo_saved, visual_err = True, ""
             else:
-                # Endcard dosyası yok — son sahne için Pexels'tan gerçek fotoğraf çek
+                # Endcard yok — son sahne için Pexels'tan fotoğraf çek
                 photo_saved, visual_err = fetch_scene_visual("social media news channel", "portrait", pexels_key, png_path)
         else:
             keyword = scene.get("keyword", topic)
@@ -1076,8 +1081,8 @@ Rules:
         except Exception:
             pass
 
-    # Son sahneye platform bandı ekle — Bilgi Shorts'ta endcard atlanır (haber markası var)
-    endcard_used = Path("static/endcard_tr.jpg").exists() and not info_format
+    # Son sahneye platform bandı ekle — endcard varsa overlay ekleme (görsel zaten tasarımlı)
+    endcard_used = (Path("static/endcard_tr.jpg").exists() and not info_format) or (info_format and INFO_ENDCARD_FILE.exists())
     if png_files and not endcard_used:
         try:
             if platform == "instagram":
@@ -4450,6 +4455,34 @@ async def get_avatar_photo():
     if not AVATAR_FILE.exists():
         raise HTTPException(404, "Avatar fotoğrafı yüklenmedi")
     return FileResponse(str(AVATAR_FILE), media_type="image/jpeg")
+
+
+@app.get("/api/info-endcard/status")
+async def info_endcard_status():
+    if INFO_ENDCARD_FILE.exists():
+        return {"has_endcard": True, "path": "/api/info-endcard/photo"}
+    return {"has_endcard": False}
+
+
+@app.post("/api/info-endcard/upload")
+async def info_endcard_upload(file: UploadFile = File(...)):
+    data = await file.read()
+    if not _save_as_jpeg(data, INFO_ENDCARD_FILE):
+        raise HTTPException(400, "Geçersiz görsel dosyası")
+    return {"ok": True, "path": "/api/info-endcard/photo"}
+
+
+@app.delete("/api/info-endcard")
+async def info_endcard_delete():
+    INFO_ENDCARD_FILE.unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.get("/api/info-endcard/photo")
+async def info_endcard_photo():
+    if not INFO_ENDCARD_FILE.exists():
+        raise HTTPException(404, "Kapanış görseli yüklenmedi")
+    return FileResponse(str(INFO_ENDCARD_FILE), media_type="image/jpeg")
 
 
 @app.get("/api/audio/{filename}")
