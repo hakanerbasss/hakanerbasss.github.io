@@ -5645,6 +5645,29 @@ def _cleanup_old_media():
     except Exception:
         pass
 
+    # THUMB_DIR'daki eski thumbnail'leri sil — haber sitesi DB'sinde olanlar korunur
+    try:
+        news_thumbs = set()
+        try:
+            import sqlite3 as _sq
+            _db = Path("haberler.db")
+            if _db.exists():
+                with _sq.connect(str(_db)) as _c:
+                    for (tn,) in _c.execute("SELECT thumbnail FROM articles WHERE thumbnail != ''"):
+                        news_thumbs.add(tn)
+        except Exception:
+            pass
+        for f in THUMB_DIR.iterdir():
+            if not f.is_file() or f.name in news_thumbs:
+                continue
+            if now - f.stat().st_mtime > 7 * 86400:
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
 
 @app.on_event("startup")
 async def startup_event():
