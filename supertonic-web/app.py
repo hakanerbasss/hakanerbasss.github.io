@@ -4882,6 +4882,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         parts.append(source_text)
     parts.append("Siz ne düşünüyorsunuz? 👇")
     parts.append("⚠️ Haberin doğruluğunu kendi kaynaklarınızdan teyit ediniz.")
+    parts.append("🔗 Tüm haberler için link bio'da")
     parts.append(full_tags)
     caption = "\n\n".join(parts)
     # Instagram caption limiti 2200 karakter — güvenli taraf
