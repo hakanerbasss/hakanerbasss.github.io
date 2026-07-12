@@ -1,19 +1,19 @@
-package com.hakanerbas.namaz
+package com.wizaicorp.namazvakitleri
 
 import android.app.Activity
 import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.appopen.AppOpenAd
 
-// ── Reklam ID'leri — AdMob konsolundan al ─────────────────────────────────────
-private const val BANNER_ID        = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
-private const val INTERSTITIAL_ID  = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
-private const val APP_OPEN_ID      = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+// AdMob konsolundan gercek ID'leri al
+private const val BANNER_ID       = "ca-app-pub-7820582813827252/8866344025"
+private const val INTERSTITIAL_ID = "ca-app-pub-7820582813827252/8866344025"
+private const val APP_OPEN_ID     = "ca-app-pub-7820582813827252/8866344025"
 
 object AdManager {
     private lateinit var ctx: Context
@@ -24,13 +24,11 @@ object AdManager {
     fun init(context: Context) {
         ctx = context.applicationContext
         MobileAds.initialize(context) {
-            Log.d("AdManager", "AdMob başlatıldı")
+            Log.d("AdManager", "AdMob baslatildi")
             loadInterstitial()
             loadAppOpen()
         }
     }
-
-    // ── Interstitial ──────────────────────────────────────────────────────────
 
     private fun loadInterstitial() {
         InterstitialAd.load(ctx, INTERSTITIAL_ID, AdRequest.Builder().build(),
@@ -51,8 +49,6 @@ object AdManager {
         } else { onDone() }
     }
 
-    // ── App Open ──────────────────────────────────────────────────────────────
-
     private fun loadAppOpen() {
         AppOpenAd.load(ctx, APP_OPEN_ID, AdRequest.Builder().build(),
             object : AppOpenAd.AppOpenAdLoadCallback() {
@@ -70,8 +66,6 @@ object AdManager {
         ad.show(activity)
     }
 }
-
-// ── Banner Composable ─────────────────────────────────────────────────────────
 
 @Composable
 fun BannerAd() {

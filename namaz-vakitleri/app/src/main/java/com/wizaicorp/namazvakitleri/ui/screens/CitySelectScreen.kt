@@ -1,4 +1,4 @@
-package com.hakanerbas.namaz.ui.screens
+package com.wizaicorp.namazvakitleri.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,8 +15,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.hakanerbas.namaz.api.AladhanApi
-import com.hakanerbas.namaz.data.City
+import com.wizaicorp.namazvakitleri.api.AladhanApi
+import com.wizaicorp.namazvakitleri.data.City
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

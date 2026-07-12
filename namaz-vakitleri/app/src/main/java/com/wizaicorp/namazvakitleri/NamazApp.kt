@@ -1,20 +1,14 @@
-package com.hakanerbas.namaz
+package com.wizaicorp.namazvakitleri
 
 import android.app.Application
 import com.google.firebase.messaging.FirebaseMessaging
-import com.hakanerbas.namaz.data.CityManager
+import com.wizaicorp.namazvakitleri.data.CityManager
 
 class NamazApp : Application() {
-
     override fun onCreate() {
         super.onCreate()
         AdManager.init(this)
-        subscribeToCity()
-    }
-
-    private fun subscribeToCity() {
         val city = CityManager.getSelected(this)
-        FirebaseMessaging.getInstance()
-            .subscribeToTopic(CityManager.topicFor(city))
+        FirebaseMessaging.getInstance().subscribeToTopic(CityManager.topicFor(city))
     }
 }

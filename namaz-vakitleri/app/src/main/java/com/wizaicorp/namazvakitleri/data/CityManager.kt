@@ -1,4 +1,4 @@
-package com.hakanerbas.namaz.data
+package com.wizaicorp.namazvakitleri.data
 
 import android.content.Context
 import com.google.firebase.messaging.FirebaseMessaging

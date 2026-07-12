@@ -1,7 +1,7 @@
-package com.hakanerbas.namaz.api
+package com.wizaicorp.namazvakitleri.api
 
 import com.google.gson.annotations.SerializedName
-import com.hakanerbas.namaz.data.PrayerTimes
+import com.wizaicorp.namazvakitleri.data.PrayerTimes
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
@@ -10,18 +10,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// ── Retrofit arayüzü ──────────────────────────────────────────────────────────
-
 interface AladhanService {
     @GET("v1/timingsByCity")
     suspend fun getTimes(
-        @Query("city") city: String,
+        @Query("city")    city: String,
         @Query("country") country: String = "Turkey",
-        @Query("method") method: Int = 13   // 13 = Diyanet İşleri Başkanlığı
+        @Query("method")  method: Int = 13
     ): AladhanResponse
 }
-
-// ── Yanıt modelleri ───────────────────────────────────────────────────────────
 
 data class AladhanResponse(val data: AladhanData)
 data class AladhanData(val timings: AladhanTimings, val date: AladhanDate)
@@ -35,10 +31,7 @@ data class AladhanTimings(
 )
 data class AladhanDate(val readable: String)
 
-// ── Retrofit singleton ────────────────────────────────────────────────────────
-
 object AladhanApi {
-
     private val service: AladhanService by lazy {
         Retrofit.Builder()
             .baseUrl("https://api.aladhan.com/")
@@ -52,14 +45,14 @@ object AladhanApi {
         val t = resp.data.timings
         val today = SimpleDateFormat("d MMMM yyyy", Locale("tr")).format(Date())
         return PrayerTimes(
-            imsak   = t.fajr.take(5),
-            gunes   = t.sunrise.take(5),
-            ogle    = t.dhuhr.take(5),
-            ikindi  = t.asr.take(5),
-            aksam   = t.maghrib.take(5),
-            yatsi   = t.isha.take(5),
-            city    = city,
-            date    = today
+            imsak  = t.fajr.take(5),
+            gunes  = t.sunrise.take(5),
+            ogle   = t.dhuhr.take(5),
+            ikindi = t.asr.take(5),
+            aksam  = t.maghrib.take(5),
+            yatsi  = t.isha.take(5),
+            city   = city,
+            date   = today
         )
     }
 }

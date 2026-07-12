@@ -1,4 +1,4 @@
-package com.hakanerbas.namaz.data
+package com.wizaicorp.namazvakitleri.data
 
 data class PrayerTimes(
     val imsak: String,
