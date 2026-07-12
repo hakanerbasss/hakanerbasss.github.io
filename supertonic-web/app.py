@@ -304,9 +304,40 @@ def get_tts():
     return tts_model
 
 
+_TR_ONES = ['', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz']
+_TR_TENS = ['', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan']
+
+
+def _tr_num_to_words(n: int) -> str:
+    """Tam sayıyı Türkçe sözcüklere çevirir. Örn: 1500 → bin beş yüz"""
+    if n == 0:
+        return 'sıfır'
+    if n < 0:
+        return 'eksi ' + _tr_num_to_words(-n)
+    parts = []
+    if n >= 1_000_000_000:
+        b = n // 1_000_000_000; n %= 1_000_000_000
+        parts.append(('bir' if b == 1 else _tr_num_to_words(b)) + ' milyar')
+    if n >= 1_000_000:
+        m = n // 1_000_000; n %= 1_000_000
+        parts.append(('bir' if m == 1 else _tr_num_to_words(m)) + ' milyon')
+    if n >= 1_000:
+        t = n // 1_000; n %= 1_000
+        parts.append(('' if t == 1 else _tr_num_to_words(t) + ' ') + 'bin')
+    if n >= 100:
+        h = n // 100; n %= 100
+        parts.append(('' if h == 1 else _TR_ONES[h] + ' ') + 'yüz')
+    if n >= 10:
+        parts.append(_TR_TENS[n // 10]); n %= 10
+    if n > 0:
+        parts.append(_TR_ONES[n])
+    return ' '.join(p.strip() for p in parts if p.strip())
+
+
 def _clean_tts_text(text: str, lang: str = "tr") -> str:
-    """TTS'e gitmeden önce metni temizle — imla/format hatalarını düzelt."""
+    """TTS'e gitmeden önce metni temizle — sayı/format hatalarını düzelt."""
     import re
+
     # Markdown kalıntılarını kaldır
     text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)
     text = re.sub(r'#{1,6}\s*', '', text)
@@ -314,18 +345,70 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
     text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
 
     if lang == "tr":
-        # 3.5 → 3 nokta 5 (ondalık) — ÖNCE yapılmalı, binlik ayırıcıdan önce
-        text = re.sub(r'(\d+)\.(\d{1,2})(?!\d)', r'\1 nokta \2', text)
-        # 3,5 → 3 virgül 5 (ondalık virgüllü yazım)
-        text = re.sub(r'(\d+),(\d{1,2})(?!\d)', r'\1 virgül \2', text)
-        # 1.500 → 1500 (binlik nokta ayırıcı)
-        text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
-        # %85 → yüzde 85
-        text = re.sub(r'%\s*(\d+)', r'yüzde \1', text)
-        # 32° → 32 derece
-        text = re.sub(r'(\d+)°', r'\1 derece', text)
+        # URL'leri kaldır (daha önce olmalı — rakam regex'lerinden önce)
+        text = re.sub(r'https?://\S+', '', text)
 
-    # URL'leri kaldır
+        # Para birimleri: $50 → 50 dolar, €50 → 50 euro, £50 → 50 sterlin
+        text = re.sub(r'\$\s*(\d[\d.,]*)', r'\1 dolar', text)
+        text = re.sub(r'€\s*(\d[\d.,]*)', r'\1 euro', text)
+        text = re.sub(r'£\s*(\d[\d.,]*)', r'\1 sterlin', text)
+
+        # Saat: 14:30 → saat on dört otuz
+        def _saat(m):
+            h, mn = int(m.group(1)), int(m.group(2))
+            return 'saat ' + _tr_num_to_words(h) + ' ' + (_tr_num_to_words(mn) if mn else '')
+        text = re.sub(r'\b(\d{1,2}):(\d{2})\b', _saat, text)
+
+        # Tarih: 12.07.2026 veya 12/07/2026 → on iki temmuz iki bin yirmi altı
+        _AYLAR = {1:'ocak',2:'şubat',3:'mart',4:'nisan',5:'mayıs',6:'haziran',
+                  7:'temmuz',8:'ağustos',9:'eylül',10:'ekim',11:'kasım',12:'aralık'}
+        def _tarih(m):
+            d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 1 <= mo <= 12 and 1 <= d <= 31 and y > 1900:
+                return _tr_num_to_words(d) + ' ' + _AYLAR[mo] + ' ' + _tr_num_to_words(y)
+            return m.group(0)
+        text = re.sub(r'\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b', _tarih, text)
+
+        # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli
+        # 3.5 → üç nokta beş
+        def _ondalik_nokta(m):
+            return _tr_num_to_words(int(m.group(1))) + ' nokta ' + m.group(2)
+        text = re.sub(r'\b(\d+)\.(\d{1,2})(?!\d)', _ondalik_nokta, text)
+        # 3,5 → üç virgül beş
+        def _ondalik_virgul(m):
+            return _tr_num_to_words(int(m.group(1))) + ' virgül ' + m.group(2)
+        text = re.sub(r'\b(\d+),(\d{1,2})(?!\d)', _ondalik_virgul, text)
+
+        # Binlik nokta ayırıcıyı kaldır: 1.500 → 1500
+        text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
+
+        # Büyük sayıları sözcüğe çevir: 1500000 → bir buçuk milyon (1.500.000+)
+        def _buyuk_sayi(m):
+            n = int(m.group(0).replace('.', ''))
+            if n >= 1000:
+                return _tr_num_to_words(n)
+            return m.group(0)
+        text = re.sub(r'\b\d[\d.]*\b', _buyuk_sayi, text)
+
+        # Yüzde: %85 → yüzde seksen beş
+        def _yuzde(m):
+            return 'yüzde ' + _tr_num_to_words(int(m.group(1)))
+        text = re.sub(r'%\s*(\d+)', _yuzde, text)
+
+        # Sıcaklık: 35°C → otuz beş santigrat, 35°F → otuz beş fahrenheit, 35° → otuz beş derece
+        text = re.sub(r'(\d+)°C', lambda m: _tr_num_to_words(int(m.group(1))) + ' santigrat', text)
+        text = re.sub(r'(\d+)°F', lambda m: _tr_num_to_words(int(m.group(1))) + ' fahrenheit', text)
+        text = re.sub(r'(\d+)°', lambda m: _tr_num_to_words(int(m.group(1))) + ' derece', text)
+
+        # Kısaltmalar
+        text = re.sub(r'\bTL\b', 'Türk lirası', text)
+        text = re.sub(r'\bkm/s\b', 'kilometre saat', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkm\b', 'kilometre', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkg\b', 'kilogram', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bm²\b', 'metrekare', text)
+        text = re.sub(r'\bm³\b', 'metreküp', text)
+
+    # URL'leri kaldır (lang != tr için de)
     text = re.sub(r'https?://\S+', '', text)
     # Özel semboller
     text = re.sub(r'[#@|_~^\\<>{}[\]]', ' ', text)
