@@ -26,6 +26,7 @@ from deep_translator import GoogleTranslator
 import whisper
 
 import news_site
+import ig_perf
 from ig_analytics_full import fetch_full_analytics
 
 app = FastAPI()
@@ -853,6 +854,14 @@ Rules:
         if exclude_topics.strip():
             exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
 
+        # ── Hesap performans verisi: kategori skorları + tekrar kısıtları ────────
+        perf_instruction = ""
+        if lang == "tr" and not topic.strip():
+            try:
+                perf_instruction = ig_perf.build_instruction(get_ig_only_tr_used_topics())
+            except Exception as _pe:
+                print(f"[ig_perf] yönlendirme üretilemedi: {_pe}", flush=True)
+
         # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
         gnews_data = {}
         search_query = topic.strip()
@@ -863,6 +872,7 @@ Rules:
                     f"The list is already sorted by popularity — prefer topics near the top. "
                     f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
                     + (f"\n\nAvoid (already posted today): {exclude_topics}" if exclude_topics.strip() else "")
+                    + perf_instruction
                 )
                 sel_resp = client.chat.completions.create(
                     model="deepseek-chat",
@@ -917,7 +927,7 @@ Rules:
                 f"4) Listede en üstte olan popüler trend haber\n"
                 f"If the trending list has NO topics matching priority 1, 2 or 3, pick by popularity as usual.\n"
                 f"Do NOT force a gurbetçi angle if the topic is not genuinely about expats.\n"
-                f"{get_diversity_instruction()}"
+                f"{get_diversity_instruction()}{perf_instruction}"
             )
         yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
         prompt = f"""Create a YouTube Shorts video.
@@ -5358,15 +5368,13 @@ IG_ONLY_TR_DAILY_TOPICS = Path("ig_only_tr_daily_topics.json")
 def load_ig_only_tr_config():
     if IG_ONLY_TR_SCHED_CONFIG.exists():
         cfg = json.loads(IG_ONLY_TR_SCHED_CONFIG.read_text())
-        if "weekly" not in cfg:
+        if "weekly" not in cfg or cfg.get("sched_v") != _IG_SCHED_VERSION:
+            # Eski schedule → veriye göre ayarlanmış yeni schedule'a geç
             cfg["weekly"] = _IG_WEEKLY_SCHEDULE
-            IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
-        elif len(cfg["weekly"].get("mon", [])) < 10:
-            # Eski az-slot schedule → yeni 12-slot schedule'a geç
-            cfg["weekly"] = _IG_WEEKLY_SCHEDULE
+            cfg["sched_v"] = _IG_SCHED_VERSION
             IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
         return cfg
-    return {"enabled": False, "voice": "F1", "weekly": _IG_WEEKLY_SCHEDULE}
+    return {"enabled": False, "voice": "F1", "weekly": _IG_WEEKLY_SCHEDULE, "sched_v": _IG_SCHED_VERSION}
 
 
 def save_ig_only_tr_log(status: str, message: str):
@@ -5452,7 +5460,18 @@ async def auto_ig_only_tr_job():
                     else:
                         save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı. Denenenler: {exclude_str[:200]}")
                         return
-                break  # dedup geçti
+
+                # Kategori tekrar/tavan kontrolü — son denemede ihlale rağmen paylaşılır
+                # (slot boş kalmasın; trend listesi o gün tek konuya kilitlenmiş olabilir)
+                cat_ok, cat_reason = ig_perf.check_hard_rules(gen_title, get_ig_only_tr_used_topics())
+                if not cat_ok:
+                    if _attempt < _MAX_DEDUP_RETRY - 1:
+                        print(f"[CAT-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] {cat_reason}: '{gen_title[:60]}' — farklı kategori istenecek", flush=True)
+                        exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
+                        continue
+                    else:
+                        print(f"[CAT-WARN] {cat_reason} ama son deneme — yine de paylaşılıyor: '{gen_title[:60]}'", flush=True)
+                break  # dedup + kategori geçti
 
         if d is None:
             return
@@ -5487,14 +5506,19 @@ async def auto_ig_only_tr_job():
         lock.release()
 
 
+# v3 — 292 postluk analitik verisine göre (12.07.2026):
+# 09:00–15:00 altın pencere (ort. 4.415 izlenme, 10:00'da 5.727 + 37.6 paylaşım),
+# 06:00–09:00 ölü bölge (ort. 1.040), 22:00 civarı iyi (2.923).
+# Slotlar sabah yerine öğlen penceresine yığıldı; 18:40 tek akşam + 22:00 korundu.
+_IG_SCHED_VERSION = 3
 _IG_WEEKLY_SCHEDULE = {
-    "mon": ["06:00", "07:28", "08:55", "10:20", "11:48", "13:15", "14:42", "16:08", "17:35", "19:00", "20:28", "22:00"],
-    "tue": ["06:10", "07:38", "09:05", "10:30", "11:55", "13:22", "15:05", "16:10", "17:15", "18:20", "19:25", "20:35", "21:45", "22:55"],
-    "wed": ["06:05", "07:32", "09:00", "10:25", "11:52", "13:18", "14:45", "16:12", "17:38", "19:05", "20:32", "22:05"],
-    "thu": ["06:15", "07:42", "09:10", "10:35", "12:00", "13:28", "14:55", "16:20", "17:48", "19:15", "20:40", "22:15"],
-    "fri": ["06:00", "07:25", "08:52", "10:18", "11:45", "13:12", "14:38", "16:05", "17:30", "18:58", "20:25", "22:00"],
-    "sat": ["08:00", "10:00", "11:35", "13:10", "14:45", "16:30", "18:15", "20:30"],
-    "sun": ["08:30", "10:30", "12:05", "13:40", "15:15", "17:00", "19:00", "21:00"],
+    "mon": ["09:00", "09:50", "10:40", "11:30", "12:20", "13:10", "14:05", "15:00", "16:00", "17:05", "18:40", "22:00"],
+    "tue": ["09:05", "09:55", "10:45", "11:35", "12:25", "13:15", "14:10", "15:05", "16:05", "17:10", "18:45", "22:05"],
+    "wed": ["09:10", "10:00", "10:50", "11:40", "12:30", "13:20", "14:15", "15:10", "16:10", "17:15", "18:50", "22:10"],
+    "thu": ["09:00", "09:52", "10:42", "11:32", "12:22", "13:12", "14:07", "15:02", "16:02", "17:07", "18:42", "22:02"],
+    "fri": ["09:05", "09:57", "10:47", "11:37", "12:27", "13:17", "14:12", "15:07", "16:07", "17:12", "18:47", "22:07"],
+    "sat": ["09:30", "10:30", "11:30", "12:30", "13:45", "15:00", "16:30", "22:00"],
+    "sun": ["09:35", "10:35", "11:35", "12:35", "13:50", "15:05", "16:35", "22:05"],
 }
 
 
@@ -5546,7 +5570,8 @@ async def save_ig_only_tr_sched_config(
     weekly = {}
     for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
         weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
-    cfg = {"enabled": enabled == "true", "voice": voice, "weekly": weekly}
+    # sched_v damgalanır ki kullanıcının elle kaydettiği saatler migration'da ezilmesin
+    cfg = {"enabled": enabled == "true", "voice": voice, "weekly": weekly, "sched_v": _IG_SCHED_VERSION}
     IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_ig_only_tr_scheduler()
     return {"ok": True}
@@ -5737,6 +5762,19 @@ def _cleanup_old_media():
         pass
 
 
+async def _refresh_ig_analytics_cache():
+    """Gece 05:15'te analitik cache'i yeniler — ig_perf skorlaması hep taze veriyle çalışsın.
+    İlk sabah postu 09:00'da olduğundan skorlar güne hazır olur."""
+    try:
+        cfg = get_ig_config()
+        if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+            return
+        data = await fetch_full_analytics(cfg["ig_user_id"], cfg["access_token"], force=True)
+        print(f"[ig_perf] analitik cache yenilendi: {data.get('total_posts', 0)} post", flush=True)
+    except Exception as e:
+        print(f"[ig_perf] analitik cache yenileme hatası: {e}", flush=True)
+
+
 @app.on_event("startup")
 async def startup_event():
     global _SERVICE_STARTED_AT, _RESCUE_MAP
@@ -5761,6 +5799,10 @@ async def startup_event():
     scheduler.add_job(
         _cleanup_old_media, CronTrigger(hour=4, minute=30, timezone="Europe/Istanbul"),
         id="cleanup_old_media", replace_existing=True,
+    )
+    scheduler.add_job(
+        _refresh_ig_analytics_cache, CronTrigger(hour=5, minute=15, timezone="Europe/Istanbul"),
+        id="refresh_ig_analytics", replace_existing=True,
     )
 
     asyncio.create_task(_rescue_interrupted_jobs_task())
