@@ -6405,12 +6405,13 @@ async def tts_upload_reference(file: UploadFile = File(...)):
     async with aiofiles.open(tmp, "wb") as f:
         content = await file.read()
         await f.write(content)
-    if ext != ".wav":
-        cmd = ["ffmpeg", "-y", "-i", str(tmp), "-ar", "22050", "-ac", "1", str(dest)]
-        r = subprocess.run(cmd, capture_output=True)
-        tmp.unlink(missing_ok=True)
-        if r.returncode != 0:
-            raise HTTPException(500, f"FFmpeg dönüşüm hatası: {r.stderr.decode()[:200]}")
+    # Gürültü temizleme + normalize + WAV dönüşümü (tüm formatlar için)
+    noise_filter = "anlmdn=s=7:p=0.002:r=0.002:m=15,highpass=f=100,lowpass=f=8000,loudnorm"
+    cmd = ["ffmpeg", "-y", "-i", str(tmp), "-af", noise_filter, "-ar", "22050", "-ac", "1", str(dest)]
+    r = subprocess.run(cmd, capture_output=True)
+    tmp.unlink(missing_ok=True)
+    if r.returncode != 0:
+        raise HTTPException(500, f"FFmpeg dönüşüm hatası: {r.stderr.decode()[:200]}")
     else:
         tmp.rename(dest)
     return {"ok": True, "path": str(dest), "size_kb": round(dest.stat().st_size / 1024)}
