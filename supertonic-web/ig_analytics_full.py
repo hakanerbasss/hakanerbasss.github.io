@@ -11,6 +11,7 @@ Mevcut /api/instagram/analytics endpoint'inin çok üstünde:
 """
 
 import re
+import sys
 import json
 import time
 import httpx
@@ -66,36 +67,50 @@ async def _fetch_all_media(uid: str, token: str, client: httpx.AsyncClient) -> l
 
 
 async def _fetch_media_insights(media_id: str, media_type: str, token: str, client: httpx.AsyncClient) -> dict:
-    """Post başına tüm metrikler."""
-    # likes ve comments insights metriği değil, media object field'ı — bunlar 400 hatası çıkarır
+    """Post başına tüm metrikler. Meta bir metrik grubunda tek geçersiz metrik varsa TÜM
+    isteği 400 ile reddeder (örn. impressions birçok hesapta deprecate edildi) — bu yüzden
+    önce tam grup denenir, 400 alınırsa impressions çıkarılıp tekrar denenir."""
+    # likes ve comments insights metriği değil, media object field'ı (like_count/comments_count)
     if media_type in ("VIDEO", "REEL"):
-        metrics = "views,reach,shares,saved,total_interactions,impressions"
+        full = "views,reach,shares,saved,total_interactions,impressions"
+        fallback = "views,reach,shares,saved,total_interactions"
     else:
-        metrics = "impressions,reach,saved,total_interactions"
+        full = "reach,saved,total_interactions,impressions"
+        fallback = "reach,saved,total_interactions"
 
-    try:
+    async def _try(metrics: str):
         r = await client.get(
             f"{GRAPH}/{media_id}/insights",
             params={"metric": metrics, "period": "lifetime", "access_token": token},
             timeout=15,
         )
-        if r.status_code == 200:
-            items = r.json().get("data", [])
-            result = {}
-            for item in items:
-                if "total_value" in item:
-                    val = item["total_value"].get("value", 0)
-                elif "value" in item:
-                    val = item["value"] or 0
-                elif "values" in item:
-                    val = item["values"][0].get("value", 0) if item.get("values") else 0
-                else:
-                    val = 0
-                result[item["name"]] = val if isinstance(val, (int, float)) else 0
-            return result
-    except Exception:
-        pass
-    return {}
+        return r
+
+    try:
+        r = await _try(full)
+        if r.status_code != 200:
+            r = await _try(fallback)
+        if r.status_code != 200:
+            print(f"[ig_analytics_full] insights fail media={media_id} "
+                  f"status={r.status_code} body={r.text[:200]}", file=sys.stderr)
+            return {}
+
+        items = r.json().get("data", [])
+        result = {}
+        for item in items:
+            if "total_value" in item:
+                val = item["total_value"].get("value", 0)
+            elif "value" in item:
+                val = item["value"] or 0
+            elif "values" in item:
+                val = item["values"][0].get("value", 0) if item.get("values") else 0
+            else:
+                val = 0
+            result[item["name"]] = val if isinstance(val, (int, float)) else 0
+        return result
+    except Exception as e:
+        print(f"[ig_analytics_full] insights exception media={media_id}: {e}", file=sys.stderr)
+        return {}
 
 
 async def _fetch_account_daily(uid: str, token: str, client: httpx.AsyncClient) -> dict:
