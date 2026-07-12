@@ -1402,27 +1402,16 @@ Rules:
         except Exception as _sp_e:
             print(f"[SPIKER] Hata: {_sp_e}", flush=True)
 
-    # Animasyonlu outro ekle
-    try:
-        _ig_handle = get_ig_config().get("ig_handle", "")
-        _outro_raw = OUTPUT_DIR / f"{uid}_outro_raw.mp4"
-        _outro_ok = await asyncio.to_thread(
-            create_animated_outro_video,
-            AVATAR_FILE if AVATAR_FILE.exists() else None,
-            _ig_handle,
-            _outro_raw,
-            platform,
-        )
-        if _outro_ok and _outro_raw.exists():
-            _outro_merged = OUTPUT_DIR / f"{uid}_outro_merged.mp4"
-            _merged_ok = await _append_outro_to_video(output_file, _outro_raw, _outro_merged)
-            if _merged_ok and _outro_merged.exists():
+    # Outro template ekle (uploads/outro_template.mp4 varsa)
+    if OUTRO_TEMPLATE.exists():
+        try:
+            _outro_final = OUTPUT_DIR / f"{uid}_with_outro.mp4"
+            if await _append_outro_template(output_file, _outro_final) and _outro_final.exists():
                 output_file.unlink(missing_ok=True)
-                _outro_merged.rename(output_file)
-                print("[OUTRO] Animasyonlu outro eklendi", flush=True)
-            _outro_raw.unlink(missing_ok=True)
-    except Exception as _outro_e:
-        print(f"[OUTRO] Hata: {_outro_e}", flush=True)
+                _outro_final.rename(output_file)
+                print("[OUTRO] Template outro eklendi", flush=True)
+        except Exception as _outro_e:
+            print(f"[OUTRO] Hata: {_outro_e}", flush=True)
 
     # Geçici dosyaları temizle (disk dolmaması için)
     shutil.rmtree(scene_dir, ignore_errors=True)
@@ -2009,17 +1998,7 @@ def overlay_like_subscribe_banner(photo_path: Path) -> None:
     img.convert("RGB").save(str(photo_path), "JPEG", quality=92)
 
 
-def _draw_rounded_rect(draw, xy, radius, fill_rgba):
-    """Pillow sürümünden bağımsız yuvarlak köşeli dikdörtgen."""
-    x0, y0, x1, y1 = xy
-    r, g, b, a = fill_rgba
-    c = (r, g, b, a)
-    draw.rectangle([x0 + radius, y0, x1 - radius, y1], fill=c)
-    draw.rectangle([x0, y0 + radius, x1, y1 - radius], fill=c)
-    draw.ellipse([x0, y0, x0 + 2 * radius, y0 + 2 * radius], fill=c)
-    draw.ellipse([x1 - 2 * radius, y0, x1, y0 + 2 * radius], fill=c)
-    draw.ellipse([x0, y1 - 2 * radius, x0 + 2 * radius, y1], fill=c)
-    draw.ellipse([x1 - 2 * radius, y1 - 2 * radius, x1, y1], fill=c)
+OUTRO_TEMPLATE = UPLOAD_DIR / "outro_template.mp4"
 
 
 def create_animated_outro_video(
@@ -2030,7 +2009,8 @@ def create_animated_outro_video(
     duration_sec: float = 3.5,
     fps: int = 30,
 ) -> bool:
-    """3.5 saniyelik animasyonlu outro klip oluşturur (ses yok, saf görsel)."""
+    """Artık kullanılmıyor — template sistemi kullanılıyor."""
+    return False
     import tempfile, math, random
     from PIL import Image, ImageDraw, ImageFont
 
@@ -2249,29 +2229,16 @@ def create_animated_outro_video(
             return False
 
 
-async def _append_outro_to_video(
-    main_video: Path,
-    outro_video: Path,
-    final_output: Path,
-) -> bool:
-    """Ana video + sessiz outro klibini birleştir."""
+async def _append_outro_template(main_video: Path, final_output: Path) -> bool:
+    """uploads/outro_template.mp4 varsa ana videoya yapıştır."""
+    if not OUTRO_TEMPLATE.exists():
+        return False
     import tempfile as _tf
     try:
-        # Outro'ya sessiz ses kanalı ekle (main video'nun formatıyla uyumlu)
-        outro_with_audio = outro_video.with_stem(outro_video.stem + "_a")
-        await arun_ffmpeg([
-            "ffmpeg", "-y",
-            "-i", str(outro_video.absolute()),
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-c:v", "copy", "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
-            "-shortest", str(outro_with_audio.absolute())
-        ], timeout=60, step="outro-audio")
-
         with _tf.NamedTemporaryFile(suffix=".txt", delete=False, mode="w") as f:
             f.write(f"file '{main_video.absolute()}'\n")
-            f.write(f"file '{outro_with_audio.absolute()}'\n")
+            f.write(f"file '{OUTRO_TEMPLATE.absolute()}'\n")
             concat_list = f.name
-
         await arun_ffmpeg([
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0", "-i", concat_list,
@@ -2281,8 +2248,6 @@ async def _append_outro_to_video(
             "-movflags", "+faststart",
             str(final_output.absolute())
         ], timeout=300, step="outro-concat")
-
-        outro_with_audio.unlink(missing_ok=True)
         Path(concat_list).unlink(missing_ok=True)
         return final_output.exists()
     except Exception as e:
@@ -4907,6 +4872,28 @@ async def info_endcard_photo():
     if not INFO_ENDCARD_FILE.exists():
         raise HTTPException(404, "Kapanış görseli yüklenmedi")
     return FileResponse(str(INFO_ENDCARD_FILE), media_type="image/jpeg")
+
+
+@app.get("/api/outro-template/status")
+async def outro_template_status():
+    if OUTRO_TEMPLATE.exists():
+        size_mb = round(OUTRO_TEMPLATE.stat().st_size / 1024 / 1024, 1)
+        return {"has_template": True, "size_mb": size_mb}
+    return {"has_template": False}
+
+
+@app.post("/api/outro-template/upload")
+async def outro_template_upload(file: UploadFile = File(...)):
+    data = await file.read()
+    OUTRO_TEMPLATE.write_bytes(data)
+    size_mb = round(len(data) / 1024 / 1024, 1)
+    return {"ok": True, "size_mb": size_mb}
+
+
+@app.delete("/api/outro-template")
+async def outro_template_delete():
+    OUTRO_TEMPLATE.unlink(missing_ok=True)
+    return {"ok": True}
 
 
 @app.get("/api/audio/{filename}")

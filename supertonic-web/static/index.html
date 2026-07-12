@@ -1715,7 +1715,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'tnlv') updateTNLVApiKeyStatus();
   if (name === 'longvideo') { updateLVApiKeyStatus(); checkLVStatusOnLoad(); }
-  if (name === 'infoshorts') { updateInfoApiKeyStatus(); loadInfoEndcardStatus(); }
+  if (name === 'infoshorts') { updateInfoApiKeyStatus(); loadInfoEndcardStatus(); loadOutroTemplateStatus(); }
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
 }
@@ -2568,6 +2568,7 @@ updateLVApiKeyStatus();
 updateTNLVApiKeyStatus();
 updateInfoApiKeyStatus();
 loadInfoEndcardStatus();
+loadOutroTemplateStatus();
 
 function saveApiKey() {
   const v = dsKey.value.trim();
@@ -2757,6 +2758,44 @@ async function generateInfoShorts() {
     setLoading('btn-infoshorts', 'spin-infoshorts', false);
     showError('err-infoshorts', e.message);
   }
+}
+
+async function loadOutroTemplateStatus() {
+  try {
+    const s = await fetch('/api/outro-template/status').then(r => r.json());
+    if (s.has_template) {
+      document.getElementById('outro-size').textContent = s.size_mb + ' MB';
+      document.getElementById('outro-current').style.display = 'block';
+      document.getElementById('outro-empty').style.display = 'none';
+    } else {
+      document.getElementById('outro-current').style.display = 'none';
+      document.getElementById('outro-empty').style.display = 'block';
+    }
+  } catch(e) {}
+}
+async function uploadOutroTemplate(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch('/api/outro-template/upload', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || 'Hata');
+    await loadOutroTemplateStatus();
+  } catch(err) { alert('Yükleme hatası: ' + err.message); }
+}
+function handleOutroDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '#333';
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  uploadOutroTemplate({ target: { files: [file] } });
+}
+async function deleteOutroTemplate() {
+  if (!confirm('Outro videosu kaldırılsın mı?')) return;
+  await fetch('/api/outro-template', { method: 'DELETE' });
+  document.getElementById('outro-input').value = '';
+  await loadOutroTemplateStatus();
 }
 
 async function loadInfoEndcardStatus() {
@@ -4696,6 +4735,25 @@ function deleteComedyVideo() {
       <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎬 Pexels Video Klip Kullan</div>
       <div style="font-size:11px;color:#555;margin-top:2px;">Fotoğraf yerine Pexels'tan stock video klipleri kullanır</div>
     </div>
+  </div>
+
+  <div class="field">
+    <label>Outro Videosu <span style="color:#555;font-weight:400;">(tüm videolara sonuna eklenir)</span></label>
+    <div id="outro-current" style="display:none;margin-bottom:8px;padding:10px;background:#111;border:1px solid #2a2a2a;border-radius:8px;">
+      <div style="color:#aaa;font-size:13px;margin-bottom:8px;">✅ Outro yüklü — <span id="outro-size"></span></div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('outro-input').click()" style="flex:1;padding:7px;background:#333;border:none;color:#ddd;border-radius:5px;cursor:pointer;font-size:12px;">Değiştir</button>
+        <button onclick="deleteOutroTemplate()" style="flex:1;padding:7px;background:#5a1a1a;border:none;color:#f88;border-radius:5px;cursor:pointer;font-size:12px;">Kaldır</button>
+      </div>
+    </div>
+    <div id="outro-empty" onclick="document.getElementById('outro-input').click()"
+      style="border:2px dashed #333;border-radius:8px;padding:16px;text-align:center;cursor:pointer;"
+      ondragover="event.preventDefault();this.style.borderColor='#e1306c'"
+      ondragleave="this.style.borderColor='#333'"
+      ondrop="handleOutroDrop(event)">
+      <div style="color:#555;font-size:13px;">🎬 Outro MP4 yükle<br><span style="font-size:11px;">CapCut'ta yapıp buraya yükle — her videoya otomatik eklenir</span></div>
+    </div>
+    <input type="file" id="outro-input" accept="video/mp4,video/*" style="display:none" onchange="uploadOutroTemplate(event)">
   </div>
 
   <div class="field">
