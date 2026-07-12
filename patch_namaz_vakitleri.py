@@ -116,8 +116,8 @@ object CityManager {{
             .putString(KEY_CITY, city.name)
             .putString(KEY_CITY_API, city.apiName)
             .apply()
-        FirebaseMessaging.getInstance().unsubscribeFromTopic("namaz_\${{prev.apiName.lowercase()}}")
-        FirebaseMessaging.getInstance().subscribeToTopic("namaz_\${{city.apiName.lowercase()}}")
+        FirebaseMessaging.getInstance().unsubscribeFromTopic("namaz_${{prev.apiName.lowercase()}}")
+        FirebaseMessaging.getInstance().subscribeToTopic("namaz_${{city.apiName.lowercase()}}")
     }}
 }}
 """)
@@ -209,7 +209,7 @@ class NamazFCMService : FirebaseMessagingService() {{
     override fun onNewToken(token: String) {{
         val city = CityManager.getSelected(this)
         com.google.firebase.messaging.FirebaseMessaging.getInstance()
-            .subscribeToTopic("namaz_\${{city.apiName.lowercase()}}")
+            .subscribeToTopic("namaz_${{city.apiName.lowercase()}}")
     }}
 
     private fun showNotification(title: String, body: String) {{
@@ -335,7 +335,7 @@ class NamazApp : Application() {{
         super.onCreate()
         AdManager.init(this)
         val city = CityManager.getSelected(this)
-        FirebaseMessaging.getInstance().subscribeToTopic("namaz_\${{city.apiName.lowercase()}}")
+        FirebaseMessaging.getInstance().subscribeToTopic("namaz_${{city.apiName.lowercase()}}")
     }}
 }}
 """)
