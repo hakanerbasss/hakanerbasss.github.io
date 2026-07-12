@@ -2262,7 +2262,7 @@ async def _append_outro_to_video(
         await arun_ffmpeg([
             "ffmpeg", "-y",
             "-i", str(outro_video.absolute()),
-            "-f", "lavfi", "-i", f"aevalsrc=0:c=stereo:r=44100:d={3.5}",
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
             "-c:v", "copy", "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
             "-shortest", str(outro_with_audio.absolute())
         ], timeout=60, step="outro-audio")
