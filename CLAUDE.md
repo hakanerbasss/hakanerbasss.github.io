@@ -31,3 +31,4 @@ Ana proje: `supertonic-web/` klasörü.
 
 - `baretim-mavi-admob/` — Mobil uygulama
 - `whatsapp-api-server/` — WhatsApp servisi (`wa.wizaicorp.com`)
+- `ses-klonu/` — Kendi sesle TTS (XTTS-v2, ücretsiz HuggingFace Space'e deploy edilir) + konuşan fotoğraf (Wav2Lip, `konusan-foto/`)
