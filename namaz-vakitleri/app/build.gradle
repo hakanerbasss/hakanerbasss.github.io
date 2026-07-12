@@ -16,7 +16,10 @@ android {
         versionName "1.0"
     }
 
-    buildFeatures { compose true }
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
     composeOptions { kotlinCompilerExtensionVersion '1.5.5' }
     kotlinOptions { jvmTarget = '17' }
     compileOptions {
@@ -31,9 +34,16 @@ android {
         }
     }
 
-    // 16kb page alignment fix (Android 15 Play Store zorunluluğu)
+    // 16kb page alignment fix (Android 15 / Play Store zorunluluğu)
     packaging {
         jniLibs { useLegacyPackaging = false }
+    }
+}
+
+// 16kb: graphics-path 1.0.1 → 4KB hizali, force ile 1.1.0-rc01 kullan
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.graphics:graphics-path:1.1.0-rc01'
     }
 }
 
@@ -50,12 +60,15 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0'
     implementation 'androidx.core:core-ktx:1.12.0'
 
-    // Firebase (FCM bildirimleri)
-    implementation platform('com.google.firebase:firebase-bom:32.7.1')
+    // Firebase (FCM bildirimleri) — BOM 33.7.0+
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-messaging-ktx'
 
-    // AdMob
+    // AdMob — 23.3.0 kullan (23.6+ kotlin-stdlib-2.1.x ceker, 1.9.x ile catisir)
     implementation 'com.google.android.gms:play-services-ads:23.3.0'
+
+    // UMP — kullanici rizasi (No Fill sorununu onler)
+    implementation 'com.google.android.ump:user-messaging-platform:3.1.0'
 
     // HTTP + JSON
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
