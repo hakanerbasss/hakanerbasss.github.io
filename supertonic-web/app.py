@@ -28,6 +28,7 @@ import whisper
 import news_site
 import ig_perf
 from ig_analytics_full import fetch_full_analytics
+from namaz_bildirim import start_namaz_scheduler
 import xtts_clone
 
 app = FastAPI()
@@ -5902,6 +5903,8 @@ async def startup_event():
         _refresh_ig_analytics_cache, CronTrigger(hour=5, minute=15, timezone="Europe/Istanbul"),
         id="refresh_ig_analytics", replace_existing=True,
     )
+
+    start_namaz_scheduler(scheduler)
 
     asyncio.create_task(_rescue_interrupted_jobs_task())
 
