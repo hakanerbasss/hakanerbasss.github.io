@@ -15,6 +15,6 @@ class NamazApp : Application() {
     private fun subscribeToCity() {
         val city = CityManager.getSelected(this)
         FirebaseMessaging.getInstance()
-            .subscribeToTopic("namaz_${city.apiName.lowercase()}")
+            .subscribeToTopic(CityManager.topicFor(city))
     }
 }

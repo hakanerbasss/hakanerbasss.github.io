@@ -47,8 +47,8 @@ object AladhanApi {
             .create(AladhanService::class.java)
     }
 
-    suspend fun getPrayerTimes(city: String): PrayerTimes {
-        val resp = service.getTimes(city)
+    suspend fun getPrayerTimes(city: String, country: String = "Turkey"): PrayerTimes {
+        val resp = service.getTimes(city, country)
         val t = resp.data.timings
         val today = SimpleDateFormat("d MMMM yyyy", Locale("tr")).format(Date())
         return PrayerTimes(

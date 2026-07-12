@@ -80,7 +80,7 @@ private fun NamazNavHost() {
             isLoading = true
             error = null
             try {
-                prayerTimes = AladhanApi.getPrayerTimes(city.apiName)
+                prayerTimes = AladhanApi.getPrayerTimes(city.apiName, city.country)
             } catch (e: Exception) {
                 error = "Vakitler yuklenemedi. Lutfen internet baglantinizi kontrol edin."
             } finally {

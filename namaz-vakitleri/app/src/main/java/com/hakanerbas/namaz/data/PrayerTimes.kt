@@ -20,4 +20,4 @@ data class PrayerTimes(
     )
 }
 
-data class City(val name: String, val apiName: String)
+data class City(val name: String, val apiName: String, val country: String = "Turkey")

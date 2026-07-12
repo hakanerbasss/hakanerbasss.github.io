@@ -33,12 +33,25 @@ def _ensure_firebase():
 
 # ── Vakitler ──────────────────────────────────────────────────────────────────
 
-CITIES = [
-    "Adana", "Ankara", "Antalya", "Bursa", "Diyarbakir", "Erzurum",
-    "Eskisehir", "Gaziantep", "Hatay", "Istanbul", "Izmir", "Kahramanmaras",
-    "Kayseri", "Kocaeli", "Konya", "Malatya", "Mersin", "Samsun",
-    "Trabzon", "Van"
+_CITIES_FILE = "namaz_cities.json"
+_DEFAULT_CITIES = [
+    {"key": "istanbul_turkey",  "city": "Istanbul",  "country": "Turkey"},
+    {"key": "ankara_turkey",    "city": "Ankara",    "country": "Turkey"},
+    {"key": "izmir_turkey",     "city": "Izmir",     "country": "Turkey"},
 ]
+
+def _load_cities() -> list[dict]:
+    from pathlib import Path
+    p = Path(_CITIES_FILE)
+    if p.exists():
+        import json
+        try:
+            cities = json.loads(p.read_text())
+            if cities:
+                return cities
+        except Exception:
+            pass
+    return _DEFAULT_CITIES
 
 VAKIT_LABELS = {
     "Fajr":    "İmsak",
@@ -49,12 +62,12 @@ VAKIT_LABELS = {
     "Isha":    "Yatsı",
 }
 
-def _fetch_times(city: str) -> dict:
+def _fetch_times(city: str, country: str = "Turkey") -> dict:
     """Aladhan'dan bugünün vakitlerini çek. {label: "HH:MM"} döndür."""
     url = "https://api.aladhan.com/v1/timingsByCity"
     for attempt in range(3):
         resp = requests.get(url, params={
-            "city": city, "country": "Turkey", "method": 13
+            "city": city, "country": country, "method": 13
         }, timeout=10)
         if resp.status_code == 429:
             wait = 10 * (attempt + 1)
@@ -68,10 +81,9 @@ def _fetch_times(city: str) -> dict:
 
 # ── FCM gönder ────────────────────────────────────────────────────────────────
 
-def _send_fcm(city: str, vakit: str):
-    """Tek bir şehir + vakit için FCM topic mesajı gönder."""
+def _send_fcm_topic(topic: str, vakit: str):
+    """Bir FCM topic'ine namaz vakti bildirimi gönder."""
     _ensure_firebase()
-    topic = f"namaz_{city.lower()}"
     message = messaging.Message(
         notification=messaging.Notification(
             title=vakit,
@@ -92,27 +104,30 @@ def _schedule_today(scheduler):
     today = date.today().isoformat()
     log.info("Namaz vakitleri planlanıyor: %s", today)
 
-    for city in CITIES:
+    for entry in _load_cities():
+        city    = entry["city"]
+        country = entry.get("country", "Turkey")
         try:
-            times = _fetch_times(city)
+            times = _fetch_times(city, country)
         except Exception as e:
             log.error("Vakit çekme hatası %s: %s", city, e)
             continue
 
+        topic = f"namaz_{city.lower().replace(' ', '_')}_{country.lower().replace(' ', '_')}"
         for vakit, time_str in times.items():
             h, m = map(int, time_str.split(":"))
-            job_id = f"namaz_{city}_{vakit}_{today}"
+            job_id = f"{topic}_{vakit}_{today}"
             scheduler.add_job(
-                _send_fcm,
+                _send_fcm_topic,
                 trigger="cron",
                 hour=h,
                 minute=m,
                 id=job_id,
-                args=[city, vakit],
+                args=[topic, vakit],
                 replace_existing=True,
                 misfire_grace_time=120,
             )
-            log.debug("  %s %s → %s", city, vakit, time_str)
+            log.debug("  %s/%s %s → %s", city, country, vakit, time_str)
         time.sleep(2)  # şehirler arası bekleme — rate limit önleme
 
     log.info("Tüm vakitler planlandı.")

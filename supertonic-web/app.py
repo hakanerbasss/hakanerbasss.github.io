@@ -5909,6 +5909,23 @@ async def startup_event():
     asyncio.create_task(_rescue_interrupted_jobs_task())
 
 
+@app.post("/api/namaz/register-city")
+async def namaz_register_city(request: Request):
+    """Uygulama açılışında aktif şehri kaydeder. namaz_bildirim.py bu listeyi okur."""
+    body = await request.json()
+    city    = str(body.get("city", "")).strip()
+    country = str(body.get("country", "Turkey")).strip()
+    if not city:
+        raise HTTPException(status_code=400, detail="city required")
+    cities_file = Path("namaz_cities.json")
+    cities: list = json.loads(cities_file.read_text()) if cities_file.exists() else []
+    key = f"{city.lower()}_{country.lower()}"
+    if not any(c.get("key") == key for c in cities):
+        cities.append({"key": key, "city": city, "country": country})
+        cities_file.write_text(json.dumps(cities, ensure_ascii=False, indent=2))
+    return {"ok": True}
+
+
 @app.get("/api/status/service-start")
 async def get_service_start():
     return {"ts": _SERVICE_STARTED_AT}
