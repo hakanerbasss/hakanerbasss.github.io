@@ -28,6 +28,7 @@ import whisper
 import news_site
 import ig_perf
 from ig_analytics_full import fetch_full_analytics
+import xtts_clone
 
 app = FastAPI()
 app.include_router(news_site.router)
@@ -256,7 +257,11 @@ LANG_MAP = {
 VOICES = ["M1", "M2", "M3", "F1", "F2", "F3"]
 
 async def _synth_audio(text: str, lang: str, voice: str, speed: float, out_path: Path) -> float:
-    """Ses sentezi."""
+    """Ses sentezi. Türkçe+clone modu aktifse XTTS-v2, değilse Supertonic."""
+    if lang == "tr" and get_ig_config().get("use_clone_voice", False) and xtts_clone.hazir_mi():
+        return await xtts_clone.seslendir(
+            _clean_tts_text(text, lang), str(out_path), language="tr", speed=speed
+        )
     tts_obj = get_tts()
     style = tts_obj.get_voice_style(voice_name=voice)
     wav, dur = await asyncio.to_thread(tts_obj.synthesize,
@@ -6375,6 +6380,65 @@ _BACKUP_FILES = [
     news_site.DB_PATH,
 ]
 
+
+# ── Ses Klonu (XTTS-v2) ──────────────────────────────────────────────────────
+
+@app.get("/api/tts/clone-status")
+async def tts_clone_status():
+    cfg = get_ig_config()
+    return {
+        "has_reference": xtts_clone.hazir_mi(),
+        "use_clone": cfg.get("use_clone_voice", False),
+        "ref_path": str(xtts_clone.ref_audio_path()) if xtts_clone.hazir_mi() else None,
+    }
+
+
+@app.post("/api/tts/upload-reference")
+async def tts_upload_reference(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(400, "Dosya seçilmedi")
+    ext = Path(file.filename).suffix.lower()
+    if ext not in (".wav", ".mp3", ".m4a", ".ogg", ".flac"):
+        raise HTTPException(400, "Desteklenen formatlar: wav, mp3, m4a, ogg, flac")
+    dest = xtts_clone.ref_audio_path()
+    tmp = dest.with_suffix(".tmp")
+    async with aiofiles.open(tmp, "wb") as f:
+        content = await file.read()
+        await f.write(content)
+    if ext != ".wav":
+        cmd = ["ffmpeg", "-y", "-i", str(tmp), "-ar", "22050", "-ac", "1", str(dest)]
+        r = subprocess.run(cmd, capture_output=True)
+        tmp.unlink(missing_ok=True)
+        if r.returncode != 0:
+            raise HTTPException(500, f"FFmpeg dönüşüm hatası: {r.stderr.decode()[:200]}")
+    else:
+        tmp.rename(dest)
+    return {"ok": True, "path": str(dest), "size_kb": round(dest.stat().st_size / 1024)}
+
+
+@app.post("/api/tts/toggle-clone")
+async def tts_toggle_clone(enabled: bool = Form(...)):
+    cfg = get_ig_config()
+    cfg["use_clone_voice"] = enabled
+    IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
+    return {"use_clone": enabled}
+
+
+@app.post("/api/tts/test-clone")
+async def tts_test_clone(text: str = Form("Merhaba, bu benim klonlanmış sesim. Türkçe haber sunuyorum.")):
+    if not xtts_clone.hazir_mi():
+        raise HTTPException(400, "Referans ses yok — önce referans_sesim.wav yükle")
+    out = Path("/tmp") / f"clone_test_{uuid.uuid4().hex[:8]}.wav"
+    try:
+        dur = await xtts_clone.seslendir(text, str(out), language="tr")
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    return FileResponse(str(out), media_type="audio/wav",
+                        filename="clone_test.wav",
+                        headers={"X-Duration": str(round(dur, 2))})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 def _write_simple_backup_zip(zf) -> None:
     """Sadece config/token dosyaları — Telegram için küçük boyutlu yedek."""

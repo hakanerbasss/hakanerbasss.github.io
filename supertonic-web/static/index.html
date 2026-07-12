@@ -1542,7 +1542,44 @@
       </div>
     </div>
 
-    <!-- 9. Sistem -->
+    <!-- 9. Ses Klonu -->
+    <div class="acc-item" id="acc-sesklonu">
+      <div class="acc-header" onclick="toggleAcc('sesklonu')">
+        <span class="acc-title">🎙 Ses Klonu (Kendi Sesim)</span>
+        <span class="acc-right"><span class="acc-chevron" id="acc-chev-sesklonu">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-sesklonu">
+        <div id="clone-status-box" style="background:#111;border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;">
+          Yükleniyor...
+        </div>
+
+        <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Referans Ses Yükle</p>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">20-30 saniye, sessiz ortamda haber sunar gibi kaydettiğin ses. WAV, MP3, M4A desteklenir. Sunucuya kaydedilir, git'e eklenmez.</p>
+        <input type="file" id="clone-ref-file" accept=".wav,.mp3,.m4a,.ogg,.flac" style="display:none;" onchange="uploadCloneRef()">
+        <button onclick="document.getElementById('clone-ref-file').click()" style="font-size:12px;padding:8px 16px;margin-bottom:6px;">📁 Referans Ses Seç & Yükle</button>
+        <div id="clone-upload-status" style="font-size:12px;color:#888;margin-bottom:14px;"></div>
+
+        <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Test</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+          <input type="text" id="clone-test-text" value="Merhaba, bu benim klonlanmış sesim. Türkçe haber sunuyorum." style="flex:1;min-width:200px;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:12px;padding:8px;outline:none;">
+          <button onclick="testCloneVoice()" id="btn-clone-test" style="font-size:12px;padding:8px 16px;white-space:nowrap;">▶ Test Et</button>
+        </div>
+        <audio id="clone-test-audio" controls style="width:100%;display:none;margin-bottom:14px;"></audio>
+
+        <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Bot Entegrasyonu</p>
+        <p style="color:#555;font-size:11px;margin-bottom:10px;">Aktif edilince Türkçe IG postlarında Supertonic yerine senin klonlanmış sesin kullanılır. İlk çalıştırmada model yüklenmesi ~10-15 sn sürer.</p>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label class="toggle" style="margin:0;">
+            <input type="checkbox" id="clone-toggle" onchange="toggleCloneVoice(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="clone-toggle-label" style="font-size:13px;color:#aaa;">Supertonic (varsayılan)</span>
+        </div>
+        <div id="clone-toggle-status" style="font-size:12px;color:#888;margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <!-- 10. Sistem -->
     <div class="acc-item" id="acc-sistem">
       <div class="acc-header" onclick="toggleAcc('sistem')">
         <span class="acc-title">💾 Sistem / Yedek</span>
@@ -2111,6 +2148,7 @@ async function openSettings() {
   checkInstagramStatus();
   loadInstagramLog();
   loadBannedTopics();
+  loadCloneStatus();
 }
 
 async function loadBannedTopics() {
@@ -3248,6 +3286,76 @@ async function deleteIGFailed(filename, btn) {
     await loadIGFailedUploads();
   } catch(e) {
     btn.disabled = false;
+  }
+}
+
+// ── Ses Klonu ─────────────────────────────────────────────────────────────────
+
+async function loadCloneStatus() {
+  try {
+    const d = await fetch('/api/tts/clone-status').then(r => r.json());
+    const box = document.getElementById('clone-status-box');
+    box.innerHTML = d.has_reference
+      ? `<span style="color:#4ade80;">✓ Referans ses yüklü</span>`
+      : `<span style="color:#f87171;">✗ Referans ses yok — aşağıdan yükle</span>`;
+    const tog = document.getElementById('clone-toggle');
+    if (tog) tog.checked = d.use_clone;
+    const lbl = document.getElementById('clone-toggle-label');
+    if (lbl) lbl.textContent = d.use_clone ? 'Kendi sesim (XTTS-v2) aktif' : 'Supertonic (varsayılan)';
+  } catch(e) { console.error('clone status:', e); }
+}
+
+async function uploadCloneRef() {
+  const inp = document.getElementById('clone-ref-file');
+  const st = document.getElementById('clone-upload-status');
+  if (!inp.files.length) return;
+  st.textContent = 'Yükleniyor...'; st.style.color = '#888';
+  const fd = new FormData();
+  fd.append('file', inp.files[0]);
+  try {
+    const r = await fetch('/api/tts/upload-reference', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Hata');
+    st.textContent = `✓ Yüklendi (${d.size_kb} KB)`; st.style.color = '#4ade80';
+    loadCloneStatus();
+  } catch(e) {
+    st.textContent = '✗ ' + e.message; st.style.color = '#f87171';
+  }
+  inp.value = '';
+}
+
+async function testCloneVoice() {
+  const btn = document.getElementById('btn-clone-test');
+  const audio = document.getElementById('clone-test-audio');
+  const text = document.getElementById('clone-test-text').value.trim();
+  btn.disabled = true; btn.textContent = '⏳ Üretiliyor...';
+  try {
+    const fd = new FormData(); fd.append('text', text);
+    const r = await fetch('/api/tts/test-clone', { method: 'POST', body: fd });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Hata'); }
+    const blob = await r.blob();
+    audio.src = URL.createObjectURL(blob);
+    audio.style.display = 'block';
+    audio.play();
+  } catch(e) {
+    alert('Hata: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '▶ Test Et';
+}
+
+async function toggleCloneVoice(enabled) {
+  const lbl = document.getElementById('clone-toggle-label');
+  const st = document.getElementById('clone-toggle-status');
+  lbl.textContent = 'Kaydediliyor...';
+  const fd = new FormData(); fd.append('enabled', enabled);
+  try {
+    const r = await fetch('/api/tts/toggle-clone', { method: 'POST', body: fd });
+    const d = await r.json();
+    lbl.textContent = d.use_clone ? 'Kendi sesim (XTTS-v2) aktif' : 'Supertonic (varsayılan)';
+    st.textContent = '✓ Kaydedildi'; st.style.color = '#4ade80';
+    setTimeout(() => { st.textContent = ''; }, 2000);
+  } catch(e) {
+    lbl.textContent = '✗ Hata'; st.textContent = e.message; st.style.color = '#f87171';
   }
 }
 
