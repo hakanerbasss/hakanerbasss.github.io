@@ -1555,7 +1555,7 @@
 
         <p style="color:#888;font-size:12px;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Referans Ses Yükle</p>
         <p style="color:#555;font-size:11px;margin-bottom:10px;">20-30 saniye, sessiz ortamda haber sunar gibi kaydettiğin ses. WAV, MP3, M4A desteklenir. Sunucuya kaydedilir, git'e eklenmez.</p>
-        <input type="file" id="clone-ref-file" accept=".wav,.mp3,.m4a,.ogg,.flac" style="display:none;" onchange="uploadCloneRef()">
+        <input type="file" id="clone-ref-file" accept="audio/*" style="display:none;" onchange="uploadCloneRef()">
         <button onclick="document.getElementById('clone-ref-file').click()" style="font-size:12px;padding:8px 16px;margin-bottom:6px;">📁 Referans Ses Seç & Yükle</button>
         <div id="clone-upload-status" style="font-size:12px;color:#888;margin-bottom:14px;"></div>
 
