@@ -1402,6 +1402,28 @@ Rules:
         except Exception as _sp_e:
             print(f"[SPIKER] Hata: {_sp_e}", flush=True)
 
+    # Animasyonlu outro ekle
+    try:
+        _ig_handle = get_ig_config().get("ig_handle", "")
+        _outro_raw = OUTPUT_DIR / f"{uid}_outro_raw.mp4"
+        _outro_ok = await asyncio.to_thread(
+            create_animated_outro_video,
+            AVATAR_FILE if AVATAR_FILE.exists() else None,
+            _ig_handle,
+            _outro_raw,
+            platform,
+        )
+        if _outro_ok and _outro_raw.exists():
+            _outro_merged = OUTPUT_DIR / f"{uid}_outro_merged.mp4"
+            _merged_ok = await _append_outro_to_video(output_file, _outro_raw, _outro_merged)
+            if _merged_ok and _outro_merged.exists():
+                output_file.unlink(missing_ok=True)
+                _outro_merged.rename(output_file)
+                print("[OUTRO] Animasyonlu outro eklendi", flush=True)
+            _outro_raw.unlink(missing_ok=True)
+    except Exception as _outro_e:
+        print(f"[OUTRO] Hata: {_outro_e}", flush=True)
+
     # Geçici dosyaları temizle (disk dolmaması için)
     shutil.rmtree(scene_dir, ignore_errors=True)
 
@@ -1985,6 +2007,287 @@ def overlay_like_subscribe_banner(photo_path: Path) -> None:
     draw.text((rx, H - BAND_H + 128), "Abone Ol", font=font_small, anchor="mt", fill=RED)
 
     img.convert("RGB").save(str(photo_path), "JPEG", quality=92)
+
+
+def _draw_rounded_rect(draw, xy, radius, fill_rgba):
+    """Pillow sürümünden bağımsız yuvarlak köşeli dikdörtgen."""
+    x0, y0, x1, y1 = xy
+    r, g, b, a = fill_rgba
+    c = (r, g, b, a)
+    draw.rectangle([x0 + radius, y0, x1 - radius, y1], fill=c)
+    draw.rectangle([x0, y0 + radius, x1, y1 - radius], fill=c)
+    draw.ellipse([x0, y0, x0 + 2 * radius, y0 + 2 * radius], fill=c)
+    draw.ellipse([x1 - 2 * radius, y0, x1, y0 + 2 * radius], fill=c)
+    draw.ellipse([x0, y1 - 2 * radius, x0 + 2 * radius, y1], fill=c)
+    draw.ellipse([x1 - 2 * radius, y1 - 2 * radius, x1, y1], fill=c)
+
+
+def create_animated_outro_video(
+    avatar_file,
+    ig_handle: str,
+    output_path: Path,
+    platform: str = "instagram",
+    duration_sec: float = 3.5,
+    fps: int = 30,
+) -> bool:
+    """3.5 saniyelik animasyonlu outro klip oluşturur (ses yok, saf görsel)."""
+    import tempfile, math, random
+    from PIL import Image, ImageDraw, ImageFont
+
+    W, H = 1080, 1920
+    total_frames = int(duration_sec * fps)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    fp = next((f for f in font_candidates if Path(f).exists()), None)
+
+    def lf(size):
+        if fp:
+            try:
+                return ImageFont.truetype(fp, size)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+
+    def eout(t: float) -> float:
+        t = max(0.0, min(1.0, t))
+        return 1 - (1 - t) ** 3
+
+    def eio(t: float) -> float:
+        t = max(0.0, min(1.0, t))
+        return 3 * t * t - 2 * t * t * t
+
+    # Avatar daire hazırlama
+    AVSIZE = 320
+    avatar_img = None
+    if avatar_file and Path(avatar_file).exists():
+        try:
+            av = Image.open(avatar_file).convert("RGBA").resize((AVSIZE, AVSIZE), Image.LANCZOS)
+            mask = Image.new("L", (AVSIZE, AVSIZE), 0)
+            ImageDraw.Draw(mask).ellipse([0, 0, AVSIZE, AVSIZE], fill=255)
+            av.putalpha(mask)
+            avatar_img = av
+        except Exception:
+            pass
+
+    # Platform renkler
+    if platform == "instagram":
+        cta_color = (225, 48, 108)    # Instagram pembe
+        cta_icon = "👤"
+        cta_label = "Takip Et"
+        bottom_text = "❤️  Beğen ve Paylaş"
+    else:
+        cta_color = (255, 0, 0)       # YouTube kırmızı
+        cta_icon = "🔴"
+        cta_label = "Abone Ol"
+        bottom_text = "🔔  Bildirimleri Aç"
+
+    # Sabit parıltı noktaları (deterministic, random seed)
+    rng = random.Random(42)
+    sparkles = [(rng.randint(40, W - 40), rng.randint(100, H - 100), rng.random()) for _ in range(35)]
+
+    cy_mid = H // 2 - 80   # dikey merkez
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for fi in range(total_frames):
+            t = fi / max(total_frames - 1, 1)
+
+            bg = Image.new("RGBA", (W, H), (5, 5, 16, 255))
+            draw = ImageDraw.Draw(bg)
+
+            # ── Animasyonlu radyal glow ──
+            glow_r = int(460 + 55 * math.sin(t * math.tau))
+            for gr in range(glow_r, 0, -20):
+                a = int(22 * (gr / glow_r))
+                draw.ellipse([W // 2 - gr, cy_mid - gr, W // 2 + gr, cy_mid + gr],
+                             fill=(18, 36, 90, a))
+
+            # ── Parıltı noktaları ──
+            for sx, sy, sp in sparkles:
+                sa = int(160 * abs(math.sin((t * 2.5 + sp) * math.tau)))
+                sr = rng.randint(2, 5) if sa > 60 else 2
+                draw.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], fill=(255, 255, 255, sa))
+
+            # ── 1. Üst yazı: "Daha Fazlası İçin" (0 → 0.35s, slide-up + fade) ──
+            lbl_e = eout(t / 0.3)
+            if lbl_e > 0:
+                lbl_a = int(255 * lbl_e)
+                lbl_offset = int(55 * (1 - lbl_e))
+                lbl_font = lf(58)
+                lbl_text = "Daha Fazlası İçin"
+                bb = draw.textbbox((0, 0), lbl_text, font=lbl_font)
+                lw = bb[2] - bb[0]
+                ll = Image.new("RGBA", (W, 90), (0, 0, 0, 0))
+                ImageDraw.Draw(ll).text(
+                    (W // 2 - lw // 2, 0), lbl_text, font=lbl_font,
+                    fill=(200, 205, 230, lbl_a)
+                )
+                bg.alpha_composite(ll, (0, cy_mid - 400 + lbl_offset))
+
+            # ── 2. Avatar yüzük + görsel (0.2 → 0.7s, scale-in) ──
+            av_e = eout((t - 0.18) / 0.42)
+            av_cx, av_cy = W // 2, cy_mid - 20
+
+            if av_e > 0:
+                av_a = int(255 * av_e)
+                scale_r = int((AVSIZE // 2 + 14) * av_e)
+
+                # Dış halkalar (glow ring)
+                ring_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                rd = ImageDraw.Draw(ring_layer)
+                # İç halka — beyaz
+                rd.ellipse([av_cx - scale_r, av_cy - scale_r,
+                            av_cx + scale_r, av_cy + scale_r],
+                           fill=(255, 255, 255, av_a))
+                # İkinci halka — platform rengi, daha büyük, şeffaf
+                ring2_r = scale_r + 12
+                rd.ellipse([av_cx - ring2_r, av_cy - ring2_r,
+                            av_cx + ring2_r, av_cy + ring2_r],
+                           fill=(*cta_color, int(av_a * 0.35)))
+                bg.alpha_composite(ring_layer)
+
+                # Avatar veya placeholder
+                av_final_r = int(AVSIZE // 2 * av_e)
+                if av_final_r > 2:
+                    if avatar_img:
+                        av_scaled = avatar_img.resize((av_final_r * 2, av_final_r * 2), Image.LANCZOS)
+                        if av_a < 255:
+                            r2, g2, b2, alpha2 = av_scaled.split()
+                            alpha2 = alpha2.point(lambda x: int(x * av_a / 255))
+                            av_scaled = Image.merge("RGBA", (r2, g2, b2, alpha2))
+                        bg.alpha_composite(av_scaled, (av_cx - av_final_r, av_cy - av_final_r))
+                    else:
+                        ph = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                        ImageDraw.Draw(ph).ellipse(
+                            [av_cx - av_final_r, av_cy - av_final_r,
+                             av_cx + av_final_r, av_cy + av_final_r],
+                            fill=(40, 60, 120, av_a)
+                        )
+                        bg.alpha_composite(ph)
+
+            # ── 3. Kullanıcı adı (0.55 → 0.8s, fade-in) ──
+            usr_e = eout((t - 0.52) / 0.25)
+            if usr_e > 0 and ig_handle:
+                usr_a = int(255 * usr_e)
+                usr_font = lf(54)
+                utext = f"@{ig_handle.lstrip('@')}"
+                bb = draw.textbbox((0, 0), utext, font=usr_font)
+                uw = bb[2] - bb[0]
+                ul = Image.new("RGBA", (W, 72), (0, 0, 0, 0))
+                ImageDraw.Draw(ul).text(
+                    (W // 2 - uw // 2, 0), utext, font=usr_font,
+                    fill=(255, 255, 255, usr_a)
+                )
+                bg.alpha_composite(ul, (0, av_cy + AVSIZE // 2 + 22))
+
+            # ── 4. CTA butonu (0.68 → 1.0s, slide-up + scale) ──
+            btn_e = eout((t - 0.65) / 0.3)
+            BTN_W, BTN_H = 440, 108
+            btn_cy_final = av_cy + AVSIZE // 2 + (110 if ig_handle else 60)
+            btn_cy = int(btn_cy_final + 200 * (1 - btn_e))
+            btn_a = int(255 * btn_e)
+
+            if btn_e > 0:
+                # Nabız efekti (2s'den sonra)
+                pulse = 1.0 + 0.04 * math.sin((t - 1.8) * 6.0 * math.pi) if t > 1.8 else 1.0
+                pb_w = int(BTN_W * pulse)
+                pb_h = int(BTN_H * pulse)
+                bx0 = W // 2 - pb_w // 2
+                by0 = btn_cy - pb_h // 2
+                btn_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                _draw_rounded_rect(
+                    ImageDraw.Draw(btn_layer),
+                    [bx0, by0, bx0 + pb_w, by0 + pb_h],
+                    pb_h // 2,
+                    (*cta_color, btn_a)
+                )
+                btn_font = lf(56)
+                btext = f"{cta_icon}  {cta_label}"
+                bbd = ImageDraw.Draw(btn_layer).textbbox((0, 0), btext, font=btn_font)
+                btw = bbd[2] - bbd[0]
+                bth = bbd[3] - bbd[1]
+                ImageDraw.Draw(btn_layer).text(
+                    (W // 2 - btw // 2, btn_cy - bth // 2 - bbd[1]),
+                    btext, font=btn_font,
+                    fill=(255, 255, 255, btn_a)
+                )
+                bg.alpha_composite(btn_layer)
+
+            # ── 5. Alt metin (0.9 → 1.0s, fade-in) ──
+            bot_e = eout((t - 0.88) / 0.18)
+            if bot_e > 0:
+                bot_a = int(200 * bot_e)
+                bot_font = lf(46)
+                bb = draw.textbbox((0, 0), bottom_text, font=bot_font)
+                bw = bb[2] - bb[0]
+                bot_l = Image.new("RGBA", (W, 66), (0, 0, 0, 0))
+                ImageDraw.Draw(bot_l).text(
+                    (W // 2 - bw // 2, 0), bottom_text, font=bot_font,
+                    fill=(255, 215, 60, bot_a)
+                )
+                bg.alpha_composite(bot_l, (0, btn_cy_final + BTN_H // 2 + 30))
+
+            frame_path = Path(tmpdir) / f"frame_{fi:05d}.png"
+            bg.convert("RGB").save(str(frame_path))
+
+        try:
+            r = subprocess.run([
+                "ffmpeg", "-y",
+                "-framerate", str(fps),
+                "-i", str(Path(tmpdir) / "frame_%05d.png"),
+                "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                "-pix_fmt", "yuv420p", "-r", str(fps),
+                str(output_path)
+            ], capture_output=True, timeout=180)
+            return r.returncode == 0 and output_path.exists()
+        except Exception as e:
+            print(f"[OUTRO] ffmpeg encode hata: {e}", flush=True)
+            return False
+
+
+async def _append_outro_to_video(
+    main_video: Path,
+    outro_video: Path,
+    final_output: Path,
+) -> bool:
+    """Ana video + sessiz outro klibini birleştir."""
+    import tempfile as _tf
+    try:
+        # Outro'ya sessiz ses kanalı ekle (main video'nun formatıyla uyumlu)
+        outro_with_audio = outro_video.with_stem(outro_video.stem + "_a")
+        await arun_ffmpeg([
+            "ffmpeg", "-y",
+            "-i", str(outro_video.absolute()),
+            "-f", "lavfi", "-i", f"aevalsrc=0:c=stereo:r=44100:d={3.5}",
+            "-c:v", "copy", "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+            "-shortest", str(outro_with_audio.absolute())
+        ], timeout=60, step="outro-audio")
+
+        with _tf.NamedTemporaryFile(suffix=".txt", delete=False, mode="w") as f:
+            f.write(f"file '{main_video.absolute()}'\n")
+            f.write(f"file '{outro_with_audio.absolute()}'\n")
+            concat_list = f.name
+
+        await arun_ffmpeg([
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", concat_list,
+            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+            "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(final_output.absolute())
+        ], timeout=300, step="outro-concat")
+
+        outro_with_audio.unlink(missing_ok=True)
+        Path(concat_list).unlink(missing_ok=True)
+        return final_output.exists()
+    except Exception as e:
+        print(f"[OUTRO] concat hata: {e}", flush=True)
+        return False
 
 
 def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -> None:
@@ -4038,6 +4341,7 @@ async def set_instagram_config(
         "access_token": tok,
         "post_reels": post_reels == "true",
         "post_story": post_story == "true",
+        "ig_handle": existing.get("ig_handle", ""),
     }
     IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
     return {"ok": True}
