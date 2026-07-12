@@ -314,7 +314,11 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
     text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
 
     if lang == "tr":
-        # 1.500 → 1500
+        # 3.5 → 3 nokta 5 (ondalık) — ÖNCE yapılmalı, binlik ayırıcıdan önce
+        text = re.sub(r'(\d+)\.(\d{1,2})(?!\d)', r'\1 nokta \2', text)
+        # 3,5 → 3 virgül 5 (ondalık virgüllü yazım)
+        text = re.sub(r'(\d+),(\d{1,2})(?!\d)', r'\1 virgül \2', text)
+        # 1.500 → 1500 (binlik nokta ayırıcı)
         text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
         # %85 → yüzde 85
         text = re.sub(r'%\s*(\d+)', r'yüzde \1', text)
