@@ -501,10 +501,12 @@ _HOOK_RULE_YENI = (
     '"Az önce ortaya çıktı:", "Herkes bunu merak ediyordu — cevap şoke etti.", "Peki gerçekte ne oldu?". '
     'Do NOT repeat the same opener across videos.\n'
     '  3) PERSONAL-IMPACT framing whenever the topic allows it — make the viewer feel directly affected, not '
-    'just an observer. Prefer angles like "seni ilgilendiriyor", "milyonlarca kişiyi etkileyecek", '
-    '"cebini/hayatını değiştirecek" over neutral third-person reporting. Topics with a direct personal-impact '
-    'angle (money, rights, health, safety, prices, jobs) consistently outperform purely observational news '
-    '(celebrity, distant politics) — lean into the personal-impact angle whenever the topic has one.\n'
+    'just an observer. Use angles like "seni ilgilendiriyor", "cebini/hayatını değiştirecek" over neutral '
+    'third-person reporting. Topics with a direct personal-impact angle (money, rights, health, safety, '
+    'prices, jobs) consistently outperform purely observational news — lean into the personal-impact angle. '
+    'CRITICAL: NEVER invent scope words ("milyonlarca", "binlerce", "yüz binlerce") unless that exact '
+    'number or scale appears verbatim in the news source. If the source says "bazı memurlar" you must '
+    'write "bazı memurlar" — not "milyonlarca memur".\n'
     '  4) NEVER open with a plain, fully-informative news statement — the viewer must have zero reason to '
     'swipe away before scene 2.'
 )
@@ -957,6 +959,8 @@ Rules:
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly. Example: write "Yükseköğretim Kurumları Sınavı" not "YKS", "Amerika Birleşik Devletleri" not "ABD".
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - POLITICAL TITLES: Your training data is outdated. NEVER assume someone still holds a position from your training. Use ONLY the title given in the news context above. If no title is given, use only the person's name. Known outdated facts to avoid: Assad is no longer Syria's president (fled Dec 2024), Biden is no longer US president.
+- NO FABRICATED NUMBERS OR SCOPE: NEVER write "milyonlarca", "binlerce", "yüz binlerce", or any specific number/count/percentage UNLESS it appears word-for-word in the news source provided above. If the source does not mention a number, do NOT invent one. Use the exact scope from the source (e.g. if source says "bazı çalışanlar", write "bazı çalışanlar" — never upgrade it to "milyonlarca çalışan"). Inventing numbers is disinformation and causes legal risk.
+- NO SENSATIONALISM BEYOND SOURCE: Do not use words like "şoke eden", "bomba", "skandal", "rezalet", "inanılmaz" unless the source itself uses comparable language. Stick to facts as stated in the source.
 {get_hook_rule()}
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
@@ -4790,6 +4794,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     if source_text:
         parts.append(source_text)
     parts.append("Siz ne düşünüyorsunuz? 👇")
+    parts.append("⚠️ Haberin doğruluğunu kendi kaynaklarınızdan teyit ediniz.")
     parts.append(full_tags)
     caption = "\n\n".join(parts)
     # Instagram caption limiti 2200 karakter — güvenli taraf
