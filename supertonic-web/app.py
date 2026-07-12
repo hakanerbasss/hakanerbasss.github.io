@@ -6412,8 +6412,6 @@ async def tts_upload_reference(file: UploadFile = File(...)):
     tmp.unlink(missing_ok=True)
     if r.returncode != 0:
         raise HTTPException(500, f"FFmpeg dönüşüm hatası: {r.stderr.decode()[:200]}")
-    else:
-        tmp.rename(dest)
     return {"ok": True, "path": str(dest), "size_kb": round(dest.stat().st_size / 1024)}
 
 
