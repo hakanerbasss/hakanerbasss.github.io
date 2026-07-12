@@ -44,5 +44,4 @@ for dir in values drawable xml; do
 done
 
 echo ">>> Build başlıyor..."
-cd "$BUILD_DIR"
-prj d
+bash -i -c "cd $BUILD_DIR && prj d"
