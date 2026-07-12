@@ -9,6 +9,7 @@ Kullanım (app.py'e ekle):
 """
 
 import logging
+import time
 import requests
 from datetime import datetime, date
 import firebase_admin
@@ -51,12 +52,19 @@ VAKIT_LABELS = {
 def _fetch_times(city: str) -> dict:
     """Aladhan'dan bugünün vakitlerini çek. {label: "HH:MM"} döndür."""
     url = "https://api.aladhan.com/v1/timingsByCity"
-    resp = requests.get(url, params={
-        "city": city, "country": "Turkey", "method": 13
-    }, timeout=10)
-    resp.raise_for_status()
-    timings = resp.json()["data"]["timings"]
-    return {label: timings[key][:5] for key, label in VAKIT_LABELS.items()}
+    for attempt in range(3):
+        resp = requests.get(url, params={
+            "city": city, "country": "Turkey", "method": 13
+        }, timeout=10)
+        if resp.status_code == 429:
+            wait = 10 * (attempt + 1)
+            log.warning("Rate limit %s, %ds bekleniyor...", city, wait)
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        timings = resp.json()["data"]["timings"]
+        return {label: timings[key][:5] for key, label in VAKIT_LABELS.items()}
+    raise Exception(f"{city} için vakit alınamadı (rate limit)")
 
 # ── FCM gönder ────────────────────────────────────────────────────────────────
 
@@ -105,6 +113,7 @@ def _schedule_today(scheduler):
                 misfire_grace_time=120,
             )
             log.debug("  %s %s → %s", city, vakit, time_str)
+        time.sleep(2)  # şehirler arası bekleme — rate limit önleme
 
     log.info("Tüm vakitler planlandı.")
 
