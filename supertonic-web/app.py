@@ -1130,7 +1130,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 }}
 
 Rules:
-- 7 to 10 scenes — tell the story completely, do NOT cut it short mid-narrative
+- 5 to 7 scenes
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly. Example: write "Yükseköğretim Kurumları Sınavı" not "YKS", "Amerika Birleşik Devletleri" not "ABD".
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - POLITICAL TITLES: Your training data is outdated. NEVER assume someone still holds a position from your training. Use ONLY the title given in the news context above. If no title is given, use only the person's name. Known outdated facts to avoid: Assad is no longer Syria's president (fled Dec 2024), Biden is no longer US president.
@@ -1139,7 +1139,7 @@ Rules:
 {get_hook_rule()}
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
-- Total narration 60 to 80 seconds — enough to tell a complete story with context
+- Total narration under 55 seconds
 - hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
 {_custom_block}"""
 
