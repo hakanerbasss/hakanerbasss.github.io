@@ -1104,6 +1104,16 @@ Rules:
         else:
             topic_instruction = (
                 f"Choose ONE of these TODAY'S trending topics and make a short breaking-news video:\n{trend_topics}\n"
+                f"\nSTEP 1 — HOOK SCORE (do this mentally before choosing):\n"
+                f"Score each headline 1-10 on hook strength:\n"
+                f"  +3 if it directly affects the viewer's wallet, safety, or daily life\n"
+                f"  +2 if it triggers curiosity or surprise ('how is that possible?')\n"
+                f"  +2 if there's a clear human story or victim/winner\n"
+                f"  +1 if it's time-sensitive / just happened\n"
+                f"  +1 if it has a specific number or contrast in the headline\n"
+                f"  -3 if it's vague, abstract, or institutional (e.g. 'committee meets', 'statement issued')\n"
+                f"Eliminate any topic scoring below 7. If all score below 7, keep the top 2 and continue.\n"
+                f"\nSTEP 2 — PICK from the remaining topics:\n"
                 f"Pick whichever topic is most compelling and timely. Prefer topics that directly affect "
                 f"people's daily lives (safety, wallet, health, rights) — but do not force a category; "
                 f"a genuinely viral story beats a forced angle every time.\n"
