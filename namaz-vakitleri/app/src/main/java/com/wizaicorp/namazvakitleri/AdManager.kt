@@ -3,7 +3,11 @@ package com.wizaicorp.namazvakitleri
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
@@ -69,10 +73,7 @@ object AdManager {
 
 @Composable
 fun BannerAd() {
-    androidx.compose.foundation.layout.Box(
-        modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
-    ) {
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         AndroidView(factory = { ctx ->
             AdView(ctx).apply {
                 setAdSize(AdSize.BANNER)
