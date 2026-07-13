@@ -16,11 +16,10 @@ import com.google.android.ump.UserMessagingPlatform
 import com.wizaicorp.namazvakitleri.data.City
 import com.wizaicorp.namazvakitleri.data.CityManager
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
-import com.wizaicorp.namazvakitleri.AlarmScheduler
 import com.wizaicorp.namazvakitleri.api.AladhanApi
 import com.wizaicorp.namazvakitleri.ui.screens.CitySelectScreen
+import com.wizaicorp.namazvakitleri.ui.screens.MainScreen
 import com.wizaicorp.namazvakitleri.ui.screens.SettingsScreen
-import com.wizaicorp.namazvakitleri.ui.screens.PrayerTimesScreen
 import com.wizaicorp.namazvakitleri.ui.theme.NamazTheme
 import kotlinx.coroutines.launch
 
@@ -94,13 +93,20 @@ private fun NamazNavHost() {
     LaunchedEffect(Unit) { loadTimes() }
 
     when (screen) {
-        Screen.PrayerTimes -> PrayerTimesScreen(
-            prayerTimes = prayerTimes, isLoading = isLoading, error = error,
-            onRefresh = { loadTimes() },
-            onCityClick = { screen = Screen.CitySelect },
+        Screen.PrayerTimes,
+        Screen.Qibla,
+        Screen.Calendar -> MainScreen(
+            currentTab     = screen,
+            onTabChange    = { screen = it },
+            prayerTimes    = prayerTimes,
+            isLoading      = isLoading,
+            error          = error,
+            selectedCity   = selectedCity,
+            onRefresh      = { loadTimes() },
+            onCityClick    = { screen = Screen.CitySelect },
             onSettingsClick = { screen = Screen.Settings }
         )
-        Screen.Settings    -> SettingsScreen(onBack = { screen = Screen.PrayerTimes })
+        Screen.Settings   -> SettingsScreen(onBack = { screen = Screen.PrayerTimes })
         Screen.CitySelect -> CitySelectScreen(
             selectedCity = selectedCity,
             onCitySelected = { city ->
@@ -114,8 +120,10 @@ private fun NamazNavHost() {
     }
 }
 
-private sealed class Screen {
+sealed class Screen {
     object PrayerTimes : Screen()
+    object Qibla       : Screen()
+    object Calendar    : Screen()
     object CitySelect  : Screen()
     object Settings    : Screen()
 }
