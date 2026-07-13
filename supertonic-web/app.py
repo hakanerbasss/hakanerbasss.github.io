@@ -1060,6 +1060,9 @@ Rules:
                 f"{get_diversity_instruction()}{perf_instruction}"
             )
         yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
+        _cr = get_custom_prompt_rules()
+        _custom_block = ("- CUSTOM RULES (highest priority — always follow these):\n" +
+                         "\n".join("  " + ln for ln in _cr.splitlines())) if _cr else ""
         prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
 {topic_instruction}
@@ -1089,7 +1092,7 @@ Rules:
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
 - hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
-{("- CUSTOM RULES (highest priority — always follow these):\n" + "\n".join("  " + l for l in get_custom_prompt_rules().splitlines())) if get_custom_prompt_rules() else ""}"""
+{_custom_block}"""
 
         for attempt in range(3):
             response = client.chat.completions.create(
