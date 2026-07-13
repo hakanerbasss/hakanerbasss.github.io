@@ -1404,6 +1404,12 @@
             <option value="M3">M3 (Erkek)</option>
           </select>
         </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;background:#111;border:1px solid #333;border-radius:8px;padding:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;flex:1;">
+            <input type="checkbox" id="ig-only-tr-video-mode" style="width:18px;height:18px;accent-color:#7c3aed;" onchange="saveIGOnlyTRScheduler()">
+            🎬 Video modu <span style="color:#666;font-size:12px;margin-left:4px;">(%40 ihtimalle Pexels video klip, yoksa görsel)</span>
+          </label>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:14px;">
           <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
           <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
@@ -3206,6 +3212,8 @@ async function loadIGOnlyTRStatus() {
       if (el) el.value = (weekly[day] || []).join(',');
     });
     if (d.voice) document.getElementById('ig-only-tr-voice').value = d.voice;
+    const vmEl = document.getElementById('ig-only-tr-video-mode');
+    if (vmEl) vmEl.checked = (d.video_mode === 'random');
 
     const st = document.getElementById('ig-only-tr-status');
     if (d.next_run || d.log?.ts) {
@@ -3248,6 +3256,8 @@ async function saveIGOnlyTRScheduler() {
   const fd = new FormData();
   fd.append('enabled', document.getElementById('ig-only-tr-enabled').checked ? 'true' : 'false');
   fd.append('voice', document.getElementById('ig-only-tr-voice').value);
+  const vmEl = document.getElementById('ig-only-tr-video-mode');
+  fd.append('video_mode', (vmEl && vmEl.checked) ? 'random' : 'off');
   ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
     fd.append(day, document.getElementById(`ig-times-${day}`).value);
   });

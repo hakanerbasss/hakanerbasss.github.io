@@ -5897,6 +5897,8 @@ async def auto_ig_only_tr_job():
 
         cfg = load_ig_only_tr_config()
         s_voice = cfg.get("voice", "F1")
+        video_mode = cfg.get("video_mode", "off")
+        use_video_val = "true" if (video_mode == "random" and random.random() < 0.40) else "false"
         used_topics = get_ig_only_tr_used_topics()
         banned = load_banned_topics()
         banned_str = " | ".join(banned) if banned else ""
@@ -5911,7 +5913,8 @@ async def auto_ig_only_tr_job():
                 r = await client.post(
                     "http://localhost:8001/api/generate-shorts",
                     data={"topic": "", "api_key": api_key, "lang": "tr", "voice": s_voice,
-                          "speed": "1.0", "exclude_topics": exclude_str, "region": "TR", "platform": "instagram"},
+                          "speed": "1.0", "exclude_topics": exclude_str, "region": "TR",
+                          "platform": "instagram", "use_video": use_video_val},
                 )
                 if r.status_code != 200:
                     save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
@@ -6036,6 +6039,7 @@ async def get_ig_only_tr_sched_config():
 async def save_ig_only_tr_sched_config(
     enabled: str = Form("false"),
     voice: str = Form("F1"),
+    video_mode: str = Form("off"),
     mon: str = Form(""),
     tue: str = Form(""),
     wed: str = Form(""),
@@ -6048,7 +6052,9 @@ async def save_ig_only_tr_sched_config(
     for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
         weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
     # sched_v damgalanır ki kullanıcının elle kaydettiği saatler migration'da ezilmesin
-    cfg = {"enabled": enabled == "true", "voice": voice, "weekly": weekly, "sched_v": _IG_SCHED_VERSION}
+    cfg = {"enabled": enabled == "true", "voice": voice,
+           "video_mode": video_mode if video_mode in ("off", "random") else "off",
+           "weekly": weekly, "sched_v": _IG_SCHED_VERSION}
     IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_ig_only_tr_scheduler()
     return {"ok": True}
