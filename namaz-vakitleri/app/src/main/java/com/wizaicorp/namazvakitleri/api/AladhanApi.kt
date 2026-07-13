@@ -19,7 +19,7 @@ interface AladhanService {
         @Query("method")  method: Int = 13
     ): AladhanResponse
 
-    @GET("v1/calendar/{year}/{month}")
+    @GET("v1/calendarByCity/{year}/{month}")
     suspend fun getCalendar(
         @Path("year")     year: Int,
         @Path("month")    month: Int,

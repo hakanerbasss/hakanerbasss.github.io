@@ -63,7 +63,6 @@ fun MainScreen(
         },
         bottomBar = {
             Column {
-                BannerAd()
                 NavigationBar {
                     NavigationBarItem(
                         selected = currentTab == Screen.PrayerTimes,
@@ -84,7 +83,7 @@ fun MainScreen(
                         label    = { Text("Takvim") }
                     )
                 }
-                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+                BannerAd()
             }
         }
     ) { padding ->
