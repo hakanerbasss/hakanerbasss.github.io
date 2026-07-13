@@ -1,6 +1,7 @@
 package com.wizaicorp.namazvakitleri.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Explore
@@ -11,7 +12,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.wizaicorp.namazvakitleri.R
 import com.wizaicorp.namazvakitleri.BannerAd
 import com.wizaicorp.namazvakitleri.Screen
 import com.wizaicorp.namazvakitleri.data.City
@@ -40,6 +46,17 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.mosque_logo),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(36.dp)
+                            .clip(CircleShape),
+                        tint = Color.Unspecified
+                    )
+                },
                 title = { Text(topBarTitle, fontWeight = FontWeight.Bold) },
                 actions = {
                     if (currentTab == Screen.PrayerTimes) {
