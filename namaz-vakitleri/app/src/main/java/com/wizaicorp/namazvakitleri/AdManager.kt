@@ -12,8 +12,8 @@ import com.google.android.gms.ads.appopen.AppOpenAd
 
 // AdMob konsolundan gercek ID'leri al
 private const val BANNER_ID       = "ca-app-pub-7820582813827252/8866344025"
-private const val INTERSTITIAL_ID = "ca-app-pub-7820582813827252/8866344025"
-private const val APP_OPEN_ID     = "ca-app-pub-7820582813827252/8866344025"
+private const val INTERSTITIAL_ID = "ca-app-pub-7820582813827252/8159767013"
+private const val APP_OPEN_ID     = "ca-app-pub-7820582813827252/8953973937"
 
 object AdManager {
     private lateinit var ctx: Context
@@ -69,11 +69,16 @@ object AdManager {
 
 @Composable
 fun BannerAd() {
-    AndroidView(factory = { ctx ->
-        AdView(ctx).apply {
-            setAdSize(AdSize.BANNER)
-            adUnitId = BANNER_ID
-            loadAd(AdRequest.Builder().build())
-        }
-    })
+    androidx.compose.foundation.layout.Box(
+        modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+        contentAlignment = androidx.compose.ui.Alignment.Center
+    ) {
+        AndroidView(factory = { ctx ->
+            AdView(ctx).apply {
+                setAdSize(AdSize.BANNER)
+                adUnitId = BANNER_ID
+                loadAd(AdRequest.Builder().build())
+            }
+        })
+    }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,13 +26,17 @@ fun PrayerTimesScreen(
     isLoading: Boolean,
     error: String?,
     onRefresh: () -> Unit,
-    onCityClick: () -> Unit
+    onCityClick: () -> Unit,
+    onSettingsClick: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(prayerTimes?.city ?: "Namaz Vakitleri", fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Notifications, contentDescription = "Bildirim Ayarları")
+                    }
                     IconButton(onClick = onCityClick) {
                         Icon(Icons.Default.LocationCity, contentDescription = "şehir seç")
                     }
@@ -102,9 +107,12 @@ private fun NextPrayerCard(times: PrayerTimes) {
             Spacer(Modifier.height(4.dp))
             Text(label, style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
-            Spacer(Modifier.height(8.dp))
-            Text(countdown, style = MaterialTheme.typography.displaySmall,
+            Spacer(Modifier.height(6.dp))
+            Text(timeStr, style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.height(4.dp))
+            Text("$countdown kaldı", style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f))
         }
     }
 }

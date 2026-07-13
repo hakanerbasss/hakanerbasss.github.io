@@ -96,7 +96,9 @@ private fun NamazNavHost() {
     when (screen) {
         Screen.PrayerTimes -> PrayerTimesScreen(
             prayerTimes = prayerTimes, isLoading = isLoading, error = error,
-            onRefresh = { loadTimes() }, onCityClick = { screen = Screen.CitySelect }
+            onRefresh = { loadTimes() },
+            onCityClick = { screen = Screen.CitySelect },
+            onSettingsClick = { screen = Screen.Settings }
         )
         Screen.Settings    -> SettingsScreen(onBack = { screen = Screen.PrayerTimes })
         Screen.CitySelect -> CitySelectScreen(
