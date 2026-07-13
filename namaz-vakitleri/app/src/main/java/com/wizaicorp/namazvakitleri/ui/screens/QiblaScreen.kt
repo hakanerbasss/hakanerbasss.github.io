@@ -31,7 +31,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -142,6 +145,8 @@ fun QiblaContent(modifier: Modifier = Modifier) {
         }
     }
 
+    val textMeasurer = rememberTextMeasurer()
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -209,23 +214,18 @@ fun QiblaContent(modifier: Modifier = Modifier) {
                     )
                 }
 
-                // Cardinal direction labels: K=North(Red), D=East, G=South, B=West (Gold)
-                val nativeCanvas = drawContext.canvas.nativeCanvas
-                val textPaint = android.graphics.Paint().apply {
-                    textSize  = radius * 0.18f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    typeface  = android.graphics.Typeface.DEFAULT_BOLD
-                    isAntiAlias = true
-                }
+                // Cardinal direction labels using Compose drawText (no nativeCanvas)
+                val northStyle = TextStyle(color = Color.Red, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                val cardinalStyle = TextStyle(color = Color(0xFFD4AF37), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 val cardinalLabels = listOf("K" to 0, "D" to 18, "G" to 36, "B" to 54)
                 for ((label, tick) in cardinalLabels) {
                     val angleRad = Math.toRadians((tick * 5.0) - 90.0)
                     val labelR   = radius * 0.68f
-                    val x = cx + labelR * cos(angleRad).toFloat()
-                    val y = cy + labelR * sin(angleRad).toFloat() + textPaint.textSize / 3f
-                    textPaint.color = if (label == "K") android.graphics.Color.RED
-                                      else android.graphics.Color.parseColor("#FFD4AF37")
-                    nativeCanvas.drawText(label, x, y, textPaint)
+                    val style    = if (label == "K") northStyle else cardinalStyle
+                    val measured = textMeasurer.measure(label, style)
+                    val x = cx + labelR * cos(angleRad).toFloat() - measured.size.width / 2f
+                    val y = cy + labelR * sin(angleRad).toFloat() - measured.size.height / 2f
+                    drawText(measured, topLeft = Offset(x, y))
                 }
             }
 
