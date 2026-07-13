@@ -30,7 +30,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -211,28 +210,22 @@ fun QiblaContent(modifier: Modifier = Modifier) {
                 }
 
                 // Cardinal direction labels: K=North(Red), D=East, G=South, B=West (Gold)
-                drawIntoCanvas { canvas ->
-                    val paint = android.graphics.Paint().apply {
-                        textSize  = radius * 0.18f
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        typeface  = android.graphics.Typeface.DEFAULT_BOLD
-                        isAntiAlias = true
-                    }
-                    val labels = listOf(
-                        "K" to 0,   // North  0°
-                        "D" to 18,  // East  90°
-                        "G" to 36,  // South 180°
-                        "B" to 54   // West  270°
-                    )
-                    for ((label, tick) in labels) {
-                        val angleRad = Math.toRadians((tick * 5.0) - 90.0)
-                        val labelR   = radius * 0.68f
-                        val x = cx + labelR * cos(angleRad).toFloat()
-                        val y = cy + labelR * sin(angleRad).toFloat() + paint.textSize / 3f
-                        paint.color = if (label == "K") android.graphics.Color.RED
+                val nativeCanvas = drawContext.canvas.nativeCanvas
+                val textPaint = android.graphics.Paint().apply {
+                    textSize  = radius * 0.18f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    typeface  = android.graphics.Typeface.DEFAULT_BOLD
+                    isAntiAlias = true
+                }
+                val cardinalLabels = listOf("K" to 0, "D" to 18, "G" to 36, "B" to 54)
+                for ((label, tick) in cardinalLabels) {
+                    val angleRad = Math.toRadians((tick * 5.0) - 90.0)
+                    val labelR   = radius * 0.68f
+                    val x = cx + labelR * cos(angleRad).toFloat()
+                    val y = cy + labelR * sin(angleRad).toFloat() + textPaint.textSize / 3f
+                    textPaint.color = if (label == "K") android.graphics.Color.RED
                                       else android.graphics.Color.parseColor("#FFD4AF37")
-                        canvas.nativeCanvas.drawText(label, x, y, paint)
-                    }
+                    nativeCanvas.drawText(label, x, y, textPaint)
                 }
             }
 

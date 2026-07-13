@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.wizaicorp.namazvakitleri.data.NotifPrefs
@@ -51,7 +52,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                 offsets.forEach { min ->
                     FilterChip(
                         selected = selectedOffset == min,
-                        onClick  = { selectedOffset = min; NotifPrefs.setOffsetMin(ctx, min) },
+                        onClick  = {
+                            selectedOffset = min
+                            NotifPrefs.setOffsetMin(ctx, min)
+                            val msg = if (min == 0) "Tam vakitte bildirim" else "$min dakika öncesinde bildirim"
+                            Toast.makeText(ctx, "$msg kaydedildi", Toast.LENGTH_SHORT).show()
+                        },
                         label    = { Text(if (min == 0) "Tam vakitte" else "$min dk önce") }
                     )
                 }
@@ -72,7 +78,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Text(label, style = MaterialTheme.typography.bodyLarge)
                     Switch(
                         checked         = state.value,
-                        onCheckedChange = { on -> state.value = on; NotifPrefs.setEnabled(ctx, key, on) }
+                        onCheckedChange = { on ->
+                            state.value = on
+                            NotifPrefs.setEnabled(ctx, key, on)
+                            val durum = if (on) "açıldı" else "kapatıldı"
+                            Toast.makeText(ctx, "$label bildirimi $durum", Toast.LENGTH_SHORT).show()
+                        }
                     )
                 }
             }

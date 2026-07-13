@@ -90,16 +90,10 @@ private fun NextPrayerCard(times: PrayerTimes) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                timeStr,
-                style = MaterialTheme.typography.displaySmall,
+                "$countdown kaldı",
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.secondary
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "$countdown kaldı",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
             )
         }
     }
@@ -178,5 +172,11 @@ private fun remainingTime(target: String): String {
     val (h, m) = target.split(":").map { it.toInt() }
     var diff = h * 60 + m - nowMin
     if (diff < 0) diff += 24 * 60
-    return "%d:%02d".format(diff / 60, diff % 60)
+    val hours = diff / 60
+    val mins = diff % 60
+    return when {
+        hours > 0 && mins > 0 -> "$hours saat $mins dakika"
+        hours > 0 -> "$hours saat"
+        else -> "$mins dakika"
+    }
 }
