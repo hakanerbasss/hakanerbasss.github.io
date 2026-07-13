@@ -288,6 +288,7 @@
   <div class="tab" onclick="switchTab('iganalytics')">📸 IG Analitik</div>
   <div class="tab" onclick="switchTab('comedy')">📰 Komik Haber</div>
   <div class="tab" onclick="switchTab('infoshorts')">💡 Bilgi Shorts</div>
+  <div class="tab" onclick="switchTab('prompt')">🤖 Prompt</div>
 </div>
 
 <!-- TEXT TO SPEECH -->
@@ -1707,7 +1708,7 @@ async function loadMeta() {
 }
 
 function switchTab(name) {
-  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy','infoshorts'];
+  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy','infoshorts','prompt'];
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', names[i] === name);
   });
@@ -1718,6 +1719,7 @@ function switchTab(name) {
   if (name === 'infoshorts') { updateInfoApiKeyStatus(); loadInfoEndcardStatus(); loadOutroTemplateStatus(); }
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
+  if (name === 'prompt') loadPromptPreview();
 }
 
 let _lvPollTimer = null;
@@ -4819,9 +4821,112 @@ function deleteComedyVideo() {
   </div>
 </div>
 
+<!-- PROMPT SEKMESİ -->
+<div class="panel" id="tab-prompt">
+  <h2 style="color:#a78bfa;margin-bottom:20px">🤖 DeepSeek Prompt Ayarları</h2>
+
+  <!-- Analiz durumu -->
+  <div style="margin-bottom:28px">
+    <p style="color:#aaa;font-size:13px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Analiz Verisi (ig_perf)</p>
+    <div id="prompt-analytics-status" style="background:#111;border:1px solid #333;border-radius:8px;padding:14px">Yükleniyor…</div>
+  </div>
+
+  <!-- Hook stili -->
+  <div style="margin-bottom:28px">
+    <p style="color:#aaa;font-size:13px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Hook Stili</p>
+    <div style="display:flex;gap:10px;align-items:center">
+      <select id="prompt-hook-style" onchange="saveHookStyle()" style="background:#1a1a1a;color:#eee;border:1px solid #444;border-radius:6px;padding:8px 12px;font-size:14px">
+        <option value="yeni">Yeni (kısa + kişisel etki)</option>
+        <option value="eski">Eski (merak boşluğu)</option>
+      </select>
+      <span style="color:#777;font-size:12px">Değiştirince otomatik kaydedilir</span>
+    </div>
+    <pre id="prompt-hook-rule" style="margin-top:10px;background:#111;border:1px solid #333;border-radius:8px;padding:12px;font-size:12px;color:#ccc;white-space:pre-wrap;word-break:break-word;max-height:160px;overflow-y:auto"></pre>
+  </div>
+
+  <!-- Özel kurallar -->
+  <div style="margin-bottom:28px">
+    <p style="color:#aaa;font-size:13px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Özel Kurallar <span style="color:#666;font-weight:400;text-transform:none">(her prompta eklenir, en yüksek öncelik)</span></p>
+    <p style="color:#666;font-size:12px;margin-bottom:8px">Her satır bir kural. Boş bırakırsan eklenmez.</p>
+    <textarea id="prompt-custom-rules" rows="6" placeholder="Örnek:&#10;- Başlık her zaman soru ile bitsin&#10;- Son sahnede emoji kullan&#10;- Resmi dil kullan, argo olmasın" style="width:100%;background:#1a1a1a;color:#eee;border:1px solid #444;border-radius:8px;padding:12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+    <button id="btn-save-custom-rules" onclick="saveCustomRules()" style="margin-top:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:9px 22px;font-size:13px;cursor:pointer">Kaydet</button>
+  </div>
+
+  <!-- Perf instruction (ne gönderiliyor) -->
+  <div>
+    <p style="color:#aaa;font-size:13px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">DeepSeek'e Gönderilen Performans Yönlendirmesi</p>
+    <pre id="prompt-perf-instr" style="background:#111;border:1px solid #333;border-radius:8px;padding:12px;font-size:12px;color:#ccc;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto"></pre>
+  </div>
+</div>
+
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+  }
+
+  // ── Prompt sekmesi ──────────────────────────────────────────────────────────
+  async function loadPromptPreview() {
+    const r = await fetch('/api/prompt-preview');
+    const d = await r.json();
+
+    // Analiz durumu
+    const analyticsEl = document.getElementById('prompt-analytics-status');
+    if (d.has_analytics && d.category_scores.length) {
+      let rows = d.category_scores.map(s =>
+        `<tr><td>${s.category}</td><td>${s.n}</td><td>${s.avg_views.toLocaleString('tr')}</td><td>${s.avg_shares}</td><td style="color:#a78bfa;font-weight:600">${s.score.toLocaleString('tr')}</td></tr>`
+      ).join('');
+      analyticsEl.innerHTML = `
+        <div style="color:#4ade80;font-size:13px;margin-bottom:10px">✅ Analiz verisi aktif — DeepSeek bu tabloyu görüyor</div>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="color:#888;text-align:left">
+            <th style="padding:6px 10px">Kategori</th>
+            <th style="padding:6px 10px">Post</th>
+            <th style="padding:6px 10px">Ort. İzlenme</th>
+            <th style="padding:6px 10px">Ort. Paylaşım</th>
+            <th style="padding:6px 10px">Skor</th>
+          </tr></thead>
+          <tbody style="color:#eee">${rows}</tbody>
+        </table></div>`;
+    } else {
+      analyticsEl.innerHTML = `<div style="color:#f87171;font-size:13px">⚠️ Analiz cache boş — sabah 05:15'te otomatik yenilenir ya da IG Analitik sekmesinden manuel yenile</div>`;
+    }
+
+    // Hook stili
+    document.getElementById('prompt-hook-style').value = d.hook_style;
+
+    // Hook kuralı (readonly)
+    document.getElementById('prompt-hook-rule').textContent = d.hook_rule;
+
+    // Perf instruction (readonly)
+    document.getElementById('prompt-perf-instr').textContent = d.perf_instruction || '(henüz analiz verisi yok)';
+
+    // Custom rules
+    document.getElementById('prompt-custom-rules').value = d.custom_rules;
+  }
+
+  async function saveCustomRules() {
+    const rules = document.getElementById('prompt-custom-rules').value;
+    const btn = document.getElementById('btn-save-custom-rules');
+    btn.disabled = true;
+    btn.textContent = 'Kaydediliyor…';
+    try {
+      const fd = new FormData();
+      fd.append('rules', rules);
+      const r = await fetch('/api/custom-prompt-rules', { method: 'POST', body: fd });
+      const d = await r.json();
+      btn.textContent = d.ok ? '✅ Kaydedildi' : '❌ Hata';
+    } catch {
+      btn.textContent = '❌ Hata';
+    }
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Kaydet'; }, 2000);
+  }
+
+  async function saveHookStyle() {
+    const style = document.getElementById('prompt-hook-style').value;
+    const fd = new FormData();
+    fd.append('style', style);
+    await fetch('/api/hook-style', { method: 'POST', body: fd });
   }
 </script>
 </body>

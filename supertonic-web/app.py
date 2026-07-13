@@ -207,6 +207,16 @@ INFO_ENDCARD_FILE = UPLOAD_DIR / "info_endcard.jpg"
 LONGCAT_SPACE = "https://victor-longcat-video-avatar-1-5.hf.space"
 
 BANNED_TOPICS_FILE = Path("banned_topics.json")
+CUSTOM_PROMPT_RULES_FILE = Path("custom_prompt_rules.json")
+
+
+def get_custom_prompt_rules() -> str:
+    if not CUSTOM_PROMPT_RULES_FILE.exists():
+        return ""
+    try:
+        return json.loads(CUSTOM_PROMPT_RULES_FILE.read_text()).get("rules", "").strip()
+    except Exception:
+        return ""
 
 
 def load_banned_topics() -> list[str]:
@@ -626,6 +636,37 @@ async def api_set_hook_style(style: str = Form(...)):
         raise HTTPException(400, "style 'eski' veya 'yeni' olmalı")
     HOOK_STYLE_CONFIG.write_text(json.dumps({"style": style}))
     return {"ok": True, "style": style}
+
+
+@app.get("/api/custom-prompt-rules")
+async def api_get_custom_rules():
+    return {"rules": get_custom_prompt_rules()}
+
+
+@app.post("/api/custom-prompt-rules")
+async def api_set_custom_rules(rules: str = Form(...)):
+    CUSTOM_PROMPT_RULES_FILE.write_text(
+        json.dumps({"rules": rules.strip()}, ensure_ascii=False, indent=2)
+    )
+    return {"ok": True}
+
+
+@app.get("/api/prompt-preview")
+async def api_prompt_preview():
+    scores = ig_perf.category_scores()
+    perf_instr = ""
+    try:
+        perf_instr = ig_perf.build_instruction([])
+    except Exception:
+        pass
+    return {
+        "hook_style": get_hook_style(),
+        "hook_rule": get_hook_rule(),
+        "custom_rules": get_custom_prompt_rules(),
+        "perf_instruction": perf_instr,
+        "has_analytics": bool(scores),
+        "category_scores": scores,
+    }
 
 
 # ── Kategori çeşitliliği takibi ─────────────────────────────────────────────
@@ -1048,7 +1089,7 @@ Rules:
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration under 55 seconds
 - hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
-"""
+{("- CUSTOM RULES (highest priority — always follow these):\n" + "\n".join("  " + l for l in get_custom_prompt_rules().splitlines())) if get_custom_prompt_rules() else ""}"""
 
         for attempt in range(3):
             response = client.chat.completions.create(
