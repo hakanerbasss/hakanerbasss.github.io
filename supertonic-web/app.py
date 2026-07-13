@@ -708,8 +708,43 @@ def get_diversity_instruction() -> str:
     return ""
 
 
+async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
+    """Haber URL'sine gidip tam makale metnini çeker. Başarısız olursa boş string döner."""
+    if not url:
+        return ""
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(5.0, read=12.0),
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+        ) as client:
+            r = await client.get(url)
+        if r.status_code != 200:
+            return ""
+        try:
+            import trafilatura
+            text = trafilatura.extract(
+                r.text,
+                include_comments=False,
+                include_tables=False,
+                favor_recall=True,
+            )
+            if text and len(text) > 80:
+                return text[:max_chars]
+        except Exception:
+            pass
+        # Fallback: kaba HTML temizleme
+        import re as _re
+        clean = _re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", "", r.text, flags=_re.DOTALL | _re.IGNORECASE)
+        clean = _re.sub(r"<[^>]+>", " ", clean)
+        clean = _re.sub(r"\s+", " ", clean).strip()
+        return clean[:max_chars] if len(clean) > 80 else ""
+    except Exception:
+        return ""
+
+
 async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) -> dict:
-    """Google News RSS'ten gerçek haber detayları çeker. Hata olursa {} döner."""
+    """Google News RSS'ten haber başlıkları + tam makale metinlerini çeker. Hata olursa {} döner."""
     import xml.etree.ElementTree as ET
     import re
     from urllib.parse import quote
@@ -731,32 +766,45 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
         for item in channel.findall("item")[:max_items]:
             title = (item.findtext("title") or "").strip()
             desc = re.sub(r"<[^>]+>", "", (item.findtext("description") or "")).strip()
+            link = (item.findtext("link") or "").strip()
             src_el = item.find("source")
             src_name = (src_el.text or "").strip() if src_el is not None else ""
             if not src_name:
-                # dc:creator fallback
                 dc = item.find("{http://purl.org/dc/elements/1.1/}creator")
                 if dc is not None:
                     src_name = (dc.text or "").strip()
             if title:
-                articles.append({"title": title, "desc": desc[:300], "source": src_name})
+                articles.append({"title": title, "desc": desc[:300], "source": src_name, "link": link})
                 if src_name and src_name not in sources:
                     sources.append(src_name)
         if not articles:
             return {}
+
+        # Tam makale metinlerini paralel çek
+        texts = await asyncio.gather(
+            *[_fetch_article_text(a["link"]) for a in articles],
+            return_exceptions=True,
+        )
+        for i, txt in enumerate(texts):
+            if isinstance(txt, str) and len(txt) > 80:
+                articles[i]["full_text"] = txt
+
+        has_full = any(a.get("full_text") for a in articles)
+
         context_lines = []
         for a in articles:
-            line = f"- {a['title']}"
+            header = f"KAYNAK: {a['title']}"
             if a["source"]:
-                line += f" [{a['source']}]"
-            if a["desc"]:
-                line += f"\n  {a['desc']}"
-            context_lines.append(line)
+                header += f" [{a['source']}]"
+            body = a.get("full_text") or a["desc"]
+            context_lines.append(f"{header}\n{body}")
+
         return {
             "found": True,
             "articles": articles,
             "sources": sources,
-            "context_text": "\n".join(context_lines),
+            "context_text": "\n\n---\n\n".join(context_lines),
+            "has_full_text": has_full,
         }
     except Exception:
         return {}
@@ -1024,17 +1072,18 @@ Rules:
 
         news_context_instruction = ""
         if gnews_data.get("found"):
+            depth_label = "TAM MAKALE METNİ" if gnews_data.get("has_full_text") else "HABER ÖZETİ"
             news_context_instruction = (
-                f"\n\nREAL NEWS VERIFICATION — Use these verified facts (exact names, titles, locations MUST match):\n"
+                f"\n\nHABER KAYNAĞI ({depth_label}) — Senaryo YALNIZCA aşağıdaki metne dayanmalı:\n"
                 f"{gnews_data['context_text']}\n"
-                f"CRITICAL RULES FOR FACTS:\n"
-                f"- Do NOT use your training data for names, titles or positions — it is OUTDATED.\n"
-                f"- Use ONLY the names and titles written in the news context above.\n"
-                f"- Political positions change: a person who was a leader in the past may no longer be. "
-                f"Use the title given in the news context, not what you remember from training.\n"
-                f"- Example of forbidden error: calling Assad 'Suriye Devlet Başkanı' — he fled in Dec 2024; "
-                f"the news context will name the correct current leader.\n"
-                f"- If the news context does not mention a title for a person, describe them by their action only.\n"
+                f"MUTLAK KURALLAR — İhlali yasaktır:\n"
+                f"- Yukarıdaki metinde YAZMAYANH İÇBİR isim, rakam, tarih, yüzde, pozisyon kullanma. Bilmiyorsan söyleme, atla.\n"
+                f"- Eğitim verinle tahmin yürütme — güncel değil. Kaynakta ne yazıyorsa onu söyle.\n"
+                f"- Kaynak 'bazı kişiler' diyorsa sen 'milyonlarca kişi' diyemezsin.\n"
+                f"- Kaynak rakam vermemişse sen rakam uyduramassın.\n"
+                f"- Birinin unvanı kaynakta yoksa sadece adını kullan, unvan takma.\n"
+                f"- Assad örneği: eğitim verisinde 'Suriye Devlet Başkanı' görünür ama Aralık 2024'te kaçtı — "
+                f"kaynakta ne yazıyorsa onu kullan.\n"
             )
         # ─────────────────────────────────────────────────────────────────────────
 
