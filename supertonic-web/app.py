@@ -1012,20 +1012,10 @@ Rules:
             )
         else:
             topic_instruction = (
-                f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}\n"
-                f"PRIORITY ORDER (always pick the highest available priority — based on real audience performance data):\n"
-                f"1) Türkiye ekonomisini doğrudan etkileyen haberler — maaş, tazminat, emekli maaşı, "
-                f"asgari ücret, zam, vergi, SGK, ikramiye (cüzdana direkt etki = en yüksek paylaşım)\n"
-                f"2) Meteoroloji / hava durumu uyarısı — kuvvetli yağış, fırtına, sel uyarısı, sıcak hava "
-                f"(günlük kullanışlılık = ikinci en yüksek paylaşım)\n"
-                f"3) Şoke edici / duygusal iç haberler — şehit, büyük kaza, kamuoyunu sarsan insan haberi, "
-                f"belediye/siyasetçi operasyonu (duygusal bağ, paylaşım tetikler)\n"
-                f"4) Afet / doğal felaket / acil uyarı\n"
-                f"5) Listede en üstte olan popüler trend haber\n"
-                f"LOW PRIORITY — pick ONLY if it is genuinely major breaking news affecting millions: "
-                f"uluslararası siyaset (NATO, ABD, Rusya), diaspora/gurbetçi haberleri. "
-                f"These topics consistently underperform on this account.\n"
-                f"If the trending list has NO topics matching priority 1–4, pick by popularity.\n"
+                f"Choose ONE of these TODAY'S trending topics and make a short breaking-news video:\n{trend_topics}\n"
+                f"Pick whichever topic is most compelling and timely. Prefer topics that directly affect "
+                f"people's daily lives (safety, wallet, health, rights) — but do not force a category; "
+                f"a genuinely viral story beats a forced angle every time.\n"
                 f"{get_diversity_instruction()}{perf_instruction}"
             )
         yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
