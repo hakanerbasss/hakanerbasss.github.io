@@ -1173,8 +1173,10 @@ Rules:
             numbers_block = ", ".join(facts_data.get("numbers", [])) or "yok"
             dates_block = ", ".join(facts_data.get("dates", [])) or "yok"
             thin_note = (
-                "\nNOT: Olgu sayısı az — üzerine spekülasyon eklemeden, elindeki olgularla "
-                "doğal bir anlatım kur. Video biraz kısa kalsa bile uydurmaktan iyidir.\n"
+                "\nNOT: Olgu sayısı az. YİNE DE video en az 45 saniye olmalı — yeni bilgi "
+                "UYDURMADAN, elindeki olguları derinleştirerek doldur (örn. bu olgu kimi nasıl "
+                "etkiler, ne zaman geçerli olur, neden önemli — olgunun kendisinden çıkan doğal "
+                "açılımlar, yeni iddia değil). Kısa kesip atlamak yerine var olan olguyu iyi anlat.\n"
                 if not facts_data.get("sufficient") else ""
             )
             news_context_instruction = (
@@ -1257,7 +1259,7 @@ Rules:
 {get_hook_rule()}
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
-- Total narration under 55 seconds
+- Total narration between 45 and 55 seconds — NEVER shorter than 45 seconds. If the facts feel thin, elaborate naturally on the facts you have (implications, who it affects, timing) instead of cutting the video short or inventing new details.
 - hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
 {_custom_block}"""
 
