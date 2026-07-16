@@ -509,6 +509,23 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
 
         _EKYAK = r"(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?"  # kesme işaretli ek — yakalanır, silinmez
 
+        # Mobil nesil: 5G → beşinci nesil. Genel büyük-sayı dönüşümünden ÖNCE
+        # işlenmeli — yoksa '5' sözcüğe çevrilir ama bitişik 'G' harfi öylece
+        # kalır ('beşG' gibi tek garip token oluşur, TTS'i şaşırtır).
+        _TR_NESIL = {1:'birinci',2:'ikinci',3:'üçüncü',4:'dördüncü',5:'beşinci',6:'altıncı'}
+        text = re.sub(r'\b([1-9])[Gg]\b', lambda m: _TR_NESIL.get(int(m.group(1)), _tr_ordinal_words(int(m.group(1)))) + ' nesil', text)
+
+        # Skor gösterimi: 3-1 → üçe bir. Eksi işareti burada negatif sayı değil,
+        # iki sayı arasında ayraç — eksi_sayı regex'i zaten bunu (önünde rakam
+        # varsa) yakalamıyor, ama ayraç ("-") öylece kalıp TTS'i şaşırtmasın diye
+        # ayrıca ele alınması gerekiyor.
+        def _skor(m):
+            words = _tr_num_to_words(int(m.group(1))).split(' ')
+            if words[-1] in _TR_DATIVE:
+                words[-1] = _TR_DATIVE[words[-1]]
+            return ' '.join(words) + ' ' + _tr_num_to_words(int(m.group(2)))
+        text = re.sub(r'\b(\d+)-(\d+)\b', _skor, text)
+
         # Sıcaklık/derece — BÜYÜK SAYI'DAN ÖNCE işlenmeli, yoksa rakam zaten
         # sözcüğe çevrilmiş olur ve "\d+°C" deseni artık eşleşmez (35°C → "otuz
         # beş°C" kalır, °C hiç açılmaz). Ondalık sıcaklık da desteklenir (36,6°C).
