@@ -1186,6 +1186,21 @@ Rules:
     else:
         # HABER SHORTS — mevcut trend/haber akışı
         trend_data = get_trends(region_code=region.upper(), lang=lang)
+
+        # TR için: normal trend + gurbetçi havuzunu birleştirip aynı filtreden geçir
+        # (ölüm/vefat/dedikodu + ASAYİŞ kategorisi elenir) — Telegram seçim listesiyle
+        # aynı havuz, artık otomatik seçimde de kullanılıyor. Konu zaten belirtilmişse
+        # (manuel/Telegram'dan zorunlu konu) bu havuz kullanılmayacağı için atlanır.
+        if lang == "tr" and not topic.strip():
+            try:
+                gurbetci_topics = await fetch_gurbetci_topics()
+                merged = _filter_low_value_topics(trend_data.get("topics", []))
+                merged = list(dict.fromkeys(merged + gurbetci_topics))
+                if merged:
+                    trend_data["topics"] = merged
+            except Exception as _ge:
+                print(f"[combined-pool] otomatik akışta birleşik havuz kullanılamadı: {_ge}", flush=True)
+
         trend_topics = ", ".join(trend_data["topics"][:12])
         yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
         trend_tags = ", ".join(trend_data["hashtags"][:10])
