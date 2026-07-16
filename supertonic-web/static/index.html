@@ -464,12 +464,20 @@
       <div class="spinner" id="spin-trends-gurbetci"></div>
       🌍 Trend + Gurbetçi Haberleri Getir
     </button>
+    <button onclick="fetchTrends('combined')" id="btn-trends-combined" style="background:#2a1a3a;font-size:13px;padding:10px 18px;margin-left:8px;">
+      <div class="spinner" id="spin-trends-combined"></div>
+      🔗 Birleşik Havuz (Filtreli)
+    </button>
     <div id="trends-box" style="display:none;margin-top:12px;background:#111;border:1px solid #222;border-radius:8px;padding:14px;">
       <div style="font-size:12px;color:#666;margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
       <div id="trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
       <div id="gurbetci-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
         <div style="font-size:12px;color:#7dd3fc;margin-bottom:8px;">🌍 Gurbetçi haber havuzu — sadece manuel inceleme için, otomatik akışa dahil değil</div>
         <div id="gurbetci-trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+      <div id="combined-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
+        <div style="font-size:12px;color:#c4b5fd;margin-bottom:8px;">🔗 Birleşik + filtreli havuz — trend + gurbetçi, ölüm/vefat/dedikodu ve ASAYİŞ kategorisi elenmiş. Sadece manuel inceleme için.</div>
+        <div id="combined-trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
       </div>
       <div style="font-size:11px;color:#444;margin-top:10px;" id="trends-time"></div>
     </div>
@@ -2321,52 +2329,60 @@ async function sendShortsToInstagram() {
   }
 }
 
-async function fetchTrends(withGurbetci) {
-  const btnId = withGurbetci ? 'btn-trends-gurbetci' : 'btn-trends';
-  const spinId = withGurbetci ? 'spin-trends-gurbetci' : 'spin-trends';
+function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText, emptyMsg) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  if (!topics.length) {
+    el.innerHTML = `<div style="font-size:12px;color:#888;">${emptyMsg}</div>`;
+    return;
+  }
+  topics.forEach(topic => {
+    const btn = document.createElement('button');
+    btn.textContent = topic;
+    btn.style.cssText = `background:${colorBg};border:1px solid ${colorBorder};border-radius:20px;padding:6px 14px;font-size:13px;color:${colorText};cursor:pointer;`;
+    btn.onclick = () => {
+      document.getElementById('shorts-topic').value = topic;
+      btn.style.background = colorBorder;
+    };
+    el.appendChild(btn);
+  });
+}
+
+async function fetchTrends(mode) {
+  // mode: undefined (normal) | true/'gurbetci' | 'combined'
+  const withGurbetci = mode === true || mode === 'gurbetci';
+  const combined = mode === 'combined';
+  const btnId = combined ? 'btn-trends-combined' : (withGurbetci ? 'btn-trends-gurbetci' : 'btn-trends');
+  const spinId = combined ? 'spin-trends-combined' : (withGurbetci ? 'spin-trends-gurbetci' : 'spin-trends');
   setLoading(btnId, spinId, true);
   try {
-    const url = withGurbetci ? `/api/trends/refresh-with-gurbetci` : `/api/trends/refresh`;
+    const url = combined ? `/api/trends/refresh-combined`
+      : withGurbetci ? `/api/trends/refresh-with-gurbetci`
+      : `/api/trends/refresh`;
     const r = await fetch(url, { method: 'POST' });
     if (!r.ok) throw new Error('Trend verisi alınamadı');
     const d = await r.json();
 
-    const list = document.getElementById('trends-list');
-    list.innerHTML = '';
-    (d.topics || []).forEach(topic => {
-      const btn = document.createElement('button');
-      btn.textContent = topic;
-      btn.style.cssText = 'background:#1a2a1a;border:1px solid #2a4a2a;border-radius:20px;padding:6px 14px;font-size:13px;color:#86efac;cursor:pointer;';
-      btn.onclick = () => {
-        document.getElementById('shorts-topic').value = topic;
-        btn.style.background = '#2a4a2a';
-      };
-      list.appendChild(btn);
-    });
+    _renderTopicChips('trends-list', d.topics || [], '#1a2a1a', '#2a4a2a', '#86efac', 'Trend bulunamadı.');
 
     const gWrap = document.getElementById('gurbetci-trends-wrap');
-    const gList = document.getElementById('gurbetci-trends-list');
-    if (withGurbetci) {
-      gList.innerHTML = '';
-      const gTopics = d.gurbetci_topics || [];
-      if (gTopics.length) {
-        gTopics.forEach(topic => {
-          const btn = document.createElement('button');
-          btn.textContent = topic;
-          btn.style.cssText = 'background:#1a2530;border:1px solid #2a4a5a;border-radius:20px;padding:6px 14px;font-size:13px;color:#7dd3fc;cursor:pointer;';
-          btn.onclick = () => {
-            document.getElementById('shorts-topic').value = topic;
-            btn.style.background = '#2a4a5a';
-          };
-          gList.appendChild(btn);
-        });
-      } else {
-        gList.innerHTML = '<div style="font-size:12px;color:#888;">Şu an gurbetçi haber havuzunda sonuç bulunamadı — birkaç dakika sonra tekrar dene.</div>';
-      }
+    if (withGurbetci || combined) {
+      _renderTopicChips('gurbetci-trends-list', d.gurbetci_topics || [], '#1a2530', '#2a4a5a', '#7dd3fc',
+        'Şu an gurbetçi haber havuzunda sonuç bulunamadı — birkaç dakika sonra tekrar dene.');
       gWrap.style.display = 'block';
-      gWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
       gWrap.style.display = 'none';
+    }
+
+    const cWrap = document.getElementById('combined-trends-wrap');
+    if (combined) {
+      _renderTopicChips('combined-trends-list', d.combined_topics || [], '#241a30', '#4a2a5a', '#c4b5fd',
+        'Birleşik havuzda sonuç bulunamadı.');
+      cWrap.style.display = 'block';
+      cWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      cWrap.style.display = 'none';
+      if (withGurbetci) document.getElementById('gurbetci-trends-wrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     const ts = new Date(d.ts * 1000).toLocaleTimeString('tr-TR');

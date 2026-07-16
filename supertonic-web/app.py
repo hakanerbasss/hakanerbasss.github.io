@@ -895,6 +895,28 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
         return []
 
 
+# Kişisel ölüm/vefat/kaza haberleri — hem gurbetçi hem normal trend havuzunda
+# ele alınır. ASAYİŞ kategorisi (cinayet, gözaltı, tutuklama vb.) ig_perf.categorize()
+# üzerinden ayrıca elenir, burada sadece keyword listesi tekil ölüm/vefat vakalarını yakalar.
+_LOW_VALUE_KW = ["öldü", "ölü bulundu", "vefat", "kaza yaptı", "hayatını kaybetti",
+                 "cesedi bulundu", "facia", "boşandı", "evlilik teklifi", "aşk yaşıyor"]
+
+
+def _filter_low_value_topics(titles: list) -> list:
+    """Kişisel ölüm/vefat/dedikodu + ASAYİŞ (cinayet/gözaltı/skandal) kategorisindeki
+    başlıkları eler. Etkisiz/düşük değerli haberleri her iki havuzdan da tutarlı
+    şekilde çıkarmak için kullanılır — otomatik akışa dahil değil, sadece manuel havuz."""
+    filtered = []
+    for t in titles:
+        low = t.lower()
+        if any(kw in low for kw in _LOW_VALUE_KW):
+            continue
+        if ig_perf.categorize(t) == "ASAYİŞ":
+            continue
+        filtered.append(t)
+    return filtered
+
+
 async def fetch_gurbetci_topics(max_items: int = 8) -> list:
     """Gurbetçi/diaspora haberlerine özel Google News RSS sorgusu.
 
@@ -932,9 +954,7 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
 
         # Kişisel ölüm/vefat/cinayet haberleri ele — "gurbetçi" kelimesi geçse bile
         # bunlar ASAYİŞ türü içerik, herkesi ilgilendiren pratik/politika haberi değil.
-        _dead_kw = ["öldü", "ölü bulundu", "vefat", "cinayet", "kaza yaptı",
-                    "hayatını kaybetti", "cesedi bulundu", "facia"]
-        filtered = [t for t in titles if not any(kw in t.lower() for kw in _dead_kw)]
+        filtered = _filter_low_value_topics(titles)
         dropped = len(titles) - len(filtered)
         if dropped:
             print(f"[gurbetci-trends] {dropped} kişisel/ölüm haberi elendi", flush=True)
@@ -4756,6 +4776,21 @@ async def trends_refresh_with_gurbetci():
     base = await trends_refresh()
     gurbetci_topics = await fetch_gurbetci_topics()
     return {**base, "gurbetci_topics": gurbetci_topics}
+
+
+@app.post("/api/trends/refresh-combined")
+async def trends_refresh_combined():
+    """Manuel inceleme için: normal trend + gurbetçi havuzlarını AYNI filtreden
+    geçirip (ölüm/vefat/dedikodu + ASAYİŞ kategorisi elenir) tek listede birleştirir.
+    Otomatik akışa bağlı değil — sadece Shorts Manuel panelinde gösterilir."""
+    base = await trends_refresh()
+    gurbetci_topics = await fetch_gurbetci_topics()
+    trend_topics_filtered = _filter_low_value_topics(base.get("topics", []))
+    dropped = len(base.get("topics", [])) - len(trend_topics_filtered)
+    if dropped:
+        print(f"[combined-trends] normal trend havuzundan {dropped} düşük değerli haber elendi", flush=True)
+    combined = list(dict.fromkeys(trend_topics_filtered + gurbetci_topics))
+    return {**base, "gurbetci_topics": gurbetci_topics, "combined_topics": combined}
 
 
 @app.post("/api/yt/config")
