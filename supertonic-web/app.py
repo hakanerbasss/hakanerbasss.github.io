@@ -387,11 +387,13 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         text = re.sub(r'€\s*(\d[\d.,]*)', r'\1 euro', text)
         text = re.sub(r'£\s*(\d[\d.,]*)', r'\1 sterlin', text)
 
-        # Saat: 14:30 → saat on dört otuz
+        # Saat: 14:30 → saat on dört otuz. Kaynak metinde önünde zaten "saat"
+        # kelimesi varsa (ör. "saat 14:30'da") onu da yutuyoruz — yoksa "saat
+        # saat on dört otuz" gibi tekrar oluyordu.
         def _saat(m):
             h, mn = int(m.group(1)), int(m.group(2))
             return 'saat ' + _tr_num_to_words(h) + ' ' + (_tr_num_to_words(mn) if mn else '')
-        text = re.sub(r'\b(\d{1,2}):(\d{2})\b', _saat, text)
+        text = re.sub(r'(?:\bsaat\s+)?\b(\d{1,2}):(\d{2})\b', _saat, text, flags=re.IGNORECASE)
 
         # Tarih: 12.07.2026 veya 12/07/2026 → on iki temmuz iki bin yirmi altı
         _AYLAR = {1:'ocak',2:'şubat',3:'mart',4:'nisan',5:'mayıs',6:'haziran',
@@ -419,6 +421,29 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             return _tr_ordinal_words(int(m.group(1)))
         text = re.sub(r'\b(\d{1,4})\.(?=\s|$)', _sira_sayi, text)
 
+        # Sıcaklık/derece — BÜYÜK SAYI'DAN ÖNCE işlenmeli, yoksa rakam zaten
+        # sözcüğe çevrilmiş olur ve "\d+°C" deseni artık eşleşmez (35°C → "otuz
+        # beş°C" kalır, °C hiç açılmaz). Ondalık sıcaklık da desteklenir (36,6°C).
+        def _sicaklik(birim):
+            def _f(m):
+                whole = _tr_num_to_words(int(m.group(1)))
+                if m.group(2):
+                    whole += ' virgül ' + _tr_num_to_words(int(m.group(2)))
+                return whole + ' ' + birim
+            return _f
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°C', _sicaklik('santigrat'), text)
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°F', _sicaklik('fahrenheit'), text)
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°', _sicaklik('derece'), text)
+        # Eksi işaretini (sıcaklık dışı bağlamda da) sözcüğe çevir: -5 → eksi beş,
+        # -3,5 → eksi üç virgül beş (ondalık kısmı da TEK regex'te yakalanmalı —
+        # ayrı geçseydi ondalık virgül regex'i "-" den sonraki rakamı bulamazdı).
+        def _eksi_sayi(m):
+            out = 'eksi ' + _tr_num_to_words(int(m.group(1)))
+            if m.group(2):
+                out += ' virgül ' + _tr_num_to_words(int(m.group(2)))
+            return out
+        text = re.sub(r'(?<![\w])-(\d+)(?:,(\d{1,2}))?(?!\d)', _eksi_sayi, text)
+
         # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli
         # 3.5 → üç nokta beş
         def _ondalik_nokta(m):
@@ -439,19 +464,24 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             return _tr_num_to_words(n)
         text = re.sub(r'\b\d[\d.]*\b', _buyuk_sayi, text)
 
+        # Kısaltmalar — rakam zaten yukarıda sözcüğe çevrildi, burada sadece birim
+        # kısaltması açılıyor. Türkçe iyelik/hal eki apostrofla iliştiyse (TL'ye,
+        # m³'lük gibi) TTS'te tuhaf duraklama/hatalı okumaya yol açıyor, o yüzden
+        # apostrof + ekini birlikte siliyoruz (cümle eksik ekle de anlaşılır kalır).
+        _EK = r"'?[a-zçğıöşüA-ZÇĞİÖŞÜ]{0,3}\b"
+        text = re.sub(r'\bTL\b' + _EK, 'lira', text)
+        text = re.sub(r'\bkm/s\b' + _EK, 'kilometre saat', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkm\b' + _EK, 'kilometre', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkg\b' + _EK, 'kilogram', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bm²\b' + _EK, 'metrekare', text)
+        text = re.sub(r'\bm³\b' + _EK, 'metreküp', text)
 
-        # Sıcaklık: 35°C → otuz beş santigrat, 35°F → otuz beş fahrenheit, 35° → otuz beş derece
-        text = re.sub(r'(\d+)°C', lambda m: _tr_num_to_words(int(m.group(1))) + ' santigrat', text)
-        text = re.sub(r'(\d+)°F', lambda m: _tr_num_to_words(int(m.group(1))) + ' fahrenheit', text)
-        text = re.sub(r'(\d+)°', lambda m: _tr_num_to_words(int(m.group(1))) + ' derece', text)
-
-        # Kısaltmalar
-        text = re.sub(r'\bTL\b', 'Türk lirası', text)
-        text = re.sub(r'\bkm/s\b', 'kilometre saat', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bkm\b', 'kilometre', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bkg\b', 'kilogram', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bm²\b', 'metrekare', text)
-        text = re.sub(r'\bm³\b', 'metreküp', text)
+        # Genel temizlik: yukarıdaki dönüşümlerden sonra kalan her türlü kesme
+        # işareti + ek kalıntısını sil (ör. "santigrat'ye", "2027'de", "5'inde").
+        # Türkçe'de kesme işareti sadece yazımda özel ad/rakamı ekten ayırmak için
+        # var, telaffuzu etkilemiyor — TTS metninde tuhaf duraklama/hatalı okumaya
+        # yol açtığı için kalıcı olarak siliniyor (cümle eksik ekle de anlaşılır kalır).
+        text = re.sub(r"(?<=\w)['’][a-zçğıöşüA-ZÇĞİÖŞÜ]{0,4}\b", '', text)
 
     # URL'leri kaldır (lang != tr için de)
     text = re.sub(r'https?://\S+', '', text)
