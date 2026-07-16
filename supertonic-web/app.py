@@ -368,6 +368,89 @@ def _tr_ordinal_words(n: int) -> str:
     return ' '.join(words)
 
 
+# Kaynak metinde sayı/birimden sonra kesme işaretiyle gelen hal ekleri (14:30'DA,
+# 250 TL'YE, 2027'DE gibi) SİLİNMEMELİ — ek cümledeki iki sayıyı birbirinden ayıran
+# tek şey, eksik olunca "on dört otuz dokuz" gibi anlamsız bitişik okuma oluyor.
+# Sayı sözcüğünün SON kelimesi her zaman bu sabit listelerden biri olduğu için
+# (birler/onlar/yüz/bin/milyon/milyar + enjekte ettiğimiz birim sözcükleri), genel
+# bir ünlü-uyumu algoritması yerine sonlu bir sözlük kullanılıyor — Türkçe'de
+# ünsüz yumuşaması (dört→dörde) bazı kelimelerde düzensiz, sözlük daha güvenilir.
+_TR_DATIVE = {          # -a/-e/-ya/-ye ("...e/a", "'a kadar" gibi)
+    'sıfır':'sıfıra','bir':'bire','iki':'ikiye','üç':'üçe','dört':'dörde','beş':'beşe',
+    'altı':'altıya','yedi':'yediye','sekiz':'sekize','dokuz':'dokuza',
+    'on':'ona','yirmi':'yirmiye','otuz':'otuza','kırk':'kırka','elli':'elliye',
+    'altmış':'altmışa','yetmiş':'yetmişe','seksen':'seksene','doksan':'doksana',
+    'yüz':'yüze','bin':'bine','milyon':'milyona','milyar':'milyara',
+    'santigrat':'santigrada','derece':'dereceye','fahrenheit':'fahrenheite',
+    'lira':'liraya','kilometre':'kilometreye','kilogram':'kilograma',
+    'metrekare':'metrekareye','metreküp':'metreküpe',
+    'dolar':'dolara','euro':'euroya','sterlin':'sterline','saat':'saate',
+}
+_TR_LOCATIVE = {        # -da/-de/-ta/-te ("...da/de")
+    'sıfır':'sıfırda','bir':'birde','iki':'ikide','üç':'üçte','dört':'dörtte','beş':'beşte',
+    'altı':'altıda','yedi':'yedide','sekiz':'sekizde','dokuz':'dokuzda',
+    'on':'onda','yirmi':'yirmide','otuz':'otuzda','kırk':'kırkta','elli':'ellide',
+    'altmış':'altmışta','yetmiş':'yetmişte','seksen':'seksende','doksan':'doksanda',
+    'yüz':'yüzde','bin':'binde','milyon':'milyonda','milyar':'milyarda',
+    'santigrat':'santigratta','derece':'derecede','fahrenheit':'fahrenheitte',
+    'lira':'lirada','kilometre':'kilometrede','kilogram':'kilogramda',
+    'metrekare':'metrekarede','metreküp':'metreküpte',
+    'dolar':'dolarda','euro':'euroda','sterlin':'sterlinde','saat':'saatte',
+}
+_TR_ABLATIVE = {        # -dan/-den/-tan/-ten ("...dan/den")
+    'sıfır':'sıfırdan','bir':'birden','iki':'ikiden','üç':'üçten','dört':'dörtten','beş':'beşten',
+    'altı':'altıdan','yedi':'yediden','sekiz':'sekizden','dokuz':'dokuzdan',
+    'on':'ondan','yirmi':'yirmiden','otuz':'otuzdan','kırk':'kırktan','elli':'elliden',
+    'altmış':'altmıştan','yetmiş':'yetmişten','seksen':'seksenden','doksan':'doksandan',
+    'yüz':'yüzden','bin':'binden','milyon':'milyondan','milyar':'milyardan',
+    'santigrat':'santigrattan','derece':'dereceden','fahrenheit':'fahrenheitten',
+    'lira':'liradan','kilometre':'kilometreden','kilogram':'kilogramdan',
+    'metrekare':'metrekareden','metreküp':'metreküpten',
+    'dolar':'dolardan','euro':'eurodan','sterlin':'sterlinden','saat':'saatten',
+}
+_TR_POSS_LOC = {        # "ayın 5'inde" → "ayın beşinde" (iyelik+bulunma birleşik eki)
+    'sıfır':'sıfırında','bir':'birinde','iki':'ikisinde','üç':'üçünde','dört':'dördünde','beş':'beşinde',
+    'altı':'altısında','yedi':'yedisinde','sekiz':'sekizinde','dokuz':'dokuzunda',
+    'on':'onunda','yirmi':'yirmisinde','otuz':'otuzunda','kırk':'kırkında','elli':'ellisinde',
+    'altmış':'altmışında','yetmiş':'yetmişinde','seksen':'sekseninde','doksan':'doksanında',
+    'yüz':'yüzünde','bin':'bininde','milyon':'milyonunda','milyar':'milyarında',
+}
+
+
+def _classify_tr_suffix(raw: str) -> str:
+    """Kesme işaretinden sonraki ek harflerine bakıp ek TÜRÜNÜ tahmin eder."""
+    s = raw.lower()
+    if s.endswith('nde') or s.endswith('nda'):
+        return 'possloc'
+    if s.endswith('den') or s.endswith('dan') or s.endswith('ten') or s.endswith('tan'):
+        return 'ablative'
+    if s.endswith('de') or s.endswith('da') or s.endswith('te') or s.endswith('ta'):
+        return 'locative'
+    if s in ('a', 'e', 'ya', 'ye'):
+        return 'dative'
+    return ''
+
+
+def _tr_attach_suffix(phrase: str, raw_suffix: str) -> str:
+    """Dönüştürülmüş sayı ifadesinin (ör. 'otuz dört') SON kelimesine, orijinal
+    kesme işaretli ekin türüne göre doğru Türkçe hal ekini bağlar. Tanınmayan/az
+    rastlanan ek türlerinde (ör. '-lik') güvenli şekilde eksiz bırakır — yanlış
+    ek eklemek, hiç eklememekten daha kötü bir okuma hatasına yol açar."""
+    if not raw_suffix:
+        return phrase
+    kind = _classify_tr_suffix(raw_suffix)
+    table = {'dative': _TR_DATIVE, 'locative': _TR_LOCATIVE,
+             'ablative': _TR_ABLATIVE, 'possloc': _TR_POSS_LOC}.get(kind)
+    if not table:
+        return phrase
+    words = phrase.split(' ')
+    last = words[-1]
+    if last in table:
+        words[-1] = table[last]
+        return ' '.join(words)
+    return phrase
+
+
 def _clean_tts_text(text: str, lang: str = "tr") -> str:
     """TTS'e gitmeden önce metni temizle — sayı/format hatalarını düzelt."""
     import re
@@ -389,11 +472,14 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
 
         # Saat: 14:30 → saat on dört otuz. Kaynak metinde önünde zaten "saat"
         # kelimesi varsa (ör. "saat 14:30'da") onu da yutuyoruz — yoksa "saat
-        # saat on dört otuz" gibi tekrar oluyordu.
+        # saat on dört otuz" gibi tekrar oluyordu. Arkasındaki hal eki (14:30'DA)
+        # doğru ünlü uyumuyla son kelimeye (dakika) bağlanır.
         def _saat(m):
             h, mn = int(m.group(1)), int(m.group(2))
-            return 'saat ' + _tr_num_to_words(h) + ' ' + (_tr_num_to_words(mn) if mn else '')
-        text = re.sub(r'(?:\bsaat\s+)?\b(\d{1,2}):(\d{2})\b', _saat, text, flags=re.IGNORECASE)
+            phrase = 'saat ' + _tr_num_to_words(h) + ' ' + (_tr_num_to_words(mn) if mn else '')
+            return _tr_attach_suffix(phrase, m.group(3) or '')
+        text = re.sub(r"(?:\bsaat\s+)?\b(\d{1,2}):(\d{2})\b(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?",
+                      _saat, text, flags=re.IGNORECASE)
 
         # Tarih: 12.07.2026 veya 12/07/2026 → on iki temmuz iki bin yirmi altı
         _AYLAR = {1:'ocak',2:'şubat',3:'mart',4:'nisan',5:'mayıs',6:'haziran',
@@ -421,19 +507,22 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             return _tr_ordinal_words(int(m.group(1)))
         text = re.sub(r'\b(\d{1,4})\.(?=\s|$)', _sira_sayi, text)
 
+        _EKYAK = r"(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?"  # kesme işaretli ek — yakalanır, silinmez
+
         # Sıcaklık/derece — BÜYÜK SAYI'DAN ÖNCE işlenmeli, yoksa rakam zaten
         # sözcüğe çevrilmiş olur ve "\d+°C" deseni artık eşleşmez (35°C → "otuz
         # beş°C" kalır, °C hiç açılmaz). Ondalık sıcaklık da desteklenir (36,6°C).
+        # Arkasındaki hal eki (38°C'YE) doğru ünlü uyumuyla bağlanır, silinmez.
         def _sicaklik(birim):
             def _f(m):
                 whole = _tr_num_to_words(int(m.group(1)))
                 if m.group(2):
                     whole += ' virgül ' + _tr_num_to_words(int(m.group(2)))
-                return whole + ' ' + birim
+                return _tr_attach_suffix(whole + ' ' + birim, m.group(3) or '')
             return _f
-        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°C', _sicaklik('santigrat'), text)
-        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°F', _sicaklik('fahrenheit'), text)
-        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°', _sicaklik('derece'), text)
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°C' + _EKYAK, _sicaklik('derece'), text)
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°F' + _EKYAK, _sicaklik('fahrenheit'), text)
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°' + _EKYAK, _sicaklik('derece'), text)
         # Eksi işaretini (sıcaklık dışı bağlamda da) sözcüğe çevir: -5 → eksi beş,
         # -3,5 → eksi üç virgül beş (ondalık kısmı da TEK regex'te yakalanmalı —
         # ayrı geçseydi ondalık virgül regex'i "-" den sonraki rakamı bulamazdı).
@@ -441,46 +530,50 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             out = 'eksi ' + _tr_num_to_words(int(m.group(1)))
             if m.group(2):
                 out += ' virgül ' + _tr_num_to_words(int(m.group(2)))
-            return out
-        text = re.sub(r'(?<![\w])-(\d+)(?:,(\d{1,2}))?(?!\d)', _eksi_sayi, text)
+            return _tr_attach_suffix(out, m.group(3) or '')
+        text = re.sub(r'(?<![\w])-(\d+)(?:,(\d{1,2}))?(?!\d)' + _EKYAK, _eksi_sayi, text)
 
         # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli
         # 3.5 → üç nokta beş
         def _ondalik_nokta(m):
-            return _tr_num_to_words(int(m.group(1))) + ' nokta ' + _tr_num_to_words(int(m.group(2)))
-        text = re.sub(r'\b(\d+)\.(\d{1,2})(?!\d)', _ondalik_nokta, text)
+            out = _tr_num_to_words(int(m.group(1))) + ' nokta ' + _tr_num_to_words(int(m.group(2)))
+            return _tr_attach_suffix(out, m.group(3) or '')
+        text = re.sub(r'\b(\d+)\.(\d{1,2})(?!\d)' + _EKYAK, _ondalik_nokta, text)
         # 3,5 → üç virgül beş
         def _ondalik_virgul(m):
-            return _tr_num_to_words(int(m.group(1))) + ' virgül ' + _tr_num_to_words(int(m.group(2)))
-        text = re.sub(r'\b(\d+),(\d{1,2})(?!\d)', _ondalik_virgul, text)
+            out = _tr_num_to_words(int(m.group(1))) + ' virgül ' + _tr_num_to_words(int(m.group(2)))
+            return _tr_attach_suffix(out, m.group(3) or '')
+        text = re.sub(r'\b(\d+),(\d{1,2})(?!\d)' + _EKYAK, _ondalik_virgul, text)
 
         # Binlik nokta ayırıcıyı kaldır: 1.500 → 1500
         text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
 
         # Büyük sayıları sözcüğe çevir: TÜM rakamlar çevrilir (Supertonic hiçbir
-        # rakamı — 1000 altı dahil — doğru okuyamıyor, eşik kaldırıldı)
+        # rakamı — 1000 altı dahil — doğru okuyamıyor, eşik kaldırıldı). Arkasındaki
+        # hal eki (2027'DE, 5'İNDE gibi) doğru ünlü uyumuyla bağlanır.
         def _buyuk_sayi(m):
-            n = int(m.group(0).replace('.', ''))
-            return _tr_num_to_words(n)
-        text = re.sub(r'\b\d[\d.]*\b', _buyuk_sayi, text)
+            n = int(m.group(1).replace('.', ''))
+            return _tr_attach_suffix(_tr_num_to_words(n), m.group(2) or '')
+        text = re.sub(r'\b(\d[\d.]*)' + _EKYAK, _buyuk_sayi, text)
 
         # Kısaltmalar — rakam zaten yukarıda sözcüğe çevrildi, burada sadece birim
-        # kısaltması açılıyor. Türkçe iyelik/hal eki apostrofla iliştiyse (TL'ye,
-        # m³'lük gibi) TTS'te tuhaf duraklama/hatalı okumaya yol açıyor, o yüzden
-        # apostrof + ekini birlikte siliyoruz (cümle eksik ekle de anlaşılır kalır).
-        _EK = r"'?[a-zçğıöşüA-ZÇĞİÖŞÜ]{0,3}\b"
-        text = re.sub(r'\bTL\b' + _EK, 'lira', text)
-        text = re.sub(r'\bkm/s\b' + _EK, 'kilometre saat', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bkm\b' + _EK, 'kilometre', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bkg\b' + _EK, 'kilogram', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bm²\b' + _EK, 'metrekare', text)
-        text = re.sub(r'\bm³\b' + _EK, 'metreküp', text)
+        # kısaltması açılıyor. Arkasındaki hal eki (TL'YE, m³'LÜK gibi) doğru ünlü
+        # uyumuyla bağlanır (lira'ye değil liraya, metreküp'lük değil metreküpe vb.).
+        def _kisaltma(kelime):
+            def _f(m):
+                return _tr_attach_suffix(kelime, m.group(1) or '')
+            return _f
+        text = re.sub(r'\bTL\b' + _EKYAK, _kisaltma('lira'), text)
+        text = re.sub(r'\bkm/s\b' + _EKYAK, _kisaltma('kilometre saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkm\b' + _EKYAK, _kisaltma('kilometre'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkg\b' + _EKYAK, _kisaltma('kilogram'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bm²\b' + _EKYAK, _kisaltma('metrekare'), text)
+        text = re.sub(r'\bm³\b' + _EKYAK, _kisaltma('metreküp'), text)
 
-        # Genel temizlik: yukarıdaki dönüşümlerden sonra kalan her türlü kesme
-        # işareti + ek kalıntısını sil (ör. "santigrat'ye", "2027'de", "5'inde").
-        # Türkçe'de kesme işareti sadece yazımda özel ad/rakamı ekten ayırmak için
-        # var, telaffuzu etkilemiyor — TTS metninde tuhaf duraklama/hatalı okumaya
-        # yol açtığı için kalıcı olarak siliniyor (cümle eksik ekle de anlaşılır kalır).
+        # Son güvenlik ağı: yukarıdaki hedefli dönüşümler kapsamadığı nadir
+        # durumlarda (ör. %13,52'LİK gibi sıfat eki) kalan kesme işareti+ek
+        # kalıntısını sil — ekisiz kalması, ham kesme işaretinin TTS'te tuhaf
+        # duraklama/hatalı okumaya yol açmasından daha güvenli.
         text = re.sub(r"(?<=\w)['’][a-zçğıöşüA-ZÇĞİÖŞÜ]{0,4}\b", '', text)
 
     # URL'leri kaldır (lang != tr için de)
