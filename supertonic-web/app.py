@@ -917,6 +917,20 @@ def _filter_low_value_topics(titles: list) -> list:
     return filtered
 
 
+def _interleave_topics(a: list, b: list) -> list:
+    """İki listeyi almaşık sıralar (a1,b1,a2,b2,...) — sonradan bir yerde [:N] ile
+    kırpılsa bile her iki havuzdan da adil pay çıkar. Düz 'a + b' birleştirme
+    kullanılsaydı b (gurbetçi) listesi hep sonda kalır, kırpma onu tamamen silerdi
+    (tam olarak yaşanan hata buydu — trend 20 slotu doldurunca gurbetçi hiç görünmedi)."""
+    out = []
+    for i in range(max(len(a), len(b))):
+        if i < len(a):
+            out.append(a[i])
+        if i < len(b):
+            out.append(b[i])
+    return list(dict.fromkeys(out))
+
+
 def _dedupe_pool_against_recent(titles: list) -> list:
     """Havuzdan, son saatlerde zaten işlenmiş (Instagram'a atılmış) konularla anahtar
     kelime örtüşen başlıkları eler — _ig_same_topic_posted ile aynı mantık, ama
@@ -1211,7 +1225,7 @@ Rules:
             try:
                 gurbetci_topics = await fetch_gurbetci_topics()
                 merged = _filter_low_value_topics(trend_data.get("topics", []))
-                merged = list(dict.fromkeys(merged + gurbetci_topics))
+                merged = _interleave_topics(merged, gurbetci_topics)
                 merged = _dedupe_pool_against_recent(merged)
                 if merged:
                     trend_data["topics"] = merged
@@ -4892,15 +4906,20 @@ async def trends_refresh_with_gurbetci():
 @app.post("/api/trends/refresh-combined")
 async def trends_refresh_combined():
     """Manuel inceleme için: normal trend + gurbetçi havuzlarını AYNI filtreden
-    geçirip (ölüm/vefat/dedikodu + ASAYİŞ kategorisi elenir) tek listede birleştirir.
-    Otomatik akışa bağlı değil — sadece Shorts Manuel panelinde gösterilir."""
+    geçirip (ölüm/vefat/dedikodu + ASAYİŞ kategorisi + son işlenenler elenir) tek
+    listede birleştirir. Bu fonksiyonun mantığı (interleave + filtre) otomatik
+    akışta (_generate_shorts_core) ve Telegram konu seçiminde de aynen kullanılıyor —
+    üçü farklı yerlerde ayrı ayrı yazıldığı için bir ara birbirinden sapmıştı
+    (gurbetçi listenin sonuna eklenip [:N] kesmesiyle siliniyordu), artık hepsi
+    aynı _interleave_topics() ile adil sıralanıyor."""
     base = await trends_refresh()
     gurbetci_topics = await fetch_gurbetci_topics()
     trend_topics_filtered = _filter_low_value_topics(base.get("topics", []))
     dropped = len(base.get("topics", [])) - len(trend_topics_filtered)
     if dropped:
         print(f"[combined-trends] normal trend havuzundan {dropped} düşük değerli haber elendi", flush=True)
-    combined = list(dict.fromkeys(trend_topics_filtered + gurbetci_topics))
+    combined = _interleave_topics(trend_topics_filtered, gurbetci_topics)
+    combined = _dedupe_pool_against_recent(combined)
     return {**base, "gurbetci_topics": gurbetci_topics, "combined_topics": combined}
 
 
@@ -6264,7 +6283,7 @@ async def auto_ig_only_tr_job():
                 trend_data = get_trends(region_code="TR", lang="tr")
                 gurbetci_topics = await fetch_gurbetci_topics()
                 pool = _filter_low_value_topics(trend_data.get("topics", []))
-                pool = list(dict.fromkeys(pool + gurbetci_topics))
+                pool = _interleave_topics(pool, gurbetci_topics)
                 pool = _dedupe_pool_against_recent(pool)[:20]
                 if pool:
                     offset = await _telegram_mark_offset_to_latest()
