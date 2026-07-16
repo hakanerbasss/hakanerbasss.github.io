@@ -106,7 +106,7 @@ def get_trends(youtube_client=None, region_code="TR", lang="tr"):
     trend_hashtags = list(dict.fromkeys(yt_hashtags + base))[:20]
 
     result = {
-        "topics": topics[:20],
+        "topics": topics[:30],
         "hashtags": trend_hashtags,          # prompt'a giden liste
         "yt_trending_tags": yt_hashtags,     # sadece YouTube kaynaklılar
         "region": region_code,

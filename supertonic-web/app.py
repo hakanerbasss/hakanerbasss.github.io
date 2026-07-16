@@ -1232,7 +1232,7 @@ Rules:
             except Exception as _ge:
                 print(f"[combined-pool] otomatik akışta birleşik havuz kullanılamadı: {_ge}", flush=True)
 
-        trend_topics = ", ".join(trend_data["topics"][:12])
+        trend_topics = ", ".join(trend_data["topics"][:30])
         yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
         trend_tags = ", ".join(trend_data["hashtags"][:10])
 
@@ -6284,10 +6284,10 @@ async def auto_ig_only_tr_job():
                 gurbetci_topics = await fetch_gurbetci_topics()
                 pool = _filter_low_value_topics(trend_data.get("topics", []))
                 pool = _interleave_topics(pool, gurbetci_topics)
-                pool = _dedupe_pool_against_recent(pool)[:20]
+                pool = _dedupe_pool_against_recent(pool)[:30]
                 if pool:
                     offset = await _telegram_mark_offset_to_latest()
-                    numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
+                    numbered = "\n\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
                     sent = await send_telegram_plain(
                         f"📰 TR Instagram-Only — 5 dakika içinde numara yaz, o haberi yapayım.\n"
                         f"Cevap gelmezse otomatik seçeceğim.\n\n{numbered}"
