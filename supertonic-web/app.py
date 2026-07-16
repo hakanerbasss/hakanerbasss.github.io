@@ -415,6 +415,13 @@ _TR_POSS_LOC = {        # "ayın 5'inde" → "ayın beşinde" (iyelik+bulunma bi
     'altmış':'altmışında','yetmiş':'yetmişinde','seksen':'sekseninde','doksan':'doksanında',
     'yüz':'yüzünde','bin':'bininde','milyon':'milyonunda','milyar':'milyarında',
 }
+_TR_GENITIVE = {        # "2026'nın ilk çeyreğinde" → "iki bin yirmi altının ilk çeyreğinde"
+    'sıfır':'sıfırın','bir':'birin','iki':'ikinin','üç':'üçün','dört':'dördün','beş':'beşin',
+    'altı':'altının','yedi':'yedinin','sekiz':'sekizin','dokuz':'dokuzun',
+    'on':'onun','yirmi':'yirminin','otuz':'otuzun','kırk':'kırkın','elli':'ellinin',
+    'altmış':'altmışın','yetmiş':'yetmişin','seksen':'sekseninin','doksan':'doksanın',
+    'yüz':'yüzün','bin':'binin','milyon':'milyonun','milyar':'milyarın',
+}
 
 
 def _classify_tr_suffix(raw: str) -> str:
@@ -422,6 +429,9 @@ def _classify_tr_suffix(raw: str) -> str:
     s = raw.lower()
     if s.endswith('nde') or s.endswith('nda'):
         return 'possloc'
+    if s.endswith('nin') or s.endswith('nın') or s.endswith('nun') or s.endswith('nün') \
+       or s in ('in', 'ın', 'un', 'ün'):
+        return 'genitive'  # 'nin' (ünlüyle biten kök, tampon n) veya 'in' (ünsüzle biten kök)
     if s.endswith('den') or s.endswith('dan') or s.endswith('ten') or s.endswith('tan'):
         return 'ablative'
     if s.endswith('de') or s.endswith('da') or s.endswith('te') or s.endswith('ta'):
@@ -434,13 +444,14 @@ def _classify_tr_suffix(raw: str) -> str:
 def _tr_attach_suffix(phrase: str, raw_suffix: str) -> str:
     """Dönüştürülmüş sayı ifadesinin (ör. 'otuz dört') SON kelimesine, orijinal
     kesme işaretli ekin türüne göre doğru Türkçe hal ekini bağlar. Tanınmayan/az
-    rastlanan ek türlerinde (ör. '-lik') güvenli şekilde eksiz bırakır — yanlış
-    ek eklemek, hiç eklememekten daha kötü bir okuma hatasına yol açar."""
+    rastlanan ek türlerinde (ör. '-lik', '-ini' iyelik-belirtme) güvenli şekilde
+    eksiz bırakır — yanlış ek eklemek, hiç eklememekten daha kötü bir okuma
+    hatasına yol açar."""
     if not raw_suffix:
         return phrase
     kind = _classify_tr_suffix(raw_suffix)
-    table = {'dative': _TR_DATIVE, 'locative': _TR_LOCATIVE,
-             'ablative': _TR_ABLATIVE, 'possloc': _TR_POSS_LOC}.get(kind)
+    table = {'dative': _TR_DATIVE, 'locative': _TR_LOCATIVE, 'ablative': _TR_ABLATIVE,
+             'possloc': _TR_POSS_LOC, 'genitive': _TR_GENITIVE}.get(kind)
     if not table:
         return phrase
     words = phrase.split(' ')
