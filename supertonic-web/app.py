@@ -570,11 +570,14 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         text = re.sub(r'\bm²\b' + _EKYAK, _kisaltma('metrekare'), text)
         text = re.sub(r'\bm³\b' + _EKYAK, _kisaltma('metreküp'), text)
 
-        # Son güvenlik ağı: yukarıdaki hedefli dönüşümler kapsamadığı nadir
-        # durumlarda (ör. %13,52'LİK gibi sıfat eki) kalan kesme işareti+ek
-        # kalıntısını sil — ekisiz kalması, ham kesme işaretinin TTS'te tuhaf
-        # duraklama/hatalı okumaya yol açmasından daha güvenli.
-        text = re.sub(r"(?<=\w)['’][a-zçğıöşüA-ZÇĞİÖŞÜ]{0,4}\b", '', text)
+        # Son güvenlik ağı: sayı/birim dışındaki kelimelerde de (özel adlar,
+        # "Meteoroloji'den" gibi) kesme işareti+ek kalıyordu — bunlar bizim sayı
+        # sözlüğümüzde olmadığı için yukarıdaki _tr_attach_suffix hiç devreye
+        # girmiyordu. ÇÖZÜM: eki SİLMEK değil, sadece kesme işaretini kaldırıp
+        # ekin harflerini kelimeye BİTİŞİK bırakmak — Türkçe'de kesme işareti
+        # zaten yalnızca yazım kuralı, telaffuzu etkilemiyor, bu yüzden
+        # "Meteoroloji'den" → "Meteorolojiden" tamamen doğru ve ek korunmuş okunur.
+        text = re.sub(r"(?<=\w)['’](?=[a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}\b)", '', text)
 
     # URL'leri kaldır (lang != tr için de)
     text = re.sub(r'https?://\S+', '', text)
