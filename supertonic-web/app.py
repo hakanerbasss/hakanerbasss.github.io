@@ -470,13 +470,28 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         text = re.sub(r'€\s*(\d[\d.,]*)', r'\1 euro', text)
         text = re.sub(r'£\s*(\d[\d.,]*)', r'\1 sterlin', text)
 
+        # Saat aralığı: 14:00-16:00 → saat on dört - saat on altı. TEKİL saat
+        # regex'inden ÖNCE işlenmeli, yoksa aradaki tire çıplak kalır
+        # ("saat on dört -saat on altı" gibi bitişik/garip okuma).
+        def _saat_phrase(h, mn):
+            p = 'saat ' + _tr_num_to_words(h)
+            if mn:
+                p += ' ' + _tr_num_to_words(mn)
+            return p
+        def _saat_araligi(m):
+            h1, mn1, h2, mn2 = int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
+            return _saat_phrase(h1, mn1) + ' - ' + _saat_phrase(h2, mn2)
+        text = re.sub(r'\b(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})\b', _saat_araligi, text)
+
         # Saat: 14:30 → saat on dört otuz. Kaynak metinde önünde zaten "saat"
         # kelimesi varsa (ör. "saat 14:30'da") onu da yutuyoruz — yoksa "saat
         # saat on dört otuz" gibi tekrar oluyordu. Arkasındaki hal eki (14:30'DA)
-        # doğru ünlü uyumuyla son kelimeye (dakika) bağlanır.
+        # doğru ünlü uyumuyla son kelimeye bağlanır — dakika sıfırsa (14:00'te
+        # gibi tam saatlerde) sondaki boşluk _tr_attach_suffix'i şaşırtmasın
+        # diye strip() ile temizlenir (son kelime 'sıfır'/saat sözü olsun).
         def _saat(m):
             h, mn = int(m.group(1)), int(m.group(2))
-            phrase = 'saat ' + _tr_num_to_words(h) + ' ' + (_tr_num_to_words(mn) if mn else '')
+            phrase = _saat_phrase(h, mn)
             return _tr_attach_suffix(phrase, m.group(3) or '')
         text = re.sub(r"(?:\bsaat\s+)?\b(\d{1,2}):(\d{2})\b(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?",
                       _saat, text, flags=re.IGNORECASE)
@@ -490,6 +505,13 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
                 return _tr_num_to_words(d) + ' ' + _AYLAR[mo] + ' ' + _tr_num_to_words(y)
             return m.group(0)
         text = re.sub(r'\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b', _tarih, text)
+
+        # Yüzde aralığı: %10-15 → yüzde on - on beş. TEKİL yüzde regex'inden
+        # ÖNCE işlenmeli — yoksa ilk sayı %'den ayrı çevrilip aradaki tire
+        # çıplak kalıyordu ("yüzde on-on beş" gibi bitişik okuma).
+        text = re.sub(r'%\s*(\d+)-(\d+)',
+                      lambda m: 'yüzde ' + _tr_num_to_words(int(m.group(1))) + ' - ' + _tr_num_to_words(int(m.group(2))),
+                      text)
 
         # Yüzde: %85 → yüzde seksen beş, %13,52 → yüzde on üç virgül elli iki
         # ÖNCE işlenmeli — ondalık virgül regex'i "%13,52" içindeki "13,52"yi
@@ -549,17 +571,26 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             return _tr_attach_suffix(out, m.group(3) or '')
         text = re.sub(r'(?<![\w])-(\d+)(?:,(\d{1,2}))?(?!\d)' + _EKYAK, _eksi_sayi, text)
 
+        # Ondalık kısım sözcüğe çevrilirken: 1-2 haneliyse tek sayı olarak
+        # ("52" → "elli iki"), 3+ haneliyse hassasiyet kaybolmasın diye hane
+        # hane okunur ("003" → "sıfır sıfır üç" — "üç" desek 0,003 ile 0,3
+        # birbirine karışırdı, baştaki sıfırların anlamı kaybolurdu).
+        def _tr_ondalik_kisim(frac: str) -> str:
+            if len(frac) <= 2:
+                return _tr_num_to_words(int(frac))
+            return ' '.join(_tr_num_to_words(int(c)) for c in frac)
+
         # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli
         # 3.5 → üç nokta beş
         def _ondalik_nokta(m):
-            out = _tr_num_to_words(int(m.group(1))) + ' nokta ' + _tr_num_to_words(int(m.group(2)))
+            out = _tr_num_to_words(int(m.group(1))) + ' nokta ' + _tr_ondalik_kisim(m.group(2))
             return _tr_attach_suffix(out, m.group(3) or '')
-        text = re.sub(r'\b(\d+)\.(\d{1,2})(?!\d)' + _EKYAK, _ondalik_nokta, text)
+        text = re.sub(r'\b(\d+)\.(\d{1,4})(?!\d)' + _EKYAK, _ondalik_nokta, text)
         # 3,5 → üç virgül beş
         def _ondalik_virgul(m):
-            out = _tr_num_to_words(int(m.group(1))) + ' virgül ' + _tr_num_to_words(int(m.group(2)))
+            out = _tr_num_to_words(int(m.group(1))) + ' virgül ' + _tr_ondalik_kisim(m.group(2))
             return _tr_attach_suffix(out, m.group(3) or '')
-        text = re.sub(r'\b(\d+),(\d{1,2})(?!\d)' + _EKYAK, _ondalik_virgul, text)
+        text = re.sub(r'\b(\d+),(\d{1,4})(?!\d)' + _EKYAK, _ondalik_virgul, text)
 
         # Binlik nokta ayırıcıyı kaldır: 1.500 → 1500
         text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
@@ -581,7 +612,16 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             return _f
         text = re.sub(r'\bTL\b' + _EKYAK, _kisaltma('lira'), text)
         text = re.sub(r'\bkm/s\b' + _EKYAK, _kisaltma('kilometre saat'), text, flags=re.IGNORECASE)
+        # ² / ³'lü birimler ÖNCE işlenmeli — yoksa \bkm\b gibi eksiz kalıplar
+        # önce eşleşip "km²" içindeki "km"yi tek başına yer, "²" açılmadan kalır.
+        text = re.sub(r'\bkm²\b' + _EKYAK, _kisaltma('kilometrekare'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkm³\b' + _EKYAK, _kisaltma('kilometreküp'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcm²\b' + _EKYAK, _kisaltma('santimetrekare'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcm³\b' + _EKYAK, _kisaltma('santimetreküp'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bmm²\b' + _EKYAK, _kisaltma('milimetrekare'), text, flags=re.IGNORECASE)
         text = re.sub(r'\bkm\b' + _EKYAK, _kisaltma('kilometre'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcm\b' + _EKYAK, _kisaltma('santimetre'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bmm\b' + _EKYAK, _kisaltma('milimetre'), text, flags=re.IGNORECASE)
         text = re.sub(r'\bkg\b' + _EKYAK, _kisaltma('kilogram'), text, flags=re.IGNORECASE)
         text = re.sub(r'\bm²\b' + _EKYAK, _kisaltma('metrekare'), text)
         text = re.sub(r'\bm³\b' + _EKYAK, _kisaltma('metreküp'), text)
