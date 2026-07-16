@@ -929,8 +929,8 @@ async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output:
             "-filter_complex", filter_complex,
             "-map", "0:a",
             "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-            "-pix_fmt", "yuv420p", "-r", "30",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+            "-pix_fmt", "yuv420p", "-r", "30", "-bf", "0", "-g", "30",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
             "-movflags", "+faststart",
             "-shortest",
             str(output.absolute()),
@@ -1443,7 +1443,8 @@ Rules:
         "-vf", disclaimer_filter,
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
-        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+        "-bf", "0", "-g", "30",
+        "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         "-shortest", str(output_file.absolute())
     ], timeout=600, retries=1, step="ses+video mux")
@@ -2341,8 +2342,8 @@ async def _append_outro_template(main_video: Path, final_output: Path) -> bool:
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0", "-i", concat_list,
             "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-            "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+            "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr", "-bf", "0", "-g", "30",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
             "-movflags", "+faststart",
             str(final_output.absolute())
         ], timeout=300, step="outro-concat")
@@ -6772,8 +6773,8 @@ async def comedy_create_video(request: Request):
         ["ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
          "-map", "0:v:0", "-map", "1:a:0",
          "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
-         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr", "-bf", "0", "-g", "30",
+         "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
          "-movflags", "+faststart", "-shortest", str(output_file.absolute())],
         check=True, capture_output=True, timeout=300,
     )
