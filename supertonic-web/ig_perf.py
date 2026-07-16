@@ -32,11 +32,18 @@ DAILY_CAT_CAP = 4        # aynı kategoriden günde en fazla bu kadar post
 MAX_CONSECUTIVE = 2      # aynı kategoriden art arda en fazla bu kadar post
 EXPLORE_RATE = 0.20      # bu ihtimalle performans sıralaması prompt'a eklenmez
 
+# Skor ne olursa olsun hiç seçilmesin — kişisel/skandal/cinayet haberleri sistematik
+# olarak düşük performans gösteriyor ve hesabın "haber ve medya sitesi" imajına uymuyor.
+HARD_EXCLUDE_CATS = ["ASAYİŞ"]
+
 # Sıra önemli: ilk eşleşen kazanır (HAVA, AFET'ten önce gelmeli — "sıcaklık" ikisinde de olabilir)
 _CATS = [
     ("HAVA", ["havadurumu", "hava durumu", "meteoroloji", "sıcaklık", "sıcak hava",
               "yağış", "sağanak", "kar yağışı", "fırtına", "dolu yağışı", "don olayı",
               "soğuk hava", "kavurucu", "hissedilen"]),
+    ("GURBETÇİ", ["gurbetçi", "gurbetçiler", "yurtdışında yaşayan", "yurt dışında yaşayan",
+                  "avrupa'daki türkler", "almanya'daki türkler", "diaspora", "bedelli askerlik",
+                  "yurtdışı vatandaş", "yurtdışı türk", "avrupa türkleri"]),
     ("EKONOMİ", ["maaş", "zam", "emekli", "asgari ücret", "asgariücret", "enflasyon",
                  "dolar", "euro", "faiz", "borsa", "vergi", "kira", "sgk", "promosyon",
                  "ikramiye", "tazminat", "bağkur", "prim"]),
@@ -61,6 +68,7 @@ DEFAULT_CAT = "GÜNDEM"
 # Prompt'ta kategori adının yanına eklenen İngilizce açıklama (DeepSeek promptları İngilizce)
 _CAT_EN = {
     "HAVA": "weather/meteorology warnings",
+    "GURBETÇİ": "Turkish diaspora abroad (military service, residency, benefits)",
     "EKONOMİ": "salary/pension/economy",
     "AFET": "disasters",
     "SPOR": "sports",
@@ -195,6 +203,12 @@ def build_instruction(used_titles: list[str] = None) -> str:
 
     capped, consecutive_ban = _constraints(used_titles or [])
     rules = []
+    for c in HARD_EXCLUDE_CATS:
+        rules.append(
+            f"NEVER pick a {c} ({_CAT_EN.get(c, '')}) topic — celebrity scandals, arrests, "
+            f"crimes and personal drama consistently underperform on this account and do not "
+            f"fit its news-brand image. Skip these entirely, no exceptions."
+        )
     if consecutive_ban:
         rules.append(
             f"The last {MAX_CONSECUTIVE} posts today were all {consecutive_ban} "
@@ -216,6 +230,8 @@ def build_instruction(used_titles: list[str] = None) -> str:
 def check_hard_rules(title: str, used_titles: list[str]) -> tuple[bool, str]:
     """Üretilen başlık sert kuralları ihlal ediyor mu? (True, "") = temiz."""
     cat = categorize(title)
+    if cat in HARD_EXCLUDE_CATS:
+        return False, f"{cat} kategorisi kalıcı olarak dışlandı"
     if cat == DEFAULT_CAT:
         return True, ""
     capped, consecutive_ban = _constraints(used_titles or [])

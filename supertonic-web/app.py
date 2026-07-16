@@ -6091,12 +6091,18 @@ async def auto_ig_only_tr_job():
 
                 # Kategori tekrar/tavan kontrolü — son denemede ihlale rağmen paylaşılır
                 # (slot boş kalmasın; trend listesi o gün tek konuya kilitlenmiş olabilir)
+                # İSTİSNA: HARD_EXCLUDE_CATS (kişisel/skandal/cinayet haberleri) hiçbir
+                # koşulda paylaşılmaz — son deneme dahil, slot boş geçilir.
                 cat_ok, cat_reason = ig_perf.check_hard_rules(gen_title, get_ig_only_tr_used_topics())
                 if not cat_ok:
+                    is_hard_exclude = ig_perf.categorize(gen_title) in ig_perf.HARD_EXCLUDE_CATS
                     if _attempt < _MAX_DEDUP_RETRY - 1:
                         print(f"[CAT-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] {cat_reason}: '{gen_title[:60]}' — farklı kategori istenecek", flush=True)
                         exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
                         continue
+                    elif is_hard_exclude:
+                        save_ig_only_tr_log("error", f"{cat_reason}: {_MAX_DEDUP_RETRY} denemede de kişisel/skandal haber çıktı, slot atlandı. Son konu: '{gen_title[:100]}'")
+                        return
                     else:
                         print(f"[CAT-WARN] {cat_reason} ama son deneme — yine de paylaşılıyor: '{gen_title[:60]}'", flush=True)
                 break  # dedup + kategori geçti
