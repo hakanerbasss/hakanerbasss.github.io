@@ -515,16 +515,15 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         _TR_NESIL = {1:'birinci',2:'ikinci',3:'üçüncü',4:'dördüncü',5:'beşinci',6:'altıncı'}
         text = re.sub(r'\b([1-9])[Gg]\b', lambda m: _TR_NESIL.get(int(m.group(1)), _tr_ordinal_words(int(m.group(1)))) + ' nesil', text)
 
-        # Skor gösterimi: 3-1 → üçe bir. Eksi işareti burada negatif sayı değil,
-        # iki sayı arasında ayraç — eksi_sayı regex'i zaten bunu (önünde rakam
-        # varsa) yakalamıyor, ama ayraç ("-") öylece kalıp TTS'i şaşırtmasın diye
-        # ayrıca ele alınması gerekiyor.
-        def _skor(m):
-            words = _tr_num_to_words(int(m.group(1))).split(' ')
-            if words[-1] in _TR_DATIVE:
-                words[-1] = _TR_DATIVE[words[-1]]
-            return ' '.join(words) + ' ' + _tr_num_to_words(int(m.group(2)))
-        text = re.sub(r'\b(\d+)-(\d+)\b', _skor, text)
+        # İki sayı arası tire: hem maç skoru (3-1) hem aralık (10-15 derece)
+        # anlamına gelebilir — bağlamdan ayırt etmek güvenilir değil. İlk
+        # denemede skora göre "e" hali eklemiştim ("ona on beş derece" gibi
+        # aralıklarda anlamsız çıktı verdi). Güvenli ortak çözüm: ikisi de
+        # doğal okunan düz yan yana biçim — "üç bir" (skor, doğru), "on on
+        # beş" (aralık, "arasında" ile birlikte anlaşılır kalıyor).
+        text = re.sub(r'\b(\d+)-(\d+)\b',
+                      lambda m: _tr_num_to_words(int(m.group(1))) + ' ' + _tr_num_to_words(int(m.group(2))),
+                      text)
 
         # Sıcaklık/derece — BÜYÜK SAYI'DAN ÖNCE işlenmeli, yoksa rakam zaten
         # sözcüğe çevrilmiş olur ve "\d+°C" deseni artık eşleşmez (35°C → "otuz
