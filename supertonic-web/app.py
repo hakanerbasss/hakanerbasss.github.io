@@ -346,6 +346,28 @@ def _tr_num_to_words(n: int) -> str:
     return ' '.join(p.strip() for p in parts if p.strip())
 
 
+# Sıra sayı eki her zaman sayının SON kelimesine eklenir (ör. "yüz yirmi üç" → "yüz
+# yirmi üçüncü") ve Türkçe'de ünlü uyumu + ünsüz yumuşaması içerir (dört→dördüncü).
+# Son kelime her zaman bu sabit listelerden biri olduğu için (birler/onlar/yüz/bin/
+# milyon/milyar), tam algoritma yerine sonlu bir sözlük yeterli ve daha güvenilir.
+_TR_ORDINAL_MAP = {
+    'sıfır': 'sıfırıncı', 'bir': 'birinci', 'iki': 'ikinci', 'üç': 'üçüncü',
+    'dört': 'dördüncü', 'beş': 'beşinci', 'altı': 'altıncı', 'yedi': 'yedinci',
+    'sekiz': 'sekizinci', 'dokuz': 'dokuzuncu',
+    'on': 'onuncu', 'yirmi': 'yirminci', 'otuz': 'otuzuncu', 'kırk': 'kırkıncı',
+    'elli': 'ellinci', 'altmış': 'altmışıncı', 'yetmiş': 'yetmişinci',
+    'seksen': 'sekseninci', 'doksan': 'doksanıncı',
+    'yüz': 'yüzüncü', 'bin': 'bininci', 'milyon': 'milyonuncu', 'milyar': 'milyarıncı',
+}
+
+
+def _tr_ordinal_words(n: int) -> str:
+    """Sıra sayı sözcüğü üretir. Örn: 13 → on üçüncü, 1 → birinci."""
+    words = _tr_num_to_words(n).split(' ')
+    words[-1] = _TR_ORDINAL_MAP.get(words[-1], words[-1] + 'ıncı')
+    return ' '.join(words)
+
+
 def _clean_tts_text(text: str, lang: str = "tr") -> str:
     """TTS'e gitmeden önce metni temizle — sayı/format hatalarını düzelt."""
     import re
@@ -381,31 +403,42 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             return m.group(0)
         text = re.sub(r'\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b', _tarih, text)
 
+        # Yüzde: %85 → yüzde seksen beş, %13,52 → yüzde on üç virgül elli iki
+        # ÖNCE işlenmeli — ondalık virgül regex'i "%13,52" içindeki "13,52"yi
+        # kendi başına yakalayıp "%" işaretini boşta bırakıyordu.
+        def _yuzde(m):
+            out = 'yüzde ' + _tr_num_to_words(int(m.group(1)))
+            if m.group(2):
+                out += ' virgül ' + _tr_num_to_words(int(m.group(2)))
+            return out
+        text = re.sub(r'%\s*(\d+)(?:,(\d{1,2}))?', _yuzde, text)
+
+        # Sıra sayılar: "13." (nokta + boşluk/son, arkasında rakam YOK) → "on üçüncü"
+        # ÖNCE işlenmeli — aksi halde "13." önce "on üç." olur, sıra anlamı kaybolur.
+        def _sira_sayi(m):
+            return _tr_ordinal_words(int(m.group(1)))
+        text = re.sub(r'\b(\d{1,4})\.(?=\s|$)', _sira_sayi, text)
+
         # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli
         # 3.5 → üç nokta beş
         def _ondalik_nokta(m):
-            return _tr_num_to_words(int(m.group(1))) + ' nokta ' + m.group(2)
+            return _tr_num_to_words(int(m.group(1))) + ' nokta ' + _tr_num_to_words(int(m.group(2)))
         text = re.sub(r'\b(\d+)\.(\d{1,2})(?!\d)', _ondalik_nokta, text)
         # 3,5 → üç virgül beş
         def _ondalik_virgul(m):
-            return _tr_num_to_words(int(m.group(1))) + ' virgül ' + m.group(2)
+            return _tr_num_to_words(int(m.group(1))) + ' virgül ' + _tr_num_to_words(int(m.group(2)))
         text = re.sub(r'\b(\d+),(\d{1,2})(?!\d)', _ondalik_virgul, text)
 
         # Binlik nokta ayırıcıyı kaldır: 1.500 → 1500
         text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
 
-        # Büyük sayıları sözcüğe çevir: 1500000 → bir buçuk milyon (1.500.000+)
+        # Büyük sayıları sözcüğe çevir: TÜM rakamlar çevrilir (Supertonic hiçbir
+        # rakamı — 1000 altı dahil — doğru okuyamıyor, eşik kaldırıldı)
         def _buyuk_sayi(m):
             n = int(m.group(0).replace('.', ''))
-            if n >= 1000:
-                return _tr_num_to_words(n)
-            return m.group(0)
+            return _tr_num_to_words(n)
         text = re.sub(r'\b\d[\d.]*\b', _buyuk_sayi, text)
 
-        # Yüzde: %85 → yüzde seksen beş
-        def _yuzde(m):
-            return 'yüzde ' + _tr_num_to_words(int(m.group(1)))
-        text = re.sub(r'%\s*(\d+)', _yuzde, text)
 
         # Sıcaklık: 35°C → otuz beş santigrat, 35°F → otuz beş fahrenheit, 35° → otuz beş derece
         text = re.sub(r'(\d+)°C', lambda m: _tr_num_to_words(int(m.group(1))) + ' santigrat', text)
