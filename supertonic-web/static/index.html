@@ -1426,6 +1426,12 @@
             🎬 Video modu <span style="color:#666;font-size:12px;margin-left:4px;">(%40 ihtimalle Pexels video klip, yoksa görsel)</span>
           </label>
         </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;background:#111;border:1px solid #333;border-radius:8px;padding:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:14px;margin:0;flex:1;">
+            <input type="checkbox" id="ig-only-tr-telegram-pick" style="width:18px;height:18px;accent-color:#0ea5e9;" onchange="saveIGOnlyTRScheduler()">
+            🗳️ Telegram'dan haber seç <span style="color:#666;font-size:12px;margin-left:4px;">(zamanı gelince listeyi Telegram'a atar, 5 dk içinde numarayla cevap verirsen o haberi yapar, vermezsen otomatik seçer)</span>
+          </label>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:14px;">
           <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
           <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
@@ -3265,6 +3271,8 @@ async function loadIGOnlyTRStatus() {
     if (d.voice) document.getElementById('ig-only-tr-voice').value = d.voice;
     const vmEl = document.getElementById('ig-only-tr-video-mode');
     if (vmEl) vmEl.checked = (d.video_mode === 'random');
+    const tpEl = document.getElementById('ig-only-tr-telegram-pick');
+    if (tpEl) tpEl.checked = !!d.telegram_topic_pick;
 
     const st = document.getElementById('ig-only-tr-status');
     if (d.next_run || d.log?.ts) {
@@ -3309,6 +3317,8 @@ async function saveIGOnlyTRScheduler() {
   fd.append('voice', document.getElementById('ig-only-tr-voice').value);
   const vmEl = document.getElementById('ig-only-tr-video-mode');
   fd.append('video_mode', (vmEl && vmEl.checked) ? 'random' : 'off');
+  const tpEl = document.getElementById('ig-only-tr-telegram-pick');
+  fd.append('telegram_topic_pick', (tpEl && tpEl.checked) ? 'true' : 'false');
   ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
     fd.append(day, document.getElementById(`ig-times-${day}`).value);
   });

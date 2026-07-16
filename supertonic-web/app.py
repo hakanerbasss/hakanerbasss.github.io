@@ -3827,6 +3827,85 @@ def _fire_telegram(source: str, message: str) -> None:
         pass
 
 
+async def send_telegram_plain(text: str) -> bool:
+    """Ham metin gönder (uyarı formatı olmadan) — konu seçim listesi/onay mesajları için."""
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    chat_id = cfg.get("chat_id", "").strip()
+    if not token or not chat_id:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text},
+            )
+            return r.status_code == 200
+    except Exception as e:
+        print(f"[TELEGRAM] send_telegram_plain hata: {e}", flush=True)
+        return False
+
+
+async def _telegram_mark_offset_to_latest() -> int:
+    """Şu ana kadarki tüm mesajları 'okunmuş' işaretler (offset'i son update_id+1'e çeker).
+    Liste gönderilmeden ÖNCE çağrılır ki eski/bekleyen mesajlar cevap sanılmasın."""
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    if not token:
+        return 0
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(f"https://api.telegram.org/bot{token}/getUpdates", params={"timeout": 0})
+            if r.status_code != 200:
+                return 0
+            results = r.json().get("result", [])
+            if not results:
+                return 0
+            max_id = max(u["update_id"] for u in results)
+            # offset'i ilerletmek için bir kez daha çağır (Telegram offset=X → X'e kadarki mesajları siler)
+            await client.get(f"https://api.telegram.org/bot{token}/getUpdates", params={"offset": max_id + 1, "timeout": 0})
+            return max_id + 1
+    except Exception as e:
+        print(f"[TELEGRAM] offset temizleme hatası: {e}", flush=True)
+        return 0
+
+
+async def wait_for_telegram_numeric_reply(offset: int, max_choice: int, timeout_sec: int = 300, poll_sec: int = 8) -> int | None:
+    """offset'ten itibaren gelen mesajlarda 1..max_choice aralığında bir sayı arar.
+    Bulursa sayıyı, timeout dolarsa None döner."""
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    expected_chat_id = cfg.get("chat_id", "").strip()
+    if not token:
+        return None
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        try:
+            async with httpx.AsyncClient(timeout=poll_sec + 5) as client:
+                remaining = max(1, int(deadline - time.time()))
+                r = await client.get(
+                    f"https://api.telegram.org/bot{token}/getUpdates",
+                    params={"offset": offset, "timeout": min(poll_sec, remaining)},
+                )
+            if r.status_code == 200:
+                results = r.json().get("result", [])
+                for u in results:
+                    offset = max(offset, u["update_id"] + 1)
+                    msg = u.get("message") or {}
+                    chat_id = str(msg.get("chat", {}).get("id", ""))
+                    text = (msg.get("text") or "").strip()
+                    if expected_chat_id and chat_id != expected_chat_id:
+                        continue
+                    if text.isdigit():
+                        n = int(text)
+                        if 1 <= n <= max_choice:
+                            return n
+        except Exception as e:
+            print(f"[TELEGRAM] cevap bekleme hatası: {e}", flush=True)
+            await asyncio.sleep(poll_sec)
+    return None
+
+
 async def send_telegram_video(video_path: Path, title: str, description: str, tags: str) -> None:
     """Üretilen videoyu Telegram'a gönder."""
     cfg = get_telegram_config()
@@ -6123,11 +6202,6 @@ def add_ig_only_tr_used_topic(title: str):
 
 
 async def auto_ig_only_tr_job():
-    lock = _get_gen_lock()
-    if lock.locked():
-        save_ig_only_tr_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
-    await lock.acquire()
-    save_ig_only_tr_log("running", "Video üretiliyor…")
     try:
         api_key = get_deepseek_key()
         if not api_key:
@@ -6149,84 +6223,127 @@ async def auto_ig_only_tr_job():
         if banned_str:
             exclude_str = f"{exclude_str} | YASAKLI KONULAR (kesinlikle yapma): {banned_str}" if exclude_str else f"YASAKLI KONULAR (kesinlikle yapma): {banned_str}"
 
-        _MAX_DEDUP_RETRY = 3
-        d = None
-        async with httpx.AsyncClient(timeout=900) as client:
-            for _attempt in range(_MAX_DEDUP_RETRY):
-                r = await client.post(
-                    "http://localhost:8001/api/generate-shorts",
-                    data={"topic": "", "api_key": api_key, "lang": "tr", "voice": s_voice,
-                          "speed": "1.0", "exclude_topics": exclude_str, "region": "TR",
-                          "platform": "instagram", "use_video": use_video_val},
-                )
-                if r.status_code != 200:
-                    save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
-                    return
-                d = r.json()
-                gen_title = d.get("title", "")
+        # ── Telegram'dan manuel konu seçimi (switch açıksa) ──────────────────────
+        # Kullanıcı 5 dakika içinde numarayla cevap verirse o haberi zorla, vermezse
+        # eskisi gibi DeepSeek otomatik seçsin.
+        forced_topic = ""
+        if cfg.get("telegram_topic_pick"):
+            try:
+                trend_data = get_trends(region_code="TR", lang="tr")
+                gurbetci_topics = await fetch_gurbetci_topics()
+                pool = _filter_low_value_topics(trend_data.get("topics", []))
+                pool = list(dict.fromkeys(pool + gurbetci_topics))[:20]
+                if pool:
+                    offset = await _telegram_mark_offset_to_latest()
+                    numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
+                    sent = await send_telegram_plain(
+                        f"📰 TR Instagram-Only — 5 dakika içinde numara yaz, o haberi yapayım.\n"
+                        f"Cevap gelmezse otomatik seçeceğim.\n\n{numbered}"
+                    )
+                    if sent:
+                        save_ig_only_tr_log("running", "📰 Telegram'a haber listesi gönderildi, cevap bekleniyor (5 dk)...")
+                        choice = await wait_for_telegram_numeric_reply(offset, len(pool), timeout_sec=300)
+                        if choice:
+                            forced_topic = pool[choice - 1]
+                            await send_telegram_plain(f"✅ Seçildi: {forced_topic}\nÜretiliyor…")
+                            save_ig_only_tr_log("running", f"Telegram'dan seçildi: {forced_topic[:80]}")
+                        else:
+                            await send_telegram_plain("⏱️ Cevap gelmedi, otomatik seçiliyor…")
+                            save_ig_only_tr_log("running", "Telegram cevabı gelmedi, otomatik seçime devam ediliyor...")
+            except Exception as te:
+                print(f"[TELEGRAM-PICK] hata: {te}", flush=True)
+        # ───────────────────────────────────────────────────────────────────────
 
-                # Banned topic kontrolü
-                if _is_banned_topic(gen_title):
-                    print(f"[BANNED-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] Yasaklı konu: '{gen_title[:60]}'", flush=True)
-                    if _attempt < _MAX_DEDUP_RETRY - 1:
-                        continue
-                    else:
-                        save_ig_only_tr_log("error", f"Yasaklı konu: {_MAX_DEDUP_RETRY} denemede uygun konu bulunamadı")
+        # Kullanıcı Telegram'dan belirli bir haber seçtiyse tekrar denemenin anlamı
+        # yok (aynı konu tekrar denenirse yine aynı sonucu verir) — tek deneme yapılır.
+        _MAX_DEDUP_RETRY = 1 if forced_topic else 3
+
+        # Kilit sadece gerçek üretim aşamasında tutulur — Telegram cevabı beklerken
+        # (yukarıda, kilitsiz) diğer zamanlanmış işler 5 dakika boyunca kuyrukta
+        # bekletilmesin diye kilit alımı buraya, üretimin hemen öncesine taşındı.
+        lock = _get_gen_lock()
+        if lock.locked():
+            save_ig_only_tr_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
+        await lock.acquire()
+        try:
+            save_ig_only_tr_log("running", "Video üretiliyor…")
+            d = None
+            async with httpx.AsyncClient(timeout=900) as client:
+                for _attempt in range(_MAX_DEDUP_RETRY):
+                    r = await client.post(
+                        "http://localhost:8001/api/generate-shorts",
+                        data={"topic": forced_topic, "api_key": api_key, "lang": "tr", "voice": s_voice,
+                              "speed": "1.0", "exclude_topics": exclude_str, "region": "TR",
+                              "platform": "instagram", "use_video": use_video_val},
+                    )
+                    if r.status_code != 200:
+                        save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
                         return
+                    d = r.json()
+                    gen_title = d.get("title", "")
 
-                # Dedup: video üretilmeden önce Instagram konu kontrolü
-                if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
-                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] ENGELLENDI: '{gen_title[:60]}' — exclude'a eklendi", flush=True)
-                    exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
-                    if _attempt < _MAX_DEDUP_RETRY - 1:
-                        continue
-                    else:
-                        save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı. Denenenler: {exclude_str[:200]}")
-                        return
+                    # Banned topic kontrolü
+                    if _is_banned_topic(gen_title):
+                        print(f"[BANNED-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] Yasaklı konu: '{gen_title[:60]}'", flush=True)
+                        if _attempt < _MAX_DEDUP_RETRY - 1:
+                            continue
+                        else:
+                            save_ig_only_tr_log("error", f"Yasaklı konu: {_MAX_DEDUP_RETRY} denemede uygun konu bulunamadı")
+                            return
 
-                # Kategori tekrar/tavan kontrolü — son denemede ihlale rağmen paylaşılır
-                # (slot boş kalmasın; trend listesi o gün tek konuya kilitlenmiş olabilir)
-                cat_ok, cat_reason = ig_perf.check_hard_rules(gen_title, get_ig_only_tr_used_topics())
-                if not cat_ok:
-                    if _attempt < _MAX_DEDUP_RETRY - 1:
-                        print(f"[CAT-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] {cat_reason}: '{gen_title[:60]}' — farklı kategori istenecek", flush=True)
+                    # Dedup: video üretilmeden önce Instagram konu kontrolü
+                    if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
+                        print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] ENGELLENDI: '{gen_title[:60]}' — exclude'a eklendi", flush=True)
                         exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
-                        continue
-                    else:
-                        print(f"[CAT-WARN] {cat_reason} ama son deneme — yine de paylaşılıyor: '{gen_title[:60]}'", flush=True)
-                break  # dedup + kategori geçti
+                        if _attempt < _MAX_DEDUP_RETRY - 1:
+                            continue
+                        else:
+                            save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı. Denenenler: {exclude_str[:200]}")
+                            return
 
-        if d is None:
-            return
+                    # Kategori tekrar/tavan kontrolü — son denemede ihlale rağmen paylaşılır
+                    # (slot boş kalmasın; trend listesi o gün tek konuya kilitlenmiş olabilir)
+                    cat_ok, cat_reason = ig_perf.check_hard_rules(gen_title, get_ig_only_tr_used_topics())
+                    if not cat_ok:
+                        if _attempt < _MAX_DEDUP_RETRY - 1:
+                            print(f"[CAT-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] {cat_reason}: '{gen_title[:60]}' — farklı kategori istenecek", flush=True)
+                            exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
+                            continue
+                        else:
+                            print(f"[CAT-WARN] {cat_reason} ama son deneme — yine de paylaşılıyor: '{gen_title[:60]}'", flush=True)
+                    break  # dedup + kategori geçti
 
-        add_ig_only_tr_used_topic(d.get("title", ""))
-        filename = d["video"].split("/").pop()
-        thumbnail = (d.get("thumbnail") or "").split("/").pop()
+            if d is None:
+                return
 
-        # Sadece Instagram — YouTube'a gönderilmez
-        ig_cfg["post_reels"] = True
-        vw = d.get("visual_warning", "")
-        log_title = d.get("title", "") + (f" ⚠️ {vw}" if vw else "")
+            add_ig_only_tr_used_topic(d.get("title", ""))
+            filename = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
 
-        ig_ok, ig_err = await _post_to_instagram_bg(
-            filename=filename,
-            title=d.get("title", ""),
-            suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
-            ig_cfg=ig_cfg,
-            description=d.get("suggested_description", ""),
-            thumbnail=thumbnail,
-            source="IG-Only-TR",
-            source_text=d.get("source_text", ""),
-        )
-        if ig_ok:
-            save_ig_only_tr_log("success", log_title)
-        else:
-            save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
+            # Sadece Instagram — YouTube'a gönderilmez
+            ig_cfg["post_reels"] = True
+            vw = d.get("visual_warning", "")
+            log_title = d.get("title", "") + (f" ⚠️ {vw}" if vw else "")
+
+            ig_ok, ig_err = await _post_to_instagram_bg(
+                filename=filename,
+                title=d.get("title", ""),
+                suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
+                ig_cfg=ig_cfg,
+                description=d.get("suggested_description", ""),
+                thumbnail=thumbnail,
+                source="IG-Only-TR",
+                source_text=d.get("source_text", ""),
+            )
+            if ig_ok:
+                save_ig_only_tr_log("success", log_title)
+            else:
+                save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
+        finally:
+            lock.release()
 
     except Exception as e:
         save_ig_only_tr_log("error", str(e))
-    finally:
-        lock.release()
 
 
 # v3 — 292 postluk analitik verisine göre (12.07.2026):
@@ -6283,6 +6400,7 @@ async def save_ig_only_tr_sched_config(
     enabled: str = Form("false"),
     voice: str = Form("F1"),
     video_mode: str = Form("off"),
+    telegram_topic_pick: str = Form("false"),
     mon: str = Form(""),
     tue: str = Form(""),
     wed: str = Form(""),
@@ -6297,6 +6415,7 @@ async def save_ig_only_tr_sched_config(
     # sched_v damgalanır ki kullanıcının elle kaydettiği saatler migration'da ezilmesin
     cfg = {"enabled": enabled == "true", "voice": voice,
            "video_mode": video_mode if video_mode in ("off", "random") else "off",
+           "telegram_topic_pick": telegram_topic_pick == "true",
            "weekly": weekly, "sched_v": _IG_SCHED_VERSION}
     IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_ig_only_tr_scheduler()
