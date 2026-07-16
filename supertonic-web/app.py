@@ -6318,7 +6318,8 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
             save_ig_only_tr_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
         await lock.acquire()
         try:
-            save_ig_only_tr_log("running", "Video üretiliyor…")
+            gen_msg = f"Video üretiliyor: {forced_topic[:100]}" if forced_topic else "Video üretiliyor…"
+            save_ig_only_tr_log("running", gen_msg)
             d = None
             async with httpx.AsyncClient(timeout=900) as client:
                 for _attempt in range(_MAX_DEDUP_RETRY):
@@ -6333,6 +6334,7 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                         return
                     d = r.json()
                     gen_title = d.get("title", "")
+                    save_ig_only_tr_log("running", f"Üretildi, Instagram'a yükleniyor: {gen_title[:100]}")
 
                     # Banned topic kontrolü
                     if _is_banned_topic(gen_title):
