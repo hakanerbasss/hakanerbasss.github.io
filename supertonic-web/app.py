@@ -895,6 +895,39 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
         return []
 
 
+async def fetch_gurbetci_topics(max_items: int = 8) -> list:
+    """Gurbetçi/diaspora haberlerine özel Google News RSS sorgusu.
+
+    pytrends'in Türkiye trend listesi yurt içi arama davranışını yansıtıyor —
+    gurbetçi konuları orada nadiren organik çıkıyor. Bu, ayrı bir arz kanalı:
+    manuel 'Trend + Gurbetçi' butonuyla kullanıcı havuzu inceleyip karar verir,
+    otomatik akışa henüz bağlı değil.
+    """
+    import xml.etree.ElementTree as ET
+    from urllib.parse import quote
+
+    query = "gurbetçi OR \"yurtdışındaki Türkler\" OR \"Almanya'daki Türkler\""
+    url = f"https://news.google.com/rss/search?q={quote(query)}&hl=tr&gl=TR&ceid=TR:tr"
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code != 200:
+            return []
+        root = ET.fromstring(r.text)
+        channel = root.find("channel")
+        if channel is None:
+            return []
+        titles = []
+        for item in channel.findall("item")[:max_items]:
+            t = (item.findtext("title") or "").strip()
+            if t and t not in titles:
+                titles.append(t)
+        return titles
+    except Exception as e:
+        print(f"[gurbetci-trends] hata: {e}", flush=True)
+        return []
+
+
 async def _trim_audio_for_longcat(src: Path, dst: Path, max_sec: int = 5) -> bool:
     """Sesi max_sec saniyeye kısalt (ZeroGPU GPU-time limiti için)."""
     try:
@@ -4696,6 +4729,15 @@ async def trends_refresh():
     if CACHE_FILE.exists():
         CACHE_FILE.unlink()
     return await trends_endpoint()
+
+
+@app.post("/api/trends/refresh-with-gurbetci")
+async def trends_refresh_with_gurbetci():
+    """Manuel inceleme için: normal trend listesi + ayrı gurbetçi RSS havuzu.
+    Otomatik akışa bağlı değil — sadece Shorts Manuel panelinde gösterilir."""
+    base = await trends_refresh()
+    gurbetci_topics = await fetch_gurbetci_topics()
+    return {**base, "gurbetci_topics": gurbetci_topics}
 
 
 @app.post("/api/yt/config")

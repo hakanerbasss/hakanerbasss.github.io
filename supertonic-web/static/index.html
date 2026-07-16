@@ -460,9 +460,17 @@
       <div class="spinner" id="spin-trends"></div>
       Günün Trendlerini Getir
     </button>
+    <button onclick="fetchTrends(true)" id="btn-trends-gurbetci" style="background:#1a2a3a;font-size:13px;padding:10px 18px;margin-left:8px;">
+      <div class="spinner" id="spin-trends-gurbetci"></div>
+      🌍 Trend + Gurbetçi Haberleri Getir
+    </button>
     <div id="trends-box" style="display:none;margin-top:12px;background:#111;border:1px solid #222;border-radius:8px;padding:14px;">
       <div style="font-size:12px;color:#666;margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
       <div id="trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <div id="gurbetci-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
+        <div style="font-size:12px;color:#7dd3fc;margin-bottom:8px;">🌍 Gurbetçi haber havuzu — sadece manuel inceleme için, otomatik akışa dahil değil</div>
+        <div id="gurbetci-trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
       <div style="font-size:11px;color:#444;margin-top:10px;" id="trends-time"></div>
     </div>
   </div>
@@ -2313,11 +2321,13 @@ async function sendShortsToInstagram() {
   }
 }
 
-async function fetchTrends() {
-  setLoading('btn-trends', 'spin-trends', true);
+async function fetchTrends(withGurbetci) {
+  const btnId = withGurbetci ? 'btn-trends-gurbetci' : 'btn-trends';
+  const spinId = withGurbetci ? 'spin-trends-gurbetci' : 'spin-trends';
+  setLoading(btnId, spinId, true);
   try {
-    const lang = document.getElementById('shorts-lang').value || 'tr';
-    const r = await fetch(`/api/trends/refresh`, { method: 'POST' });
+    const url = withGurbetci ? `/api/trends/refresh-with-gurbetci` : `/api/trends/refresh`;
+    const r = await fetch(url, { method: 'POST' });
     if (!r.ok) throw new Error('Trend verisi alınamadı');
     const d = await r.json();
 
@@ -2334,13 +2344,32 @@ async function fetchTrends() {
       list.appendChild(btn);
     });
 
+    const gWrap = document.getElementById('gurbetci-trends-wrap');
+    const gList = document.getElementById('gurbetci-trends-list');
+    if (withGurbetci && (d.gurbetci_topics || []).length) {
+      gList.innerHTML = '';
+      d.gurbetci_topics.forEach(topic => {
+        const btn = document.createElement('button');
+        btn.textContent = topic;
+        btn.style.cssText = 'background:#1a2530;border:1px solid #2a4a5a;border-radius:20px;padding:6px 14px;font-size:13px;color:#7dd3fc;cursor:pointer;';
+        btn.onclick = () => {
+          document.getElementById('shorts-topic').value = topic;
+          btn.style.background = '#2a4a5a';
+        };
+        gList.appendChild(btn);
+      });
+      gWrap.style.display = 'block';
+    } else {
+      gWrap.style.display = 'none';
+    }
+
     const ts = new Date(d.ts * 1000).toLocaleTimeString('tr-TR');
     document.getElementById('trends-time').textContent = `Son güncelleme: ${ts}`;
     document.getElementById('trends-box').style.display = 'block';
   } catch(e) {
     alert(e.message);
   } finally {
-    setLoading('btn-trends', 'spin-trends', false);
+    setLoading(btnId, spinId, false);
   }
 }
 

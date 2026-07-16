@@ -28,7 +28,7 @@ CACHE_FILE = Path("ig_analytics_cache.json")
 HALF_LIFE_DAYS = 14      # skor ağırlığı her 14 günde yarıya iner (eski postlar az sayılır)
 MAX_AGE_DAYS = 60        # 60 günden eski postlar skora hiç girmez
 MIN_POSTS = 3            # kategori sıralamaya girmek için en az bu kadar post
-DAILY_CAT_CAP = 4        # aynı kategoriden günde en fazla bu kadar post
+DAILY_CAT_CAP = 2        # aynı kategoriden günde en fazla bu kadar post
 MAX_CONSECUTIVE = 2      # aynı kategoriden art arda en fazla bu kadar post
 EXPLORE_RATE = 0.20      # bu ihtimalle performans sıralaması prompt'a eklenmez
 
