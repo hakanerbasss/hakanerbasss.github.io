@@ -917,6 +917,22 @@ def _filter_low_value_topics(titles: list) -> list:
     return filtered
 
 
+def _dedupe_pool_against_recent(titles: list) -> list:
+    """Havuzdan, son saatlerde zaten işlenmiş (Instagram'a atılmış) konularla anahtar
+    kelime örtüşen başlıkları eler — _ig_same_topic_posted ile aynı mantık, ama
+    üretim ÖNCESİ havuz/Telegram listesine uygulanır ki kullanıcı zaten yapılmış bir
+    haberi tekrar seçip slotu boşa harcamasın."""
+    fresh = []
+    for t in titles:
+        try:
+            if _ig_same_topic_posted(t):
+                continue
+        except Exception:
+            pass
+        fresh.append(t)
+    return fresh
+
+
 async def fetch_gurbetci_topics(max_items: int = 8) -> list:
     """Gurbetçi/diaspora haberlerine özel Google News RSS sorgusu.
 
@@ -1196,6 +1212,7 @@ Rules:
                 gurbetci_topics = await fetch_gurbetci_topics()
                 merged = _filter_low_value_topics(trend_data.get("topics", []))
                 merged = list(dict.fromkeys(merged + gurbetci_topics))
+                merged = _dedupe_pool_against_recent(merged)
                 if merged:
                     trend_data["topics"] = merged
             except Exception as _ge:
@@ -6247,7 +6264,8 @@ async def auto_ig_only_tr_job():
                 trend_data = get_trends(region_code="TR", lang="tr")
                 gurbetci_topics = await fetch_gurbetci_topics()
                 pool = _filter_low_value_topics(trend_data.get("topics", []))
-                pool = list(dict.fromkeys(pool + gurbetci_topics))[:20]
+                pool = list(dict.fromkeys(pool + gurbetci_topics))
+                pool = _dedupe_pool_against_recent(pool)[:20]
                 if pool:
                     offset = await _telegram_mark_offset_to_latest()
                     numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
