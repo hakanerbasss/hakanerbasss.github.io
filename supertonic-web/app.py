@@ -6252,7 +6252,7 @@ def add_ig_only_tr_used_topic(title: str):
     IG_ONLY_TR_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
 
 
-async def auto_ig_only_tr_job():
+async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
     try:
         api_key = get_deepseek_key()
         if not api_key:
@@ -6278,7 +6278,7 @@ async def auto_ig_only_tr_job():
         # Kullanıcı 5 dakika içinde numarayla cevap verirse o haberi zorla, vermezse
         # eskisi gibi DeepSeek otomatik seçsin.
         forced_topic = ""
-        if cfg.get("telegram_topic_pick"):
+        if cfg.get("telegram_topic_pick") or force_telegram_pick:
             try:
                 trend_data = get_trends(region_code="TR", lang="tr")
                 gurbetci_topics = await fetch_gurbetci_topics()
@@ -6477,6 +6477,14 @@ async def save_ig_only_tr_sched_config(
 @app.post("/api/ig-only-tr/run-now")
 async def run_ig_only_tr_now():
     asyncio.create_task(auto_ig_only_tr_job())
+    return {"ok": True}
+
+
+@app.post("/api/ig-only-tr/run-now-telegram")
+async def run_ig_only_tr_now_telegram():
+    """Test için: switch'in kayıtlı durumuna dokunmadan, sadece bu çalıştırmada
+    Telegram'dan konu seçimini zorlar. Saat ayarlamaya gerek kalmadan denemek için."""
+    asyncio.create_task(auto_ig_only_tr_job(force_telegram_pick=True))
     return {"ok": True}
 
 

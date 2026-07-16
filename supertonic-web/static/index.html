@@ -1437,6 +1437,9 @@
           <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:#1a1a3a;font-size:12px;padding:8px 16px;">
             <div class="spinner" id="spin-ig-only-tr-run-now"></div>Şimdi Çalıştır
           </button>
+          <button onclick="runIGOnlyTRNowTelegram()" id="btn-ig-only-tr-run-now-tg" style="background:#0c2a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-ig-only-tr-run-now-tg"></div>📱 Telegram'dan Test Et
+          </button>
         </div>
         <div id="ig-only-tr-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.7;display:none;">
           <div id="ig-only-tr-next" style="color:#888;"></div>
@@ -3300,12 +3303,16 @@ async function loadIGOnlyTRStatus() {
           _igOnlyTRPolling = setInterval(loadIGOnlyTRStatus, 8000);
         }
       } else {
-        // Bitti — polling durdur, butonu serbest bırak
+        // Bitti — polling durdur, butonları serbest bırak
         if (_igOnlyTRPolling) { clearInterval(_igOnlyTRPolling); _igOnlyTRPolling = null; }
         const btn = document.getElementById('btn-ig-only-tr-run-now');
         const spin = document.getElementById('spin-ig-only-tr-run-now');
         if (btn) btn.disabled = false;
         if (spin) spin.style.display = 'none';
+        const btnTg = document.getElementById('btn-ig-only-tr-run-now-tg');
+        const spinTg = document.getElementById('spin-ig-only-tr-run-now-tg');
+        if (btnTg) btnTg.disabled = false;
+        if (spinTg) spinTg.style.display = 'none';
       }
     }
   } catch(e) {}
@@ -3330,6 +3337,15 @@ async function runIGOnlyTRNow() {
   document.getElementById('spin-ig-only-tr-run-now').style.display = 'inline-block';
   document.getElementById('btn-ig-only-tr-run-now').disabled = true;
   await fetch('/api/ig-only-tr/run-now', { method: 'POST' });
+  setTimeout(loadIGOnlyTRStatus, 2000);
+}
+
+async function runIGOnlyTRNowTelegram() {
+  // Switch'in kayıtlı durumuna dokunmadan, sadece bu çalıştırmada Telegram'dan
+  // konu seçimini zorlar — saat ayarlamadan test etmek için.
+  document.getElementById('spin-ig-only-tr-run-now-tg').style.display = 'inline-block';
+  document.getElementById('btn-ig-only-tr-run-now-tg').disabled = true;
+  await fetch('/api/ig-only-tr/run-now-telegram', { method: 'POST' });
   setTimeout(loadIGOnlyTRStatus, 2000);
 }
 
