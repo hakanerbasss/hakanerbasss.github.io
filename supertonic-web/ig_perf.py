@@ -55,7 +55,7 @@ _CATS = [
                  "seçim", "parti", "imamoğlu", "özgür özel", "bahçeli", "mhp",
                  "cumhurbaşkanı"]),
     ("ASAYİŞ", ["cinayet", "gözaltı", "operasyon", "tutukla", "kaza", "uyuşturucu",
-                "şehit", "saldırı", "patlama", "soygun", "dolandırıcı"]),
+                "şehit", "saldırı", "patlama", "soygun", "dolandır", "nezarethane"]),
     ("TEKNOLOJİ", ["yapay zeka", "teknoloji", "nasa", "uzay", "chatgpt", "iphone",
                    "android", "robot", "bilim"]),
 ]
