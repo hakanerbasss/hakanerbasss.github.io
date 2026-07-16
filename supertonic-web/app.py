@@ -906,25 +906,33 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
     import xml.etree.ElementTree as ET
     from urllib.parse import quote
 
-    query = "gurbetçi OR \"yurtdışındaki Türkler\" OR \"Almanya'daki Türkler\""
-    url = f"https://news.google.com/rss/search?q={quote(query)}&hl=tr&gl=TR&ceid=TR:tr"
+    # Google News RSS boolean OR + tırnaklı ifadeleri güvenilir işlemiyor —
+    # basit tekil sorgularla birden fazla istek atıp birleştirmek daha sağlam.
+    queries = ["gurbetçi", "yurtdışındaki Türkler", "gurbetçilere"]
+    titles = []
     try:
         async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code != 200:
-            return []
-        root = ET.fromstring(r.text)
-        channel = root.find("channel")
-        if channel is None:
-            return []
-        titles = []
-        for item in channel.findall("item")[:max_items]:
-            t = (item.findtext("title") or "").strip()
-            if t and t not in titles:
-                titles.append(t)
-        return titles
+            for q in queries:
+                url = f"https://news.google.com/rss/search?q={quote(q)}&hl=tr&gl=TR&ceid=TR:tr"
+                try:
+                    r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code != 200:
+                        print(f"[gurbetci-trends] '{q}' → HTTP {r.status_code}", flush=True)
+                        continue
+                    root = ET.fromstring(r.text)
+                    channel = root.find("channel")
+                    if channel is None:
+                        continue
+                    for item in channel.findall("item")[:max_items]:
+                        t = (item.findtext("title") or "").strip()
+                        if t and t not in titles:
+                            titles.append(t)
+                except Exception as qe:
+                    print(f"[gurbetci-trends] '{q}' hata: {qe}", flush=True)
+        print(f"[gurbetci-trends] toplam {len(titles)} başlık bulundu", flush=True)
+        return titles[:max_items]
     except Exception as e:
-        print(f"[gurbetci-trends] hata: {e}", flush=True)
+        print(f"[gurbetci-trends] genel hata: {e}", flush=True)
         return []
 
 

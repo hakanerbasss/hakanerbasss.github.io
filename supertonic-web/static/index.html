@@ -2346,19 +2346,25 @@ async function fetchTrends(withGurbetci) {
 
     const gWrap = document.getElementById('gurbetci-trends-wrap');
     const gList = document.getElementById('gurbetci-trends-list');
-    if (withGurbetci && (d.gurbetci_topics || []).length) {
+    if (withGurbetci) {
       gList.innerHTML = '';
-      d.gurbetci_topics.forEach(topic => {
-        const btn = document.createElement('button');
-        btn.textContent = topic;
-        btn.style.cssText = 'background:#1a2530;border:1px solid #2a4a5a;border-radius:20px;padding:6px 14px;font-size:13px;color:#7dd3fc;cursor:pointer;';
-        btn.onclick = () => {
-          document.getElementById('shorts-topic').value = topic;
-          btn.style.background = '#2a4a5a';
-        };
-        gList.appendChild(btn);
-      });
+      const gTopics = d.gurbetci_topics || [];
+      if (gTopics.length) {
+        gTopics.forEach(topic => {
+          const btn = document.createElement('button');
+          btn.textContent = topic;
+          btn.style.cssText = 'background:#1a2530;border:1px solid #2a4a5a;border-radius:20px;padding:6px 14px;font-size:13px;color:#7dd3fc;cursor:pointer;';
+          btn.onclick = () => {
+            document.getElementById('shorts-topic').value = topic;
+            btn.style.background = '#2a4a5a';
+          };
+          gList.appendChild(btn);
+        });
+      } else {
+        gList.innerHTML = '<div style="font-size:12px;color:#888;">Şu an gurbetçi haber havuzunda sonuç bulunamadı — birkaç dakika sonra tekrar dene.</div>';
+      }
       gWrap.style.display = 'block';
+      gWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
       gWrap.style.display = 'none';
     }
