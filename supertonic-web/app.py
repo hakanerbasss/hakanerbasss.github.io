@@ -591,12 +591,18 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
                 return _tr_num_to_words(int(frac))
             return ' '.join(_tr_num_to_words(int(c)) for c in frac)
 
-        # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli
+        # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli. NOKTA burada {1,2}
+        # İLE SINIRLI KALMALI (virgül gibi {1,4}'e ÇIKARILMAMALI) — Türkçe'de
+        # binlik ayıracı da NOKTA olduğu için ('2.500.000'), 3 haneli bir grup
+        # gelince bunu ondalık sanıp 'iki nokta beş yüz' gibi tamamen yanlış
+        # okuyordu (gerçek bug, canlıda yakalandı). {1,2} sınırı, 3 haneli
+        # binlik gruplarının bu regex'e hiç takılmayıp aşağıdaki binlik ayırıcı
+        # adımına düşmesini sağlayan örtük ayrım mekanizması — bilerek dar tutulur.
         # 3.5 → üç nokta beş
         def _ondalik_nokta(m):
             out = _tr_num_to_words(int(m.group(1))) + ' nokta ' + _tr_ondalik_kisim(m.group(2))
             return _tr_attach_suffix(out, m.group(3) or '')
-        text = re.sub(r'\b(\d+)\.(\d{1,4})(?!\d)' + _EKYAK, _ondalik_nokta, text)
+        text = re.sub(r'\b(\d+)\.(\d{1,2})(?!\d)' + _EKYAK, _ondalik_nokta, text)
         # 3,5 → üç virgül beş
         def _ondalik_virgul(m):
             out = _tr_num_to_words(int(m.group(1))) + ' virgül ' + _tr_ondalik_kisim(m.group(2))
