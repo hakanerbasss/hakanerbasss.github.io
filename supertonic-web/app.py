@@ -811,6 +811,90 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
         return {}
 
 
+async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -> dict:
+    """Ham makale metninden SADECE kaynakta yazan olguları çıkarır (ayrı ajan — yorum/tahmin katmaz).
+
+    Senaryo yazan ajandan bilerek ayrı tutulur: aynı model hem serbest metni yorumlayıp hem de
+    akıcı/viral bir senaryo yazınca dikkat dağılıyor ve eğitim verisinden detay sızdırıyor.
+    Burada tek iş "kaynakta ne yazıyor" — yaratıcılık yok, düşük temperature.
+    """
+    if not article_text.strip():
+        return {"facts": [], "sufficient": False}
+    extract_prompt = (
+        "You are a strict fact-checking extractor. Read the article text below and extract ONLY "
+        "facts that are explicitly and literally stated in it. No inference, no assumption, "
+        "no outside/general knowledge — even if it seems obviously true.\n\n"
+        f"ARTICLE TEXT:\n{article_text}\n\n"
+        "Return ONLY valid JSON, no markdown:\n"
+        "{\n"
+        '  "facts": ["short atomic fact 1 (in ' + ("Turkish" if lang == "tr" else "English") + ')", "fact 2", "..."],\n'
+        '  "names_with_titles": {"Full Name": "exact title/role as stated in the article, or empty string if none given"},\n'
+        '  "numbers": ["exact number/percentage/count exactly as written in the article"],\n'
+        '  "dates": ["exact date/time reference exactly as written in the article"],\n'
+        '  "sufficient": true\n'
+        "}\n\n"
+        "RULES:\n"
+        "- Every fact must trace to an exact sentence in the article above.\n"
+        "- Do NOT add context from general/training knowledge, even obvious-seeming facts.\n"
+        "- If the article implies someone's role/title has changed from what you'd expect, trust "
+        "ONLY the article — never your training data.\n"
+        "- If unsure whether something counts as a stated fact, leave it out.\n"
+        '- Set "sufficient": true only if there are at least 4 solid, distinct facts — enough '
+        "material for a natural ~45-55 second news narration without padding."
+    )
+    try:
+        resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": extract_prompt}],
+            temperature=0.1,
+        )
+        result = _parse_llm_json(resp.choices[0].message.content)
+        result.setdefault("facts", [])
+        result.setdefault("sufficient", len(result["facts"]) >= 4)
+        return result
+    except Exception as e:
+        print(f"[fact-extract] hata: {e}", flush=True)
+        return {"facts": [], "sufficient": False}
+
+
+async def _verify_narration_facts(client, narration: str, facts_data: dict) -> list:
+    """Üretilen senaryodaki iddiaları olgu listesiyle karşılaştırır — desteklenmeyenleri döner.
+
+    Yazan ajandan ayrı bir üçüncü ajan: sadece karşılaştırma yapar, senaryo yazmaz.
+    """
+    if not facts_data.get("facts"):
+        return []
+    facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
+    names = ", ".join(facts_data.get("names_with_titles", {}).keys())
+    numbers = ", ".join(facts_data.get("numbers", []))
+    dates = ", ".join(facts_data.get("dates", []))
+    verify_prompt = (
+        "You are a strict fact-checker. Compare the NARRATION below against the VERIFIED FACTS list. "
+        "Find any specific claim in the narration — a name, number, date, title, or specific detail — "
+        "that is NOT supported by the verified facts.\n\n"
+        f"VERIFIED FACTS:\n{facts_list}\n"
+        f"Known names: {names or '(none)'}\n"
+        f"Known numbers: {numbers or '(none)'}\n"
+        f"Known dates: {dates or '(none)'}\n\n"
+        f"NARRATION TO CHECK:\n{narration}\n\n"
+        "Return ONLY valid JSON, no markdown:\n"
+        '{"unsupported_claims": ["claim text not backed by the facts above", "..."]}\n\n'
+        "If every specific claim in the narration is backed by the facts list (generic storytelling "
+        "phrasing with no new factual claims is fine), return an empty list."
+    )
+    try:
+        resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": verify_prompt}],
+            temperature=0.0,
+        )
+        result = _parse_llm_json(resp.choices[0].message.content)
+        return result.get("unsupported_claims", []) or []
+    except Exception as e:
+        print(f"[verify] hata: {e}", flush=True)
+        return []
+
+
 async def _trim_audio_for_longcat(src: Path, dst: Path, max_sec: int = 5) -> bool:
     """Sesi max_sec saniyeye kısalt (ZeroGPU GPU-time limiti için)."""
     try:
@@ -1071,20 +1155,41 @@ Rules:
         if search_query:
             gnews_data = await fetch_gnews_summary(search_query, lang)
 
+        # ── Olgu çıkarma: ayrı bir ajan, sadece "kaynakta ne yazıyor" işiyle uğraşır ──
+        # (Senaryo yazan ajandan bilerek ayrı — aynı model hem yorumlayıp hem yaratıcı
+        #  yazınca dikkat dağılıyor, eğitim verisinden detay sızdırıyor.)
+        facts_data = {}
+        if gnews_data.get("found") and gnews_data.get("context_text"):
+            facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
+
         news_context_instruction = ""
-        if gnews_data.get("found"):
-            depth_label = "TAM MAKALE METNİ" if gnews_data.get("has_full_text") else "HABER ÖZETİ"
+        if facts_data.get("facts"):
+            facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
+            names_map = facts_data.get("names_with_titles") or {}
+            names_block = "\n".join(
+                f"- {n}: {t or '(unvan belirtilmemiş — sadece adını kullan)'}"
+                for n, t in names_map.items()
+            )
+            numbers_block = ", ".join(facts_data.get("numbers", [])) or "yok"
+            dates_block = ", ".join(facts_data.get("dates", [])) or "yok"
+            thin_note = (
+                "\nNOT: Olgu sayısı az — üzerine spekülasyon eklemeden, elindeki olgularla "
+                "doğal bir anlatım kur. Video biraz kısa kalsa bile uydurmaktan iyidir.\n"
+                if not facts_data.get("sufficient") else ""
+            )
             news_context_instruction = (
-                f"\n\nHABER KAYNAĞI ({depth_label}) — Senaryo YALNIZCA aşağıdaki metne dayanmalı:\n"
-                f"{gnews_data['context_text']}\n"
+                f"\n\nDOĞRULANMIŞ OLGULAR (ayrı bir olgu-çıkarma ajanı tarafından kaynaktan çıkarıldı) — "
+                f"Senaryo YALNIZCA bu listeye dayanmalı:\n{facts_list}\n"
+                + (f"\nİSİMLER VE UNVANLAR (yalnızca bunları kullan):\n{names_block}\n" if names_block else "")
+                + f"\nGeçerli rakamlar: {numbers_block}\n"
+                f"Geçerli tarihler: {dates_block}\n"
+                f"{thin_note}"
                 f"MUTLAK KURALLAR — İhlali yasaktır:\n"
-                f"- Yukarıdaki metinde YAZMAYANH İÇBİR isim, rakam, tarih, yüzde, pozisyon kullanma. Bilmiyorsan söyleme, atla.\n"
-                f"- Eğitim verinle tahmin yürütme — güncel değil. Kaynakta ne yazıyorsa onu söyle.\n"
-                f"- Kaynak 'bazı kişiler' diyorsa sen 'milyonlarca kişi' diyemezsin.\n"
-                f"- Kaynak rakam vermemişse sen rakam uyduramassın.\n"
-                f"- Birinin unvanı kaynakta yoksa sadece adını kullan, unvan takma.\n"
-                f"- Assad örneği: eğitim verisinde 'Suriye Devlet Başkanı' görünür ama Aralık 2024'te kaçtı — "
-                f"kaynakta ne yazıyorsa onu kullan.\n"
+                f"- Yukarıdaki listede OLMAYAN hiçbir isim, rakam, tarih, yüzde, unvan kullanma. Bilmiyorsan söyleme, atla.\n"
+                f"- Eğitim verinle tahmin yürütme — güncel değil. Sadece yukarıdaki olgu listesini kullan.\n"
+                f"- Listede 'bazı kişiler' varsa sen 'milyonlarca kişi' diyemezsin.\n"
+                f"- Listede rakam yoksa rakam uyduramazsın.\n"
+                f"- Birinin unvanı listede yoksa sadece adını kullan, unvan takma.\n"
             )
         # ─────────────────────────────────────────────────────────────────────────
 
@@ -1168,6 +1273,33 @@ Rules:
                     raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
 
         scenes = data["scenes"]
+
+        # ── Üçüncü ajan: senaryodaki iddiaları olgu listesiyle karşılaştırır ──
+        # Desteklenmeyen bir iddia bulunursa, o iddiayı göstererek yeniden yazdırır (maks 2 deneme).
+        if facts_data.get("facts"):
+            for _verify_attempt in range(2):
+                full_narration = " ".join(s.get("text", "") for s in scenes)
+                unsupported = await _verify_narration_facts(client, full_narration, facts_data)
+                if not unsupported:
+                    break
+                print(f"[verify] desteklenmeyen iddialar bulundu, yeniden yazdırılıyor: {unsupported}", flush=True)
+                correction_prompt = prompt + (
+                    "\n\nDÜZELTME GEREKLİ — bir önceki taslağında şu iddialar olgu listesinde YOKTU. "
+                    "Bunları TAMAMEN KALDIR veya olgu listesindeki karşılığıyla değiştir. Başka hiçbir "
+                    "yeni detay ekleme:\n" + "\n".join(f"- {c}" for c in unsupported)
+                )
+                try:
+                    _fix_resp = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[{"role": "user", "content": correction_prompt}],
+                        temperature=0.5,
+                    )
+                    _fixed = _parse_llm_json(_fix_resp.choices[0].message.content)
+                    data = _fixed
+                    scenes = data["scenes"]
+                except Exception as _fix_e:
+                    print(f"[verify] düzeltme denemesi başarısız: {_fix_e}", flush=True)
+                    break
 
         if lang == "tr":
             try:
