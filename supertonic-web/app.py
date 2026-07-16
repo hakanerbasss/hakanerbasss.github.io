@@ -929,8 +929,18 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
                             titles.append(t)
                 except Exception as qe:
                     print(f"[gurbetci-trends] '{q}' hata: {qe}", flush=True)
-        print(f"[gurbetci-trends] toplam {len(titles)} başlık bulundu", flush=True)
-        return titles[:max_items]
+
+        # Kişisel ölüm/vefat/cinayet haberleri ele — "gurbetçi" kelimesi geçse bile
+        # bunlar ASAYİŞ türü içerik, herkesi ilgilendiren pratik/politika haberi değil.
+        _dead_kw = ["öldü", "ölü bulundu", "vefat", "cinayet", "kaza yaptı",
+                    "hayatını kaybetti", "cesedi bulundu", "facia"]
+        filtered = [t for t in titles if not any(kw in t.lower() for kw in _dead_kw)]
+        dropped = len(titles) - len(filtered)
+        if dropped:
+            print(f"[gurbetci-trends] {dropped} kişisel/ölüm haberi elendi", flush=True)
+
+        print(f"[gurbetci-trends] toplam {len(filtered)} başlık bulundu", flush=True)
+        return filtered[:max_items]
     except Exception as e:
         print(f"[gurbetci-trends] genel hata: {e}", flush=True)
         return []
