@@ -79,6 +79,8 @@ CONTACT_WHATSAPP = "905530930325"
 
 templates.env.globals["CATEGORIES"] = ALL_CATEGORIES
 templates.env.globals["CURRENT_YEAR"] = time.strftime("%Y")
+templates.env.globals["CONTACT_EMAIL"] = CONTACT_EMAIL
+templates.env.globals["CONTACT_WHATSAPP"] = CONTACT_WHATSAPP
 
 
 def guess_category(title: str) -> tuple[str, str]:
