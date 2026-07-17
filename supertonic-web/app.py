@@ -384,7 +384,7 @@ _TR_DATIVE = {          # -a/-e/-ya/-ye ("...e/a", "'a kadar" gibi)
     'santigrat':'santigrada','derece':'dereceye','fahrenheit':'fahrenheite',
     'lira':'liraya','kilometre':'kilometreye','kilogram':'kilograma',
     'metrekare':'metrekareye','metreküp':'metreküpe',
-    'dolar':'dolara','euro':'euroya','sterlin':'sterline','saat':'saate',
+    'dolar':'dolara','euro':'euroya','sterlin':'sterline','saat':'saate','nesil':'nesile',
 }
 _TR_LOCATIVE = {        # -da/-de/-ta/-te ("...da/de")
     'sıfır':'sıfırda','bir':'birde','iki':'ikide','üç':'üçte','dört':'dörtte','beş':'beşte',
@@ -395,7 +395,7 @@ _TR_LOCATIVE = {        # -da/-de/-ta/-te ("...da/de")
     'santigrat':'santigratta','derece':'derecede','fahrenheit':'fahrenheitte',
     'lira':'lirada','kilometre':'kilometrede','kilogram':'kilogramda',
     'metrekare':'metrekarede','metreküp':'metreküpte',
-    'dolar':'dolarda','euro':'euroda','sterlin':'sterlinde','saat':'saatte',
+    'dolar':'dolarda','euro':'euroda','sterlin':'sterlinde','saat':'saatte','nesil':'nesilde',
 }
 _TR_ABLATIVE = {        # -dan/-den/-tan/-ten ("...dan/den")
     'sıfır':'sıfırdan','bir':'birden','iki':'ikiden','üç':'üçten','dört':'dörtten','beş':'beşten',
@@ -406,7 +406,7 @@ _TR_ABLATIVE = {        # -dan/-den/-tan/-ten ("...dan/den")
     'santigrat':'santigrattan','derece':'dereceden','fahrenheit':'fahrenheitten',
     'lira':'liradan','kilometre':'kilometreden','kilogram':'kilogramdan',
     'metrekare':'metrekareden','metreküp':'metreküpten',
-    'dolar':'dolardan','euro':'eurodan','sterlin':'sterlinden','saat':'saatten',
+    'dolar':'dolardan','euro':'eurodan','sterlin':'sterlinden','saat':'saatten','nesil':'nesilden',
 }
 _TR_POSS_LOC = {        # "ayın 5'inde" → "ayın beşinde" (iyelik+bulunma birleşik eki)
     'sıfır':'sıfırında','bir':'birinde','iki':'ikisinde','üç':'üçünde','dört':'dördünde','beş':'beşinde',
@@ -544,9 +544,15 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
 
         # Mobil nesil: 5G → beşinci nesil. Genel büyük-sayı dönüşümünden ÖNCE
         # işlenmeli — yoksa '5' sözcüğe çevrilir ama bitişik 'G' harfi öylece
-        # kalır ('beşG' gibi tek garip token oluşur, TTS'i şaşırtır).
+        # kalır ('beşG' gibi tek garip token oluşur, TTS'i şaşırtır). Arkasındaki
+        # ek de (5G'YE gibi) yakalanıp doğru bağlanır — yoksa güvenlik ağı sadece
+        # apostrofu silip 'nesilye' gibi kuralsız bir bitişik bırakıyordu.
         _TR_NESIL = {1:'birinci',2:'ikinci',3:'üçüncü',4:'dördüncü',5:'beşinci',6:'altıncı'}
-        text = re.sub(r'\b([1-9])[Gg]\b', lambda m: _TR_NESIL.get(int(m.group(1)), _tr_ordinal_words(int(m.group(1)))) + ' nesil', text)
+        def _nesil(m):
+            n = int(m.group(1))
+            phrase = _TR_NESIL.get(n, _tr_ordinal_words(n)) + ' nesil'
+            return _tr_attach_suffix(phrase, m.group(2) or '')
+        text = re.sub(r'\b([1-9])[Gg]\b' + _EKYAK, _nesil, text)
 
         # İki sayı arası tire: hem maç skoru (3-1) hem aralık (10-15 derece)
         # anlamına gelebilir — bağlamdan ayırt etmek güvenilir değil. İlk
