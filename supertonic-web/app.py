@@ -482,6 +482,62 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         # URL'leri kaldır (daha önce olmalı — rakam regex'lerinden önce)
         text = re.sub(r'https?://\S+', '', text)
 
+        # Kurum/sınav kısaltmaları — DeepSeek promptunda 'bunları asla yazma,
+        # tam adını yaz' kuralı zaten var ama LLM talimatlara her zaman uymuyor
+        # (aynı 'rakam yazma' talimatının tutmaması gibi). Metin tarafında da
+        # bir güvenlik ağı: kaçan kısaltmalar burada açılıyor. Büyük/küçük harf
+        # duyarlı — bu kısaltmalar Türkçe metinde her zaman büyük harfle yazılır,
+        # rastgele kelime çakışmasını önler.
+        _TR_KISALTMA_ACILIM = {
+            'TBMM': 'Türkiye Büyük Millet Meclisi',
+            'YKS': 'Yükseköğretim Kurumları Sınavı',
+            'LGS': 'Liselere Geçiş Sınavı',
+            'ÖSS': 'Öğrenci Seçme Sınavı',
+            'ÖSYM': 'Ölçme, Seçme ve Yerleştirme Merkezi',
+            'SGK': 'Sosyal Güvenlik Kurumu',
+            'ABD': 'Amerika Birleşik Devletleri',
+            'AKP': 'Adalet ve Kalkınma Partisi',
+            'CHP': 'Cumhuriyet Halk Partisi',
+            'MHP': 'Milliyetçi Hareket Partisi',
+            'TÜBİTAK': 'Türkiye Bilimsel ve Teknolojik Araştırma Kurumu',
+            'MEB': 'Milli Eğitim Bakanlığı',
+            'TÜİK': 'Türkiye İstatistik Kurumu',
+            'TCMB': 'Türkiye Cumhuriyet Merkez Bankası',
+            'BM': 'Birleşmiş Milletler',
+            'AB': 'Avrupa Birliği',
+        }
+        # Açılımın SON kelimesi ünlüyle bittiği için hal eki tampon 'n' ister
+        # (Kurumu'ndan, Meclisi'nde gibi) — genel güvenlik ağı sadece apostrofu
+        # silip harfleri bitiştirdiği için tampon kayboluyordu ('Kurumudan').
+        # Sayılardaki _tr_attach_suffix ile aynı mantık, açılımların son
+        # kelimesine özel küçük bir sözlükle uygulanıyor.
+        _TR_KISALTMA_SON_KELIME_EKI = {
+            'Meclisi':    {'dative':'Meclisine','locative':'Meclisinde','ablative':'Meclisinden','genitive':'Meclisinin'},
+            'Kurumu':     {'dative':'Kurumuna','locative':'Kurumunda','ablative':'Kurumundan','genitive':'Kurumunun'},
+            'Devletleri': {'dative':'Devletlerine','locative':'Devletlerinde','ablative':'Devletlerinden','genitive':'Devletlerinin'},
+            'Partisi':    {'dative':'Partisine','locative':'Partisinde','ablative':'Partisinden','genitive':'Partisinin'},
+            'Bankası':    {'dative':'Bankasına','locative':'Bankasında','ablative':'Bankasından','genitive':'Bankasının'},
+            'Milletler':  {'dative':'Milletlere','locative':'Milletlerde','ablative':'Milletlerden','genitive':'Milletlerin'},
+            'Birliği':    {'dative':'Birliğine','locative':'Birliğinde','ablative':'Birliğinden','genitive':'Birliğinin'},
+            'Sınavı':     {'dative':'Sınavına','locative':'Sınavında','ablative':'Sınavından','genitive':'Sınavının'},
+            'Bakanlığı':  {'dative':'Bakanlığına','locative':'Bakanlığında','ablative':'Bakanlığından','genitive':'Bakanlığının'},
+        }
+        def _kisaltma_ek_bagla(acilim, raw_suffix):
+            if not raw_suffix:
+                return acilim
+            kind = _classify_tr_suffix(raw_suffix)
+            forms = _TR_KISALTMA_SON_KELIME_EKI.get(acilim.split(' ')[-1])
+            if kind and forms and kind in forms:
+                words = acilim.split(' ')
+                words[-1] = forms[kind]
+                return ' '.join(words)
+            return acilim
+        _EKYAK_ERKEN = r"(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?"
+        for _kis, _acilim in _TR_KISALTMA_ACILIM.items():
+            def _repl(m, _ac=_acilim):
+                return _kisaltma_ek_bagla(_ac, m.group(1) or '')
+            text = re.sub(rf'\b{re.escape(_kis)}\b' + _EKYAK_ERKEN, _repl, text)
+
         # Sayıya BİTİŞİK yazılan birim kısaltmalarının arasına boşluk sok
         # (5GB → 5 GB) — aşağıdaki birim regex'lerinin hepsi \b sınırına
         # dayanıyor, bitişik yazımda "5GB" tek kelime sayılıp hiç açılmıyordu.
