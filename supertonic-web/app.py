@@ -536,7 +536,11 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         for _kis, _acilim in _TR_KISALTMA_ACILIM.items():
             def _repl(m, _ac=_acilim):
                 return _kisaltma_ek_bagla(_ac, m.group(1) or '')
-            text = re.sub(rf'\b{re.escape(_kis)}\b' + _EKYAK_ERKEN, _repl, text)
+            # IGNORECASE: DeepSeek her zaman tam büyük harfle yazmıyor ('Yks',
+            # 'yks' gibi karışık/küçük harfli varyantlar da kaçmasın diye.
+            # Bu kısaltmaların hiçbiri gerçek Türkçe kelimeyle çakışmadığı için
+            # (ab/bm/yks vb. tek başına anlamlı kelime değil) risksiz.
+            text = re.sub(rf'\b{re.escape(_kis)}\b' + _EKYAK_ERKEN, _repl, text, flags=re.IGNORECASE)
 
         # Sayıya BİTİŞİK yazılan birim kısaltmalarının arasına boşluk sok
         # (5GB → 5 GB) — aşağıdaki birim regex'lerinin hepsi \b sınırına
