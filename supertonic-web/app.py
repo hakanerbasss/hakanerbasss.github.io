@@ -4256,9 +4256,13 @@ async def _telegram_mark_offset_to_latest() -> int:
         return 0
 
 
-async def wait_for_telegram_numeric_reply(offset: int, max_choice: int, timeout_sec: int = 300, poll_sec: int = 8) -> int | None:
+_TELEGRAM_CANCEL_KELIMELERI = {"cancel", "c", "iptal", "i", "no", "hayır", "hayir"}
+
+
+async def wait_for_telegram_numeric_reply(offset: int, max_choice: int, timeout_sec: int = 300, poll_sec: int = 8) -> int | str | None:
     """offset'ten itibaren gelen mesajlarda 1..max_choice aralığında bir sayı arar.
-    Bulursa sayıyı, timeout dolarsa None döner."""
+    Bulursa sayıyı, 'cancel'/'c'/'iptal'/'i' yazılırsa 'CANCEL' sabitini,
+    timeout dolarsa None döner."""
     cfg = get_telegram_config()
     token = cfg.get("bot_token", "").strip()
     expected_chat_id = cfg.get("chat_id", "").strip()
@@ -4282,6 +4286,8 @@ async def wait_for_telegram_numeric_reply(offset: int, max_choice: int, timeout_
                     text = (msg.get("text") or "").strip()
                     if expected_chat_id and chat_id != expected_chat_id:
                         continue
+                    if text.lower() in _TELEGRAM_CANCEL_KELIMELERI:
+                        return "CANCEL"
                     if text.isdigit():
                         n = int(text)
                         if 1 <= n <= max_choice:
@@ -6630,12 +6636,17 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                     numbered = "\n\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
                     sent = await send_telegram_plain(
                         f"📰 TR Instagram-Only — 5 dakika içinde numara yaz, o haberi yapayım.\n"
+                        f"Uygun haber yoksa 'iptal' veya 'c' yaz, bu saat dilimi hiç paylaşılmasın.\n"
                         f"Cevap gelmezse otomatik seçeceğim.\n\n{numbered}"
                     )
                     if sent:
                         save_ig_only_tr_log("running", "📰 Telegram'a haber listesi gönderildi, cevap bekleniyor (5 dk)...")
                         choice = await wait_for_telegram_numeric_reply(offset, len(pool), timeout_sec=300)
-                        if choice:
+                        if choice == "CANCEL":
+                            await send_telegram_plain("🚫 İptal edildi, bu saat diliminde paylaşım yapılmayacak.")
+                            save_ig_only_tr_log("success", "Telegram'dan iptal edildi — uygun haber yok, bu saat dilimi atlandı")
+                            return
+                        elif choice:
                             forced_topic = pool[choice - 1]
                             await send_telegram_plain(f"✅ Seçildi: {forced_topic}\nÜretiliyor…")
                             save_ig_only_tr_log("running", f"Telegram'dan seçildi: {forced_topic[:80]}")
