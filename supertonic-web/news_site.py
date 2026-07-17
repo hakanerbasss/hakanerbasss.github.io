@@ -4,6 +4,7 @@ Bot her Instagram gönderisini doğruladığında add_article() ile buraya bir
 kayıt düşer. Video sunucuda tutulmaz — Instagram embed (blockquote) ile
 gösterilir, sadece küçük thumbnail görseli yerelde saklanır.
 """
+import json
 import sqlite3
 import time
 import hashlib
@@ -12,6 +13,8 @@ from pathlib import Path
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse, Response
 from fastapi.templating import Jinja2Templates
+
+from ig_analytics_full import CACHE_FILE as IG_STATS_CACHE_FILE
 
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "news_site.db"
@@ -40,8 +43,17 @@ def _isoformat(ts: int) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(ts))
 
 
+def _tr_sayi(n) -> str:
+    """1234567 -> '1.234.567' (Türkçe binlik ayıracı = nokta)."""
+    try:
+        return f"{int(n):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return str(n)
+
+
 templates.env.filters["timesince"] = _timesince
 templates.env.filters["isoformat"] = _isoformat
+templates.env.filters["trsayi"] = _tr_sayi
 templates.env.globals["SITE_URL"] = SITE_URL
 
 PER_PAGE = 12
@@ -186,6 +198,67 @@ def get_all_ids_and_dates():
         return c.execute("SELECT id, created_at FROM articles ORDER BY id DESC").fetchall()
 
 
+def _load_ig_stats() -> dict | None:
+    """ig_analytics_full.fetch_full_analytics() tarafından yazılan cache dosyasını okur.
+    Cache app.py'de her gece 05:15'te tazelenir — burada sadece okunur, ağ isteği atılmaz."""
+    if not IG_STATS_CACHE_FILE.exists():
+        return None
+    try:
+        return json.loads(IG_STATS_CACHE_FILE.read_text())
+    except Exception:
+        return None
+
+
+def _build_stats_view(data: dict) -> dict:
+    """Ham analytics cache'ini /istatistikler sayfası için sunuma hazır hale getirir."""
+    profile = data.get("profile", {}) or {}
+    summary = data.get("summary", {}) or {}
+    posts = data.get("posts", []) or []
+
+    cutoff_30 = time.time() - 30 * 86400
+    views_30d = 0
+    for p in posts:
+        ts = p.get("timestamp") or ""
+        try:
+            t = time.mktime(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
+        except Exception:
+            continue
+        if t >= cutoff_30:
+            views_30d += p.get("views", 0) or 0
+
+    follower_daily = data.get("follower_daily", []) or []
+    max_abs = max([abs(v.get("value", 0)) for v in follower_daily], default=0) or 1
+    chart_points = [
+        {
+            "date": (v.get("end_time") or "")[5:10],
+            "value": v.get("value", 0),
+            "pct": round(abs(v.get("value", 0)) / max_abs * 100, 1),
+        }
+        for v in follower_daily
+    ]
+
+    total_interactions = (
+        (summary.get("total_likes") or 0) + (summary.get("total_comments") or 0)
+        + (summary.get("total_shares") or 0) + (summary.get("total_saved") or 0)
+    )
+
+    fetched_at = data.get("fetched_at")
+    updated_label = time.strftime("%d.%m.%Y %H:%M", time.localtime(fetched_at)) if fetched_at else ""
+
+    return {
+        "followers": profile.get("followers_count", 0),
+        "total_posts": data.get("total_posts", 0),
+        "total_views": summary.get("total_views", 0),
+        "avg_views": summary.get("avg_views", 0),
+        "max_views": summary.get("max_views", 0),
+        "views_30d": views_30d,
+        "total_interactions": total_interactions,
+        "chart_points": chart_points,
+        "top_posts": summary.get("top_posts", [])[:5],
+        "updated_label": updated_label,
+    }
+
+
 router = APIRouter()
 
 
@@ -201,7 +274,7 @@ _AI_CRAWLERS = [
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
-    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", ""]
+    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", "Allow: /istatistikler", ""]
     for ua in _AI_CRAWLERS:
         lines += [f"User-agent: {ua}", "Allow: /", ""]
     lines.append(f"Sitemap: {SITE_URL}/sitemap.xml")
@@ -215,6 +288,7 @@ async def sitemap_xml():
         f"<url><loc>{SITE_URL}/haberler</loc><changefreq>hourly</changefreq></url>",
         f"<url><loc>{SITE_URL}/hakkinda</loc><changefreq>monthly</changefreq></url>",
         f"<url><loc>{SITE_URL}/iletisim</loc><changefreq>monthly</changefreq></url>",
+        f"<url><loc>{SITE_URL}/istatistikler</loc><changefreq>daily</changefreq></url>",
     ]
     for r in rows:
         urls.append(
@@ -273,6 +347,15 @@ async def hakkinda(request: Request):
 async def iletisim(request: Request):
     return templates.TemplateResponse("iletisim.html", {
         "request": request, "contact_email": CONTACT_EMAIL, "contact_whatsapp": CONTACT_WHATSAPP,
+    })
+
+
+@router.get("/istatistikler", response_class=HTMLResponse)
+async def istatistikler(request: Request):
+    data = _load_ig_stats()
+    stats = _build_stats_view(data) if data else None
+    return templates.TemplateResponse("istatistikler.html", {
+        "request": request, "stats": stats,
     })
 
 
