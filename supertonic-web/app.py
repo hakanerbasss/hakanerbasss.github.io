@@ -548,7 +548,8 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         # NOT: bare 'G' (5G nesil göstergesi) BİLEREK bu listede yok — o özel
         # olarak bitişik kalmalı, aşağıda ayrıca ele alınıyor.
         _BITISIK_BIRIMLER = ['Gbps','Mbps','Kbps','GB','MB','KB','TB','TL',
-                             'km/s','km²','km³','km','kg','cm²','cm³','cm','mm²','mm']
+                             'km/s','km²','km³','km','kg','cm²','cm³','cm','mm²','mm',
+                             'TWh','GWh','MWh','kWh','Wh','TW','GW','MW','kW','ppm']
         for _birim in _BITISIK_BIRIMLER:
             text = re.sub(rf'(?<=\d)({re.escape(_birim)})\b', r' \1', text, flags=re.IGNORECASE)
 
@@ -592,6 +593,22 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
                 return _tr_num_to_words(d) + ' ' + _AYLAR[mo] + ' ' + _tr_num_to_words(y)
             return m.group(0)
         text = re.sub(r'\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b', _tarih, text)
+
+        # On yıl (yüzyıl) eki: "1850'lerde" → "bin sekiz yüz elliler de" tipi
+        # değil, TEK kelime "elliler" + varsa ikinci ek. ÖNCE işlenmeli —
+        # genel _EKYAK yakalayıcısı en fazla 4 harf alıyor, 'lerde'/'larda'
+        # (5 harf) buna sığmıyor ve "bin sekiz yüz ellie" gibi bozuk/anlamsız
+        # bir bitişikliğe yol açıyordu (4 harf tüketilip 5.si dışarıda kalıyordu).
+        # "ler"/"lar" kaynakta zaten doğru ünlü uyumuyla seçildiği için, arkasından
+        # gelen ikinci eki (varsa) yeniden hesaplamadan olduğu gibi bitiştiriyoruz.
+        def _yil_coğul(m):
+            yil = int(m.group(1))
+            coğul = m.group(2)
+            ek = m.group(3) or ''
+            words = _tr_num_to_words(yil).split(' ')
+            words[-1] = words[-1] + coğul + ek
+            return ' '.join(words)
+        text = re.sub(r"\b(\d{4})['’](ler|lar)([a-zçğıöşü]{0,5})\b", _yil_coğul, text, flags=re.IGNORECASE)
 
         # Yüzde aralığı: %10-15 → yüzde on - on beş. TEKİL yüzde regex'inden
         # ÖNCE işlenmeli — yoksa ilk sayı %'den ayrı çevrilip aradaki tire
@@ -735,6 +752,25 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         text = re.sub(r'\bGB\b' + _EKYAK, _kisaltma('gigabayt'), text, flags=re.IGNORECASE)
         text = re.sub(r'\bMB\b' + _EKYAK, _kisaltma('megabayt'), text, flags=re.IGNORECASE)
         text = re.sub(r'\bKB\b' + _EKYAK, _kisaltma('kilobayt'), text, flags=re.IGNORECASE)
+
+        # Enerji birimleri (Wh ailesi) — karışık büyük/küçük harfli (MWh, kWh)
+        # olduğu için ne birim kısaltma listesinde ne de harf-harf ayırma
+        # düzeneğinde (o sadece TAMAMEN büyük harfli kısaltmaları yakalıyor)
+        # yakalanıyordu, tamamen dokunulmadan kalıyordu. 'saat' zaten hal eki
+        # sözlüklerinde olduğu için ek bağlama otomatik doğru çalışıyor
+        # ('1.287 MWh'a' → '...megavat saate').
+        text = re.sub(r'\bTWh\b' + _EKYAK, _kisaltma('teravat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bGWh\b' + _EKYAK, _kisaltma('gigavat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMWh\b' + _EKYAK, _kisaltma('megavat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkWh\b' + _EKYAK, _kisaltma('kilovat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bWh\b' + _EKYAK, _kisaltma('vat saat'), text)
+        text = re.sub(r'\bTW\b' + _EKYAK, _kisaltma('teravat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bGW\b' + _EKYAK, _kisaltma('gigavat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMW\b' + _EKYAK, _kisaltma('megavat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkW\b' + _EKYAK, _kisaltma('kilovat'), text, flags=re.IGNORECASE)
+        # ppm (milyonda parça) — küçük harfli olduğu için harf-harf ayırma
+        # düzeneği de (büyük harf gerektiriyor) bunu yakalamıyordu.
+        text = re.sub(r'\bppm\b' + _EKYAK, _kisaltma('milyonda bir'), text, flags=re.IGNORECASE)
 
         # Kısaltma sözlüğümüzde olmayan (ÇYDD, PKK, TRT, KHK gibi — sonsuz
         # sayıda olabilecek) büyük harfli kısaltmalar için son çare: harfleri
