@@ -385,6 +385,8 @@ _TR_DATIVE = {          # -a/-e/-ya/-ye ("...e/a", "'a kadar" gibi)
     'lira':'liraya','kilometre':'kilometreye','kilogram':'kilograma',
     'metrekare':'metrekareye','metreküp':'metreküpe',
     'dolar':'dolara','euro':'euroya','sterlin':'sterline','saat':'saate','nesil':'nesile',
+    'gigabayt':'gigabayta','megabayt':'megabayta','kilobayt':'kilobayta','terabayt':'terabayta',
+    'gigabit':'gigabite','megabit':'megabite','kilobit':'kilobite',
 }
 _TR_LOCATIVE = {        # -da/-de/-ta/-te ("...da/de")
     'sıfır':'sıfırda','bir':'birde','iki':'ikide','üç':'üçte','dört':'dörtte','beş':'beşte',
@@ -396,6 +398,8 @@ _TR_LOCATIVE = {        # -da/-de/-ta/-te ("...da/de")
     'lira':'lirada','kilometre':'kilometrede','kilogram':'kilogramda',
     'metrekare':'metrekarede','metreküp':'metreküpte',
     'dolar':'dolarda','euro':'euroda','sterlin':'sterlinde','saat':'saatte','nesil':'nesilde',
+    'gigabayt':'gigabaytta','megabayt':'megabaytta','kilobayt':'kilobaytta','terabayt':'terabaytta',
+    'gigabit':'gigabitte','megabit':'megabitte','kilobit':'kilobitte',
 }
 _TR_ABLATIVE = {        # -dan/-den/-tan/-ten ("...dan/den")
     'sıfır':'sıfırdan','bir':'birden','iki':'ikiden','üç':'üçten','dört':'dörtten','beş':'beşten',
@@ -407,6 +411,8 @@ _TR_ABLATIVE = {        # -dan/-den/-tan/-ten ("...dan/den")
     'lira':'liradan','kilometre':'kilometreden','kilogram':'kilogramdan',
     'metrekare':'metrekareden','metreküp':'metreküpten',
     'dolar':'dolardan','euro':'eurodan','sterlin':'sterlinden','saat':'saatten','nesil':'nesilden',
+    'gigabayt':'gigabayttan','megabayt':'megabayttan','kilobayt':'kilobayttan','terabayt':'terabayttan',
+    'gigabit':'gigabitten','megabit':'megabitten','kilobit':'kilobitten',
 }
 _TR_POSS_LOC = {        # "ayın 5'inde" → "ayın beşinde" (iyelik+bulunma birleşik eki)
     'sıfır':'sıfırında','bir':'birinde','iki':'ikisinde','üç':'üçünde','dört':'dördünde','beş':'beşinde',
@@ -475,6 +481,16 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
     if lang == "tr":
         # URL'leri kaldır (daha önce olmalı — rakam regex'lerinden önce)
         text = re.sub(r'https?://\S+', '', text)
+
+        # Sayıya BİTİŞİK yazılan birim kısaltmalarının arasına boşluk sok
+        # (5GB → 5 GB) — aşağıdaki birim regex'lerinin hepsi \b sınırına
+        # dayanıyor, bitişik yazımda "5GB" tek kelime sayılıp hiç açılmıyordu.
+        # NOT: bare 'G' (5G nesil göstergesi) BİLEREK bu listede yok — o özel
+        # olarak bitişik kalmalı, aşağıda ayrıca ele alınıyor.
+        _BITISIK_BIRIMLER = ['Gbps','Mbps','Kbps','GB','MB','KB','TB','TL',
+                             'km/s','km²','km³','km','kg','cm²','cm³','cm','mm²','mm']
+        for _birim in _BITISIK_BIRIMLER:
+            text = re.sub(rf'(?<=\d)({re.escape(_birim)})\b', r' \1', text, flags=re.IGNORECASE)
 
         # Para birimleri: $50 → 50 dolar, €50 → 50 euro, £50 → 50 sterlin
         text = re.sub(r'\$\s*(\d[\d.,]*)', r'\1 dolar', text)
@@ -648,6 +664,17 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         text = re.sub(r'\bkg\b' + _EKYAK, _kisaltma('kilogram'), text, flags=re.IGNORECASE)
         text = re.sub(r'\bm²\b' + _EKYAK, _kisaltma('metrekare'), text)
         text = re.sub(r'\bm³\b' + _EKYAK, _kisaltma('metreküp'), text)
+
+        # Veri birimleri — bps'li (hız) birimler ÖNCE işlenmeli, yoksa \bMB\b gibi
+        # kısa kalıp "Mbps" içindeki "Mb"yi yanlışlıkla yer (sınır kontrolü çoğu
+        # zaman engeller ama önce işlemek daha güvenli/açık).
+        text = re.sub(r'\bGbps\b' + _EKYAK, _kisaltma('gigabit'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMbps\b' + _EKYAK, _kisaltma('megabit'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bKbps\b' + _EKYAK, _kisaltma('kilobit'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bTB\b' + _EKYAK, _kisaltma('terabayt'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bGB\b' + _EKYAK, _kisaltma('gigabayt'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMB\b' + _EKYAK, _kisaltma('megabayt'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bKB\b' + _EKYAK, _kisaltma('kilobayt'), text, flags=re.IGNORECASE)
 
         # Son güvenlik ağı: sayı/birim dışındaki kelimelerde de (özel adlar,
         # "Meteoroloji'den" gibi) kesme işareti+ek kalıyordu — bunlar bizim sayı
