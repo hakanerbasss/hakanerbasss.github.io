@@ -1564,6 +1564,7 @@ Rules:
 - 5 to 7 scenes, total narration under 55 seconds
 - {format_rule}
 - NEVER use abbreviations; write full names for text-to-speech
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
 - NEVER reference real footage or photos in narration — storytelling and facts only
 - LAST scene MUST end with (in {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!"
 - hashtags: 10-15 tags. Always include "bilgi", "öğrendim", "keşfet", "viral", "Shorts". No # symbol, NO spaces within a tag.
@@ -1743,6 +1744,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 Rules:
 - 5 to 7 scenes
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly. Example: write "Yükseköğretim Kurumları Sınavı" not "YKS", "Amerika Birleşik Devletleri" not "ABD".
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - POLITICAL TITLES: Your training data is outdated. NEVER assume someone still holds a position from your training. Use ONLY the title given in the news context above. If no title is given, use only the person's name. Known outdated facts to avoid: Assad is no longer Syria's president (fled Dec 2024), Biden is no longer US president.
 - NO FABRICATED NUMBERS OR SCOPE: NEVER write "milyonlarca", "binlerce", "yüz binlerce", or any specific number/count/percentage UNLESS it appears word-for-word in the news source provided above. If the source does not mention a number, do NOT invent one. Use the exact scope from the source (e.g. if source says "bazı çalışanlar", write "bazı çalışanlar" — never upgrade it to "milyonlarca çalışan"). Inventing numbers is disinformation and causes legal risk.
@@ -3433,6 +3435,7 @@ Return ONLY valid JSON, no markdown:
 Rules:
 - Exactly {scene_count} scenes
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP, TÜBİTAK). Always write the full name so text-to-speech reads correctly.
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven, or "1.2" when you mean "one point two" is fine but "1,287" as a thousands-grouped count is NOT). Write "1.287" for the thousands case or spell it out "bin iki yüz seksen yedi" — English-style thousands-commas break the TTS reading and can be misread as a decimal.
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - FIRST scene text MUST use a CURIOSITY-GAP hook — never state the answer directly. Create suspense, ask a question, or give a partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Cevap herkesi şoke etti.", "Peki gerçekte ne oldu?", "Tarihin en büyük...". The viewer MUST feel compelled to keep watching. NEVER open with a plain news statement. Vary the opener every video.
 - LAST scene text MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
@@ -3784,7 +3787,8 @@ Rules:
 - Copy the script's narration text exactly — do NOT paraphrase or summarize
 - Generate an appropriate English image search keyword for each scene
 - hashtags: 8-12 relevant tags. No # symbol, NO spaces within a tag.
-- NEVER use abbreviations in scene text; always write the full name for text-to-speech"""
+- NEVER use abbreviations in scene text; always write the full name for text-to-speech
+- If the uploaded script contains numbers in English format (comma as thousands separator, e.g. "1,287"), convert them to Turkish format ("1.287") or spell them out — Turkish uses comma ONLY as the decimal separator, English-style thousands-commas break the TTS reading"""
 
     response = client.chat.completions.create(
         model="deepseek-chat",
@@ -4027,6 +4031,7 @@ Return ONLY valid JSON, no markdown:
 Rules:
 - One segment per trending topic ({len(topics_list)} segments total, {len(topics_list)*2} scenes)
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly.
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - VERY FIRST scene MUST use a CURIOSITY-GAP hook — never state the answer directly. Withhold the key fact, create suspense or partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Peki gerçekte ne oldu?", "Cevap herkesi şoke etti.", "Tarihin en büyük...". The viewer MUST feel compelled to keep watching. Critical for retention — never open with a plain news headline.
 - VERY LAST scene MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
