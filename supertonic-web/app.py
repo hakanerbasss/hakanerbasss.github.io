@@ -736,6 +736,21 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         text = re.sub(r'\bMB\b' + _EKYAK, _kisaltma('megabayt'), text, flags=re.IGNORECASE)
         text = re.sub(r'\bKB\b' + _EKYAK, _kisaltma('kilobayt'), text, flags=re.IGNORECASE)
 
+        # Kısaltma sözlüğümüzde olmayan (ÇYDD, PKK, TRT, KHK gibi — sonsuz
+        # sayıda olabilecek) büyük harfli kısaltmalar için son çare: harfleri
+        # boşlukla ayır ki Supertonic her harfi ayrı ayrı Türkçe harf ismiyle
+        # okusun ('Ç Y D D'), tek bitişik "kelime" gibi okuyup İngilizce
+        # telaffuza kaçmasın. İSTİSNA: bazı kısaltmalar Türkçe'de tek kelime
+        # gibi okunur (NATO → "nato", FETÖ → "fetö") — onları bölersek bozulur,
+        # o yüzden ayrı bir listede tutulup dokunulmuyor.
+        _TR_KISALTMA_KELIME_GIBI = {'NATO','FETÖ','UEFA','FIFA','AFAD','ASELSAN','TUSAŞ','ROKETSAN'}
+        def _harf_harf(m):
+            kelime = m.group(0)
+            if kelime.upper() in _TR_KISALTMA_KELIME_GIBI:
+                return kelime
+            return ' '.join(kelime)
+        text = re.sub(r'\b[A-ZÇĞİÖŞÜ]{2,6}\b', _harf_harf, text)
+
         # Son güvenlik ağı: sayı/birim dışındaki kelimelerde de (özel adlar,
         # "Meteoroloji'den" gibi) kesme işareti+ek kalıyordu — bunlar bizim sayı
         # sözlüğümüzde olmadığı için yukarıdaki _tr_attach_suffix hiç devreye
