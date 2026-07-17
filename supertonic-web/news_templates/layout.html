@@ -56,11 +56,33 @@
   }
   .brand .name{ font-weight:800; font-size:20px; letter-spacing:-.2px; }
   .brand .name span{ color:var(--red); }
+  nav.top{ display:flex; align-items:center; gap:2px; background:var(--bg); padding:4px; border-radius:999px; }
   nav.top a{
-    font-size:14px; font-weight:600; color:var(--sub); margin-left:22px;
+    display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:700;
+    color:var(--sub); padding:9px 15px; border-radius:999px; transition:background .15s, color .15s;
   }
-  nav.top a:hover{ color:var(--ink); }
+  nav.top a svg{ width:16px; height:16px; flex-shrink:0; }
+  nav.top a:hover{ color:var(--ink); background:rgba(20,21,26,.05); }
+  nav.top a.active{ color:#fff; background:var(--red); }
   main{ max-width:1080px; margin:0 auto; padding:24px 20px 60px; }
+
+  .tabbar{ display:none; }
+  @media (max-width:700px){
+    nav.top{ display:none; }
+    .tabbar{
+      display:flex; position:fixed; left:0; right:0; bottom:0; z-index:20;
+      background:var(--card); border-top:1px solid var(--line);
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      box-shadow:0 -6px 20px rgba(20,21,26,.07);
+    }
+    .tabbar a{
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+      padding:6px 2px 5px; border-radius:12px; color:var(--sub); font-size:10.5px; font-weight:700;
+    }
+    .tabbar a svg{ width:22px; height:22px; }
+    .tabbar a.active{ color:var(--red); }
+    main{ padding-bottom:90px; }
+  }
   footer{
     border-top:1px solid var(--line); margin-top:40px; padding:26px 20px;
     text-align:center; color:var(--sub); font-size:13px;
@@ -197,17 +219,52 @@
       <span class="mark">SON DAKİKA</span>
       <span class="name">Hakan <span>Erbaş</span></span>
     </a>
+    {% set path = request.url.path %}
+    {% set nav_haberler = path == '/haberler' or path.startswith('/haber/') %}
+    {% set nav_stats = path == '/istatistikler' %}
+    {% set nav_hakkinda = path == '/hakkinda' %}
+    {% set nav_iletisim = path == '/iletisim' %}
     <nav class="top">
-      <a href="/haberler">Haberler</a>
-      <a href="/istatistikler">İstatistikler</a>
-      <a href="/hakkinda">Hakkında</a>
-      <a href="/iletisim">İletişim</a>
+      <a href="/haberler" class="{{ 'active' if nav_haberler }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+        Haberler
+      </a>
+      <a href="/istatistikler" class="{{ 'active' if nav_stats }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>
+        İstatistikler
+      </a>
+      <a href="/hakkinda" class="{{ 'active' if nav_hakkinda }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg>
+        Hakkında
+      </a>
+      <a href="/iletisim" class="{{ 'active' if nav_iletisim }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+        İletişim
+      </a>
     </nav>
   </div>
 </header>
 <main>
   {% block content %}{% endblock %}
 </main>
+<nav class="tabbar">
+  <a href="/haberler" class="{{ 'active' if nav_haberler }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+    <span>Haberler</span>
+  </a>
+  <a href="/istatistikler" class="{{ 'active' if nav_stats }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>
+    <span>İstatistik</span>
+  </a>
+  <a href="/hakkinda" class="{{ 'active' if nav_hakkinda }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg>
+    <span>Hakkında</span>
+  </a>
+  <a href="/iletisim" class="{{ 'active' if nav_iletisim }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+    <span>İletişim</span>
+  </a>
+</nav>
 <footer class="site">
   <div class="footer-grid">
     <div class="footer-col">
