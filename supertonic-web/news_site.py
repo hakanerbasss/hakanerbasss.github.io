@@ -276,7 +276,7 @@ _AI_CRAWLERS = [
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
-    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", "Allow: /istatistikler", ""]
+    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", "Allow: /istatistikler", "Allow: /gizlilik-politikasi", ""]
     for ua in _AI_CRAWLERS:
         lines += [f"User-agent: {ua}", "Allow: /", ""]
     lines.append(f"Sitemap: {SITE_URL}/sitemap.xml")
@@ -291,6 +291,7 @@ async def sitemap_xml():
         f"<url><loc>{SITE_URL}/hakkinda</loc><changefreq>monthly</changefreq></url>",
         f"<url><loc>{SITE_URL}/iletisim</loc><changefreq>monthly</changefreq></url>",
         f"<url><loc>{SITE_URL}/istatistikler</loc><changefreq>daily</changefreq></url>",
+        f"<url><loc>{SITE_URL}/gizlilik-politikasi</loc><changefreq>yearly</changefreq></url>",
     ]
     for r in rows:
         urls.append(
@@ -343,6 +344,11 @@ async def haberler_list(request: Request, sayfa: int = 1, kategori: str | None =
 @router.get("/hakkinda", response_class=HTMLResponse)
 async def hakkinda(request: Request):
     return templates.TemplateResponse("hakkinda.html", {"request": request})
+
+
+@router.get("/gizlilik-politikasi", response_class=HTMLResponse)
+async def gizlilik(request: Request):
+    return templates.TemplateResponse("gizlilik.html", {"request": request})
 
 
 @router.get("/iletisim", response_class=HTMLResponse)

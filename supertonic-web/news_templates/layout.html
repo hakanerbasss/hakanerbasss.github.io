@@ -204,7 +204,9 @@
 
   .page-narrow{ max-width:640px; margin:0 auto; }
   .page-narrow h1{ font-size:24px; margin:0 0 16px; }
+  .page-narrow h2{ font-size:17px; margin:28px 0 8px; }
   .page-narrow p{ font-size:15px; line-height:1.75; color:#26272c; }
+  .page-narrow a{ color:var(--red); font-weight:600; }
   .contact-list{ list-style:none; padding:0; margin:20px 0 0; display:flex; flex-direction:column; gap:12px; }
   .contact-list li{
     display:flex; align-items:center; gap:10px; background:var(--card);
@@ -297,6 +299,7 @@
       <a href="/hakkinda">Hakkında</a>
       <a href="/iletisim">İletişim</a>
       <a href="/haberler">Tüm Haberler</a>
+      <a href="/gizlilik-politikasi">Gizlilik Politikası</a>
     </div>
     <div class="footer-col">
       <div class="footer-title">Bizi Takip Et</div>
@@ -305,7 +308,8 @@
     </div>
   </div>
   <div class="footer-bottom">
-    &copy; {{ CURRENT_YEAR }} Hakan Erbaş &middot; Bu içerikler yapay zeka destekli olarak üretilmiştir.
+    &copy; {{ CURRENT_YEAR }} Hakan Erbaş &middot; Bu içerikler yapay zeka destekli olarak üretilmiştir. &middot;
+    <a href="/gizlilik-politikasi">Gizlilik Politikası</a>
   </div>
 </footer>
 
