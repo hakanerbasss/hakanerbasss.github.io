@@ -1336,7 +1336,15 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
 
     # Google News RSS boolean OR + tırnaklı ifadeleri güvenilir işlemiyor —
     # basit tekil sorgularla birden fazla istek atıp birleştirmek daha sağlam.
-    queries = ["gurbetçi", "yurtdışındaki Türkler", "gurbetçilere"]
+    # "when:2d" Google'ın kendi zaman filtresi — arama RSS'i varsayılan olarak alaka
+    # düzeyine göre sıralıyor (tarihe göre değil), bu da dar sorgularda aynı yüksek
+    # otoriteli makalelerin günlerce üstte kalmasına yol açıyordu. Ülke bazlı sorgular
+    # da havuzu genişletiyor.
+    queries = [
+        "gurbetçi when:2d", "yurtdışındaki Türkler when:2d", "gurbetçilere when:2d",
+        "Almanya'daki Türkler when:2d", "Hollanda'daki Türkler when:2d",
+        "Fransa'daki Türkler when:2d", "Belçika'daki Türkler when:2d",
+    ]
     titles = []
     try:
         async with httpx.AsyncClient(timeout=8) as client:
@@ -4476,12 +4484,12 @@ def _ig_recently_posted(title: str) -> bool:
 
 
 def _ig_same_topic_posted(title: str) -> bool:
-    """Aynı konuyu (3+ ortak özgün anahtar kelime) 12 saat içinde attıysa True döner."""
+    """Aynı konuyu (3+ ortak özgün anahtar kelime) 8 saat içinde attıysa True döner."""
     if not IG_RECENT_FILE.exists():
         return False
     try:
         records = json.loads(IG_RECENT_FILE.read_text())
-        cutoff = time.time() - 12 * 3600  # 24h → 12h: sık yayın programına uygun
+        cutoff = time.time() - 8 * 3600  # 12h → 8h: günde 12 slotluk yoğun programda havuz erken tükeniyordu
         new_kw = _extract_topic_keywords(title)
         if len(new_kw) < 2:
             return False
