@@ -43,7 +43,7 @@ def fetch_google_news(lang="tr", region="TR", max_items=20):
         return []
 
 
-_TOPIC_FEEDS = ["BUSINESS", "SPORTS", "WORLD"]  # ekonomi / spor / dünya
+_TOPIC_FEEDS = ["BUSINESS", "WORLD"]  # ekonomi / dünya — spor kesin filtreleniyor (app.py _HARD_EXCLUDE_CATS), boşuna çekilmesin
 
 
 def fetch_google_news_topic(topic_code, lang="tr", region="TR", max_items=15):

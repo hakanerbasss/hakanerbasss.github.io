@@ -1272,22 +1272,24 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
 
 
 # Kişisel ölüm/vefat/kaza haberleri — hem gurbetçi hem normal trend havuzunda
-# ele alınır. ASAYİŞ kategorisi (cinayet, gözaltı, tutuklama vb.) ig_perf.categorize()
-# üzerinden ayrıca elenir, burada sadece keyword listesi tekil ölüm/vefat vakalarını yakalar.
+# ele alınır. ASAYİŞ kategorisi (cinayet, gözaltı, tutuklama vb.) ve SPOR kategorisi
+# ig_perf.categorize() üzerinden ayrıca elenir — SPOR kesin/sert kural (kullanıcı isteği,
+# ASAYİŞ gibi soft-score değil), burada sadece keyword listesi tekil ölüm/vefat vakalarını yakalar.
 _LOW_VALUE_KW = ["öldü", "ölü bulundu", "vefat", "kaza yaptı", "hayatını kaybetti",
                  "cesedi bulundu", "facia", "boşandı", "evlilik teklifi", "aşk yaşıyor"]
+_HARD_EXCLUDE_CATS = {"ASAYİŞ", "SPOR"}
 
 
 def _filter_low_value_topics(titles: list) -> list:
-    """Kişisel ölüm/vefat/dedikodu + ASAYİŞ (cinayet/gözaltı/skandal) kategorisindeki
-    başlıkları eler. Etkisiz/düşük değerli haberleri her iki havuzdan da tutarlı
-    şekilde çıkarmak için kullanılır — otomatik akışa dahil değil, sadece manuel havuz."""
+    """Kişisel ölüm/vefat/dedikodu + ASAYİŞ (cinayet/gözaltı/skandal) + SPOR
+    kategorisindeki başlıkları eler. Etkisiz/düşük değerli haberleri her havuzdan
+    da tutarlı şekilde çıkarmak için kullanılır."""
     filtered = []
     for t in titles:
         low = t.lower()
         if any(kw in low for kw in _LOW_VALUE_KW):
             continue
-        if ig_perf.categorize(t) == "ASAYİŞ":
+        if ig_perf.categorize(t) in _HARD_EXCLUDE_CATS:
             continue
         filtered.append(t)
     return filtered
@@ -4005,7 +4007,10 @@ async def generate_trend_long_video(
     lang_name = LANG_MAP.get(lang, "Turkish")
 
     trend_data = get_trends(region_code=region, lang=lang)
-    topics_list = trend_data["topics"][:6]
+    trend_pool = trend_data["topics"]
+    if lang == "tr":
+        trend_pool = _filter_low_value_topics(trend_pool) or trend_pool
+    topics_list = trend_pool[:6]
     topics_str = "\n".join(f"- {t}" for t in topics_list)
     yt_tags_lv = ", ".join(trend_data.get("yt_trending_tags", [])[:12])
     today = datetime.now().strftime("%d.%m.%Y")
