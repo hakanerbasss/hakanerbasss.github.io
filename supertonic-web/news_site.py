@@ -107,8 +107,12 @@ def init_db() -> None:
             category_color TEXT,
             thumbnail TEXT,
             ig_permalink TEXT,
-            created_at REAL
+            created_at REAL,
+            source TEXT
         )""")
+        cols = [r["name"] for r in c.execute("PRAGMA table_info(articles)").fetchall()]
+        if "source" not in cols:
+            c.execute("ALTER TABLE articles ADD COLUMN source TEXT")
         c.execute("""CREATE TABLE IF NOT EXISTS comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             article_id INTEGER NOT NULL,
@@ -140,14 +144,14 @@ def _can_comment(ip: str) -> bool:
     return True
 
 
-def add_article(title: str, description: str, thumbnail: str, ig_permalink: str) -> int:
+def add_article(title: str, description: str, thumbnail: str, ig_permalink: str, source: str = "") -> int:
     label, color = guess_category(title)
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO articles (title, description, category, category_color, thumbnail, ig_permalink, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO articles (title, description, category, category_color, thumbnail, ig_permalink, created_at, source) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (title.strip()[:200], (description or "").strip()[:600], label, color,
-             thumbnail or "", ig_permalink or "", time.time()),
+             thumbnail or "", ig_permalink or "", time.time(), (source or "").strip()[:120]),
         )
         return cur.lastrowid
 
@@ -276,10 +280,47 @@ _AI_CRAWLERS = [
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
-    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", "Allow: /istatistikler", "Allow: /gizlilik-politikasi", ""]
+    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", "Allow: /istatistikler", "Allow: /gizlilik-politikasi", "Allow: /llms.txt", ""]
     for ua in _AI_CRAWLERS:
         lines += [f"User-agent: {ua}", "Allow: /", ""]
     lines.append(f"Sitemap: {SITE_URL}/sitemap.xml")
+    return "\n".join(lines) + "\n"
+
+
+@router.get("/llms.txt", response_class=PlainTextResponse)
+async def llms_txt():
+    """AI asistanlarının (ChatGPT, Claude, Gemini vb.) siteyi hızlıca anlaması için
+    llmstxt.org taslağına uygun özet dosya. Henüz büyük sağlayıcılar tarafından
+    garanti okunmuyor ama maliyeti yok — robots.txt'deki AI crawler izinleriyle birlikte
+    çalışır."""
+    rows, _ = get_articles(page=1)
+    lines = [
+        "# Hakan Erbaş | Güncel Haberler",
+        "",
+        "> Türkiye ve dünya gündeminden derlenen güncel haberler; yapay zeka destekli olarak "
+        "günlük özetlenip önce Instagram Reels'te kısa video formatında paylaşılır, ardından bu "
+        "sitede kaynak belirtilerek arşivlenir.",
+        "",
+        "## Sayfalar",
+        "",
+        f"- [Tüm Haberler]({SITE_URL}/haberler): Kategori bazlı (ekonomi, afet, dünya, teknoloji, gündem) güncel haber arşivi",
+        f"- [İstatistikler]({SITE_URL}/istatistikler): Hesabın gerçek erişim ve etkileşim verileri",
+        f"- [Hakkında]({SITE_URL}/hakkinda): Site ve içerik üretim süreci hakkında bilgi",
+        f"- [İletişim]({SITE_URL}/iletisim): İletişim bilgileri",
+        f"- [Gizlilik Politikası]({SITE_URL}/gizlilik-politikasi): Veri ve çerez kullanımı",
+        "",
+        "## Son Haberler",
+        "",
+    ]
+    for r in rows[:20]:
+        lines.append(f"- [{r['title']}]({SITE_URL}/haber/{r['id']})")
+    lines += [
+        "",
+        "## Notlar",
+        "",
+        "- Haberler güvenilir kaynaklardan (Google News, GNews API) derlenir; her haber sayfasında kaynak belirtilir.",
+        "- Bu bir haber ajansı değildir; bağımsız, yapay zeka destekli üretilen bir içerik projesidir.",
+    ]
     return "\n".join(lines) + "\n"
 
 

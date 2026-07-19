@@ -89,7 +89,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     host = (request.headers.get("host") or "").split(":")[0]
     # Login sayfası, statik dosyalar ve genel haber sitesi serbest (anonim erişim)
-    if (path in ("/login", "/logout", "/ads.txt", "/robots.txt")
+    if (path in ("/login", "/logout", "/ads.txt", "/robots.txt", "/llms.txt")
             or path.startswith("/static/")
             or path.startswith("/haberler")
             or path.startswith("/haber/")
@@ -4823,7 +4823,7 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
         return False, str(e)
 
 
-async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1, description: str = "", thumbnail: str = ""):
+async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1, description: str = "", thumbnail: str = "", source_text: str = ""):
     """Post'tan 5 dk sonra Instagram API ile reel'i doğrular. Bulunamazsa yeniden dener (maks 3)."""
     await asyncio.sleep(300)  # 5 dakika bekle
 
@@ -4877,7 +4877,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
                 )
                 if rp.status_code == 200:
                     permalink = rp.json().get("permalink", "")
-            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink)
+            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink, source=source_text)
         except Exception:
             pass
         return
@@ -4889,7 +4889,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
             reel_id2, reel_err = await post_reel_to_instagram(vpath, caption, ig_user_id, ig_token)
             if reel_id2:
                 IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[YENİDEN:{source}] Deneme {attempt + 1}: {title[:60]}"}))
-                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1, description, thumbnail))
+                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1, description, thumbnail, source_text))
             else:
                 err_msg = reel_err or "Bilinmeyen hata (boş yanıt)"
                 await send_telegram_alert(f"IG Yeniden Deneme [{source}]", f"Deneme {attempt + 1} başarısız: {err_msg}\n{title[:60]}")
@@ -6106,7 +6106,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         else:
             ig_log = f"Reels yüklendi, doğrulama bekleniyor: {reel_id}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
-            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail))
+            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail, source_text))
             upload_ok = True
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
