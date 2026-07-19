@@ -1513,6 +1513,34 @@ async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output:
         return False
 
 
+_IG_POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
+
+
+def _build_ig_caption(title: str, description: str = "", source_text: str = "", suggested_tags: str = "") -> str:
+    """Instagram için tam formatlı açıklama: başlık + özet + kaynak + etkileşim CTA'ları
+    + hashtag'ler. Hem otomatik paylaşımda (_post_to_instagram_bg) hem manuel üretim
+    sonucunda (kopyalanabilir alan olarak, gerçek Instagram gönderisiyle aynı format)
+    kullanılıyor — ikisi ayrı yerlerde farklı yazılırsa aradaki tutarsızlık geri gelir."""
+    existing_lower = suggested_tags.lower()
+    extra = " ".join(f"#{t}" for t in _IG_POWER_TAGS if t not in existing_lower)
+    full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
+    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
+    parts = [title]
+    if desc_excerpt:
+        parts.append(desc_excerpt)
+    if source_text:
+        parts.append(source_text)
+    parts.append("Siz ne düşünüyorsunuz? 👇")
+    parts.append("⚠️ Haberin doğruluğunu kendi kaynaklarınızdan teyit ediniz.")
+    parts.append("🔗 Tüm haberler için link bio'da")
+    parts.append(full_tags)
+    caption = "\n\n".join(parts)
+    # Instagram caption limiti 2200 karakter — güvenli taraf
+    if len(caption) > 2180:
+        caption = caption[:2177] + "..."
+    return caption
+
+
 async def _generate_shorts_core(
     topic: str,
     api_key: str,
@@ -2223,6 +2251,7 @@ Kurallar:
         "suggested_description": ig_caption_desc,
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
         "source_text": source_text,
+        "instagram_caption": _build_ig_caption(generated_title, ig_caption_desc, source_text, video_tags),
     }
 
 
@@ -6048,24 +6077,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
-    _POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
-    existing_lower = suggested_tags.lower()
-    extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
-    full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
-    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
-    parts = [title]
-    if desc_excerpt:
-        parts.append(desc_excerpt)
-    if source_text:
-        parts.append(source_text)
-    parts.append("Siz ne düşünüyorsunuz? 👇")
-    parts.append("⚠️ Haberin doğruluğunu kendi kaynaklarınızdan teyit ediniz.")
-    parts.append("🔗 Tüm haberler için link bio'da")
-    parts.append(full_tags)
-    caption = "\n\n".join(parts)
-    # Instagram caption limiti 2200 karakter — güvenli taraf
-    if len(caption) > 2180:
-        caption = caption[:2177] + "..."
+    caption = _build_ig_caption(title, description, source_text, suggested_tags)
 
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
     # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
@@ -7648,6 +7660,7 @@ async def shorts_send_instagram(request: Request):
     title = body.get("title", "").strip()
     tags = body.get("tags", "").strip()
     description = body.get("description", "").strip()
+    source_text = body.get("source_text", "").strip()
 
     if not filename:
         raise HTTPException(400, "filename gerekli")
@@ -7660,17 +7673,7 @@ async def shorts_send_instagram(request: Request):
     if not cfg.get("ig_user_id") or not cfg.get("access_token"):
         raise HTTPException(400, "Instagram konfigürasyonu eksik — Ayarlar'dan yapılandır")
 
-    _POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
-    existing_lower = tags.lower()
-    extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
-    full_tags = f"{tags} {extra}".strip() if extra else tags
-    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
-    if title and desc_excerpt:
-        caption = f"{title}\n\n{desc_excerpt}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
-    elif title:
-        caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
-    else:
-        caption = full_tags
+    caption = _build_ig_caption(title, description, source_text, tags) if title else tags
 
     media_id, err = await post_reel_to_instagram(
         output_file, caption, cfg["ig_user_id"], cfg["access_token"]

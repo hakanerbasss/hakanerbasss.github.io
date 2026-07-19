@@ -605,6 +605,11 @@
           <label>Hashtagler (virgülle ayır)</label>
           <input type="text" id="yt-tags" placeholder="#shorts, #yapay zeka, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Instagram Açıklaması (hazır format — kaynak, etkileşim CTA'ları, hashtag dahil)</label>
+          <textarea id="ig-caption" readonly style="min-height:160px;background:#1a1a1a;"></textarea>
+          <button type="button" onclick="copyIgCaption()" id="btn-copy-ig-caption" style="margin-top:8px;background:#2a2a2a;">📋 Kopyala</button>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
           <div class="field">
             <label>Gizlilik</label>
@@ -2075,6 +2080,7 @@ async function translateAndSynth() {
 
 let currentVideoFilename = null;
 let currentThumbnailFilename = null;
+let currentSourceText = '';
 let currentLVFilename = null;
 let currentLVThumbnailFilename = null;
 let currentTNLVFilename = null;
@@ -2300,6 +2306,17 @@ async function uploadToYouTube() {
   }
 }
 
+function copyIgCaption() {
+  const el = document.getElementById('ig-caption');
+  el.select();
+  navigator.clipboard.writeText(el.value).then(() => {
+    const btn = document.getElementById('btn-copy-ig-caption');
+    const prev = btn.textContent;
+    btn.textContent = '✓ Kopyalandı';
+    setTimeout(() => { btn.textContent = prev; }, 1500);
+  }).catch(() => document.execCommand('copy'));
+}
+
 async function sendShortsToInstagram() {
   if (!currentVideoFilename) { alert('Önce video oluştur'); return; }
   const res = document.getElementById('shorts-ig-result');
@@ -2313,7 +2330,8 @@ async function sendShortsToInstagram() {
         filename: currentVideoFilename,
         title: document.getElementById('yt-title').value || '',
         tags: document.getElementById('yt-tags').value || '',
-        description: document.getElementById('yt-desc').value || ''
+        description: document.getElementById('yt-desc').value || '',
+        source_text: currentSourceText
       })
     });
     const d = await r.json();
@@ -2472,6 +2490,8 @@ function _showShortsResult(d) {
   if (d.title) document.getElementById('yt-title').value = d.title;
   if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
   if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
+  currentSourceText = d.source_text || '';
+  document.getElementById('ig-caption').value = d.instagram_caption || '';
   currentThumbnailFilename = null;
   if (d.thumbnail) {
     currentThumbnailFilename = d.thumbnail.split('/').pop();
@@ -2516,6 +2536,9 @@ async function generateShorts(allowEmpty = false) {
     fd.append('voice', document.getElementById('shorts-voice').value);
     fd.append('speed', document.getElementById('shorts-speed').value);
     fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
+    // Bu panel artık Instagram için üretiyor — otomatik IG-Only-TR job'uyla aynı CTA
+    // metni, aynı kapanış bandı ve aynı hazır Instagram açıklaması (ig-caption) üretilsin.
+    fd.append('platform', 'instagram');
 
     if (document.getElementById('use-custom-images').checked) {
       const files = document.getElementById('custom-images-input').files;
