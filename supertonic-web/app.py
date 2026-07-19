@@ -94,7 +94,8 @@ async def auth_middleware(request: Request, call_next):
             or path.startswith("/haberler")
             or path.startswith("/haber/")
             or path.startswith("/api/thumbnail/")
-            or host == news_site.NEWS_SUBDOMAIN):
+            or host == news_site.NEWS_DOMAIN
+            or host in news_site.NEWS_LEGACY_HOSTS):
         return await call_next(request)
     # Localhost'tan gelen scheduler iç çağrıları serbest
     client_host = request.client.host if request.client else ""
@@ -836,7 +837,7 @@ def get_whisper():
 @app.get("/")
 async def index(request: Request):
     host = (request.headers.get("host") or "").split(":")[0]
-    if host == news_site.NEWS_SUBDOMAIN:
+    if host == news_site.NEWS_DOMAIN or host in news_site.NEWS_LEGACY_HOSTS:
         return await news_site.haberler_list(request, sayfa=1)
     return FileResponse("static/index.html")
 

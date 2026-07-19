@@ -20,9 +20,13 @@ BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "news_site.db"
 templates = Jinja2Templates(directory=str(BASE_DIR / "news_templates"))
 
-# Haber sitesi bu alt alan adından herkese açık servis edilir (bkz. auth_middleware, index())
-NEWS_SUBDOMAIN = "hakanerbas.wizaicorp.com"
-SITE_URL = f"https://{NEWS_SUBDOMAIN}"
+# Haber sitesi bu domainden herkese açık servis edilir (bkz. auth_middleware, index()).
+# Site hakanerbas.wizaicorp.com alt alan adından kök domaine (wizaicorp.com) taşındı —
+# eski alt alan adı NEWS_LEGACY_HOSTS'ta tutuluyor, hâlâ aynı içeriği servis eder
+# (eski linkler/yer imleri kırılmasın) ama kanonik URL'ler artık yeni domaini kullanıyor.
+NEWS_DOMAIN = "wizaicorp.com"
+NEWS_LEGACY_HOSTS = {"hakanerbas.wizaicorp.com"}
+SITE_URL = f"https://{NEWS_DOMAIN}"
 
 
 def _timesince(ts: int) -> str:
