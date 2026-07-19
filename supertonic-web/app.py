@@ -4585,10 +4585,17 @@ def _remove_failed_ig_upload(filename: str) -> None:
 
 
 def _is_non_retriable_meta_error(text: str) -> bool:
-    """Meta'nın kendisi 'retriable': false dediği hatalar (örn. RequestRateLimitedError) —
-    bunlar geçici sunucu sorunu değil, hesap/uygulama seviyesinde bir API çağrı limiti.
-    Tekrar denemek sadece zaman kaybı, limit süresi dolmadan aynı sonucu verir."""
+    """Meta'nın kendisi 'retriable': false dediği hatalar — rate limit (RequestRateLimitedError)
+    veya video işleme (ProcessingFailedError) gibi farklı türlerde olabilir, ortak nokta
+    Meta'nın bu isteği tekrar denemenin işe yaramayacağını bildirmesi."""
     return '"retriable":false' in text or '"retriable": false' in text
+
+
+def _meta_error_type(text: str) -> str:
+    """Hata mesajından Meta'nın 'type' alanını çıkarır (örn. RequestRateLimitedError,
+    ProcessingFailedError) — log'da hangi hata sınıfıyla karşılaşıldığını netleştirir."""
+    m = re.search(r'"type":\s*"([A-Za-z]+)"', text)
+    return m.group(1) if m else "bilinmeyen tür"
 
 
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
@@ -4656,7 +4663,7 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                 # Rate limit gibi "retriable: false" hatalarda 4 kez boşuna denemenin
                 # anlamı yok — Meta'nın kendisi tekrar denemenin işe yaramayacağını söylüyor.
                 if _is_non_retriable_meta_error(r2.text):
-                    return None, f"upload failed (non-retriable, muhtemelen rate limit): {r2.status_code} {r2.text[:300]}"
+                    return None, f"upload failed (non-retriable — {_meta_error_type(r2.text)}): {r2.status_code} {r2.text[:300]}"
                 if attempt < 3:
                     await asyncio.sleep(15 * (attempt + 1))  # 15s, 30s, 45s
             if not upload_ok:
@@ -4698,7 +4705,7 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                         return pub_id, ""
                     return None, f"publish 200 but no id in response: {r4.text[:200]}"
                 if _is_non_retriable_meta_error(r4.text):
-                    return None, f"publish failed (non-retriable, muhtemelen rate limit): {r4.status_code} {r4.text[:200]}"
+                    return None, f"publish failed (non-retriable — {_meta_error_type(r4.text)}): {r4.status_code} {r4.text[:200]}"
                 is_transient = r4.status_code >= 500 or '"is_transient":true' in r4.text
                 if is_transient and pub_attempt < 2:
                     await asyncio.sleep(10 * (pub_attempt + 1))  # 10s, 20s
