@@ -4584,6 +4584,13 @@ def _remove_failed_ig_upload(filename: str) -> None:
     IG_FAILED_FILE.write_text(json.dumps(items, ensure_ascii=False))
 
 
+def _is_non_retriable_meta_error(text: str) -> bool:
+    """Meta'nın kendisi 'retriable': false dediği hatalar (örn. RequestRateLimitedError) —
+    bunlar geçici sunucu sorunu değil, hesap/uygulama seviyesinde bir API çağrı limiti.
+    Tekrar denemek sadece zaman kaybı, limit süresi dolmadan aynı sonucu verir."""
+    return '"retriable":false' in text or '"retriable": false' in text
+
+
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
     """Instagram Reels yükle (resumable upload — HTTPS gerekmez). (media_id, error) döner."""
     graph = "https://graph.facebook.com/v21.0"
@@ -4646,14 +4653,23 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                             break
                     except Exception:
                         pass
+                # Rate limit gibi "retriable: false" hatalarda 4 kez boşuna denemenin
+                # anlamı yok — Meta'nın kendisi tekrar denemenin işe yaramayacağını söylüyor.
+                if _is_non_retriable_meta_error(r2.text):
+                    return None, f"upload failed (non-retriable, muhtemelen rate limit): {r2.status_code} {r2.text[:300]}"
                 if attempt < 3:
                     await asyncio.sleep(15 * (attempt + 1))  # 15s, 30s, 45s
             if not upload_ok:
                 return None, f"upload failed: {r2.status_code} {r2.text[:300]}"
 
-            # 3. İşlenme tamamlanana kadar bekle (maks 5 dakika)
-            for _ in range(30):
-                await asyncio.sleep(10)
+            # 3. İşlenme tamamlanana kadar bekle (maks ~5 dakika) — artan aralıklarla
+            # sorgula (10s'den başlayıp 20s'ye çıkar): sabit 10s×30 yerine ~16-17 çağrıya
+            # düşürüyor, günde 12 slotluk yoğun programda Meta API çağrı hacmini azaltır.
+            elapsed = 0
+            poll_interval = 10
+            while elapsed < 300:
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
                 r3 = await client.get(
                     f"{graph}/{media_id}",
                     params={"fields": "status_code,status", "access_token": access_token},
@@ -4666,6 +4682,7 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                         break
                     if code == "ERROR":
                         return None, f"processing error: {st.get('status', '')}"
+                poll_interval = min(poll_interval + 2, 20)
 
             # 4. Yayınla — Meta'nın geçici (is_transient) sunucu hatalarına karşı birkaç kez dene
             r4 = None
@@ -4680,6 +4697,8 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                     if pub_id:
                         return pub_id, ""
                     return None, f"publish 200 but no id in response: {r4.text[:200]}"
+                if _is_non_retriable_meta_error(r4.text):
+                    return None, f"publish failed (non-retriable, muhtemelen rate limit): {r4.status_code} {r4.text[:200]}"
                 is_transient = r4.status_code >= 500 or '"is_transient":true' in r4.text
                 if is_transient and pub_attempt < 2:
                     await asyncio.sleep(10 * (pub_attempt + 1))  # 10s, 20s
