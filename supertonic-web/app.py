@@ -4615,10 +4615,14 @@ def _remove_failed_ig_upload(filename: str) -> None:
 
 
 def _is_non_retriable_meta_error(text: str) -> bool:
-    """Meta'nın kendisi 'retriable': false dediği hatalar — rate limit (RequestRateLimitedError)
-    veya video işleme (ProcessingFailedError) gibi farklı türlerde olabilir, ortak nokta
-    Meta'nın bu isteği tekrar denemenin işe yaramayacağını bildirmesi."""
-    return '"retriable":false' in text or '"retriable": false' in text
+    """SADECE rate limit hatasında (RequestRateLimitedError) hemen vazgeç — bu gerçekten
+    kısa vadede çözülmüyor, tekrar denemek zaman kaybı. Meta'nın "retriable":false dediği
+    DİĞER hata türlerinde (örn. ProcessingFailedError) bu etikete güvenmiyoruz: pratikte
+    bazıları bir sonraki denemede başarılı oluyor gibi görünüyor — 20.07.2026'da bu
+    kısayolu tüm "retriable:false" hatalarına genellemek, aslında kendi kendine düzelebilecek
+    ProcessingFailedError'ları erken vazgeçirip hata oranını artırmış olabilir. Bu yüzden
+    daralttık: sadece rate limit için hemen çık, diğerleri normal retry döngüsünde kalsın."""
+    return "RequestRateLimitedError" in text
 
 
 def _meta_error_type(text: str) -> str:
@@ -6074,11 +6078,21 @@ async def auto_shorts_job():
         lock.release()
 
 
-async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "") -> tuple[bool, str]:
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "", video_mode: str = "") -> tuple[bool, str]:
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
     caption = _build_ig_caption(title, description, source_text, suggested_tags)
+
+    def _diag_suffix() -> str:
+        """Hata teşhisi için video modu + dosya boyutu — zamanla "hep video-klip modunda
+        oluyor" gibi somut bir örüntü var mı, loglardan anlaşılabilsin diye eklendi."""
+        try:
+            size_mb = round((OUTPUT_DIR / filename).stat().st_size / 1024 / 1024, 1)
+        except Exception:
+            size_mb = "?"
+        mode_label = "video-klip" if video_mode.lower() in ("true", "1", "yes") else "fotoğraf"
+        return f" [mod={mode_label}, boyut={size_mb}MB]"
 
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
     # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
@@ -6097,6 +6111,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         _ig_mark_pending(title)
         reel_id, reel_err = await post_reel_to_instagram(video_file, caption, ig_user_id, ig_token)
         if reel_err:
+            reel_err = reel_err + _diag_suffix()
             ig_log = f"Reels hatası: {reel_err}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             await send_telegram_alert(f"Instagram Reels [{source}]", reel_err)
@@ -6113,6 +6128,8 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
         ok, story_err = await post_story_to_instagram(video_file2, ig_user_id, ig_token)
+        if story_err:
+            story_err = story_err + _diag_suffix()
         story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
         combined = f"{ig_log} | {story_log}" if ig_log else story_log
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": combined}))
@@ -6832,6 +6849,7 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                 thumbnail=thumbnail,
                 source="IG-Only-TR",
                 source_text=d.get("source_text", ""),
+                video_mode=use_video_val,
             )
             if ig_ok:
                 save_ig_only_tr_log("success", log_title)
