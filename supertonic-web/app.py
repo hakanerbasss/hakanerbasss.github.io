@@ -8,11 +8,12 @@ import time
 import re
 import hashlib
 import secrets
+import random
 from pathlib import Path
 import shutil
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 import traceback
 import aiofiles
@@ -26,6 +27,10 @@ from deep_translator import GoogleTranslator
 import whisper
 
 import news_site
+import ig_perf
+from ig_analytics_full import fetch_full_analytics
+from namaz_bildirim import start_namaz_scheduler
+import xtts_clone
 
 app = FastAPI()
 app.include_router(news_site.router)
@@ -84,12 +89,13 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     host = (request.headers.get("host") or "").split(":")[0]
     # Login sayfası, statik dosyalar ve genel haber sitesi serbest (anonim erişim)
-    if (path in ("/login", "/logout")
+    if (path in ("/login", "/logout", "/ads.txt", "/robots.txt", "/llms.txt")
             or path.startswith("/static/")
             or path.startswith("/haberler")
             or path.startswith("/haber/")
             or path.startswith("/api/thumbnail/")
-            or host == news_site.NEWS_SUBDOMAIN):
+            or host == news_site.NEWS_DOMAIN
+            or host in news_site.NEWS_LEGACY_HOSTS):
         return await call_next(request)
     # Localhost'tan gelen scheduler iç çağrıları serbest
     client_host = request.client.host if request.client else ""
@@ -198,6 +204,49 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 COMEDY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+AVATAR_FILE = UPLOAD_DIR / "avatar_photo.jpg"
+INFO_ENDCARD_FILE = UPLOAD_DIR / "info_endcard.jpg"
+LONGCAT_SPACE = "https://victor-longcat-video-avatar-1-5.hf.space"
+
+BANNED_TOPICS_FILE = Path("banned_topics.json")
+CUSTOM_PROMPT_RULES_FILE = Path("custom_prompt_rules.json")
+
+
+def get_custom_prompt_rules() -> str:
+    if not CUSTOM_PROMPT_RULES_FILE.exists():
+        return ""
+    try:
+        return json.loads(CUSTOM_PROMPT_RULES_FILE.read_text()).get("rules", "").strip()
+    except Exception:
+        return ""
+
+
+def load_banned_topics() -> list[str]:
+    if not BANNED_TOPICS_FILE.exists():
+        return []
+    try:
+        data = json.loads(BANNED_TOPICS_FILE.read_text())
+        return [t.strip().lower() for t in data if t.strip()]
+    except Exception:
+        return []
+
+
+def save_banned_topics(topics: list[str]):
+    BANNED_TOPICS_FILE.write_text(json.dumps(topics, ensure_ascii=False, indent=2))
+
+
+def _is_banned_topic(title: str) -> bool:
+    """Başlık yasaklı kelimelerden herhangi birini içeriyorsa True döner."""
+    banned = load_banned_topics()
+    if not banned:
+        return False
+    title_lower = title.lower()
+    for kw in banned:
+        if kw in title_lower:
+            print(f"[BANNED] '{title[:60]}' yasaklı kelime içeriyor: '{kw}'", flush=True)
+            return True
+    return False
+
 tts_model = None
 whisper_model = None
 
@@ -221,7 +270,11 @@ LANG_MAP = {
 VOICES = ["M1", "M2", "M3", "F1", "F2", "F3"]
 
 async def _synth_audio(text: str, lang: str, voice: str, speed: float, out_path: Path) -> float:
-    """Ses sentezi."""
+    """Ses sentezi. Türkçe+clone modu aktifse XTTS-v2, değilse Supertonic."""
+    if lang == "tr" and get_ig_config().get("use_clone_voice", False) and xtts_clone.hazir_mi():
+        return await xtts_clone.seslendir(
+            _clean_tts_text(text, lang), str(out_path), language="tr", speed=speed
+        )
     tts_obj = get_tts()
     style = tts_obj.get_voice_style(voice_name=voice)
     wav, dur = await asyncio.to_thread(tts_obj.synthesize,
@@ -264,9 +317,162 @@ def get_tts():
     return tts_model
 
 
+_TR_ONES = ['', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz']
+_TR_TENS = ['', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan']
+
+
+def _tr_num_to_words(n: int) -> str:
+    """Tam sayıyı Türkçe sözcüklere çevirir. Örn: 1500 → bin beş yüz"""
+    if n == 0:
+        return 'sıfır'
+    if n < 0:
+        return 'eksi ' + _tr_num_to_words(-n)
+    parts = []
+    if n >= 1_000_000_000:
+        b = n // 1_000_000_000; n %= 1_000_000_000
+        parts.append(('bir' if b == 1 else _tr_num_to_words(b)) + ' milyar')
+    if n >= 1_000_000:
+        m = n // 1_000_000; n %= 1_000_000
+        parts.append(('bir' if m == 1 else _tr_num_to_words(m)) + ' milyon')
+    if n >= 1_000:
+        t = n // 1_000; n %= 1_000
+        parts.append(('' if t == 1 else _tr_num_to_words(t) + ' ') + 'bin')
+    if n >= 100:
+        h = n // 100; n %= 100
+        parts.append(('' if h == 1 else _TR_ONES[h] + ' ') + 'yüz')
+    if n >= 10:
+        parts.append(_TR_TENS[n // 10]); n %= 10
+    if n > 0:
+        parts.append(_TR_ONES[n])
+    return ' '.join(p.strip() for p in parts if p.strip())
+
+
+# Sıra sayı eki her zaman sayının SON kelimesine eklenir (ör. "yüz yirmi üç" → "yüz
+# yirmi üçüncü") ve Türkçe'de ünlü uyumu + ünsüz yumuşaması içerir (dört→dördüncü).
+# Son kelime her zaman bu sabit listelerden biri olduğu için (birler/onlar/yüz/bin/
+# milyon/milyar), tam algoritma yerine sonlu bir sözlük yeterli ve daha güvenilir.
+_TR_ORDINAL_MAP = {
+    'sıfır': 'sıfırıncı', 'bir': 'birinci', 'iki': 'ikinci', 'üç': 'üçüncü',
+    'dört': 'dördüncü', 'beş': 'beşinci', 'altı': 'altıncı', 'yedi': 'yedinci',
+    'sekiz': 'sekizinci', 'dokuz': 'dokuzuncu',
+    'on': 'onuncu', 'yirmi': 'yirminci', 'otuz': 'otuzuncu', 'kırk': 'kırkıncı',
+    'elli': 'ellinci', 'altmış': 'altmışıncı', 'yetmiş': 'yetmişinci',
+    'seksen': 'sekseninci', 'doksan': 'doksanıncı',
+    'yüz': 'yüzüncü', 'bin': 'bininci', 'milyon': 'milyonuncu', 'milyar': 'milyarıncı',
+}
+
+
+def _tr_ordinal_words(n: int) -> str:
+    """Sıra sayı sözcüğü üretir. Örn: 13 → on üçüncü, 1 → birinci."""
+    words = _tr_num_to_words(n).split(' ')
+    words[-1] = _TR_ORDINAL_MAP.get(words[-1], words[-1] + 'ıncı')
+    return ' '.join(words)
+
+
+# Kaynak metinde sayı/birimden sonra kesme işaretiyle gelen hal ekleri (14:30'DA,
+# 250 TL'YE, 2027'DE gibi) SİLİNMEMELİ — ek cümledeki iki sayıyı birbirinden ayıran
+# tek şey, eksik olunca "on dört otuz dokuz" gibi anlamsız bitişik okuma oluyor.
+# Sayı sözcüğünün SON kelimesi her zaman bu sabit listelerden biri olduğu için
+# (birler/onlar/yüz/bin/milyon/milyar + enjekte ettiğimiz birim sözcükleri), genel
+# bir ünlü-uyumu algoritması yerine sonlu bir sözlük kullanılıyor — Türkçe'de
+# ünsüz yumuşaması (dört→dörde) bazı kelimelerde düzensiz, sözlük daha güvenilir.
+_TR_DATIVE = {          # -a/-e/-ya/-ye ("...e/a", "'a kadar" gibi)
+    'sıfır':'sıfıra','bir':'bire','iki':'ikiye','üç':'üçe','dört':'dörde','beş':'beşe',
+    'altı':'altıya','yedi':'yediye','sekiz':'sekize','dokuz':'dokuza',
+    'on':'ona','yirmi':'yirmiye','otuz':'otuza','kırk':'kırka','elli':'elliye',
+    'altmış':'altmışa','yetmiş':'yetmişe','seksen':'seksene','doksan':'doksana',
+    'yüz':'yüze','bin':'bine','milyon':'milyona','milyar':'milyara',
+    'santigrat':'santigrada','derece':'dereceye','fahrenheit':'fahrenheite',
+    'lira':'liraya','kilometre':'kilometreye','kilogram':'kilograma',
+    'metrekare':'metrekareye','metreküp':'metreküpe',
+    'dolar':'dolara','euro':'euroya','sterlin':'sterline','saat':'saate','nesil':'nesile',
+    'gigabayt':'gigabayta','megabayt':'megabayta','kilobayt':'kilobayta','terabayt':'terabayta',
+    'gigabit':'gigabite','megabit':'megabite','kilobit':'kilobite',
+}
+_TR_LOCATIVE = {        # -da/-de/-ta/-te ("...da/de")
+    'sıfır':'sıfırda','bir':'birde','iki':'ikide','üç':'üçte','dört':'dörtte','beş':'beşte',
+    'altı':'altıda','yedi':'yedide','sekiz':'sekizde','dokuz':'dokuzda',
+    'on':'onda','yirmi':'yirmide','otuz':'otuzda','kırk':'kırkta','elli':'ellide',
+    'altmış':'altmışta','yetmiş':'yetmişte','seksen':'seksende','doksan':'doksanda',
+    'yüz':'yüzde','bin':'binde','milyon':'milyonda','milyar':'milyarda',
+    'santigrat':'santigratta','derece':'derecede','fahrenheit':'fahrenheitte',
+    'lira':'lirada','kilometre':'kilometrede','kilogram':'kilogramda',
+    'metrekare':'metrekarede','metreküp':'metreküpte',
+    'dolar':'dolarda','euro':'euroda','sterlin':'sterlinde','saat':'saatte','nesil':'nesilde',
+    'gigabayt':'gigabaytta','megabayt':'megabaytta','kilobayt':'kilobaytta','terabayt':'terabaytta',
+    'gigabit':'gigabitte','megabit':'megabitte','kilobit':'kilobitte',
+}
+_TR_ABLATIVE = {        # -dan/-den/-tan/-ten ("...dan/den")
+    'sıfır':'sıfırdan','bir':'birden','iki':'ikiden','üç':'üçten','dört':'dörtten','beş':'beşten',
+    'altı':'altıdan','yedi':'yediden','sekiz':'sekizden','dokuz':'dokuzdan',
+    'on':'ondan','yirmi':'yirmiden','otuz':'otuzdan','kırk':'kırktan','elli':'elliden',
+    'altmış':'altmıştan','yetmiş':'yetmişten','seksen':'seksenden','doksan':'doksandan',
+    'yüz':'yüzden','bin':'binden','milyon':'milyondan','milyar':'milyardan',
+    'santigrat':'santigrattan','derece':'dereceden','fahrenheit':'fahrenheitten',
+    'lira':'liradan','kilometre':'kilometreden','kilogram':'kilogramdan',
+    'metrekare':'metrekareden','metreküp':'metreküpten',
+    'dolar':'dolardan','euro':'eurodan','sterlin':'sterlinden','saat':'saatten','nesil':'nesilden',
+    'gigabayt':'gigabayttan','megabayt':'megabayttan','kilobayt':'kilobayttan','terabayt':'terabayttan',
+    'gigabit':'gigabitten','megabit':'megabitten','kilobit':'kilobitten',
+}
+_TR_POSS_LOC = {        # "ayın 5'inde" → "ayın beşinde" (iyelik+bulunma birleşik eki)
+    'sıfır':'sıfırında','bir':'birinde','iki':'ikisinde','üç':'üçünde','dört':'dördünde','beş':'beşinde',
+    'altı':'altısında','yedi':'yedisinde','sekiz':'sekizinde','dokuz':'dokuzunda',
+    'on':'onunda','yirmi':'yirmisinde','otuz':'otuzunda','kırk':'kırkında','elli':'ellisinde',
+    'altmış':'altmışında','yetmiş':'yetmişinde','seksen':'sekseninde','doksan':'doksanında',
+    'yüz':'yüzünde','bin':'bininde','milyon':'milyonunda','milyar':'milyarında',
+}
+_TR_GENITIVE = {        # "2026'nın ilk çeyreğinde" → "iki bin yirmi altının ilk çeyreğinde"
+    'sıfır':'sıfırın','bir':'birin','iki':'ikinin','üç':'üçün','dört':'dördün','beş':'beşin',
+    'altı':'altının','yedi':'yedinin','sekiz':'sekizin','dokuz':'dokuzun',
+    'on':'onun','yirmi':'yirminin','otuz':'otuzun','kırk':'kırkın','elli':'ellinin',
+    'altmış':'altmışın','yetmiş':'yetmişin','seksen':'sekseninin','doksan':'doksanın',
+    'yüz':'yüzün','bin':'binin','milyon':'milyonun','milyar':'milyarın',
+}
+
+
+def _classify_tr_suffix(raw: str) -> str:
+    """Kesme işaretinden sonraki ek harflerine bakıp ek TÜRÜNÜ tahmin eder."""
+    s = raw.lower()
+    if s.endswith('nde') or s.endswith('nda'):
+        return 'possloc'
+    if s.endswith('nin') or s.endswith('nın') or s.endswith('nun') or s.endswith('nün') \
+       or s in ('in', 'ın', 'un', 'ün'):
+        return 'genitive'  # 'nin' (ünlüyle biten kök, tampon n) veya 'in' (ünsüzle biten kök)
+    if s.endswith('den') or s.endswith('dan') or s.endswith('ten') or s.endswith('tan'):
+        return 'ablative'
+    if s.endswith('de') or s.endswith('da') or s.endswith('te') or s.endswith('ta'):
+        return 'locative'
+    if s in ('a', 'e', 'ya', 'ye'):
+        return 'dative'
+    return ''
+
+
+def _tr_attach_suffix(phrase: str, raw_suffix: str) -> str:
+    """Dönüştürülmüş sayı ifadesinin (ör. 'otuz dört') SON kelimesine, orijinal
+    kesme işaretli ekin türüne göre doğru Türkçe hal ekini bağlar. Tanınmayan/az
+    rastlanan ek türlerinde (ör. '-lik', '-ini' iyelik-belirtme) güvenli şekilde
+    eksiz bırakır — yanlış ek eklemek, hiç eklememekten daha kötü bir okuma
+    hatasına yol açar."""
+    if not raw_suffix:
+        return phrase
+    kind = _classify_tr_suffix(raw_suffix)
+    table = {'dative': _TR_DATIVE, 'locative': _TR_LOCATIVE, 'ablative': _TR_ABLATIVE,
+             'possloc': _TR_POSS_LOC, 'genitive': _TR_GENITIVE}.get(kind)
+    if not table:
+        return phrase
+    words = phrase.split(' ')
+    last = words[-1]
+    if last in table:
+        words[-1] = table[last]
+        return ' '.join(words)
+    return phrase
+
+
 def _clean_tts_text(text: str, lang: str = "tr") -> str:
-    """TTS'e gitmeden önce metni temizle — imla/format hatalarını düzelt."""
+    """TTS'e gitmeden önce metni temizle — sayı/format hatalarını düzelt."""
     import re
+
     # Markdown kalıntılarını kaldır
     text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)
     text = re.sub(r'#{1,6}\s*', '', text)
@@ -274,14 +480,324 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
     text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
 
     if lang == "tr":
-        # 1.500 → 1500
-        text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
-        # %85 → yüzde 85
-        text = re.sub(r'%\s*(\d+)', r'yüzde \1', text)
-        # 32° → 32 derece
-        text = re.sub(r'(\d+)°', r'\1 derece', text)
+        # URL'leri kaldır (daha önce olmalı — rakam regex'lerinden önce)
+        text = re.sub(r'https?://\S+', '', text)
 
-    # URL'leri kaldır
+        # Kurum/sınav kısaltmaları — DeepSeek promptunda 'bunları asla yazma,
+        # tam adını yaz' kuralı zaten var ama LLM talimatlara her zaman uymuyor
+        # (aynı 'rakam yazma' talimatının tutmaması gibi). Metin tarafında da
+        # bir güvenlik ağı: kaçan kısaltmalar burada açılıyor. Büyük/küçük harf
+        # duyarlı — bu kısaltmalar Türkçe metinde her zaman büyük harfle yazılır,
+        # rastgele kelime çakışmasını önler.
+        _TR_KISALTMA_ACILIM = {
+            'TBMM': 'Türkiye Büyük Millet Meclisi',
+            'YKS': 'Yükseköğretim Kurumları Sınavı',
+            'LGS': 'Liselere Geçiş Sınavı',
+            'ÖSS': 'Öğrenci Seçme Sınavı',
+            'ÖSYM': 'Ölçme, Seçme ve Yerleştirme Merkezi',
+            'SGK': 'Sosyal Güvenlik Kurumu',
+            'ABD': 'Amerika Birleşik Devletleri',
+            'AKP': 'Adalet ve Kalkınma Partisi',
+            'CHP': 'Cumhuriyet Halk Partisi',
+            'MHP': 'Milliyetçi Hareket Partisi',
+            'TÜBİTAK': 'Türkiye Bilimsel ve Teknolojik Araştırma Kurumu',
+            'MEB': 'Milli Eğitim Bakanlığı',
+            'TÜİK': 'Türkiye İstatistik Kurumu',
+            'TCMB': 'Türkiye Cumhuriyet Merkez Bankası',
+            'BM': 'Birleşmiş Milletler',
+            'AB': 'Avrupa Birliği',
+        }
+        # Açılımın SON kelimesi ünlüyle bittiği için hal eki tampon 'n' ister
+        # (Kurumu'ndan, Meclisi'nde gibi) — genel güvenlik ağı sadece apostrofu
+        # silip harfleri bitiştirdiği için tampon kayboluyordu ('Kurumudan').
+        # Sayılardaki _tr_attach_suffix ile aynı mantık, açılımların son
+        # kelimesine özel küçük bir sözlükle uygulanıyor.
+        _TR_KISALTMA_SON_KELIME_EKI = {
+            'Meclisi':    {'dative':'Meclisine','locative':'Meclisinde','ablative':'Meclisinden','genitive':'Meclisinin'},
+            'Kurumu':     {'dative':'Kurumuna','locative':'Kurumunda','ablative':'Kurumundan','genitive':'Kurumunun'},
+            'Devletleri': {'dative':'Devletlerine','locative':'Devletlerinde','ablative':'Devletlerinden','genitive':'Devletlerinin'},
+            'Partisi':    {'dative':'Partisine','locative':'Partisinde','ablative':'Partisinden','genitive':'Partisinin'},
+            'Bankası':    {'dative':'Bankasına','locative':'Bankasında','ablative':'Bankasından','genitive':'Bankasının'},
+            'Milletler':  {'dative':'Milletlere','locative':'Milletlerde','ablative':'Milletlerden','genitive':'Milletlerin'},
+            'Birliği':    {'dative':'Birliğine','locative':'Birliğinde','ablative':'Birliğinden','genitive':'Birliğinin'},
+            'Sınavı':     {'dative':'Sınavına','locative':'Sınavında','ablative':'Sınavından','genitive':'Sınavının'},
+            'Bakanlığı':  {'dative':'Bakanlığına','locative':'Bakanlığında','ablative':'Bakanlığından','genitive':'Bakanlığının'},
+        }
+        def _kisaltma_ek_bagla(acilim, raw_suffix):
+            if not raw_suffix:
+                return acilim
+            kind = _classify_tr_suffix(raw_suffix)
+            forms = _TR_KISALTMA_SON_KELIME_EKI.get(acilim.split(' ')[-1])
+            if kind and forms and kind in forms:
+                words = acilim.split(' ')
+                words[-1] = forms[kind]
+                return ' '.join(words)
+            return acilim
+        _EKYAK_ERKEN = r"(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?"
+        for _kis, _acilim in _TR_KISALTMA_ACILIM.items():
+            def _repl(m, _ac=_acilim):
+                return _kisaltma_ek_bagla(_ac, m.group(1) or '')
+            # IGNORECASE: DeepSeek her zaman tam büyük harfle yazmıyor ('Yks',
+            # 'yks' gibi karışık/küçük harfli varyantlar da kaçmasın diye.
+            # Bu kısaltmaların hiçbiri gerçek Türkçe kelimeyle çakışmadığı için
+            # (ab/bm/yks vb. tek başına anlamlı kelime değil) risksiz.
+            text = re.sub(rf'\b{re.escape(_kis)}\b' + _EKYAK_ERKEN, _repl, text, flags=re.IGNORECASE)
+
+        # Sayıya BİTİŞİK yazılan birim kısaltmalarının arasına boşluk sok
+        # (5GB → 5 GB) — aşağıdaki birim regex'lerinin hepsi \b sınırına
+        # dayanıyor, bitişik yazımda "5GB" tek kelime sayılıp hiç açılmıyordu.
+        # NOT: bare 'G' (5G nesil göstergesi) BİLEREK bu listede yok — o özel
+        # olarak bitişik kalmalı, aşağıda ayrıca ele alınıyor.
+        _BITISIK_BIRIMLER = ['Gbps','Mbps','Kbps','GB','MB','KB','TB','TL',
+                             'km/s','km²','km³','km','kg','cm²','cm³','cm','mm²','mm',
+                             'TWh','GWh','MWh','kWh','Wh','TW','GW','MW','kW','ppm']
+        for _birim in _BITISIK_BIRIMLER:
+            text = re.sub(rf'(?<=\d)({re.escape(_birim)})\b', r' \1', text, flags=re.IGNORECASE)
+
+        # Para birimleri: $50 → 50 dolar, €50 → 50 euro, £50 → 50 sterlin
+        text = re.sub(r'\$\s*(\d[\d.,]*)', r'\1 dolar', text)
+        text = re.sub(r'€\s*(\d[\d.,]*)', r'\1 euro', text)
+        text = re.sub(r'£\s*(\d[\d.,]*)', r'\1 sterlin', text)
+
+        # Saat aralığı: 14:00-16:00 → saat on dört - saat on altı. TEKİL saat
+        # regex'inden ÖNCE işlenmeli, yoksa aradaki tire çıplak kalır
+        # ("saat on dört -saat on altı" gibi bitişik/garip okuma).
+        def _saat_phrase(h, mn):
+            p = 'saat ' + _tr_num_to_words(h)
+            if mn:
+                p += ' ' + _tr_num_to_words(mn)
+            return p
+        def _saat_araligi(m):
+            h1, mn1, h2, mn2 = int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
+            return _saat_phrase(h1, mn1) + ' - ' + _saat_phrase(h2, mn2)
+        text = re.sub(r'\b(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})\b', _saat_araligi, text)
+
+        # Saat: 14:30 → saat on dört otuz. Kaynak metinde önünde zaten "saat"
+        # kelimesi varsa (ör. "saat 14:30'da") onu da yutuyoruz — yoksa "saat
+        # saat on dört otuz" gibi tekrar oluyordu. Arkasındaki hal eki (14:30'DA)
+        # doğru ünlü uyumuyla son kelimeye bağlanır — dakika sıfırsa (14:00'te
+        # gibi tam saatlerde) sondaki boşluk _tr_attach_suffix'i şaşırtmasın
+        # diye strip() ile temizlenir (son kelime 'sıfır'/saat sözü olsun).
+        def _saat(m):
+            h, mn = int(m.group(1)), int(m.group(2))
+            phrase = _saat_phrase(h, mn)
+            return _tr_attach_suffix(phrase, m.group(3) or '')
+        text = re.sub(r"(?:\bsaat\s+)?\b(\d{1,2}):(\d{2})\b(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?",
+                      _saat, text, flags=re.IGNORECASE)
+
+        # Tarih: 12.07.2026 veya 12/07/2026 → on iki temmuz iki bin yirmi altı
+        _AYLAR = {1:'ocak',2:'şubat',3:'mart',4:'nisan',5:'mayıs',6:'haziran',
+                  7:'temmuz',8:'ağustos',9:'eylül',10:'ekim',11:'kasım',12:'aralık'}
+        def _tarih(m):
+            d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 1 <= mo <= 12 and 1 <= d <= 31 and y > 1900:
+                return _tr_num_to_words(d) + ' ' + _AYLAR[mo] + ' ' + _tr_num_to_words(y)
+            return m.group(0)
+        text = re.sub(r'\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b', _tarih, text)
+
+        # On yıl (yüzyıl) eki: "1850'lerde" → "bin sekiz yüz elliler de" tipi
+        # değil, TEK kelime "elliler" + varsa ikinci ek. ÖNCE işlenmeli —
+        # genel _EKYAK yakalayıcısı en fazla 4 harf alıyor, 'lerde'/'larda'
+        # (5 harf) buna sığmıyor ve "bin sekiz yüz ellie" gibi bozuk/anlamsız
+        # bir bitişikliğe yol açıyordu (4 harf tüketilip 5.si dışarıda kalıyordu).
+        # "ler"/"lar" kaynakta zaten doğru ünlü uyumuyla seçildiği için, arkasından
+        # gelen ikinci eki (varsa) yeniden hesaplamadan olduğu gibi bitiştiriyoruz.
+        def _yil_coğul(m):
+            yil = int(m.group(1))
+            coğul = m.group(2)
+            ek = m.group(3) or ''
+            words = _tr_num_to_words(yil).split(' ')
+            words[-1] = words[-1] + coğul + ek
+            return ' '.join(words)
+        text = re.sub(r"\b(\d{4})['’](ler|lar)([a-zçğıöşü]{0,5})\b", _yil_coğul, text, flags=re.IGNORECASE)
+
+        # Yüzde aralığı: %10-15 → yüzde on - on beş. TEKİL yüzde regex'inden
+        # ÖNCE işlenmeli — yoksa ilk sayı %'den ayrı çevrilip aradaki tire
+        # çıplak kalıyordu ("yüzde on-on beş" gibi bitişik okuma).
+        text = re.sub(r'%\s*(\d+)-(\d+)',
+                      lambda m: 'yüzde ' + _tr_num_to_words(int(m.group(1))) + ' - ' + _tr_num_to_words(int(m.group(2))),
+                      text)
+
+        # Yüzde: %85 → yüzde seksen beş, %13,52 → yüzde on üç virgül elli iki
+        # ÖNCE işlenmeli — ondalık virgül regex'i "%13,52" içindeki "13,52"yi
+        # kendi başına yakalayıp "%" işaretini boşta bırakıyordu.
+        def _yuzde(m):
+            out = 'yüzde ' + _tr_num_to_words(int(m.group(1)))
+            if m.group(2):
+                out += ' virgül ' + _tr_num_to_words(int(m.group(2)))
+            return out
+        text = re.sub(r'%\s*(\d+)(?:,(\d{1,2}))?', _yuzde, text)
+
+        # Sıra sayılar: "13." (nokta + boşluk/son, arkasında rakam YOK) → "on üçüncü"
+        # ÖNCE işlenmeli — aksi halde "13." önce "on üç." olur, sıra anlamı kaybolur.
+        def _sira_sayi(m):
+            return _tr_ordinal_words(int(m.group(1)))
+        text = re.sub(r'\b(\d{1,4})\.(?=\s|$)', _sira_sayi, text)
+
+        _EKYAK = r"(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?"  # kesme işaretli ek — yakalanır, silinmez
+
+        # Mobil nesil: 5G → beşinci nesil. Genel büyük-sayı dönüşümünden ÖNCE
+        # işlenmeli — yoksa '5' sözcüğe çevrilir ama bitişik 'G' harfi öylece
+        # kalır ('beşG' gibi tek garip token oluşur, TTS'i şaşırtır). Arkasındaki
+        # ek de (5G'YE gibi) yakalanıp doğru bağlanır — yoksa güvenlik ağı sadece
+        # apostrofu silip 'nesilye' gibi kuralsız bir bitişik bırakıyordu.
+        _TR_NESIL = {1:'birinci',2:'ikinci',3:'üçüncü',4:'dördüncü',5:'beşinci',6:'altıncı'}
+        def _nesil(m):
+            n = int(m.group(1))
+            phrase = _TR_NESIL.get(n, _tr_ordinal_words(n)) + ' nesil'
+            return _tr_attach_suffix(phrase, m.group(2) or '')
+        text = re.sub(r'\b([1-9])[Gg]\b' + _EKYAK, _nesil, text)
+
+        # İki sayı arası tire: hem maç skoru (3-1) hem aralık (10-15 derece)
+        # anlamına gelebilir — bağlamdan ayırt etmek güvenilir değil. İlk
+        # denemede skora göre "e" hali eklemiştim ("ona on beş derece" gibi
+        # aralıklarda anlamsız çıktı verdi). Güvenli ortak çözüm: ikisi de
+        # doğal okunan düz yan yana biçim — "üç bir" (skor, doğru), "on on
+        # beş" (aralık, "arasında" ile birlikte anlaşılır kalıyor).
+        text = re.sub(r'\b(\d+)-(\d+)\b',
+                      lambda m: _tr_num_to_words(int(m.group(1))) + ' ' + _tr_num_to_words(int(m.group(2))),
+                      text)
+
+        # Sıcaklık/derece — BÜYÜK SAYI'DAN ÖNCE işlenmeli, yoksa rakam zaten
+        # sözcüğe çevrilmiş olur ve "\d+°C" deseni artık eşleşmez (35°C → "otuz
+        # beş°C" kalır, °C hiç açılmaz). Ondalık sıcaklık da desteklenir (36,6°C).
+        # Arkasındaki hal eki (38°C'YE) doğru ünlü uyumuyla bağlanır, silinmez.
+        def _sicaklik(birim):
+            def _f(m):
+                whole = _tr_num_to_words(int(m.group(1)))
+                if m.group(2):
+                    whole += ' virgül ' + _tr_num_to_words(int(m.group(2)))
+                return _tr_attach_suffix(whole + ' ' + birim, m.group(3) or '')
+            return _f
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°C' + _EKYAK, _sicaklik('derece'), text)
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°F' + _EKYAK, _sicaklik('fahrenheit'), text)
+        text = re.sub(r'(-?\d+)(?:[.,](\d{1,2}))?°' + _EKYAK, _sicaklik('derece'), text)
+        # Eksi işaretini (sıcaklık dışı bağlamda da) sözcüğe çevir: -5 → eksi beş,
+        # -3,5 → eksi üç virgül beş (ondalık kısmı da TEK regex'te yakalanmalı —
+        # ayrı geçseydi ondalık virgül regex'i "-" den sonraki rakamı bulamazdı).
+        def _eksi_sayi(m):
+            out = 'eksi ' + _tr_num_to_words(int(m.group(1)))
+            if m.group(2):
+                out += ' virgül ' + _tr_num_to_words(int(m.group(2)))
+            return _tr_attach_suffix(out, m.group(3) or '')
+        text = re.sub(r'(?<![\w])-(\d+)(?:,(\d{1,2}))?(?!\d)' + _EKYAK, _eksi_sayi, text)
+
+        # Ondalık kısım sözcüğe çevrilirken: 1-2 haneliyse tek sayı olarak
+        # ("52" → "elli iki"), 3+ haneliyse hassasiyet kaybolmasın diye hane
+        # hane okunur ("003" → "sıfır sıfır üç" — "üç" desek 0,003 ile 0,3
+        # birbirine karışırdı, baştaki sıfırların anlamı kaybolurdu).
+        def _tr_ondalik_kisim(frac: str) -> str:
+            if len(frac) <= 2:
+                return _tr_num_to_words(int(frac))
+            return ' '.join(_tr_num_to_words(int(c)) for c in frac)
+
+        # Ondalık sayı — ÖNCE binlik ayırıcıdan önce işlenmeli. NOKTA burada {1,2}
+        # İLE SINIRLI KALMALI (virgül gibi {1,4}'e ÇIKARILMAMALI) — Türkçe'de
+        # binlik ayıracı da NOKTA olduğu için ('2.500.000'), 3 haneli bir grup
+        # gelince bunu ondalık sanıp 'iki nokta beş yüz' gibi tamamen yanlış
+        # okuyordu (gerçek bug, canlıda yakalandı). {1,2} sınırı, 3 haneli
+        # binlik gruplarının bu regex'e hiç takılmayıp aşağıdaki binlik ayırıcı
+        # adımına düşmesini sağlayan örtük ayrım mekanizması — bilerek dar tutulur.
+        # 3.5 → üç nokta beş
+        def _ondalik_nokta(m):
+            out = _tr_num_to_words(int(m.group(1))) + ' nokta ' + _tr_ondalik_kisim(m.group(2))
+            return _tr_attach_suffix(out, m.group(3) or '')
+        text = re.sub(r'\b(\d+)\.(\d{1,2})(?!\d)' + _EKYAK, _ondalik_nokta, text)
+        # 3,5 → üç virgül beş
+        def _ondalik_virgul(m):
+            out = _tr_num_to_words(int(m.group(1))) + ' virgül ' + _tr_ondalik_kisim(m.group(2))
+            return _tr_attach_suffix(out, m.group(3) or '')
+        text = re.sub(r'\b(\d+),(\d{1,4})(?!\d)' + _EKYAK, _ondalik_virgul, text)
+
+        # Binlik nokta ayırıcıyı kaldır: 1.500 → 1500
+        text = re.sub(r'(\d)\.(\d{3})\b', r'\1\2', text)
+
+        # Büyük sayıları sözcüğe çevir: TÜM rakamlar çevrilir (Supertonic hiçbir
+        # rakamı — 1000 altı dahil — doğru okuyamıyor, eşik kaldırıldı). Arkasındaki
+        # hal eki (2027'DE, 5'İNDE gibi) doğru ünlü uyumuyla bağlanır.
+        def _buyuk_sayi(m):
+            n = int(m.group(1).replace('.', ''))
+            return _tr_attach_suffix(_tr_num_to_words(n), m.group(2) or '')
+        text = re.sub(r'\b(\d[\d.]*)' + _EKYAK, _buyuk_sayi, text)
+
+        # Kısaltmalar — rakam zaten yukarıda sözcüğe çevrildi, burada sadece birim
+        # kısaltması açılıyor. Arkasındaki hal eki (TL'YE, m³'LÜK gibi) doğru ünlü
+        # uyumuyla bağlanır (lira'ye değil liraya, metreküp'lük değil metreküpe vb.).
+        def _kisaltma(kelime):
+            def _f(m):
+                return _tr_attach_suffix(kelime, m.group(1) or '')
+            return _f
+        text = re.sub(r'\bTL\b' + _EKYAK, _kisaltma('lira'), text)
+        text = re.sub(r'\bkm/s\b' + _EKYAK, _kisaltma('kilometre saat'), text, flags=re.IGNORECASE)
+        # ² / ³'lü birimler ÖNCE işlenmeli — yoksa \bkm\b gibi eksiz kalıplar
+        # önce eşleşip "km²" içindeki "km"yi tek başına yer, "²" açılmadan kalır.
+        text = re.sub(r'\bkm²\b' + _EKYAK, _kisaltma('kilometrekare'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkm³\b' + _EKYAK, _kisaltma('kilometreküp'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcm²\b' + _EKYAK, _kisaltma('santimetrekare'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcm³\b' + _EKYAK, _kisaltma('santimetreküp'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bmm²\b' + _EKYAK, _kisaltma('milimetrekare'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkm\b' + _EKYAK, _kisaltma('kilometre'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcm\b' + _EKYAK, _kisaltma('santimetre'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bmm\b' + _EKYAK, _kisaltma('milimetre'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkg\b' + _EKYAK, _kisaltma('kilogram'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bm²\b' + _EKYAK, _kisaltma('metrekare'), text)
+        text = re.sub(r'\bm³\b' + _EKYAK, _kisaltma('metreküp'), text)
+
+        # Veri birimleri — bps'li (hız) birimler ÖNCE işlenmeli, yoksa \bMB\b gibi
+        # kısa kalıp "Mbps" içindeki "Mb"yi yanlışlıkla yer (sınır kontrolü çoğu
+        # zaman engeller ama önce işlemek daha güvenli/açık).
+        text = re.sub(r'\bGbps\b' + _EKYAK, _kisaltma('gigabit'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMbps\b' + _EKYAK, _kisaltma('megabit'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bKbps\b' + _EKYAK, _kisaltma('kilobit'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bTB\b' + _EKYAK, _kisaltma('terabayt'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bGB\b' + _EKYAK, _kisaltma('gigabayt'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMB\b' + _EKYAK, _kisaltma('megabayt'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bKB\b' + _EKYAK, _kisaltma('kilobayt'), text, flags=re.IGNORECASE)
+
+        # Enerji birimleri (Wh ailesi) — karışık büyük/küçük harfli (MWh, kWh)
+        # olduğu için ne birim kısaltma listesinde ne de harf-harf ayırma
+        # düzeneğinde (o sadece TAMAMEN büyük harfli kısaltmaları yakalıyor)
+        # yakalanıyordu, tamamen dokunulmadan kalıyordu. 'saat' zaten hal eki
+        # sözlüklerinde olduğu için ek bağlama otomatik doğru çalışıyor
+        # ('1.287 MWh'a' → '...megavat saate').
+        text = re.sub(r'\bTWh\b' + _EKYAK, _kisaltma('teravat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bGWh\b' + _EKYAK, _kisaltma('gigavat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMWh\b' + _EKYAK, _kisaltma('megavat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkWh\b' + _EKYAK, _kisaltma('kilovat saat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bWh\b' + _EKYAK, _kisaltma('vat saat'), text)
+        text = re.sub(r'\bTW\b' + _EKYAK, _kisaltma('teravat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bGW\b' + _EKYAK, _kisaltma('gigavat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bMW\b' + _EKYAK, _kisaltma('megavat'), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkW\b' + _EKYAK, _kisaltma('kilovat'), text, flags=re.IGNORECASE)
+        # ppm (milyonda parça) — küçük harfli olduğu için harf-harf ayırma
+        # düzeneği de (büyük harf gerektiriyor) bunu yakalamıyordu.
+        text = re.sub(r'\bppm\b' + _EKYAK, _kisaltma('milyonda bir'), text, flags=re.IGNORECASE)
+
+        # Kısaltma sözlüğümüzde olmayan (ÇYDD, PKK, TRT, KHK gibi — sonsuz
+        # sayıda olabilecek) büyük harfli kısaltmalar için son çare: harfleri
+        # boşlukla ayır ki Supertonic her harfi ayrı ayrı Türkçe harf ismiyle
+        # okusun ('Ç Y D D'), tek bitişik "kelime" gibi okuyup İngilizce
+        # telaffuza kaçmasın. İSTİSNA: bazı kısaltmalar Türkçe'de tek kelime
+        # gibi okunur (NATO → "nato", FETÖ → "fetö") — onları bölersek bozulur,
+        # o yüzden ayrı bir listede tutulup dokunulmuyor.
+        _TR_KISALTMA_KELIME_GIBI = {'NATO','FETÖ','UEFA','FIFA','AFAD','ASELSAN','TUSAŞ','ROKETSAN'}
+        def _harf_harf(m):
+            kelime = m.group(0)
+            if kelime.upper() in _TR_KISALTMA_KELIME_GIBI:
+                return kelime
+            return ' '.join(kelime)
+        text = re.sub(r'\b[A-ZÇĞİÖŞÜ]{2,6}\b', _harf_harf, text)
+
+        # Son güvenlik ağı: sayı/birim dışındaki kelimelerde de (özel adlar,
+        # "Meteoroloji'den" gibi) kesme işareti+ek kalıyordu — bunlar bizim sayı
+        # sözlüğümüzde olmadığı için yukarıdaki _tr_attach_suffix hiç devreye
+        # girmiyordu. ÇÖZÜM: eki SİLMEK değil, sadece kesme işaretini kaldırıp
+        # ekin harflerini kelimeye BİTİŞİK bırakmak — Türkçe'de kesme işareti
+        # zaten yalnızca yazım kuralı, telaffuzu etkilemiyor, bu yüzden
+        # "Meteoroloji'den" → "Meteorolojiden" tamamen doğru ve ek korunmuş okunur.
+        text = re.sub(r"(?<=\w)['’](?=[a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}\b)", '', text)
+
+    # URL'leri kaldır (lang != tr için de)
     text = re.sub(r'https?://\S+', '', text)
     # Özel semboller
     text = re.sub(r'[#@|_~^\\<>{}[\]]', ' ', text)
@@ -321,7 +837,7 @@ def get_whisper():
 @app.get("/")
 async def index(request: Request):
     host = (request.headers.get("host") or "").split(":")[0]
-    if host == news_site.NEWS_SUBDOMAIN:
+    if host == news_site.NEWS_DOMAIN or host in news_site.NEWS_LEGACY_HOSTS:
         return await news_site.haberler_list(request, sayfa=1)
     return FileResponse("static/index.html")
 
@@ -461,10 +977,12 @@ _HOOK_RULE_YENI = (
     '"Az önce ortaya çıktı:", "Herkes bunu merak ediyordu — cevap şoke etti.", "Peki gerçekte ne oldu?". '
     'Do NOT repeat the same opener across videos.\n'
     '  3) PERSONAL-IMPACT framing whenever the topic allows it — make the viewer feel directly affected, not '
-    'just an observer. Prefer angles like "seni ilgilendiriyor", "milyonlarca kişiyi etkileyecek", '
-    '"cebini/hayatını değiştirecek" over neutral third-person reporting. Topics with a direct personal-impact '
-    'angle (money, rights, health, safety, prices, jobs) consistently outperform purely observational news '
-    '(celebrity, distant politics) — lean into the personal-impact angle whenever the topic has one.\n'
+    'just an observer. Use angles like "seni ilgilendiriyor", "cebini/hayatını değiştirecek" over neutral '
+    'third-person reporting. Topics with a direct personal-impact angle (money, rights, health, safety, '
+    'prices, jobs) consistently outperform purely observational news — lean into the personal-impact angle. '
+    'CRITICAL: NEVER invent scope words ("milyonlarca", "binlerce", "yüz binlerce") unless that exact '
+    'number or scale appears verbatim in the news source. If the source says "bazı memurlar" you must '
+    'write "bazı memurlar" — not "milyonlarca memur".\n'
     '  4) NEVER open with a plain, fully-informative news statement — the viewer must have zero reason to '
     'swipe away before scene 2.'
 )
@@ -496,6 +1014,37 @@ async def api_set_hook_style(style: str = Form(...)):
         raise HTTPException(400, "style 'eski' veya 'yeni' olmalı")
     HOOK_STYLE_CONFIG.write_text(json.dumps({"style": style}))
     return {"ok": True, "style": style}
+
+
+@app.get("/api/custom-prompt-rules")
+async def api_get_custom_rules():
+    return {"rules": get_custom_prompt_rules()}
+
+
+@app.post("/api/custom-prompt-rules")
+async def api_set_custom_rules(rules: str = Form(...)):
+    CUSTOM_PROMPT_RULES_FILE.write_text(
+        json.dumps({"rules": rules.strip()}, ensure_ascii=False, indent=2)
+    )
+    return {"ok": True}
+
+
+@app.get("/api/prompt-preview")
+async def api_prompt_preview():
+    scores = ig_perf.category_scores()
+    perf_instr = ""
+    try:
+        perf_instr = ig_perf.build_instruction([])
+    except Exception:
+        pass
+    return {
+        "hook_style": get_hook_style(),
+        "hook_rule": get_hook_rule(),
+        "custom_rules": get_custom_prompt_rules(),
+        "perf_instruction": perf_instr,
+        "has_analytics": bool(scores),
+        "category_scores": scores,
+    }
 
 
 # ── Kategori çeşitliliği takibi ─────────────────────────────────────────────
@@ -537,8 +1086,43 @@ def get_diversity_instruction() -> str:
     return ""
 
 
+async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
+    """Haber URL'sine gidip tam makale metnini çeker. Başarısız olursa boş string döner."""
+    if not url:
+        return ""
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(5.0, read=12.0),
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+        ) as client:
+            r = await client.get(url)
+        if r.status_code != 200:
+            return ""
+        try:
+            import trafilatura
+            text = trafilatura.extract(
+                r.text,
+                include_comments=False,
+                include_tables=False,
+                favor_recall=True,
+            )
+            if text and len(text) > 80:
+                return text[:max_chars]
+        except Exception:
+            pass
+        # Fallback: kaba HTML temizleme
+        import re as _re
+        clean = _re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", "", r.text, flags=_re.DOTALL | _re.IGNORECASE)
+        clean = _re.sub(r"<[^>]+>", " ", clean)
+        clean = _re.sub(r"\s+", " ", clean).strip()
+        return clean[:max_chars] if len(clean) > 80 else ""
+    except Exception:
+        return ""
+
+
 async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) -> dict:
-    """Google News RSS'ten gerçek haber detayları çeker. Hata olursa {} döner."""
+    """Google News RSS'ten haber başlıkları + tam makale metinlerini çeker. Hata olursa {} döner."""
     import xml.etree.ElementTree as ET
     import re
     from urllib.parse import quote
@@ -560,35 +1144,410 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
         for item in channel.findall("item")[:max_items]:
             title = (item.findtext("title") or "").strip()
             desc = re.sub(r"<[^>]+>", "", (item.findtext("description") or "")).strip()
+            link = (item.findtext("link") or "").strip()
             src_el = item.find("source")
             src_name = (src_el.text or "").strip() if src_el is not None else ""
             if not src_name:
-                # dc:creator fallback
                 dc = item.find("{http://purl.org/dc/elements/1.1/}creator")
                 if dc is not None:
                     src_name = (dc.text or "").strip()
             if title:
-                articles.append({"title": title, "desc": desc[:300], "source": src_name})
+                articles.append({"title": title, "desc": desc[:300], "source": src_name, "link": link})
                 if src_name and src_name not in sources:
                     sources.append(src_name)
         if not articles:
             return {}
+
+        # Tam makale metinlerini paralel çek
+        texts = await asyncio.gather(
+            *[_fetch_article_text(a["link"]) for a in articles],
+            return_exceptions=True,
+        )
+        for i, txt in enumerate(texts):
+            if isinstance(txt, str) and len(txt) > 80:
+                articles[i]["full_text"] = txt
+
+        has_full = any(a.get("full_text") for a in articles)
+
         context_lines = []
         for a in articles:
-            line = f"- {a['title']}"
+            header = f"KAYNAK: {a['title']}"
             if a["source"]:
-                line += f" [{a['source']}]"
-            if a["desc"]:
-                line += f"\n  {a['desc']}"
-            context_lines.append(line)
+                header += f" [{a['source']}]"
+            body = a.get("full_text") or a["desc"]
+            context_lines.append(f"{header}\n{body}")
+
         return {
             "found": True,
             "articles": articles,
             "sources": sources,
-            "context_text": "\n".join(context_lines),
+            "context_text": "\n\n---\n\n".join(context_lines),
+            "has_full_text": has_full,
         }
     except Exception:
         return {}
+
+
+async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -> dict:
+    """Ham makale metninden SADECE kaynakta yazan olguları çıkarır (ayrı ajan — yorum/tahmin katmaz).
+
+    Senaryo yazan ajandan bilerek ayrı tutulur: aynı model hem serbest metni yorumlayıp hem de
+    akıcı/viral bir senaryo yazınca dikkat dağılıyor ve eğitim verisinden detay sızdırıyor.
+    Burada tek iş "kaynakta ne yazıyor" — yaratıcılık yok, düşük temperature.
+    """
+    if not article_text.strip():
+        return {"facts": [], "sufficient": False}
+    extract_prompt = (
+        "You are a strict fact-checking extractor. Read the article text below and extract ONLY "
+        "facts that are explicitly and literally stated in it. No inference, no assumption, "
+        "no outside/general knowledge — even if it seems obviously true.\n\n"
+        f"ARTICLE TEXT:\n{article_text}\n\n"
+        "Return ONLY valid JSON, no markdown:\n"
+        "{\n"
+        '  "facts": ["short atomic fact 1 (in ' + ("Turkish" if lang == "tr" else "English") + ')", "fact 2", "..."],\n'
+        '  "names_with_titles": {"Full Name": "exact title/role as stated in the article, or empty string if none given"},\n'
+        '  "numbers": ["exact number/percentage/count exactly as written in the article"],\n'
+        '  "dates": ["exact date/time reference exactly as written in the article"],\n'
+        '  "sufficient": true\n'
+        "}\n\n"
+        "RULES:\n"
+        "- Every fact must trace to an exact sentence in the article above.\n"
+        "- Do NOT add context from general/training knowledge, even obvious-seeming facts.\n"
+        "- If the article implies someone's role/title has changed from what you'd expect, trust "
+        "ONLY the article — never your training data.\n"
+        "- If unsure whether something counts as a stated fact, leave it out.\n"
+        '- Set "sufficient": true only if there are at least 4 solid, distinct facts — enough '
+        "material for a natural ~45-55 second news narration without padding."
+    )
+    try:
+        resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": extract_prompt}],
+            temperature=0.1,
+        )
+        result = _parse_llm_json(resp.choices[0].message.content)
+        result.setdefault("facts", [])
+        result.setdefault("sufficient", len(result["facts"]) >= 4)
+        return result
+    except Exception as e:
+        print(f"[fact-extract] hata: {e}", flush=True)
+        return {"facts": [], "sufficient": False}
+
+
+async def _verify_narration_facts(client, narration: str, facts_data: dict) -> list:
+    """Üretilen senaryodaki iddiaları olgu listesiyle karşılaştırır — desteklenmeyenleri döner.
+
+    Yazan ajandan ayrı bir üçüncü ajan: sadece karşılaştırma yapar, senaryo yazmaz.
+    """
+    if not facts_data.get("facts"):
+        return []
+    facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
+    names = ", ".join(facts_data.get("names_with_titles", {}).keys())
+    numbers = ", ".join(facts_data.get("numbers", []))
+    dates = ", ".join(facts_data.get("dates", []))
+    verify_prompt = (
+        "You are a strict fact-checker. Compare the NARRATION below against the VERIFIED FACTS list. "
+        "Find any specific claim in the narration — a name, number, date, title, or specific detail — "
+        "that is NOT supported by the verified facts.\n\n"
+        f"VERIFIED FACTS:\n{facts_list}\n"
+        f"Known names: {names or '(none)'}\n"
+        f"Known numbers: {numbers or '(none)'}\n"
+        f"Known dates: {dates or '(none)'}\n\n"
+        f"NARRATION TO CHECK:\n{narration}\n\n"
+        "Return ONLY valid JSON, no markdown:\n"
+        '{"unsupported_claims": ["claim text not backed by the facts above", "..."]}\n\n'
+        "If every specific claim in the narration is backed by the facts list (generic storytelling "
+        "phrasing with no new factual claims is fine), return an empty list."
+    )
+    try:
+        resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": verify_prompt}],
+            temperature=0.0,
+        )
+        result = _parse_llm_json(resp.choices[0].message.content)
+        return result.get("unsupported_claims", []) or []
+    except Exception as e:
+        print(f"[verify] hata: {e}", flush=True)
+        return []
+
+
+# Kişisel ölüm/vefat/kaza haberleri — hem gurbetçi hem normal trend havuzunda
+# ele alınır. ASAYİŞ kategorisi (cinayet, gözaltı, tutuklama vb.) ve SPOR kategorisi
+# ig_perf.categorize() üzerinden ayrıca elenir — SPOR kesin/sert kural (kullanıcı isteği,
+# ASAYİŞ gibi soft-score değil), burada sadece keyword listesi tekil ölüm/vefat vakalarını yakalar.
+_LOW_VALUE_KW = ["öldü", "ölü bulundu", "vefat", "kaza yaptı", "hayatını kaybetti",
+                 "cesedi bulundu", "facia", "boşandı", "evlilik teklifi", "aşk yaşıyor"]
+_HARD_EXCLUDE_CATS = {"ASAYİŞ", "SPOR"}
+
+
+def _filter_low_value_topics(titles: list) -> list:
+    """Kişisel ölüm/vefat/dedikodu + ASAYİŞ (cinayet/gözaltı/skandal) + SPOR
+    kategorisindeki başlıkları eler. Etkisiz/düşük değerli haberleri her havuzdan
+    da tutarlı şekilde çıkarmak için kullanılır."""
+    filtered = []
+    for t in titles:
+        low = t.lower()
+        if any(kw in low for kw in _LOW_VALUE_KW):
+            continue
+        if ig_perf.categorize(t) in _HARD_EXCLUDE_CATS:
+            continue
+        filtered.append(t)
+    return filtered
+
+
+def _interleave_topics(a: list, b: list) -> list:
+    """İki listeyi almaşık sıralar (a1,b1,a2,b2,...) — sonradan bir yerde [:N] ile
+    kırpılsa bile her iki havuzdan da adil pay çıkar. Düz 'a + b' birleştirme
+    kullanılsaydı b (gurbetçi) listesi hep sonda kalır, kırpma onu tamamen silerdi
+    (tam olarak yaşanan hata buydu — trend 20 slotu doldurunca gurbetçi hiç görünmedi)."""
+    out = []
+    for i in range(max(len(a), len(b))):
+        if i < len(a):
+            out.append(a[i])
+        if i < len(b):
+            out.append(b[i])
+    return list(dict.fromkeys(out))
+
+
+def _dedupe_pool_against_recent(titles: list) -> list:
+    """Havuzdan, son saatlerde zaten işlenmiş (Instagram'a atılmış) konularla anahtar
+    kelime örtüşen başlıkları eler — _ig_same_topic_posted ile aynı mantık, ama
+    üretim ÖNCESİ havuz/Telegram listesine uygulanır ki kullanıcı zaten yapılmış bir
+    haberi tekrar seçip slotu boşa harcamasın."""
+    fresh = []
+    for t in titles:
+        try:
+            if _ig_same_topic_posted(t):
+                continue
+        except Exception:
+            pass
+        fresh.append(t)
+    return fresh
+
+
+async def fetch_gurbetci_topics(max_items: int = 8) -> list:
+    """Gurbetçi/diaspora haberlerine özel Google News RSS sorgusu.
+
+    pytrends'in Türkiye trend listesi yurt içi arama davranışını yansıtıyor —
+    gurbetçi konuları orada nadiren organik çıkıyor. Bu, ayrı bir arz kanalı:
+    manuel 'Trend + Gurbetçi' butonuyla kullanıcı havuzu inceleyip karar verir,
+    otomatik akışa henüz bağlı değil.
+    """
+    import xml.etree.ElementTree as ET
+    from urllib.parse import quote
+
+    # Google News RSS boolean OR + tırnaklı ifadeleri güvenilir işlemiyor —
+    # basit tekil sorgularla birden fazla istek atıp birleştirmek daha sağlam.
+    # "when:2d" Google'ın kendi zaman filtresi — arama RSS'i varsayılan olarak alaka
+    # düzeyine göre sıralıyor (tarihe göre değil), bu da dar sorgularda aynı yüksek
+    # otoriteli makalelerin günlerce üstte kalmasına yol açıyordu. Ülke bazlı sorgular
+    # da havuzu genişletiyor.
+    queries = [
+        "gurbetçi when:2d", "yurtdışındaki Türkler when:2d", "gurbetçilere when:2d",
+        "Almanya'daki Türkler when:2d", "Hollanda'daki Türkler when:2d",
+        "Fransa'daki Türkler when:2d", "Belçika'daki Türkler when:2d",
+    ]
+    titles = []
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            for q in queries:
+                url = f"https://news.google.com/rss/search?q={quote(q)}&hl=tr&gl=TR&ceid=TR:tr"
+                try:
+                    r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code != 200:
+                        print(f"[gurbetci-trends] '{q}' → HTTP {r.status_code}", flush=True)
+                        continue
+                    root = ET.fromstring(r.text)
+                    channel = root.find("channel")
+                    if channel is None:
+                        continue
+                    for item in channel.findall("item")[:max_items]:
+                        t = (item.findtext("title") or "").strip()
+                        if t and t not in titles:
+                            titles.append(t)
+                except Exception as qe:
+                    print(f"[gurbetci-trends] '{q}' hata: {qe}", flush=True)
+
+        # Kişisel ölüm/vefat/cinayet haberleri ele — "gurbetçi" kelimesi geçse bile
+        # bunlar ASAYİŞ türü içerik, herkesi ilgilendiren pratik/politika haberi değil.
+        filtered = _filter_low_value_topics(titles)
+        dropped = len(titles) - len(filtered)
+        if dropped:
+            print(f"[gurbetci-trends] {dropped} kişisel/ölüm haberi elendi", flush=True)
+
+        print(f"[gurbetci-trends] toplam {len(filtered)} başlık bulundu", flush=True)
+        return filtered[:max_items]
+    except Exception as e:
+        print(f"[gurbetci-trends] genel hata: {e}", flush=True)
+        return []
+
+
+async def _trim_audio_for_longcat(src: Path, dst: Path, max_sec: int = 5) -> bool:
+    """Sesi max_sec saniyeye kısalt (ZeroGPU GPU-time limiti için)."""
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(src), "-t", str(max_sec),
+             "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1", str(dst)],
+            check=True, capture_output=True, timeout=30,
+        )
+        return True
+    except Exception as e:
+        print(f"[LONGCAT] Ses kısaltma hatası: {e}", flush=True)
+        return False
+
+
+async def _call_longcat_api(photo_path: Path, audio_path: Path, output_path: Path) -> bool:
+    """Avatar fotoğrafı + ses → lip-synced video. HuggingFace LongCat Space'i kullanır."""
+    try:
+        timeout = httpx.Timeout(30.0, read=360.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as cli:
+            # Gradio 5.x: /gradio_api/ prefix
+            with open(photo_path, "rb") as fp, open(audio_path, "rb") as fa:
+                up_r = await cli.post(
+                    f"{LONGCAT_SPACE}/gradio_api/upload",
+                    files=[
+                        ("files", (photo_path.name, fp.read(), "image/jpeg")),
+                        ("files", (audio_path.name, fa.read(), "audio/wav")),
+                    ],
+                )
+            if up_r.status_code != 200:
+                print(f"[LONGCAT] Upload failed: {up_r.status_code} {up_r.text[:200]}", flush=True)
+                return False
+            uploaded = up_r.json()
+            img_ref = uploaded[0] if isinstance(uploaded[0], str) else uploaded[0].get("path", "")
+            aud_ref = uploaded[1] if isinstance(uploaded[1], str) else uploaded[1].get("path", "")
+
+            session_hash = uuid.uuid4().hex[:10]
+            join_r = await cli.post(
+                f"{LONGCAT_SPACE}/gradio_api/queue/join",
+                json={
+                    "data": [
+                        {"path": img_ref, "meta": {"_type": "gradio.FileData"}},
+                        {"path": aud_ref, "meta": {"_type": "gradio.FileData"}},
+                        "A photorealistic person speaking naturally to the camera",
+                        42,
+                        False,
+                    ],
+                    "event_data": None,
+                    "fn_index": 0,
+                    "session_hash": session_hash,
+                    "trigger_id": 0,
+                },
+            )
+            if join_r.status_code != 200:
+                print(f"[LONGCAT] Queue join failed: {join_r.status_code}", flush=True)
+                return False
+
+            deadline = time.time() + 360
+            async with cli.stream(
+                "GET",
+                f"{LONGCAT_SPACE}/gradio_api/queue/data?session_hash={session_hash}",
+                headers={"Accept": "text/event-stream"},
+            ) as stream:
+                async for raw_line in stream.aiter_lines():
+                    if time.time() > deadline:
+                        print("[LONGCAT] SSE timeout", flush=True)
+                        return False
+                    if not raw_line.startswith("data:"):
+                        continue
+                    try:
+                        evt = json.loads(raw_line[5:].strip())
+                    except Exception:
+                        continue
+                    msg = evt.get("msg", "")
+                    if msg == "process_completed":
+                        out = evt.get("output", {}).get("data", [])
+                        if not out:
+                            print("[LONGCAT] Empty output data", flush=True)
+                            return False
+                        video_info = out[0]
+                        if isinstance(video_info, dict):
+                            vpath = video_info.get("path") or video_info.get("url", "")
+                        else:
+                            vpath = str(video_info)
+                        if not vpath:
+                            return False
+                        dl_url = vpath if vpath.startswith("http") else f"{LONGCAT_SPACE}/gradio_api/file={vpath}"
+                        dl = await cli.get(dl_url)
+                        if dl.status_code == 200:
+                            output_path.write_bytes(dl.content)
+                            print(f"[LONGCAT] Başarılı → {output_path.name}", flush=True)
+                            return True
+                        print(f"[LONGCAT] Download failed: {dl.status_code}", flush=True)
+                        return False
+                    elif msg == "process_errored":
+                        print(f"[LONGCAT] Process errored: {evt.get('output', '')}", flush=True)
+                        return False
+        return False
+    except Exception as e:
+        print(f"[LONGCAT] API hatası: {e}", flush=True)
+        return False
+
+
+async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output: Path) -> bool:
+    """Avatar videosunu ana videonun sağ alt köşesine PIP olarak yerleştirir (loop destekli)."""
+    try:
+        # %22 genişlik, sağ alt köşe, 20px kenar + 80px taban boşluğu
+        # stream_loop -1: avatar video kısa olsa bile ana video süresince tekrarlanır
+        filter_complex = (
+            "[1:v]scale=trunc(iw*0.22/2)*2:trunc(ih*0.22/2)*2[av];"
+            "[0:v][av]overlay=main_w-overlay_w-20:main_h-overlay_h-80"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(main_video.absolute()),
+            "-stream_loop", "-1", "-i", str(avatar_video.absolute()),
+            "-filter_complex", filter_complex,
+            "-map", "0:a",
+            "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
+            "-pix_fmt", "yuv420p", "-r", "30", "-bf", "0", "-g", "30",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-shortest",
+            str(output.absolute()),
+        ]
+        await arun_ffmpeg(cmd, timeout=300, step="avatar overlay")
+        return True
+    except Exception as e:
+        print(f"[OVERLAY] Hata: {e}", flush=True)
+        return False
+
+
+_IG_POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
+
+# Namaz Vakitleri uygulama tanıtımı — caption'lara ortalama 3'te 1 eklenir
+_NAMAZ_APP_PROMO = (
+    "\U0001F54C Vakitleri kaçırmayın: ezan bildirimi, kıble ve zikirmatik cebinizde. "
+    "Namaz Vakitleri uygulaması — link bio'da \U0001F932"
+)
+
+
+def _build_ig_caption(title: str, description: str = "", source_text: str = "", suggested_tags: str = "") -> str:
+    """Instagram için tam formatlı açıklama: başlık + özet + kaynak + etkileşim CTA'ları
+    + hashtag'ler. Hem otomatik paylaşımda (_post_to_instagram_bg) hem manuel üretim
+    sonucunda (kopyalanabilir alan olarak, gerçek Instagram gönderisiyle aynı format)
+    kullanılıyor — ikisi ayrı yerlerde farklı yazılırsa aradaki tutarsızlık geri gelir."""
+    existing_lower = suggested_tags.lower()
+    extra = " ".join(f"#{t}" for t in _IG_POWER_TAGS if t not in existing_lower)
+    full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
+    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
+    parts = [title]
+    if desc_excerpt:
+        parts.append(desc_excerpt)
+    if source_text:
+        parts.append(source_text)
+    parts.append("Siz ne düşünüyorsunuz? 👇")
+    parts.append("⚠️ Haberin doğruluğunu kendi kaynaklarınızdan teyit ediniz.")
+    parts.append("🔗 Tüm haberler için link bio'da")
+    if secrets.randbelow(3) == 0:
+        parts.append(_NAMAZ_APP_PROMO)
+    parts.append(full_tags)
+    caption = "\n\n".join(parts)
+    # Instagram caption limiti 2200 karakter — güvenli taraf
+    if len(caption) > 2180:
+        caption = caption[:2177] + "..."
+    return caption
 
 
 async def _generate_shorts_core(
@@ -602,6 +1561,10 @@ async def _generate_shorts_core(
     use_video: str = "false",
     platform: str = "youtube",
     custom_image_paths: list = None,
+    spiker_mode: bool = False,
+    avatar_path: Path = None,
+    info_format: str = None,
+    cover_image_path: Path = None,
 ):
     import json
     import httpx
@@ -614,73 +1577,201 @@ async def _generate_shorts_core(
     pexels_key = get_pexels_key()
 
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
-
-    # Trend verileri al
-    trend_data = get_trends(region_code=region.upper(), lang=lang)
-    trend_topics = ", ".join(trend_data["topics"][:12])
-    yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
-    trend_tags = ", ".join(trend_data["hashtags"][:10])
-
     lang_name = LANG_MAP.get(lang, "Turkish")
-    exclude_instruction = ""
-    if exclude_topics.strip():
-        exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
-
-    # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
-    # Konu belirlenmemişse trend listesinin en üstünden seç — Google Trends zaten
-    # popülerlik sırasıyla veriyor, yapay öncelik eklemeye gerek yok
+    data = None
+    scenes = []
     gnews_data = {}
-    search_query = topic.strip()
-    if not search_query:
-        try:
-            sel_prompt = (
-                f"From this list of trending topics, pick ONE to make a breaking news Short video about. "
-                f"The list is already sorted by popularity — prefer topics near the top. "
-                f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
-                + (f"\n\nAvoid (already posted today): {exclude_topics}" if exclude_topics.strip() else "")
-            )
-            sel_resp = client.chat.completions.create(
+
+    if info_format:
+        # BİLGİ SHORTS — eğitici/bilgilendirici format, trend/haber atlanır
+        _format_hooks = {
+            "biliyormuydunuz": "FIRST scene MUST start with 'Bunu biliyor muydunuz?' — open with a shocking or surprising fact that stops the scroll.",
+            "aklinizda": "FIRST scene MUST start with 'Aklınızda bulunsun' — give a practical, life-saving tip the viewer can use today.",
+            "30saniye": "FIRST scene MUST start with '30 saniyede öğrenin' — rapid-fire, one key fact per scene, punchy and fast.",
+            "cogusinsan": "FIRST scene MUST start with 'Çoğu insan bunu bilmiyor' — revelation format, viewer feels they're learning an insider secret.",
+        }
+        format_rule = _format_hooks.get(info_format, _format_hooks["biliyormuydunuz"])
+        info_prompt = f"""Create a YouTube Shorts informational/educational video in {lang_name}.
+
+Topic: {topic}
+
+Return ONLY valid JSON, no markdown:
+{{
+  "title": "catchy YouTube title (max 80 chars, in {lang_name})",
+  "hashtags": ["Shorts", "bilgi", "keşfet", "topic", "tags"],
+  "scenes": [
+    {{
+      "text": "narration text (1-2 short punchy sentences)",
+      "keyword": "english search keyword for stock photo (2-3 words)"
+    }}
+  ]
+}}
+
+Rules:
+- 5 to 7 scenes, total narration under 55 seconds
+- {format_rule}
+- NEVER use abbreviations; write full names for text-to-speech
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
+- NEVER reference real footage or photos in narration — storytelling and facts only
+- LAST scene MUST end with (in {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!"
+- hashtags: 10-15 tags. Always include "bilgi", "öğrendim", "keşfet", "viral", "Shorts". No # symbol, NO spaces within a tag.
+- keyword: English, 2-3 words, visual and specific"""
+        for attempt in range(3):
+            _resp = client.chat.completions.create(
                 model="deepseek-chat",
-                messages=[{"role": "user", "content": sel_prompt}],
-                temperature=0.3,
-                max_tokens=60,
+                messages=[{"role": "user", "content": info_prompt}],
+                temperature=0.7,
             )
-            search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
-        except Exception:
-            search_query = trend_data["topics"][0] if trend_data["topics"] else ""
-    if search_query:
-        gnews_data = await fetch_gnews_summary(search_query, lang)
+            try:
+                data = _parse_llm_json(_resp.choices[0].message.content)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
+        scenes = data["scenes"]
+        # Son sahne CTA'sını zorla override — DeepSeek "haberler" yazmasın
+        _info_cta = {
+            "tr": {"youtube": "Beğenmek ve abone olmak için 2 saniye ver!", "instagram": "Takip et ve beğen! 2 saniye yeter!"},
+            "en": {"youtube": "Like and subscribe! Just 2 seconds!", "instagram": "Follow and like! 2 seconds is all it takes!"},
+        }
+        if scenes:
+            scenes[-1]["text"] = _info_cta.get(lang, _info_cta["tr"]).get(platform, "Beğenmek ve abone olmak için 2 saniye ver!")
 
-    news_context_instruction = ""
-    if gnews_data.get("found"):
-        news_context_instruction = (
-            f"\n\nREAL NEWS VERIFICATION — Use these verified facts (exact names, ages, locations MUST match):\n"
-            f"{gnews_data['context_text']}\n"
-            f"CRITICAL: Do NOT invent or change names, ages, or locations. Use what is written above.\n"
-        )
-    # ─────────────────────────────────────────────────────────────────────────
-
-    if topic.strip():
-        topic_instruction = (
-            f"Make a Short video ONLY about this specific topic: {topic}\n"
-            f"IMPORTANT: Cover ONLY this topic in depth. Do NOT include or mention other news stories."
-        )
-    elif lang == "en":
-        topic_instruction = (
-            f"Choose ONE of these TODAY'S trending news topics for a US/English-speaking audience:\n{trend_topics}\n"
-            f"PRIORITY ORDER: 1) Trump or US President news  2) US politics / Congress / White House  "
-            f"3) Major US foreign policy (wars, sanctions, NATO)  4) Breaking global news that impacts the US  "
-            f"5) Any other trending topic.\n"
-            f"Always pick the HIGHEST priority category available in the list above."
-        )
     else:
-        topic_instruction = (
-            f"Choose ONE of these TODAY'S trending news and make a Short about it:\n{trend_topics}\n"
-            f"The list is sorted by popularity — prefer topics near the top of the list.\n"
-            f"{get_diversity_instruction()}"
-        )
-    yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
-    prompt = f"""Create a YouTube Shorts video.
+        # HABER SHORTS — mevcut trend/haber akışı
+        trend_data = get_trends(region_code=region.upper(), lang=lang)
+
+        # TR için: normal trend + gurbetçi havuzunu birleştirip aynı filtreden geçir
+        # (ölüm/vefat/dedikodu + ASAYİŞ kategorisi elenir) — Telegram seçim listesiyle
+        # aynı havuz, artık otomatik seçimde de kullanılıyor. Konu zaten belirtilmişse
+        # (manuel/Telegram'dan zorunlu konu) bu havuz kullanılmayacağı için atlanır.
+        if lang == "tr" and not topic.strip():
+            try:
+                gurbetci_topics = await fetch_gurbetci_topics()
+                merged = _filter_low_value_topics(trend_data.get("topics", []))
+                merged = _interleave_topics(merged, gurbetci_topics)
+                merged = _dedupe_pool_against_recent(merged)
+                if merged:
+                    trend_data["topics"] = merged
+            except Exception as _ge:
+                print(f"[combined-pool] otomatik akışta birleşik havuz kullanılamadı: {_ge}", flush=True)
+
+        trend_topics = ", ".join(trend_data["topics"][:30])
+        yt_tags = ", ".join(trend_data.get("yt_trending_tags", [])[:10])
+        trend_tags = ", ".join(trend_data["hashtags"][:10])
+
+        exclude_instruction = ""
+        if exclude_topics.strip():
+            exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
+
+        # ── Hesap performans verisi: kategori skorları + tekrar kısıtları ────────
+        perf_instruction = ""
+        if lang == "tr" and not topic.strip():
+            try:
+                perf_instruction = ig_perf.build_instruction(get_ig_only_tr_used_topics())
+            except Exception as _pe:
+                print(f"[ig_perf] yönlendirme üretilemedi: {_pe}", flush=True)
+
+        # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
+        gnews_data = {}
+        search_query = topic.strip()
+        if not search_query:
+            try:
+                sel_prompt = (
+                    f"From this list of trending topics, pick ONE to make a breaking news Short video about. "
+                    f"The list is already sorted by popularity — prefer topics near the top. "
+                    f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
+                    + (f"\n\nAvoid (already posted today): {exclude_topics}" if exclude_topics.strip() else "")
+                    + perf_instruction
+                )
+                sel_resp = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[{"role": "user", "content": sel_prompt}],
+                    temperature=0.3,
+                    max_tokens=60,
+                )
+                search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
+            except Exception:
+                search_query = trend_data["topics"][0] if trend_data["topics"] else ""
+        if search_query:
+            gnews_data = await fetch_gnews_summary(search_query, lang)
+
+        # ── Olgu çıkarma: ayrı bir ajan, sadece "kaynakta ne yazıyor" işiyle uğraşır ──
+        # (Senaryo yazan ajandan bilerek ayrı — aynı model hem yorumlayıp hem yaratıcı
+        #  yazınca dikkat dağılıyor, eğitim verisinden detay sızdırıyor.)
+        facts_data = {}
+        if gnews_data.get("found") and gnews_data.get("context_text"):
+            facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
+
+        news_context_instruction = ""
+        if facts_data.get("facts"):
+            facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
+            names_map = facts_data.get("names_with_titles") or {}
+            names_block = "\n".join(
+                f"- {n}: {t or '(unvan belirtilmemiş — sadece adını kullan)'}"
+                for n, t in names_map.items()
+            )
+            numbers_block = ", ".join(facts_data.get("numbers", [])) or "yok"
+            dates_block = ", ".join(facts_data.get("dates", [])) or "yok"
+            thin_note = (
+                "\nNOT: Olgu sayısı az. YİNE DE video en az 45 saniye olmalı — yeni bilgi "
+                "UYDURMADAN, elindeki olguları derinleştirerek doldur (örn. bu olgu kimi nasıl "
+                "etkiler, ne zaman geçerli olur, neden önemli — olgunun kendisinden çıkan doğal "
+                "açılımlar, yeni iddia değil). Kısa kesip atlamak yerine var olan olguyu iyi anlat.\n"
+                if not facts_data.get("sufficient") else ""
+            )
+            news_context_instruction = (
+                f"\n\nDOĞRULANMIŞ OLGULAR (ayrı bir olgu-çıkarma ajanı tarafından kaynaktan çıkarıldı) — "
+                f"Senaryo YALNIZCA bu listeye dayanmalı:\n{facts_list}\n"
+                + (f"\nİSİMLER VE UNVANLAR (yalnızca bunları kullan):\n{names_block}\n" if names_block else "")
+                + f"\nGeçerli rakamlar: {numbers_block}\n"
+                f"Geçerli tarihler: {dates_block}\n"
+                f"{thin_note}"
+                f"MUTLAK KURALLAR — İhlali yasaktır:\n"
+                f"- Yukarıdaki listede OLMAYAN hiçbir isim, rakam, tarih, yüzde, unvan kullanma. Bilmiyorsan söyleme, atla.\n"
+                f"- Eğitim verinle tahmin yürütme — güncel değil. Sadece yukarıdaki olgu listesini kullan.\n"
+                f"- Listede 'bazı kişiler' varsa sen 'milyonlarca kişi' diyemezsin.\n"
+                f"- Listede rakam yoksa rakam uyduramazsın.\n"
+                f"- Birinin unvanı listede yoksa sadece adını kullan, unvan takma.\n"
+            )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        if topic.strip():
+            topic_instruction = (
+                f"Make a Short video ONLY about this specific topic: {topic}\n"
+                f"IMPORTANT: Cover ONLY this topic in depth. Do NOT include or mention other news stories."
+            )
+        elif lang == "en":
+            topic_instruction = (
+                f"Choose ONE of these TODAY'S trending news topics for a US/English-speaking audience:\n{trend_topics}\n"
+                f"PRIORITY ORDER: 1) Trump or US President news  2) US politics / Congress / White House  "
+                f"3) Major US foreign policy (wars, sanctions, NATO)  4) Breaking global news that impacts the US  "
+                f"5) Any other trending topic.\n"
+                f"Always pick the HIGHEST priority category available in the list above."
+            )
+        else:
+            topic_instruction = (
+                f"Choose ONE of these TODAY'S trending topics and make a short breaking-news video:\n{trend_topics}\n"
+                f"\nSTEP 1 — HOOK SCORE (do this mentally before choosing):\n"
+                f"Score each headline 1-10 on hook strength:\n"
+                f"  +3 if it directly affects the viewer's wallet, safety, or daily life\n"
+                f"  +2 if it triggers curiosity or surprise ('how is that possible?')\n"
+                f"  +2 if there's a clear human story or victim/winner\n"
+                f"  +1 if it's time-sensitive / just happened\n"
+                f"  +1 if it has a specific number or contrast in the headline\n"
+                f"  -3 if it's vague, abstract, or institutional (e.g. 'committee meets', 'statement issued')\n"
+                f"Eliminate any topic scoring below 7. If all score below 7, keep the top 2 and continue.\n"
+                f"\nSTEP 2 — PICK from the remaining topics:\n"
+                f"Pick whichever topic is most compelling and timely. Prefer topics that directly affect "
+                f"people's daily lives (safety, wallet, health, rights) — but do not force a category; "
+                f"a genuinely viral story beats a forced angle every time.\n"
+                f"{get_diversity_instruction()}{perf_instruction}"
+            )
+        yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
+        _cr = get_custom_prompt_rules()
+        _custom_block = ("- CUSTOM RULES (highest priority — always follow these):\n" +
+                         "\n".join("  " + ln for ln in _cr.splitlines())) if _cr else ""
+        prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
 {topic_instruction}
 {exclude_instruction}{news_context_instruction}Suggested hashtags: {trend_tags}{yt_tag_instruction}
@@ -700,50 +1791,82 @@ Return ONLY valid JSON, no markdown, no explanation:
 Rules:
 - 5 to 7 scenes
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly. Example: write "Yükseköğretim Kurumları Sınavı" not "YKS", "Amerika Birleşik Devletleri" not "ABD".
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
+- POLITICAL TITLES: Your training data is outdated. NEVER assume someone still holds a position from your training. Use ONLY the title given in the news context above. If no title is given, use only the person's name. Known outdated facts to avoid: Assad is no longer Syria's president (fled Dec 2024), Biden is no longer US president.
+- NO FABRICATED NUMBERS OR SCOPE: NEVER write "milyonlarca", "binlerce", "yüz binlerce", or any specific number/count/percentage UNLESS it appears word-for-word in the news source provided above. If the source does not mention a number, do NOT invent one. Use the exact scope from the source (e.g. if source says "bazı çalışanlar", write "bazı çalışanlar" — never upgrade it to "milyonlarca çalışan"). Inventing numbers is disinformation and causes legal risk.
+- TITLE SCOPE MUST MATCH THE SOURCE TOO — this is NOT just a narration rule: the "title" field gets the SAME scrutiny as scene text. If the source says only SOME workers/positions/groups are affected (e.g. "bazı memur kadroları", "bazı unvanlar"), the title must NOT generalize to the whole group (e.g. do NOT write "MEMURLARA Ek Tazminat" if it's only a subset — write "Bazı Memurlara..." or name the specific group). A catchy title is fine; an overclaimed scope is not — viewers who don't qualify will call it a lie in the comments.
+- NO SENSATIONALISM BEYOND SOURCE: Do not use words like "şoke eden", "bomba", "skandal", "rezalet", "inanılmaz" unless the source itself uses comparable language. Stick to facts as stated in the source.
+- NO EMPTY PROMISES: NEVER write a sentence that promises information without immediately delivering it in the same or next sentence — e.g. "detaylar açıklandı", "işte merak edilenler", "peki bakalım neler var" followed by ending the video without saying what those details/answers actually are. Every scene must contain a real, concrete piece of information from the facts list. If you don't have enough facts to fill a promised detail, do NOT tease it — cut that sentence entirely instead. Ending a video on an unfulfilled setup reads as clickbait and destroys trust, even if no fact was technically wrong.
 {get_hook_rule()}
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
-- Total narration under 55 seconds
+- Total narration between 45 and 55 seconds — NEVER shorter than 45 seconds. If the facts feel thin, elaborate naturally on the facts you have (implications, who it affects, timing) instead of cutting the video short or inventing new details.
 - hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
-"""
+{_custom_block}"""
 
-    data = None
-    for attempt in range(3):
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-        )
-        try:
-            data = _parse_llm_json(response.choices[0].message.content)
-            break
-        except Exception:
-            if attempt == 2:
-                raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
+        for attempt in range(3):
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+            )
+            try:
+                data = _parse_llm_json(response.choices[0].message.content)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise HTTPException(500, "DeepSeek geçerli JSON döndürmedi (3 deneme)")
 
-    scenes = data["scenes"]
+        scenes = data["scenes"]
 
-    if lang == "tr":
-        try:
-            add_recent_category(news_site.guess_category(data.get("title", ""))[0])
-        except Exception:
-            pass
+        # ── Üçüncü ajan: senaryodaki iddiaları olgu listesiyle karşılaştırır ──
+        # Desteklenmeyen bir iddia bulunursa, o iddiayı göstererek yeniden yazdırır (maks 2 deneme).
+        if facts_data.get("facts"):
+            for _verify_attempt in range(2):
+                full_narration = " ".join(s.get("text", "") for s in scenes)
+                unsupported = await _verify_narration_facts(client, full_narration, facts_data)
+                if not unsupported:
+                    break
+                print(f"[verify] desteklenmeyen iddialar bulundu, yeniden yazdırılıyor: {unsupported}", flush=True)
+                correction_prompt = prompt + (
+                    "\n\nDÜZELTME GEREKLİ — bir önceki taslağında şu iddialar olgu listesinde YOKTU. "
+                    "Bunları TAMAMEN KALDIR veya olgu listesindeki karşılığıyla değiştir. Başka hiçbir "
+                    "yeni detay ekleme:\n" + "\n".join(f"- {c}" for c in unsupported)
+                )
+                try:
+                    _fix_resp = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[{"role": "user", "content": correction_prompt}],
+                        temperature=0.5,
+                    )
+                    _fixed = _parse_llm_json(_fix_resp.choices[0].message.content)
+                    data = _fixed
+                    scenes = data["scenes"]
+                except Exception as _fix_e:
+                    print(f"[verify] düzeltme denemesi başarısız: {_fix_e}", flush=True)
+                    break
 
-    # Son sahne TTS metnini platforma göre sabit CTA ile değiştir
-    if scenes:
-        _cta = {
-            "tr": {
-                "youtube": "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
-                "instagram": "Takip et ve beğen! Her haberi ilk sen gör! İki saniye yeterli!",
-            },
-            "en": {
-                "youtube": "Like, subscribe and drop a comment! Just 2 seconds!",
-                "instagram": "Follow and like! Be the first to see every update!",
-            },
-        }
-        _lang_cta = _cta.get(lang, _cta["tr"])
-        scenes[-1]["text"] = _lang_cta.get(platform, _lang_cta["youtube"])
+        if lang == "tr":
+            try:
+                add_recent_category(news_site.guess_category(data.get("title", ""))[0])
+            except Exception:
+                pass
+
+        # Son sahne TTS metnini platforma göre sabit CTA ile değiştir (haber shorts)
+        if scenes:
+            _cta = {
+                "tr": {
+                    "youtube": "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
+                    "instagram": "Takip et ve beğen! Her haberi ilk sen gör! İki saniye yeterli!",
+                },
+                "en": {
+                    "youtube": "Like, subscribe and drop a comment! Just 2 seconds!",
+                    "instagram": "Follow and like! Be the first to see every update!",
+                },
+            }
+            _lang_cta = _cta.get(lang, _cta["tr"])
+            scenes[-1]["text"] = _lang_cta.get(platform, _lang_cta["youtube"])
 
     uid = uuid.uuid4().hex
     scene_dir = UPLOAD_DIR / uid
@@ -768,16 +1891,27 @@ Rules:
 
         if is_last_scene:
             endcard = Path("static/endcard_tr.jpg")
-            if endcard.exists():
+            if info_format and INFO_ENDCARD_FILE.exists():
+                import shutil as _sh
+                _sh.copy2(str(INFO_ENDCARD_FILE), str(png_path))
+                photo_saved, visual_err = True, ""
+            elif endcard.exists() and not info_format:
                 import shutil as _sh
                 _sh.copy2(str(endcard), str(png_path))
                 photo_saved, visual_err = True, ""
             else:
-                # Endcard dosyası yok — son sahne için Pexels'tan gerçek fotoğraf çek
+                # Endcard yok — son sahne için Pexels'tan fotoğraf çek
                 photo_saved, visual_err = fetch_scene_visual("social media news channel", "portrait", pexels_key, png_path)
         else:
             keyword = scene.get("keyword", topic)
-            if custom_image_paths:
+            if i == 0 and cover_image_path and Path(cover_image_path).exists():
+                try:
+                    import shutil as _sh
+                    _sh.copy2(str(cover_image_path), str(png_path))
+                    photo_saved, visual_err = True, ""
+                except Exception:
+                    photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+            elif custom_image_paths:
                 # Kullanıcının kendi yüklediği görseller (ör. uygulama ekran görüntüleri)
                 try:
                     import shutil as _sh
@@ -823,16 +1957,16 @@ Rules:
 
         png_files.append(png_path)
 
-    # İlk sahneye haber overlay ekle
-    if png_files:
+    # İlk sahneye haber overlay ekle — Bilgi Shorts modunda atla
+    if png_files and not info_format:
         try:
             first_title = data.get("title", topic or scenes[0]["text"][:60])
             overlay_first_scene_banner(png_files[0], first_title, lang=lang)
         except Exception:
             pass
 
-    # Son sahneye platform bandı ekle (endcard kullanılıyorsa atlıyoruz — zaten içinde var)
-    endcard_used = Path("static/endcard_tr.jpg").exists()
+    # Son sahneye platform bandı ekle — endcard varsa overlay ekleme (görsel zaten tasarımlı)
+    endcard_used = (Path("static/endcard_tr.jpg").exists() and not info_format) or (info_format and INFO_ENDCARD_FILE.exists())
     if png_files and not endcard_used:
         try:
             if platform == "instagram":
@@ -987,7 +2121,8 @@ Rules:
         "-vf", disclaimer_filter,
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
-        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+        "-bf", "0", "-g", "30",
+        "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         "-shortest", str(output_file.absolute())
     ], timeout=600, retries=1, step="ses+video mux")
@@ -998,11 +2133,15 @@ Rules:
     # Videoya özel hashtag'ler (DeepSeek'ten) + genel engagement tag'leri
     raw_tags = data.get("hashtags", [])
     if raw_tags:
-        video_tags = _format_hashtags(raw_tags, limit=5)
+        tag_limit = 15 if info_format else 5
+        video_tags = _format_hashtags(raw_tags, limit=tag_limit)
     else:
-        # Fallback: trend hashtag'leri + başlık kelimelerinden üret
-        title_tags = [w.lower() for w in generated_title.split()[:3] if len(w) > 3]
-        video_tags = _format_hashtags(["Shorts"] + title_tags + trend_data["hashtags"][1:6], limit=5)
+        if info_format:
+            video_tags = "#bilgi #Shorts #keşfet #öğren #viral"
+        else:
+            # Fallback: trend hashtag'leri + başlık kelimelerinden üret
+            title_tags = [w.lower() for w in generated_title.split()[:3] if len(w) > 3]
+            video_tags = _format_hashtags(["Shorts"] + title_tags + trend_data["hashtags"][1:6], limit=5)
 
     # Thumbnail — overlay'li ilk sahneyi kopyala (ayrıca create_thumbnail gerekmez)
     thumb_path = None
@@ -1013,6 +2152,44 @@ Rules:
     except Exception:
         pass
 
+    # Spiker Modu: avatar fotoğrafı varsa LongCat API ile lip-sync video oluştur
+    if spiker_mode and avatar_path and Path(avatar_path).exists():
+        try:
+            print(f"[SPIKER] LongCat API çağrısı başlıyor…", flush=True)
+            # ZeroGPU GPU-time limiti: sesi 9 saniyeye kısalt, overlay'de loop ile tüm videoya yay
+            spiker_audio = OUTPUT_DIR / f"{uid}_spiker_audio.wav"
+            trim_ok = await _trim_audio_for_longcat(combined_audio, spiker_audio, max_sec=5)
+            if not trim_ok:
+                shutil.copy2(str(combined_audio.absolute()), str(spiker_audio))
+            avatar_video_path = OUTPUT_DIR / f"{uid}_avatar.mp4"
+            lc_ok = await _call_longcat_api(Path(avatar_path), spiker_audio, avatar_video_path)
+            if lc_ok and avatar_video_path.exists():
+                spiker_output = OUTPUT_DIR / f"{uid}_spiker_shorts.mp4"
+                ov_ok = await _overlay_avatar_on_video(output_file, avatar_video_path, spiker_output)
+                if ov_ok and spiker_output.exists():
+                    output_file.unlink(missing_ok=True)
+                    spiker_output.rename(output_file)
+                    print(f"[SPIKER] Avatar overlay tamamlandı", flush=True)
+                else:
+                    print("[SPIKER] Overlay başarısız, orijinal video korunuyor", flush=True)
+            else:
+                print("[SPIKER] LongCat başarısız, orijinal video korunuyor", flush=True)
+            for tmp in (spiker_audio, avatar_video_path):
+                tmp.unlink(missing_ok=True)
+        except Exception as _sp_e:
+            print(f"[SPIKER] Hata: {_sp_e}", flush=True)
+
+    # Outro template ekle (uploads/outro_template.mp4 varsa)
+    if OUTRO_TEMPLATE.exists():
+        try:
+            _outro_final = OUTPUT_DIR / f"{uid}_with_outro.mp4"
+            if await _append_outro_template(output_file, _outro_final) and _outro_final.exists():
+                output_file.unlink(missing_ok=True)
+                _outro_final.rename(output_file)
+                print("[OUTRO] Template outro eklendi", flush=True)
+        except Exception as _outro_e:
+            print(f"[OUTRO] Hata: {_outro_e}", flush=True)
+
     # Geçici dosyaları temizle (disk dolmaması için)
     shutil.rmtree(scene_dir, ignore_errors=True)
 
@@ -1022,18 +2199,35 @@ Rules:
     sources = gnews_data.get("sources", [])
     source_text = ("Kaynak: " + ", ".join(sources)) if sources else ""
 
-    # Instagram için tam haber açıklaması — video senaryosu değil, gerçek haber özeti
+    # Açıklama metni — Bilgi Shorts için eğitim odaklı, haber için haber odaklı
     ig_caption_desc = ""
     try:
-        cap_context = gnews_data.get("context_text", "") if gnews_data.get("found") else ""
         cap_lang_note = "Türkçe" if lang == "tr" else "English"
-        cap_prompt = (
-            f"Aşağıdaki haber için Instagram açıklama metni yaz.\n"
-            f"Dil: {cap_lang_note}\n"
-            f"Başlık: {generated_title}\n"
-            f"\nVideo senaryosu (kısa özet):\n{full_script}\n"
-            + (f"\nGüncel haber kaynakları:\n{cap_context}\n" if cap_context else "")
-            + """
+        if info_format:
+            cap_prompt = (
+                f"Aşağıdaki eğitici/bilgilendirici kısa video için YouTube açıklama metni yaz.\n"
+                f"Dil: {cap_lang_note}\n"
+                f"Başlık: {generated_title}\n"
+                f"\nVideo içeriği:\n{full_script}\n"
+                + """
+Kurallar:
+- 2-3 paragraf, toplamda 600-1000 karakter
+- Videoda anlatılan bilgileri özetle, izleyiciye fayda hissettir
+- Merak uyandıran, sade ve akıcı bir dil kullan
+- Emoji yok, hashtag yok, başlık tekrarlama
+- Son cümle: "Beğenin ve abone olun, her hafta yeni bilgiler paylaşıyorum!"
+- Sadece açıklama paragraflarını döndür
+"""
+            )
+        else:
+            cap_context = gnews_data.get("context_text", "") if gnews_data.get("found") else ""
+            cap_prompt = (
+                f"Aşağıdaki haber için Instagram açıklama metni yaz.\n"
+                f"Dil: {cap_lang_note}\n"
+                f"Başlık: {generated_title}\n"
+                f"\nVideo senaryosu (kısa özet):\n{full_script}\n"
+                + (f"\nGüncel haber kaynakları:\n{cap_context}\n" if cap_context else "")
+                + """
 Kurallar:
 - 3-4 paragraf, toplamda 900-1400 karakter
 - Haberin tüm önemli detaylarını ver: kim, ne, nerede, ne zaman, neden
@@ -1044,7 +2238,7 @@ Kurallar:
 - Emoji yok, hashtag yok, başlık tekrarlama
 - Sadece açıklama paragraflarını döndür
 """
-        )
+            )
         cap_resp = client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": cap_prompt}],
@@ -1066,6 +2260,7 @@ Kurallar:
         "suggested_description": ig_caption_desc,
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
         "source_text": source_text,
+        "instagram_caption": _build_ig_caption(generated_title, ig_caption_desc, source_text, video_tags),
     }
 
 
@@ -1125,10 +2320,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -1146,6 +2341,11 @@ async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics,
                 Path(p).unlink(missing_ok=True)
             except Exception:
                 pass
+        if cover_image_path:
+            try:
+                Path(cover_image_path).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 @app.post("/api/generate-shorts-async")
@@ -1160,6 +2360,8 @@ async def generate_shorts_async_endpoint(
     use_video: str = Form("false"),
     platform: str = Form("youtube"),
     custom_images: list[UploadFile] = File(default=[]),
+    spiker_mode: str = Form("false"),
+    avatar_image: UploadFile = File(default=None),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -1175,11 +2377,83 @@ async def generate_shorts_async_endpoint(
         dest = UPLOAD_DIR / f"customimg_{uuid.uuid4().hex}_{i}.jpg"
         if _save_as_jpeg(data, dest):
             custom_image_paths.append(dest)
+
+    use_spiker = spiker_mode.lower() in ("true", "1", "yes")
+    saved_avatar_path = None
+    if use_spiker and avatar_image and avatar_image.filename:
+        av_data = await avatar_image.read()
+        av_dest = UPLOAD_DIR / f"avatar_{uuid.uuid4().hex}.jpg"
+        if _save_as_jpeg(av_data, av_dest):
+            saved_avatar_path = av_dest
+            shutil.copy2(str(av_dest), str(AVATAR_FILE))
+        else:
+            use_spiker = False
+    elif use_spiker and AVATAR_FILE.exists():
+        saved_avatar_path = AVATAR_FILE
+
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path))
     return {"ok": True}
+
+
+@app.post("/api/generate-info-shorts-async")
+async def generate_info_shorts_async(
+    topic: str = Form(...),
+    info_format: str = Form("biliyormuydunuz"),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    use_video: str = Form("false"),
+    platform: str = Form("youtube"),
+    cover_image: UploadFile = File(None),
+):
+    global _manual_shorts_lock
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    if not topic.strip():
+        raise HTTPException(400, "Konu boş olamaz")
+    if _manual_shorts_lock:
+        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+
+    saved_cover = None
+    if cover_image and cover_image.filename:
+        data = await cover_image.read()
+        dest = UPLOAD_DIR / f"cover_{uuid.uuid4().hex}.jpg"
+        if _save_as_jpeg(data, dest):
+            saved_cover = dest
+
+    _manual_shorts_lock = True
+    started_at = time.time()
+    _save_manual_shorts_log("running", started_at=started_at)
+    asyncio.create_task(_shorts_job_runner(
+        topic, api_key, lang, voice, speed, "", "TR", use_video, platform,
+        spiker_mode=False, avatar_path=None, info_format=info_format,
+        cover_image_path=saved_cover,
+    ))
+    return {"ok": True}
+
+
+@app.get("/api/avatar-status")
+async def get_avatar_status():
+    if AVATAR_FILE.exists():
+        return {"has_avatar": True, "path": f"/api/avatar-photo"}
+    return {"has_avatar": False}
+
+
+@app.get("/api/settings/banned-topics")
+async def get_banned_topics():
+    return {"topics": load_banned_topics()}
+
+
+@app.post("/api/settings/banned-topics")
+async def set_banned_topics(request: Request):
+    body = await request.json()
+    topics = [t.strip().lower() for t in body.get("topics", []) if t.strip()]
+    save_banned_topics(topics)
+    return {"ok": True, "count": len(topics)}
 
 
 @app.get("/api/manual-shorts/status")
@@ -1214,8 +2488,8 @@ THUMB_DIR = Path("thumbnails")
 THUMB_DIR.mkdir(exist_ok=True)
 
 
-def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720), lang="tr"):
-    """Haber kanalı stili thumbnail: koyu fotoğraf + sarı bantlar + SON DAKİKA."""
+def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280, 720), lang="tr", news_style=True):
+    """Haber kanalı stili thumbnail: koyu fotoğraf + sarı bantlar. news_style=False → SON DAKİKA ve bantlar olmadan belgesel stili."""
     from PIL import Image, ImageDraw, ImageFont
     import io, textwrap
 
@@ -1344,14 +2618,15 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
             y += band4_h + int(H * 0.018)
 
         # ⑤ SON DAKİKA kırmızı bant — alt
-        badge_h = badge_fs + int(H * 0.028)
-        by = H - badge_h - int(H * 0.04)
-        draw.rectangle([(0, by), (W, by + badge_h)], fill=RED)
-        draw.rectangle([(0, by), (W, by + 5)], fill=(255, 23, 68))
-        draw.rectangle([(0, by), (8, by + badge_h)], fill=(255, 23, 68))
-        draw.rectangle([(W - 8, by), (W, by + badge_h)], fill=(255, 23, 68))
-        bw = text_w(draw, badge_text, badge_font)
-        draw.text(((W - bw) / 2, by + (badge_h - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
+        if news_style:
+            badge_h = badge_fs + int(H * 0.028)
+            by = H - badge_h - int(H * 0.04)
+            draw.rectangle([(0, by), (W, by + badge_h)], fill=RED)
+            draw.rectangle([(0, by), (W, by + 5)], fill=(255, 23, 68))
+            draw.rectangle([(0, by), (8, by + badge_h)], fill=(255, 23, 68))
+            draw.rectangle([(W - 8, by), (W, by + badge_h)], fill=(255, 23, 68))
+            bw = text_w(draw, badge_text, badge_font)
+            draw.text(((W - bw) / 2, by + (badge_h - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
 
     else:
         # ── Landscape (uzun video 1280×720) ──
@@ -1392,14 +2667,15 @@ def create_thumbnail(photo_bytes: bytes, title: str, out_path: Path, size=(1280,
                 y += mid_fs + int(H * 0.015)
 
         # SON DAKİKA
-        badge_band = badge_fs + int(H * 0.04)
-        by = H - badge_band - int(H * 0.03)
-        draw.rectangle([(0, by), (W, by + badge_band)], fill=RED)
-        draw.rectangle([(0, by), (W, by + 4)], fill=(255, 23, 68))
-        draw.rectangle([(0, by), (8, by + badge_band)], fill=(255, 23, 68))
-        draw.rectangle([(W - 8, by), (W, by + badge_band)], fill=(255, 23, 68))
-        bw = text_w(draw, badge_text, badge_font)
-        draw.text(((W - bw) / 2, by + (badge_band - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
+        if news_style:
+            badge_band = badge_fs + int(H * 0.04)
+            by = H - badge_band - int(H * 0.03)
+            draw.rectangle([(0, by), (W, by + badge_band)], fill=RED)
+            draw.rectangle([(0, by), (W, by + 4)], fill=(255, 23, 68))
+            draw.rectangle([(0, by), (8, by + badge_band)], fill=(255, 23, 68))
+            draw.rectangle([(W - 8, by), (W, by + badge_band)], fill=(255, 23, 68))
+            bw = text_w(draw, badge_text, badge_font)
+            draw.text(((W - bw) / 2, by + (badge_band - badge_fs) // 2), badge_text, font=badge_font, fill=WHITE)
 
     img.save(str(out_path), "JPEG", quality=92)
     return out_path
@@ -1498,6 +2774,263 @@ def overlay_like_subscribe_banner(photo_path: Path) -> None:
     draw.text((rx, H - BAND_H + 128), "Abone Ol", font=font_small, anchor="mt", fill=RED)
 
     img.convert("RGB").save(str(photo_path), "JPEG", quality=92)
+
+
+OUTRO_TEMPLATE = UPLOAD_DIR / "outro_template.mp4"
+
+
+def create_animated_outro_video(
+    avatar_file,
+    ig_handle: str,
+    output_path: Path,
+    platform: str = "instagram",
+    duration_sec: float = 3.5,
+    fps: int = 30,
+) -> bool:
+    """Artık kullanılmıyor — template sistemi kullanılıyor."""
+    return False
+    import tempfile, math, random
+    from PIL import Image, ImageDraw, ImageFont
+
+    W, H = 1080, 1920
+    total_frames = int(duration_sec * fps)
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]
+    fp = next((f for f in font_candidates if Path(f).exists()), None)
+
+    def lf(size):
+        if fp:
+            try:
+                return ImageFont.truetype(fp, size)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+
+    def eout(t: float) -> float:
+        t = max(0.0, min(1.0, t))
+        return 1 - (1 - t) ** 3
+
+    def eio(t: float) -> float:
+        t = max(0.0, min(1.0, t))
+        return 3 * t * t - 2 * t * t * t
+
+    # Avatar daire hazırlama
+    AVSIZE = 320
+    avatar_img = None
+    if avatar_file and Path(avatar_file).exists():
+        try:
+            av = Image.open(avatar_file).convert("RGBA").resize((AVSIZE, AVSIZE), Image.LANCZOS)
+            mask = Image.new("L", (AVSIZE, AVSIZE), 0)
+            ImageDraw.Draw(mask).ellipse([0, 0, AVSIZE, AVSIZE], fill=255)
+            av.putalpha(mask)
+            avatar_img = av
+        except Exception:
+            pass
+
+    # Platform renkler
+    if platform == "instagram":
+        cta_color = (225, 48, 108)    # Instagram pembe
+        cta_icon = "👤"
+        cta_label = "Takip Et"
+        bottom_text = "❤️  Beğen ve Paylaş"
+    else:
+        cta_color = (255, 0, 0)       # YouTube kırmızı
+        cta_icon = "🔴"
+        cta_label = "Abone Ol"
+        bottom_text = "🔔  Bildirimleri Aç"
+
+    # Sabit parıltı noktaları (deterministic, random seed)
+    rng = random.Random(42)
+    sparkles = [(rng.randint(40, W - 40), rng.randint(100, H - 100), rng.random()) for _ in range(35)]
+
+    cy_mid = H // 2 - 80   # dikey merkez
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for fi in range(total_frames):
+            t = fi / max(total_frames - 1, 1)
+
+            bg = Image.new("RGBA", (W, H), (5, 5, 16, 255))
+            draw = ImageDraw.Draw(bg)
+
+            # ── Animasyonlu radyal glow ──
+            glow_r = int(460 + 55 * math.sin(t * math.tau))
+            for gr in range(glow_r, 0, -20):
+                a = int(22 * (gr / glow_r))
+                draw.ellipse([W // 2 - gr, cy_mid - gr, W // 2 + gr, cy_mid + gr],
+                             fill=(18, 36, 90, a))
+
+            # ── Parıltı noktaları ──
+            for sx, sy, sp in sparkles:
+                sa = int(160 * abs(math.sin((t * 2.5 + sp) * math.tau)))
+                sr = rng.randint(2, 5) if sa > 60 else 2
+                draw.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], fill=(255, 255, 255, sa))
+
+            # ── 1. Üst yazı: "Daha Fazlası İçin" (0 → 0.35s, slide-up + fade) ──
+            lbl_e = eout(t / 0.3)
+            if lbl_e > 0:
+                lbl_a = int(255 * lbl_e)
+                lbl_offset = int(55 * (1 - lbl_e))
+                lbl_font = lf(58)
+                lbl_text = "Daha Fazlası İçin"
+                bb = draw.textbbox((0, 0), lbl_text, font=lbl_font)
+                lw = bb[2] - bb[0]
+                ll = Image.new("RGBA", (W, 90), (0, 0, 0, 0))
+                ImageDraw.Draw(ll).text(
+                    (W // 2 - lw // 2, 0), lbl_text, font=lbl_font,
+                    fill=(200, 205, 230, lbl_a)
+                )
+                bg.alpha_composite(ll, (0, cy_mid - 400 + lbl_offset))
+
+            # ── 2. Avatar yüzük + görsel (0.2 → 0.7s, scale-in) ──
+            av_e = eout((t - 0.18) / 0.42)
+            av_cx, av_cy = W // 2, cy_mid - 20
+
+            if av_e > 0:
+                av_a = int(255 * av_e)
+                scale_r = int((AVSIZE // 2 + 14) * av_e)
+
+                # Dış halkalar (glow ring)
+                ring_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                rd = ImageDraw.Draw(ring_layer)
+                # İç halka — beyaz
+                rd.ellipse([av_cx - scale_r, av_cy - scale_r,
+                            av_cx + scale_r, av_cy + scale_r],
+                           fill=(255, 255, 255, av_a))
+                # İkinci halka — platform rengi, daha büyük, şeffaf
+                ring2_r = scale_r + 12
+                rd.ellipse([av_cx - ring2_r, av_cy - ring2_r,
+                            av_cx + ring2_r, av_cy + ring2_r],
+                           fill=(*cta_color, int(av_a * 0.35)))
+                bg.alpha_composite(ring_layer)
+
+                # Avatar veya placeholder
+                av_final_r = int(AVSIZE // 2 * av_e)
+                if av_final_r > 2:
+                    if avatar_img:
+                        av_scaled = avatar_img.resize((av_final_r * 2, av_final_r * 2), Image.LANCZOS)
+                        if av_a < 255:
+                            r2, g2, b2, alpha2 = av_scaled.split()
+                            alpha2 = alpha2.point(lambda x: int(x * av_a / 255))
+                            av_scaled = Image.merge("RGBA", (r2, g2, b2, alpha2))
+                        bg.alpha_composite(av_scaled, (av_cx - av_final_r, av_cy - av_final_r))
+                    else:
+                        ph = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                        ImageDraw.Draw(ph).ellipse(
+                            [av_cx - av_final_r, av_cy - av_final_r,
+                             av_cx + av_final_r, av_cy + av_final_r],
+                            fill=(40, 60, 120, av_a)
+                        )
+                        bg.alpha_composite(ph)
+
+            # ── 3. Kullanıcı adı (0.55 → 0.8s, fade-in) ──
+            usr_e = eout((t - 0.52) / 0.25)
+            if usr_e > 0 and ig_handle:
+                usr_a = int(255 * usr_e)
+                usr_font = lf(54)
+                utext = f"@{ig_handle.lstrip('@')}"
+                bb = draw.textbbox((0, 0), utext, font=usr_font)
+                uw = bb[2] - bb[0]
+                ul = Image.new("RGBA", (W, 72), (0, 0, 0, 0))
+                ImageDraw.Draw(ul).text(
+                    (W // 2 - uw // 2, 0), utext, font=usr_font,
+                    fill=(255, 255, 255, usr_a)
+                )
+                bg.alpha_composite(ul, (0, av_cy + AVSIZE // 2 + 22))
+
+            # ── 4. CTA butonu (0.68 → 1.0s, slide-up + scale) ──
+            btn_e = eout((t - 0.65) / 0.3)
+            BTN_W, BTN_H = 440, 108
+            btn_cy_final = av_cy + AVSIZE // 2 + (110 if ig_handle else 60)
+            btn_cy = int(btn_cy_final + 200 * (1 - btn_e))
+            btn_a = int(255 * btn_e)
+
+            if btn_e > 0:
+                # Nabız efekti (2s'den sonra)
+                pulse = 1.0 + 0.04 * math.sin((t - 1.8) * 6.0 * math.pi) if t > 1.8 else 1.0
+                pb_w = int(BTN_W * pulse)
+                pb_h = int(BTN_H * pulse)
+                bx0 = W // 2 - pb_w // 2
+                by0 = btn_cy - pb_h // 2
+                btn_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                _draw_rounded_rect(
+                    ImageDraw.Draw(btn_layer),
+                    [bx0, by0, bx0 + pb_w, by0 + pb_h],
+                    pb_h // 2,
+                    (*cta_color, btn_a)
+                )
+                btn_font = lf(56)
+                btext = f"{cta_icon}  {cta_label}"
+                bbd = ImageDraw.Draw(btn_layer).textbbox((0, 0), btext, font=btn_font)
+                btw = bbd[2] - bbd[0]
+                bth = bbd[3] - bbd[1]
+                ImageDraw.Draw(btn_layer).text(
+                    (W // 2 - btw // 2, btn_cy - bth // 2 - bbd[1]),
+                    btext, font=btn_font,
+                    fill=(255, 255, 255, btn_a)
+                )
+                bg.alpha_composite(btn_layer)
+
+            # ── 5. Alt metin (0.9 → 1.0s, fade-in) ──
+            bot_e = eout((t - 0.88) / 0.18)
+            if bot_e > 0:
+                bot_a = int(200 * bot_e)
+                bot_font = lf(46)
+                bb = draw.textbbox((0, 0), bottom_text, font=bot_font)
+                bw = bb[2] - bb[0]
+                bot_l = Image.new("RGBA", (W, 66), (0, 0, 0, 0))
+                ImageDraw.Draw(bot_l).text(
+                    (W // 2 - bw // 2, 0), bottom_text, font=bot_font,
+                    fill=(255, 215, 60, bot_a)
+                )
+                bg.alpha_composite(bot_l, (0, btn_cy_final + BTN_H // 2 + 30))
+
+            frame_path = Path(tmpdir) / f"frame_{fi:05d}.png"
+            bg.convert("RGB").save(str(frame_path))
+
+        try:
+            r = subprocess.run([
+                "ffmpeg", "-y",
+                "-framerate", str(fps),
+                "-i", str(Path(tmpdir) / "frame_%05d.png"),
+                "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                "-pix_fmt", "yuv420p", "-r", str(fps),
+                str(output_path)
+            ], capture_output=True, timeout=180)
+            return r.returncode == 0 and output_path.exists()
+        except Exception as e:
+            print(f"[OUTRO] ffmpeg encode hata: {e}", flush=True)
+            return False
+
+
+async def _append_outro_template(main_video: Path, final_output: Path) -> bool:
+    """uploads/outro_template.mp4 varsa ana videoya yapıştır."""
+    if not OUTRO_TEMPLATE.exists():
+        return False
+    import tempfile as _tf
+    try:
+        with _tf.NamedTemporaryFile(suffix=".txt", delete=False, mode="w") as f:
+            f.write(f"file '{main_video.absolute()}'\n")
+            f.write(f"file '{OUTRO_TEMPLATE.absolute()}'\n")
+            concat_list = f.name
+        await arun_ffmpeg([
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", concat_list,
+            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+            "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr", "-bf", "0", "-g", "30",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(final_output.absolute())
+        ], timeout=300, step="outro-concat")
+        Path(concat_list).unlink(missing_ok=True)
+        return final_output.exists()
+    except Exception as e:
+        print(f"[OUTRO] concat hata: {e}", flush=True)
+        return False
 
 
 def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -> None:
@@ -1875,10 +3408,7 @@ def overlay_lv_title_banner(photo_path: Path, title: str) -> None:
         od.rectangle([(0, 0), (1920, 200)], fill=(10, 10, 20, 210))
         img.paste(PILImage.new("RGB", (1920, 200), (10, 10, 20)),
                   (0, 0), mask=overlay.split()[3])
-        # SON DAKİKA rozeti
-        draw.rectangle([(40, 20), (240, 60)], fill=(200, 0, 0))
-        draw.text((50, 22), "SON DAKİKA", fill=(255, 255, 255), font=font_sm)
-        # Başlık (max 2 satır)
+        # Başlık (max 2 satır) — belgesel modda SON DAKİKA rozeti yok
         words = title.split()
         line1, line2 = [], []
         for w in words:
@@ -1886,10 +3416,10 @@ def overlay_lv_title_banner(photo_path: Path, title: str) -> None:
                 line1.append(w)
             else:
                 line2.append(w)
-        draw.text((40, 70), " ".join(line1), fill=(255, 220, 0), font=font_big,
+        draw.text((40, 20), " ".join(line1), fill=(255, 220, 0), font=font_big,
                   stroke_width=2, stroke_fill=(0, 0, 0))
         if line2:
-            draw.text((40, 135), " ".join(line2[:8]), fill=(255, 220, 0), font=font_big,
+            draw.text((40, 90), " ".join(line2[:8]), fill=(255, 220, 0), font=font_big,
                       stroke_width=2, stroke_fill=(0, 0, 0))
         img.save(str(photo_path), "JPEG", quality=90)
     except Exception:
@@ -1953,6 +3483,7 @@ Return ONLY valid JSON, no markdown:
 Rules:
 - Exactly {scene_count} scenes
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP, TÜBİTAK). Always write the full name so text-to-speech reads correctly.
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven, or "1.2" when you mean "one point two" is fine but "1,287" as a thousands-grouped count is NOT). Write "1.287" for the thousands case or spell it out "bin iki yüz seksen yedi" — English-style thousands-commas break the TTS reading and can be misread as a decimal.
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - FIRST scene text MUST use a CURIOSITY-GAP hook — never state the answer directly. Create suspense, ask a question, or give a partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Cevap herkesi şoke etti.", "Peki gerçekte ne oldu?", "Tarihin en büyük...". The viewer MUST feel compelled to keep watching. NEVER open with a plain news statement. Vary the opener every video.
 - LAST scene text MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
@@ -2139,7 +3670,7 @@ Rules:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
             thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-            create_thumbnail(first_img.read_bytes(), lv_title, thumb_out, size=(1280, 720), lang=lang)
+            create_thumbnail(first_img.read_bytes(), lv_title, thumb_out, size=(1280, 720), lang=lang, news_style=False)
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
@@ -2239,6 +3770,120 @@ async def generate_long_video(
     return {"ok": True}
 
 
+@app.post("/api/generate-long-video-from-script")
+async def generate_long_video_from_script(
+    script_file: UploadFile = File(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    voice: str = Form("M1"),
+    speed: float = Form(1.0),
+    use_video: str = Form("false"),
+):
+    content = await script_file.read()
+    try:
+        script_text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        script_text = content.decode("latin-1", errors="replace")
+
+    if not script_text.strip():
+        raise HTTPException(400, "Dosya boş")
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+
+    if MANUAL_LV_LOG.exists():
+        try:
+            existing = json.loads(MANUAL_LV_LOG.read_text())
+            if existing.get("status") == "running":
+                pid = existing.get("pid")
+                if pid:
+                    try:
+                        os.kill(int(pid), 0)
+                        raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+                    except OSError:
+                        pass
+                else:
+                    raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    lang_name = LANG_MAP.get(lang, "Turkish")
+
+    parse_prompt = f"""Below is a script text in {lang_name}. Parse it into scenes for a YouTube video narration.
+
+SCRIPT:
+{script_text[:8000]}
+
+Return ONLY valid JSON, no markdown:
+{{
+  "title": "engaging YouTube title based on the script (max 80 chars, in {lang_name})",
+  "description": "detailed video description (3-4 sentences, in {lang_name})",
+  "hashtags": ["relevant", "hashtag", "words", "no", "hash", "symbol"],
+  "scenes": [
+    {{
+      "text": "narration text for this scene (copy exact words from script, 2-4 sentences per scene)",
+      "keyword": "english search keyword for stock photo (2-3 words)"
+    }}
+  ]
+}}
+
+Rules:
+- Split the script naturally into logical scenes of 2-4 sentences each
+- Copy the script's narration text exactly — do NOT paraphrase or summarize
+- Generate an appropriate English image search keyword for each scene
+- hashtags: 8-12 relevant tags. No # symbol, NO spaces within a tag.
+- NEVER use abbreviations in scene text; always write the full name for text-to-speech
+- If the uploaded script contains numbers in English format (comma as thousands separator, e.g. "1,287"), convert them to Turkish format ("1.287") or spell them out — Turkish uses comma ONLY as the decimal separator, English-style thousands-commas break the TTS reading"""
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "user", "content": parse_prompt}],
+        temperature=0.3,
+        max_tokens=8000,
+    )
+    data = _parse_llm_json(response.choices[0].message.content)
+    if not data.get("scenes"):
+        raise HTTPException(500, "Senaryo sahnelere ayrılamadı")
+
+    started_at = time.time()
+    job = {
+        "topic": data.get("title", script_file.filename or "Senaryo"),
+        "title": data.get("title", ""),
+        "description": data.get("description", ""),
+        "hashtags": data.get("hashtags", []),
+        "scenes": data["scenes"],
+        "api_key": api_key,
+        "lang": lang,
+        "voice": voice,
+        "speed": speed,
+        "duration_min": max(3, len(data["scenes"]) // 2),
+        "use_video": use_video,
+        "started_at": started_at,
+    }
+    LV_JOB_FILE.write_text(json.dumps(job, ensure_ascii=False))
+
+    worker_path = Path(__file__).parent / "lv_worker.py"
+    proc = subprocess.Popen(
+        [sys.executable, str(worker_path)],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=open(Path(__file__).parent / "lv_worker.log", "a"),
+        cwd=str(Path(__file__).parent),
+    )
+    _save_manual_lv_log("running", started_at=started_at)
+    try:
+        existing = json.loads(MANUAL_LV_LOG.read_text())
+        existing["pid"] = proc.pid
+        MANUAL_LV_LOG.write_text(json.dumps(existing, ensure_ascii=False))
+    except Exception:
+        pass
+
+    return {"ok": True, "scenes": len(data["scenes"]), "title": data.get("title", "")}
+
+
 @app.get("/api/manual-lv/status")
 async def get_manual_lv_status():
     if not MANUAL_LV_LOG.exists():
@@ -2288,6 +3933,56 @@ async def reset_manual_lv():
     if LV_JOB_FILE.exists():
         LV_JOB_FILE.unlink(missing_ok=True)
     return {"ok": True}
+
+
+@app.post("/api/info-shorts-trend")
+async def info_shorts_trend(
+    category: str = Form(...),
+    api_key: str = Form(...),
+    lang: str = Form("tr"),
+    info_format: str = Form("biliyormuydunuz"),
+):
+    """Bilgi Shorts için seçilen kategori ve formata uygun konu öner."""
+    from openai import OpenAI
+    from datetime import datetime
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    if not category.strip():
+        raise HTTPException(400, "Kategori boş olamaz")
+    lang_name = LANG_MAP.get(lang, "Turkish")
+    today = datetime.now().strftime("%d.%m.%Y")
+    format_labels = {
+        "biliyormuydunuz": "Bunu biliyor muydunuz? (shocking fact)",
+        "aklinizda": "Aklınızda bulunsun (practical tip)",
+        "30saniye": "30 saniyede öğren (quick explainer)",
+        "cogusinsan": "Çoğu insan bilmiyor (insider secret)",
+    }
+    fmt_label = format_labels.get(info_format, format_labels["biliyormuydunuz"])
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    prompt = f"""Today is {today}. You are helping create a YouTube Shorts informational video in {lang_name}.
+
+Category: {category}
+Format style: {fmt_label}
+
+Suggest ONE compelling short video topic (45-60 seconds) that:
+- Fits the format style perfectly
+- Is surprising, useful, or counterintuitive — something that makes people say "I didn't know that!"
+- Targets general audience aged 35-65
+- Is specific (not "health tips" but "Why you should never drink coffee before 10am")
+
+Return ONLY a JSON object, no markdown:
+{{"topic": "the specific topic in {lang_name}", "hook": "one sentence that captures the hook in {lang_name}"}}"""
+    try:
+        resp = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.9,
+            max_tokens=200,
+        )
+        data = _parse_llm_json(resp.choices[0].message.content)
+        return {"topic": data.get("topic", ""), "hook": data.get("hook", "")}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.post("/api/lv-category-trend")
@@ -2350,7 +4045,10 @@ async def generate_trend_long_video(
     lang_name = LANG_MAP.get(lang, "Turkish")
 
     trend_data = get_trends(region_code=region, lang=lang)
-    topics_list = trend_data["topics"][:6]
+    trend_pool = trend_data["topics"]
+    if lang == "tr":
+        trend_pool = _filter_low_value_topics(trend_pool) or trend_pool
+    topics_list = trend_pool[:6]
     topics_str = "\n".join(f"- {t}" for t in topics_list)
     yt_tags_lv = ", ".join(trend_data.get("yt_trending_tags", [])[:12])
     today = datetime.now().strftime("%d.%m.%Y")
@@ -2384,6 +4082,7 @@ Return ONLY valid JSON, no markdown:
 Rules:
 - One segment per trending topic ({len(topics_list)} segments total, {len(topics_list)*2} scenes)
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly.
+- Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - VERY FIRST scene MUST use a CURIOSITY-GAP hook — never state the answer directly. Withhold the key fact, create suspense or partial reveal. Examples: "Kimse beklemiyordu:", "Meğer...", "Az önce ortaya çıktı:", "Peki gerçekte ne oldu?", "Cevap herkesi şoke etti.", "Tarihin en büyük...". The viewer MUST feel compelled to keep watching. Critical for retention — never open with a plain news headline.
 - VERY LAST scene MUST end with (translated naturally to {lang_name}): "Beğenmek ve abone olmak için 2 saniye ver!" — urgent and personal, not generic.
@@ -2527,7 +4226,7 @@ Rules:
         first_img = scene_dir / "scene_0.jpg"
         if first_img.exists():
             thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-            create_thumbnail(first_img.read_bytes(), tnlv_title, thumb_out, size=(1280, 720), lang=lang)
+            create_thumbnail(first_img.read_bytes(), tnlv_title, thumb_out, size=(1280, 720), lang=lang, news_style=False)
             thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
@@ -2604,6 +4303,91 @@ def _fire_telegram(source: str, message: str) -> None:
         pass  # event loop çalışmıyor
     except Exception:
         pass
+
+
+async def send_telegram_plain(text: str) -> bool:
+    """Ham metin gönder (uyarı formatı olmadan) — konu seçim listesi/onay mesajları için."""
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    chat_id = cfg.get("chat_id", "").strip()
+    if not token or not chat_id:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text},
+            )
+            return r.status_code == 200
+    except Exception as e:
+        print(f"[TELEGRAM] send_telegram_plain hata: {e}", flush=True)
+        return False
+
+
+async def _telegram_mark_offset_to_latest() -> int:
+    """Şu ana kadarki tüm mesajları 'okunmuş' işaretler (offset'i son update_id+1'e çeker).
+    Liste gönderilmeden ÖNCE çağrılır ki eski/bekleyen mesajlar cevap sanılmasın."""
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    if not token:
+        return 0
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(f"https://api.telegram.org/bot{token}/getUpdates", params={"timeout": 0})
+            if r.status_code != 200:
+                return 0
+            results = r.json().get("result", [])
+            if not results:
+                return 0
+            max_id = max(u["update_id"] for u in results)
+            # offset'i ilerletmek için bir kez daha çağır (Telegram offset=X → X'e kadarki mesajları siler)
+            await client.get(f"https://api.telegram.org/bot{token}/getUpdates", params={"offset": max_id + 1, "timeout": 0})
+            return max_id + 1
+    except Exception as e:
+        print(f"[TELEGRAM] offset temizleme hatası: {e}", flush=True)
+        return 0
+
+
+_TELEGRAM_CANCEL_KELIMELERI = {"cancel", "c", "iptal", "i", "no", "hayır", "hayir"}
+
+
+async def wait_for_telegram_numeric_reply(offset: int, max_choice: int, timeout_sec: int = 300, poll_sec: int = 8) -> int | str | None:
+    """offset'ten itibaren gelen mesajlarda 1..max_choice aralığında bir sayı arar.
+    Bulursa sayıyı, 'cancel'/'c'/'iptal'/'i' yazılırsa 'CANCEL' sabitini,
+    timeout dolarsa None döner."""
+    cfg = get_telegram_config()
+    token = cfg.get("bot_token", "").strip()
+    expected_chat_id = cfg.get("chat_id", "").strip()
+    if not token:
+        return None
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        try:
+            async with httpx.AsyncClient(timeout=poll_sec + 5) as client:
+                remaining = max(1, int(deadline - time.time()))
+                r = await client.get(
+                    f"https://api.telegram.org/bot{token}/getUpdates",
+                    params={"offset": offset, "timeout": min(poll_sec, remaining)},
+                )
+            if r.status_code == 200:
+                results = r.json().get("result", [])
+                for u in results:
+                    offset = max(offset, u["update_id"] + 1)
+                    msg = u.get("message") or {}
+                    chat_id = str(msg.get("chat", {}).get("id", ""))
+                    text = (msg.get("text") or "").strip()
+                    if expected_chat_id and chat_id != expected_chat_id:
+                        continue
+                    if text.lower() in _TELEGRAM_CANCEL_KELIMELERI:
+                        return "CANCEL"
+                    if text.isdigit():
+                        n = int(text)
+                        if 1 <= n <= max_choice:
+                            return n
+        except Exception as e:
+            print(f"[TELEGRAM] cevap bekleme hatası: {e}", flush=True)
+            await asyncio.sleep(poll_sec)
+    return None
 
 
 async def send_telegram_video(video_path: Path, title: str, description: str, tags: str) -> None:
@@ -2703,16 +4487,25 @@ def get_ig_config() -> dict:
 _IG_DEDUP_HOURS = 24  # aynı başlık bu süreden önce atıldıysa tekrar atma — haberler günlük/saatlik yenilendiği için 1 gün yeterli
 
 _TR_STOP_WORDS = {
+    # Bağlaçlar / edatlar
     "ile", "bir", "bu", "şu", "ne", "ki", "son", "için", "gibi",
     "kadar", "daha", "çok", "var", "yok", "ama", "veya", "ayrı",
     "aynı", "oldu", "olan", "eden", "etti", "etdi", "konusu",
     "haberi", "haber", "dakika", "acil", "işte", "birer", "fakat",
     "vurdu", "geldi", "çıktı", "atıldı", "yapıldı", "alındı",
+    # Çok genel ülke / şehir / kurum adları — tek başına ayırt edici değil
+    "nato", "ankara", "istanbul", "türkiye", "türk", "türkiye",
+    "trump", "erdoğan", "biden", "rusya", "ruslar", "ukrayna",
+    "israil", "filistin", "iran", "irak", "suriye", "mısır",
+    "avrupa", "amerika", "almanya", "fransa", "ingiltere",
+    "tbmm", "meclis", "hükümet", "cumhurbaskani", "basbakan",
+    "zirvesi", "toplantı", "zirve", "açıklama", "açıkladı",
+    "bakanlığı", "bakanlık", "başkanlık", "basın",
 }
 
 
 def _extract_topic_keywords(title: str) -> set:
-    """Başlıktan yer adı, olay adı gibi anlamlı kelimeleri çıkarır (≥4 harf)."""
+    """Başlıktan olay/kişi/kurum gibi anlamlı kelimeleri çıkarır (≥4 harf)."""
     cleaned = re.sub(r"[^a-züğışöçA-ZÜĞİŞÖÇ\s]", " ", title.lower())
     return {w for w in cleaned.split() if len(w) >= 4 and w not in _TR_STOP_WORDS}
 
@@ -2734,13 +4527,12 @@ def _ig_recently_posted(title: str) -> bool:
 
 
 def _ig_same_topic_posted(title: str) -> bool:
-    """Aynı konuyu (2+ ortak anahtar kelime) 24 saat içinde attıysa True döner.
-    Örn: 'Balıkesir yangın' → farklı başlıkla da olsa tekrar atılmasın."""
+    """Aynı konuyu (3+ ortak özgün anahtar kelime) 8 saat içinde attıysa True döner."""
     if not IG_RECENT_FILE.exists():
         return False
     try:
         records = json.loads(IG_RECENT_FILE.read_text())
-        cutoff = time.time() - 24 * 3600
+        cutoff = time.time() - 8 * 3600  # 12h → 8h: günde 12 slotluk yoğun programda havuz erken tükeniyordu
         new_kw = _extract_topic_keywords(title)
         if len(new_kw) < 2:
             return False
@@ -2749,8 +4541,8 @@ def _ig_same_topic_posted(title: str) -> bool:
                 continue
             past_kw = _extract_topic_keywords(r.get("title", ""))
             common = new_kw & past_kw
-            if len(common) >= 2:
-                print(f"[DEDUP-TOPIC] '{title[:60]}' → ortak kelimeler: {common}", flush=True)
+            if len(common) >= 3:  # 2 → 3: genel kelime çakışmalarını engelle
+                print(f"[DEDUP-TOPIC] ENGELLENDI '{title[:60]}' ← çakışan: '{r.get('title','')[:60]}' | ortak: {common}", flush=True)
                 return True
         return False
     except Exception:
@@ -2830,6 +4622,24 @@ def _remove_failed_ig_upload(filename: str) -> None:
     IG_FAILED_FILE.write_text(json.dumps(items, ensure_ascii=False))
 
 
+def _is_non_retriable_meta_error(text: str) -> bool:
+    """SADECE rate limit hatasında (RequestRateLimitedError) hemen vazgeç — bu gerçekten
+    kısa vadede çözülmüyor, tekrar denemek zaman kaybı. Meta'nın "retriable":false dediği
+    DİĞER hata türlerinde (örn. ProcessingFailedError) bu etikete güvenmiyoruz: pratikte
+    bazıları bir sonraki denemede başarılı oluyor gibi görünüyor — 20.07.2026'da bu
+    kısayolu tüm "retriable:false" hatalarına genellemek, aslında kendi kendine düzelebilecek
+    ProcessingFailedError'ları erken vazgeçirip hata oranını artırmış olabilir. Bu yüzden
+    daralttık: sadece rate limit için hemen çık, diğerleri normal retry döngüsünde kalsın."""
+    return "RequestRateLimitedError" in text
+
+
+def _meta_error_type(text: str) -> str:
+    """Hata mesajından Meta'nın 'type' alanını çıkarır (örn. RequestRateLimitedError,
+    ProcessingFailedError) — log'da hangi hata sınıfıyla karşılaşıldığını netleştirir."""
+    m = re.search(r'"type":\s*"([A-Za-z]+)"', text)
+    return m.group(1) if m else "bilinmeyen tür"
+
+
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
     """Instagram Reels yükle (resumable upload — HTTPS gerekmez). (media_id, error) döner."""
     graph = "https://graph.facebook.com/v21.0"
@@ -2892,14 +4702,23 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                             break
                     except Exception:
                         pass
+                # Rate limit gibi "retriable: false" hatalarda 4 kez boşuna denemenin
+                # anlamı yok — Meta'nın kendisi tekrar denemenin işe yaramayacağını söylüyor.
+                if _is_non_retriable_meta_error(r2.text):
+                    return None, f"upload failed (non-retriable — {_meta_error_type(r2.text)}): {r2.status_code} {r2.text[:300]}"
                 if attempt < 3:
                     await asyncio.sleep(15 * (attempt + 1))  # 15s, 30s, 45s
             if not upload_ok:
                 return None, f"upload failed: {r2.status_code} {r2.text[:300]}"
 
-            # 3. İşlenme tamamlanana kadar bekle (maks 5 dakika)
-            for _ in range(30):
-                await asyncio.sleep(10)
+            # 3. İşlenme tamamlanana kadar bekle (maks ~5 dakika) — artan aralıklarla
+            # sorgula (10s'den başlayıp 20s'ye çıkar): sabit 10s×30 yerine ~16-17 çağrıya
+            # düşürüyor, günde 12 slotluk yoğun programda Meta API çağrı hacmini azaltır.
+            elapsed = 0
+            poll_interval = 10
+            while elapsed < 300:
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
                 r3 = await client.get(
                     f"{graph}/{media_id}",
                     params={"fields": "status_code,status", "access_token": access_token},
@@ -2912,6 +4731,7 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                         break
                     if code == "ERROR":
                         return None, f"processing error: {st.get('status', '')}"
+                poll_interval = min(poll_interval + 2, 20)
 
             # 4. Yayınla — Meta'nın geçici (is_transient) sunucu hatalarına karşı birkaç kez dene
             r4 = None
@@ -2926,6 +4746,8 @@ async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str
                     if pub_id:
                         return pub_id, ""
                     return None, f"publish 200 but no id in response: {r4.text[:200]}"
+                if _is_non_retriable_meta_error(r4.text):
+                    return None, f"publish failed (non-retriable — {_meta_error_type(r4.text)}): {r4.status_code} {r4.text[:200]}"
                 is_transient = r4.status_code >= 500 or '"is_transient":true' in r4.text
                 if is_transient and pub_attempt < 2:
                     await asyncio.sleep(10 * (pub_attempt + 1))  # 10s, 20s
@@ -3014,7 +4836,7 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
         return False, str(e)
 
 
-async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1, description: str = "", thumbnail: str = ""):
+async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1, description: str = "", thumbnail: str = "", source_text: str = ""):
     """Post'tan 5 dk sonra Instagram API ile reel'i doğrular. Bulunamazsa yeniden dener (maks 3)."""
     await asyncio.sleep(300)  # 5 dakika bekle
 
@@ -3068,7 +4890,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
                 )
                 if rp.status_code == 200:
                     permalink = rp.json().get("permalink", "")
-            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink)
+            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink, source=source_text)
         except Exception:
             pass
         return
@@ -3080,7 +4902,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
             reel_id2, reel_err = await post_reel_to_instagram(vpath, caption, ig_user_id, ig_token)
             if reel_id2:
                 IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[YENİDEN:{source}] Deneme {attempt + 1}: {title[:60]}"}))
-                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1, description, thumbnail))
+                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1, description, thumbnail, source_text))
             else:
                 err_msg = reel_err or "Bilinmeyen hata (boş yanıt)"
                 await send_telegram_alert(f"IG Yeniden Deneme [{source}]", f"Deneme {attempt + 1} başarısız: {err_msg}\n{title[:60]}")
@@ -3383,6 +5205,7 @@ async def set_instagram_config(
         "access_token": tok,
         "post_reels": post_reels == "true",
         "post_story": post_story == "true",
+        "ig_handle": existing.get("ig_handle", ""),
     }
     IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
     return {"ok": True}
@@ -3493,6 +5316,18 @@ async def instagram_analytics(limit: int = 15):
     }
 
 
+@app.get("/api/instagram/analytics/full")
+async def instagram_analytics_full(force: bool = False):
+    """Tüm Instagram verileri: tüm postlar, demografi, saat haritası, günlük takipçi."""
+    cfg = get_ig_config()
+    if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+        raise HTTPException(400, "Instagram yapılandırması eksik")
+    try:
+        data = await fetch_full_analytics(cfg["ig_user_id"], cfg["access_token"], force=force)
+        return data
+    except Exception as e:
+        raise HTTPException(502, str(e))
+
 
 def load_yt_config():
     if CONFIG_FILE.exists():
@@ -3525,6 +5360,35 @@ async def trends_refresh():
     if CACHE_FILE.exists():
         CACHE_FILE.unlink()
     return await trends_endpoint()
+
+
+@app.post("/api/trends/refresh-with-gurbetci")
+async def trends_refresh_with_gurbetci():
+    """Manuel inceleme için: normal trend listesi + ayrı gurbetçi RSS havuzu.
+    Otomatik akışa bağlı değil — sadece Shorts Manuel panelinde gösterilir."""
+    base = await trends_refresh()
+    gurbetci_topics = await fetch_gurbetci_topics()
+    return {**base, "gurbetci_topics": gurbetci_topics}
+
+
+@app.post("/api/trends/refresh-combined")
+async def trends_refresh_combined():
+    """Manuel inceleme için: normal trend + gurbetçi havuzlarını AYNI filtreden
+    geçirip (ölüm/vefat/dedikodu + ASAYİŞ kategorisi + son işlenenler elenir) tek
+    listede birleştirir. Bu fonksiyonun mantığı (interleave + filtre) otomatik
+    akışta (_generate_shorts_core) ve Telegram konu seçiminde de aynen kullanılıyor —
+    üçü farklı yerlerde ayrı ayrı yazıldığı için bir ara birbirinden sapmıştı
+    (gurbetçi listenin sonuna eklenip [:N] kesmesiyle siliniyordu), artık hepsi
+    aynı _interleave_topics() ile adil sıralanıyor."""
+    base = await trends_refresh()
+    gurbetci_topics = await fetch_gurbetci_topics()
+    trend_topics_filtered = _filter_low_value_topics(base.get("topics", []))
+    dropped = len(base.get("topics", [])) - len(trend_topics_filtered)
+    if dropped:
+        print(f"[combined-trends] normal trend havuzundan {dropped} düşük değerli haber elendi", flush=True)
+    combined = _interleave_topics(trend_topics_filtered, gurbetci_topics)
+    combined = _dedupe_pool_against_recent(combined)
+    return {**base, "gurbetci_topics": gurbetci_topics, "combined_topics": combined}
 
 
 @app.post("/api/yt/config")
@@ -3903,6 +5767,63 @@ async def get_thumbnail(filename: str):
     return FileResponse(str(path), media_type="image/jpeg")
 
 
+@app.get("/api/avatar-photo")
+async def get_avatar_photo():
+    if not AVATAR_FILE.exists():
+        raise HTTPException(404, "Avatar fotoğrafı yüklenmedi")
+    return FileResponse(str(AVATAR_FILE), media_type="image/jpeg")
+
+
+@app.get("/api/info-endcard/status")
+async def info_endcard_status():
+    if INFO_ENDCARD_FILE.exists():
+        return {"has_endcard": True, "path": "/api/info-endcard/photo"}
+    return {"has_endcard": False}
+
+
+@app.post("/api/info-endcard/upload")
+async def info_endcard_upload(file: UploadFile = File(...)):
+    data = await file.read()
+    if not _save_as_jpeg(data, INFO_ENDCARD_FILE):
+        raise HTTPException(400, "Geçersiz görsel dosyası")
+    return {"ok": True, "path": "/api/info-endcard/photo"}
+
+
+@app.delete("/api/info-endcard")
+async def info_endcard_delete():
+    INFO_ENDCARD_FILE.unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.get("/api/info-endcard/photo")
+async def info_endcard_photo():
+    if not INFO_ENDCARD_FILE.exists():
+        raise HTTPException(404, "Kapanış görseli yüklenmedi")
+    return FileResponse(str(INFO_ENDCARD_FILE), media_type="image/jpeg")
+
+
+@app.get("/api/outro-template/status")
+async def outro_template_status():
+    if OUTRO_TEMPLATE.exists():
+        size_mb = round(OUTRO_TEMPLATE.stat().st_size / 1024 / 1024, 1)
+        return {"has_template": True, "size_mb": size_mb}
+    return {"has_template": False}
+
+
+@app.post("/api/outro-template/upload")
+async def outro_template_upload(file: UploadFile = File(...)):
+    data = await file.read()
+    OUTRO_TEMPLATE.write_bytes(data)
+    size_mb = round(len(data) / 1024 / 1024, 1)
+    return {"ok": True, "size_mb": size_mb}
+
+
+@app.delete("/api/outro-template")
+async def outro_template_delete():
+    OUTRO_TEMPLATE.unlink(missing_ok=True)
+    return {"ok": True}
+
+
 @app.get("/api/audio/{filename}")
 async def get_audio(filename: str):
     path = OUTPUT_DIR / filename
@@ -4068,7 +5989,11 @@ async def auto_shorts_job():
         s_voice = shorts_cfg.get("voice", "F1")
 
         used_topics = get_shorts_used_topics()
+        banned = load_banned_topics()
+        banned_str = " | ".join(banned) if banned else ""
         exclude_str = " | ".join(used_topics) if used_topics else ""
+        if banned_str:
+            exclude_str = f"{exclude_str} | YASAKLI KONULAR (kesinlikle yapma): {banned_str}" if exclude_str else f"YASAKLI KONULAR (kesinlikle yapma): {banned_str}"
 
         async with httpx.AsyncClient(timeout=900) as client:
             _MAX_DEDUP_RETRY = 3
@@ -4086,15 +6011,23 @@ async def auto_shorts_job():
                 d = r.json()
                 gen_title = d.get("title", "")
 
+                # Banned topic kontrolü
+                if _is_banned_topic(gen_title):
+                    print(f"[BANNED-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] Yasaklı konu: '{gen_title[:60]}'", flush=True)
+                    if _attempt < _MAX_DEDUP_RETRY - 1:
+                        continue
+                    else:
+                        save_sched_log("error", f"Yasaklı konu: {_MAX_DEDUP_RETRY} denemede uygun konu bulunamadı")
+                        return
+
                 # Dedup: video üretildi ama Instagram'a zaten atılmış konu mu?
                 if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
-                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] '{gen_title[:60]}' daha önce atıldı, farklı haber deneniyor…", flush=True)
-                    # Üretilen başlığı exclude listesine ekle, bir sonraki denemede bu konu seçilmesin
+                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] ENGELLENDI: '{gen_title[:60]}' — exclude'a eklendi", flush=True)
                     exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
                     if _attempt < _MAX_DEDUP_RETRY - 1:
                         continue  # yeniden dene
                     else:
-                        save_sched_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı")
+                        save_sched_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı. Denenenler: {exclude_str[:200]}")
                         return
 
                 # Dedup geçti — bu konuyu kullanıyoruz
@@ -4153,35 +6086,21 @@ async def auto_shorts_job():
         lock.release()
 
 
-# Namaz Vakitleri uygulama tanıtımı — otomatik gönderilerde ortalama 3'te 1 eklenir
-NAMAZ_APP_PROMO = (
-    "\U0001F54C Vakitleri kaçırmayın: ezan bildirimi, kıble ve zikirmatik cebinizde. "
-    "Namaz Vakitleri — link bio'da \U0001F932"
-)
-
-
-async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "") -> tuple[bool, str]:
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "", video_mode: str = "") -> tuple[bool, str]:
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
-    _POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
-    existing_lower = suggested_tags.lower()
-    extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
-    full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
-    desc_excerpt = _smart_truncate(description, limit=1600) if description else ""
-    parts = [title]
-    if desc_excerpt:
-        parts.append(desc_excerpt)
-    if source_text:
-        parts.append(source_text)
-    parts.append("Siz ne düşünüyorsunuz? 👇")
-    if secrets.randbelow(3) == 0:
-        parts.append(NAMAZ_APP_PROMO)
-    parts.append(full_tags)
-    caption = "\n\n".join(parts)
-    # Instagram caption limiti 2200 karakter — güvenli taraf
-    if len(caption) > 2180:
-        caption = caption[:2177] + "..."
+    caption = _build_ig_caption(title, description, source_text, suggested_tags)
+
+    def _diag_suffix() -> str:
+        """Hata teşhisi için video modu + dosya boyutu — zamanla "hep video-klip modunda
+        oluyor" gibi somut bir örüntü var mı, loglardan anlaşılabilsin diye eklendi."""
+        try:
+            size_mb = round((OUTPUT_DIR / filename).stat().st_size / 1024 / 1024, 1)
+        except Exception:
+            size_mb = "?"
+        mode_label = "video-klip" if video_mode.lower() in ("true", "1", "yes") else "fotoğraf"
+        return f" [mod={mode_label}, boyut={size_mb}MB]"
 
     # Aynı başlık daha önce atıldıysa veya doğrulama bekliyorsa atla — ama kuyruğa
     # düşür, kullanıcı gerçekten farklı bir haber olduğunu düşünürse zorla gönderebilsin
@@ -4200,6 +6119,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         _ig_mark_pending(title)
         reel_id, reel_err = await post_reel_to_instagram(video_file, caption, ig_user_id, ig_token)
         if reel_err:
+            reel_err = reel_err + _diag_suffix()
             ig_log = f"Reels hatası: {reel_err}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             await send_telegram_alert(f"Instagram Reels [{source}]", reel_err)
@@ -4210,12 +6130,14 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         else:
             ig_log = f"Reels yüklendi, doğrulama bekleniyor: {reel_id}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
-            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail))
+            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail, source_text))
             upload_ok = True
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
         ok, story_err = await post_story_to_instagram(video_file2, ig_user_id, ig_token)
+        if story_err:
+            story_err = story_err + _diag_suffix()
         story_log = "Story yüklendi" if ok else f"Story hatası: {story_err}"
         combined = f"{ig_log} | {story_log}" if ig_log else story_log
         IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": combined}))
@@ -4760,15 +6682,13 @@ IG_ONLY_TR_DAILY_TOPICS = Path("ig_only_tr_daily_topics.json")
 def load_ig_only_tr_config():
     if IG_ONLY_TR_SCHED_CONFIG.exists():
         cfg = json.loads(IG_ONLY_TR_SCHED_CONFIG.read_text())
-        if "weekly" not in cfg:
+        if "weekly" not in cfg or cfg.get("sched_v") != _IG_SCHED_VERSION:
+            # Eski schedule → veriye göre ayarlanmış yeni schedule'a geç
             cfg["weekly"] = _IG_WEEKLY_SCHEDULE
-            IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
-        elif len(cfg["weekly"].get("mon", [])) < 10:
-            # Eski az-slot schedule → yeni 12-slot schedule'a geç
-            cfg["weekly"] = _IG_WEEKLY_SCHEDULE
+            cfg["sched_v"] = _IG_SCHED_VERSION
             IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
         return cfg
-    return {"enabled": False, "voice": "F1", "weekly": _IG_WEEKLY_SCHEDULE}
+    return {"enabled": False, "voice": "F1", "weekly": _IG_WEEKLY_SCHEDULE, "sched_v": _IG_SCHED_VERSION}
 
 
 def save_ig_only_tr_log(status: str, message: str):
@@ -4796,12 +6716,7 @@ def add_ig_only_tr_used_topic(title: str):
     IG_ONLY_TR_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
 
 
-async def auto_ig_only_tr_job():
-    lock = _get_gen_lock()
-    if lock.locked():
-        save_ig_only_tr_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
-    await lock.acquire()
-    save_ig_only_tr_log("running", "Video üretiliyor…")
+async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
     try:
         api_key = get_deepseek_key()
         if not api_key:
@@ -4814,76 +6729,160 @@ async def auto_ig_only_tr_job():
 
         cfg = load_ig_only_tr_config()
         s_voice = cfg.get("voice", "F1")
+        video_mode = cfg.get("video_mode", "off")
+        use_video_val = "true" if (video_mode == "random" and random.random() < 0.40) else "false"
         used_topics = get_ig_only_tr_used_topics()
+        banned = load_banned_topics()
+        banned_str = " | ".join(banned) if banned else ""
         exclude_str = " | ".join(used_topics) if used_topics else ""
+        if banned_str:
+            exclude_str = f"{exclude_str} | YASAKLI KONULAR (kesinlikle yapma): {banned_str}" if exclude_str else f"YASAKLI KONULAR (kesinlikle yapma): {banned_str}"
 
-        _MAX_DEDUP_RETRY = 3
-        d = None
-        async with httpx.AsyncClient(timeout=900) as client:
-            for _attempt in range(_MAX_DEDUP_RETRY):
-                r = await client.post(
-                    "http://localhost:8001/api/generate-shorts",
-                    data={"topic": "", "api_key": api_key, "lang": "tr", "voice": s_voice,
-                          "speed": "1.0", "exclude_topics": exclude_str, "region": "TR", "platform": "instagram"},
-                )
-                if r.status_code != 200:
-                    save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
-                    return
-                d = r.json()
-                gen_title = d.get("title", "")
+        # ── Telegram'dan manuel konu seçimi (switch açıksa) ──────────────────────
+        # Kullanıcı 5 dakika içinde numarayla cevap verirse o haberi zorla, vermezse
+        # eskisi gibi DeepSeek otomatik seçsin.
+        forced_topic = ""
+        if cfg.get("telegram_topic_pick") or force_telegram_pick:
+            try:
+                trend_data = get_trends(region_code="TR", lang="tr")
+                gurbetci_topics = await fetch_gurbetci_topics()
+                pool = _filter_low_value_topics(trend_data.get("topics", []))
+                pool = _interleave_topics(pool, gurbetci_topics)
+                pool = _dedupe_pool_against_recent(pool)[:30]
+                if pool:
+                    offset = await _telegram_mark_offset_to_latest()
+                    numbered = "\n\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
+                    sent = await send_telegram_plain(
+                        f"📰 TR Instagram-Only — 5 dakika içinde numara yaz, o haberi yapayım.\n"
+                        f"Uygun haber yoksa 'iptal' veya 'c' yaz, bu saat dilimi hiç paylaşılmasın.\n"
+                        f"Cevap gelmezse otomatik seçeceğim.\n\n{numbered}"
+                    )
+                    if sent:
+                        save_ig_only_tr_log("running", "📰 Telegram'a haber listesi gönderildi, cevap bekleniyor (5 dk)...")
+                        choice = await wait_for_telegram_numeric_reply(offset, len(pool), timeout_sec=300)
+                        if choice == "CANCEL":
+                            await send_telegram_plain("🚫 İptal edildi, bu saat diliminde paylaşım yapılmayacak.")
+                            save_ig_only_tr_log("success", "Telegram'dan iptal edildi — uygun haber yok, bu saat dilimi atlandı")
+                            return
+                        elif choice:
+                            forced_topic = pool[choice - 1]
+                            await send_telegram_plain(f"✅ Seçildi: {forced_topic}\nÜretiliyor…")
+                            save_ig_only_tr_log("running", f"Telegram'dan seçildi: {forced_topic[:80]}")
+                        else:
+                            await send_telegram_plain("⏱️ Cevap gelmedi, otomatik seçiliyor…")
+                            save_ig_only_tr_log("running", "Telegram cevabı gelmedi, otomatik seçime devam ediliyor...")
+            except Exception as te:
+                print(f"[TELEGRAM-PICK] hata: {te}", flush=True)
+        # ───────────────────────────────────────────────────────────────────────
 
-                # Dedup: video üretilmeden önce Instagram konu kontrolü
-                if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
-                    print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] '{gen_title[:60]}' daha önce atıldı, farklı haber deneniyor…", flush=True)
-                    exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
-                    if _attempt < _MAX_DEDUP_RETRY - 1:
-                        continue
-                    else:
-                        save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı")
+        # Kullanıcı Telegram'dan belirli bir haber seçtiyse tekrar denemenin anlamı
+        # yok (aynı konu tekrar denenirse yine aynı sonucu verir) — tek deneme yapılır.
+        _MAX_DEDUP_RETRY = 1 if forced_topic else 3
+
+        # Kilit sadece gerçek üretim aşamasında tutulur — Telegram cevabı beklerken
+        # (yukarıda, kilitsiz) diğer zamanlanmış işler 5 dakika boyunca kuyrukta
+        # bekletilmesin diye kilit alımı buraya, üretimin hemen öncesine taşındı.
+        lock = _get_gen_lock()
+        if lock.locked():
+            save_ig_only_tr_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
+        await lock.acquire()
+        try:
+            gen_msg = f"Video üretiliyor: {forced_topic[:100]}" if forced_topic else "Video üretiliyor…"
+            save_ig_only_tr_log("running", gen_msg)
+            d = None
+            async with httpx.AsyncClient(timeout=900) as client:
+                for _attempt in range(_MAX_DEDUP_RETRY):
+                    r = await client.post(
+                        "http://localhost:8001/api/generate-shorts",
+                        data={"topic": forced_topic, "api_key": api_key, "lang": "tr", "voice": s_voice,
+                              "speed": "1.0", "exclude_topics": exclude_str, "region": "TR",
+                              "platform": "instagram", "use_video": use_video_val},
+                    )
+                    if r.status_code != 200:
+                        save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
                         return
-                break  # dedup geçti
+                    d = r.json()
+                    gen_title = d.get("title", "")
+                    save_ig_only_tr_log("running", f"Üretildi, Instagram'a yükleniyor: {gen_title[:100]}")
 
-        if d is None:
-            return
+                    # Banned topic kontrolü
+                    if _is_banned_topic(gen_title):
+                        print(f"[BANNED-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] Yasaklı konu: '{gen_title[:60]}'", flush=True)
+                        if _attempt < _MAX_DEDUP_RETRY - 1:
+                            continue
+                        else:
+                            save_ig_only_tr_log("error", f"Yasaklı konu: {_MAX_DEDUP_RETRY} denemede uygun konu bulunamadı")
+                            return
 
-        add_ig_only_tr_used_topic(d.get("title", ""))
-        filename = d["video"].split("/").pop()
-        thumbnail = (d.get("thumbnail") or "").split("/").pop()
+                    # Dedup: video üretilmeden önce Instagram konu kontrolü
+                    if _ig_recently_posted(gen_title) or _ig_same_topic_posted(gen_title):
+                        print(f"[DEDUP-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] ENGELLENDI: '{gen_title[:60]}' — exclude'a eklendi", flush=True)
+                        exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
+                        if _attempt < _MAX_DEDUP_RETRY - 1:
+                            continue
+                        else:
+                            save_ig_only_tr_log("error", f"Dedup: {_MAX_DEDUP_RETRY} denemede farklı konu bulunamadı, saat dilimi atlandı. Denenenler: {exclude_str[:200]}")
+                            return
 
-        # Sadece Instagram — YouTube'a gönderilmez
-        ig_cfg["post_reels"] = True
-        vw = d.get("visual_warning", "")
-        log_title = d.get("title", "") + (f" ⚠️ {vw}" if vw else "")
+                    # Kategori tekrar/tavan kontrolü — son denemede ihlale rağmen paylaşılır
+                    # (slot boş kalmasın; trend listesi o gün tek konuya kilitlenmiş olabilir)
+                    cat_ok, cat_reason = ig_perf.check_hard_rules(gen_title, get_ig_only_tr_used_topics())
+                    if not cat_ok:
+                        if _attempt < _MAX_DEDUP_RETRY - 1:
+                            print(f"[CAT-RETRY {_attempt+1}/{_MAX_DEDUP_RETRY}] {cat_reason}: '{gen_title[:60]}' — farklı kategori istenecek", flush=True)
+                            exclude_str = f"{exclude_str} | {gen_title}" if exclude_str else gen_title
+                            continue
+                        else:
+                            print(f"[CAT-WARN] {cat_reason} ama son deneme — yine de paylaşılıyor: '{gen_title[:60]}'", flush=True)
+                    break  # dedup + kategori geçti
 
-        ig_ok, ig_err = await _post_to_instagram_bg(
-            filename=filename,
-            title=d.get("title", ""),
-            suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
-            ig_cfg=ig_cfg,
-            description=d.get("suggested_description", ""),
-            thumbnail=thumbnail,
-            source="IG-Only-TR",
-            source_text=d.get("source_text", ""),
-        )
-        if ig_ok:
-            save_ig_only_tr_log("success", log_title)
-        else:
-            save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
+            if d is None:
+                return
+
+            add_ig_only_tr_used_topic(d.get("title", ""))
+            filename = d["video"].split("/").pop()
+            thumbnail = (d.get("thumbnail") or "").split("/").pop()
+
+            # Sadece Instagram — YouTube'a gönderilmez
+            ig_cfg["post_reels"] = True
+            vw = d.get("visual_warning", "")
+            log_title = d.get("title", "") + (f" ⚠️ {vw}" if vw else "")
+
+            ig_ok, ig_err = await _post_to_instagram_bg(
+                filename=filename,
+                title=d.get("title", ""),
+                suggested_tags=d.get("suggested_tags", "#Shorts #gündem"),
+                ig_cfg=ig_cfg,
+                description=d.get("suggested_description", ""),
+                thumbnail=thumbnail,
+                source="IG-Only-TR",
+                source_text=d.get("source_text", ""),
+                video_mode=use_video_val,
+            )
+            if ig_ok:
+                save_ig_only_tr_log("success", log_title)
+            else:
+                save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
+        finally:
+            lock.release()
 
     except Exception as e:
         save_ig_only_tr_log("error", str(e))
-    finally:
-        lock.release()
 
 
+# v3 — 292 postluk analitik verisine göre (12.07.2026):
+# 09:00–15:00 altın pencere (ort. 4.415 izlenme, 10:00'da 5.727 + 37.6 paylaşım),
+# 06:00–09:00 ölü bölge (ort. 1.040), 22:00 civarı iyi (2.923).
+# Slotlar sabah yerine öğlen penceresine yığıldı; 18:40 tek akşam + 22:00 korundu.
+_IG_SCHED_VERSION = 3
 _IG_WEEKLY_SCHEDULE = {
-    "mon": ["06:00", "07:28", "08:55", "10:20", "11:48", "13:15", "14:42", "16:08", "17:35", "19:00", "20:28", "22:00"],
-    "tue": ["06:10", "07:38", "09:05", "10:30", "11:55", "13:22", "15:05", "16:10", "17:15", "18:20", "19:25", "20:35", "21:45", "22:55"],
-    "wed": ["06:05", "07:32", "09:00", "10:25", "11:52", "13:18", "14:45", "16:12", "17:38", "19:05", "20:32", "22:05"],
-    "thu": ["06:15", "07:42", "09:10", "10:35", "12:00", "13:28", "14:55", "16:20", "17:48", "19:15", "20:40", "22:15"],
-    "fri": ["06:00", "07:25", "08:52", "10:18", "11:45", "13:12", "14:38", "16:05", "17:30", "18:58", "20:25", "22:00"],
-    "sat": ["08:00", "10:00", "11:35", "13:10", "14:45", "16:30", "18:15", "20:30"],
-    "sun": ["08:30", "10:30", "12:05", "13:40", "15:15", "17:00", "19:00", "21:00"],
+    "mon": ["09:00", "09:50", "10:40", "11:30", "12:20", "13:10", "14:05", "15:00", "16:00", "17:05", "18:40", "22:00"],
+    "tue": ["09:05", "09:55", "10:45", "11:35", "12:25", "13:15", "14:10", "15:05", "16:05", "17:10", "18:45", "22:05"],
+    "wed": ["09:10", "10:00", "10:50", "11:40", "12:30", "13:20", "14:15", "15:10", "16:10", "17:15", "18:50", "22:10"],
+    "thu": ["09:00", "09:52", "10:42", "11:32", "12:22", "13:12", "14:07", "15:02", "16:02", "17:07", "18:42", "22:02"],
+    "fri": ["09:05", "09:57", "10:47", "11:37", "12:27", "13:17", "14:12", "15:07", "16:07", "17:12", "18:47", "22:07"],
+    "sat": ["09:30", "10:30", "11:30", "12:30", "13:45", "15:00", "16:30", "22:00"],
+    "sun": ["09:35", "10:35", "11:35", "12:35", "13:50", "15:05", "16:35", "22:05"],
 }
 
 
@@ -4924,6 +6923,8 @@ async def get_ig_only_tr_sched_config():
 async def save_ig_only_tr_sched_config(
     enabled: str = Form("false"),
     voice: str = Form("F1"),
+    video_mode: str = Form("off"),
+    telegram_topic_pick: str = Form("false"),
     mon: str = Form(""),
     tue: str = Form(""),
     wed: str = Form(""),
@@ -4935,7 +6936,11 @@ async def save_ig_only_tr_sched_config(
     weekly = {}
     for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
         weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
-    cfg = {"enabled": enabled == "true", "voice": voice, "weekly": weekly}
+    # sched_v damgalanır ki kullanıcının elle kaydettiği saatler migration'da ezilmesin
+    cfg = {"enabled": enabled == "true", "voice": voice,
+           "video_mode": video_mode if video_mode in ("off", "random") else "off",
+           "telegram_topic_pick": telegram_topic_pick == "true",
+           "weekly": weekly, "sched_v": _IG_SCHED_VERSION}
     IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_ig_only_tr_scheduler()
     return {"ok": True}
@@ -4944,6 +6949,14 @@ async def save_ig_only_tr_sched_config(
 @app.post("/api/ig-only-tr/run-now")
 async def run_ig_only_tr_now():
     asyncio.create_task(auto_ig_only_tr_job())
+    return {"ok": True}
+
+
+@app.post("/api/ig-only-tr/run-now-telegram")
+async def run_ig_only_tr_now_telegram():
+    """Test için: switch'in kayıtlı durumuna dokunmadan, sadece bu çalıştırmada
+    Telegram'dan konu seçimini zorlar. Saat ayarlamaya gerek kalmadan denemek için."""
+    asyncio.create_task(auto_ig_only_tr_job(force_telegram_pick=True))
     return {"ok": True}
 
 
@@ -5102,6 +7115,42 @@ def _cleanup_old_media():
     except Exception:
         pass
 
+    # THUMB_DIR'daki eski thumbnail'leri sil — haber sitesi DB'sinde olanlar korunur
+    try:
+        news_thumbs = set()
+        try:
+            import sqlite3 as _sq
+            _db = Path("haberler.db")
+            if _db.exists():
+                with _sq.connect(str(_db)) as _c:
+                    for (tn,) in _c.execute("SELECT thumbnail FROM articles WHERE thumbnail != ''"):
+                        news_thumbs.add(tn)
+        except Exception:
+            pass
+        for f in THUMB_DIR.iterdir():
+            if not f.is_file() or f.name in news_thumbs:
+                continue
+            if now - f.stat().st_mtime > 7 * 86400:
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+async def _refresh_ig_analytics_cache():
+    """Gece 05:15'te analitik cache'i yeniler — ig_perf skorlaması hep taze veriyle çalışsın.
+    İlk sabah postu 09:00'da olduğundan skorlar güne hazır olur."""
+    try:
+        cfg = get_ig_config()
+        if not cfg.get("ig_user_id") or not cfg.get("access_token"):
+            return
+        data = await fetch_full_analytics(cfg["ig_user_id"], cfg["access_token"], force=True)
+        print(f"[ig_perf] analitik cache yenilendi: {data.get('total_posts', 0)} post", flush=True)
+    except Exception as e:
+        print(f"[ig_perf] analitik cache yenileme hatası: {e}", flush=True)
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -5128,8 +7177,31 @@ async def startup_event():
         _cleanup_old_media, CronTrigger(hour=4, minute=30, timezone="Europe/Istanbul"),
         id="cleanup_old_media", replace_existing=True,
     )
+    scheduler.add_job(
+        _refresh_ig_analytics_cache, CronTrigger(hour=5, minute=15, timezone="Europe/Istanbul"),
+        id="refresh_ig_analytics", replace_existing=True,
+    )
+
+    start_namaz_scheduler(scheduler)
 
     asyncio.create_task(_rescue_interrupted_jobs_task())
+
+
+@app.post("/api/namaz/register-city")
+async def namaz_register_city(request: Request):
+    """Uygulama açılışında aktif şehri kaydeder. namaz_bildirim.py bu listeyi okur."""
+    body = await request.json()
+    city    = str(body.get("city", "")).strip()
+    country = str(body.get("country", "Turkey")).strip()
+    if not city:
+        raise HTTPException(status_code=400, detail="city required")
+    cities_file = Path("namaz_cities.json")
+    cities: list = json.loads(cities_file.read_text()) if cities_file.exists() else []
+    key = f"{city.lower()}_{country.lower()}"
+    if not any(c.get("key") == key for c in cities):
+        cities.append({"key": key, "city": city, "country": country})
+        cities_file.write_text(json.dumps(cities, ensure_ascii=False, indent=2))
+    return {"ok": True}
 
 
 @app.get("/api/status/service-start")
@@ -5583,8 +7655,8 @@ async def comedy_create_video(request: Request):
         ["ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
          "-map", "0:v:0", "-map", "1:a:0",
          "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
-         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
-         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr", "-bf", "0", "-g", "30",
+         "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
          "-movflags", "+faststart", "-shortest", str(output_file.absolute())],
         check=True, capture_output=True, timeout=300,
     )
@@ -5615,6 +7687,7 @@ async def shorts_send_instagram(request: Request):
     title = body.get("title", "").strip()
     tags = body.get("tags", "").strip()
     description = body.get("description", "").strip()
+    source_text = body.get("source_text", "").strip()
 
     if not filename:
         raise HTTPException(400, "filename gerekli")
@@ -5627,17 +7700,7 @@ async def shorts_send_instagram(request: Request):
     if not cfg.get("ig_user_id") or not cfg.get("access_token"):
         raise HTTPException(400, "Instagram konfigürasyonu eksik — Ayarlar'dan yapılandır")
 
-    _POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
-    existing_lower = tags.lower()
-    extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
-    full_tags = f"{tags} {extra}".strip() if extra else tags
-    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
-    if title and desc_excerpt:
-        caption = f"{title}\n\n{desc_excerpt}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
-    elif title:
-        caption = f"{title}\n\nSiz ne düşünüyorsunuz? 👇\n\n{full_tags}"
-    else:
-        caption = full_tags
+    caption = _build_ig_caption(title, description, source_text, tags) if title else tags
 
     media_id, err = await post_reel_to_instagram(
         output_file, caption, cfg["ig_user_id"], cfg["access_token"]
@@ -5699,6 +7762,64 @@ _BACKUP_FILES = [
     news_site.DB_PATH,
 ]
 
+
+# ── Ses Klonu (XTTS-v2) ──────────────────────────────────────────────────────
+
+@app.get("/api/tts/clone-status")
+async def tts_clone_status():
+    cfg = get_ig_config()
+    return {
+        "has_reference": xtts_clone.hazir_mi(),
+        "use_clone": cfg.get("use_clone_voice", False),
+        "ref_path": str(xtts_clone.ref_audio_path()) if xtts_clone.hazir_mi() else None,
+    }
+
+
+@app.post("/api/tts/upload-reference")
+async def tts_upload_reference(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(400, "Dosya seçilmedi")
+    ext = Path(file.filename).suffix.lower()
+    if ext not in (".wav", ".mp3", ".m4a", ".ogg", ".flac"):
+        raise HTTPException(400, "Desteklenen formatlar: wav, mp3, m4a, ogg, flac")
+    dest = xtts_clone.ref_audio_path()
+    tmp = dest.with_suffix(".tmp")
+    async with aiofiles.open(tmp, "wb") as f:
+        content = await file.read()
+        await f.write(content)
+    # Gürültü temizleme + normalize + WAV dönüşümü (tüm formatlar için)
+    noise_filter = "anlmdn=s=7:p=0.002:r=0.002:m=15,highpass=f=100,lowpass=f=8000,loudnorm"
+    cmd = ["ffmpeg", "-y", "-i", str(tmp), "-af", noise_filter, "-ar", "22050", "-ac", "1", str(dest)]
+    r = subprocess.run(cmd, capture_output=True)
+    tmp.unlink(missing_ok=True)
+    if r.returncode != 0:
+        raise HTTPException(500, f"FFmpeg dönüşüm hatası: {r.stderr.decode()[:200]}")
+    return {"ok": True, "path": str(dest), "size_kb": round(dest.stat().st_size / 1024)}
+
+
+@app.post("/api/tts/toggle-clone")
+async def tts_toggle_clone(enabled: bool = Form(...)):
+    cfg = get_ig_config()
+    cfg["use_clone_voice"] = enabled
+    IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
+    return {"use_clone": enabled}
+
+
+@app.post("/api/tts/test-clone")
+async def tts_test_clone(text: str = Form("Merhaba, bu benim klonlanmış sesim. Türkçe haber sunuyorum.")):
+    if not xtts_clone.hazir_mi():
+        raise HTTPException(400, "Referans ses yok — önce referans_sesim.wav yükle")
+    out = Path("/tmp") / f"clone_test_{uuid.uuid4().hex[:8]}.wav"
+    try:
+        dur = await xtts_clone.seslendir(text, str(out), language="tr")
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    return FileResponse(str(out), media_type="audio/wav",
+                        filename="clone_test.wav",
+                        headers={"X-Duration": str(round(dur, 2))})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 def _write_simple_backup_zip(zf) -> None:
     """Sadece config/token dosyaları — Telegram için küçük boyutlu yedek."""
@@ -5788,6 +7909,10 @@ async def backup_restore(file: UploadFile = File(...)):
                 skipped.append(name)
     return {"ok": True, "restored": restored, "skipped": skipped}
 
+
+@app.get("/ads.txt", response_class=PlainTextResponse)
+async def ads_txt():
+    return "google.com, pub-7820582813827252, DIRECT, f08c47fec0942fa0\n"
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

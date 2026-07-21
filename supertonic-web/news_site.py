@@ -4,6 +4,7 @@ Bot her Instagram gönderisini doğruladığında add_article() ile buraya bir
 kayıt düşer. Video sunucuda tutulmaz — Instagram embed (blockquote) ile
 gösterilir, sadece küçük thumbnail görseli yerelde saklanır.
 """
+import json
 import sqlite3
 import time
 import hashlib
@@ -13,13 +14,19 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from ig_analytics_full import CACHE_FILE as IG_STATS_CACHE_FILE
+
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "news_site.db"
 templates = Jinja2Templates(directory=str(BASE_DIR / "news_templates"))
 
-# Haber sitesi bu alt alan adından herkese açık servis edilir (bkz. auth_middleware, index())
-NEWS_SUBDOMAIN = "hakanerbas.wizaicorp.com"
-SITE_URL = f"https://{NEWS_SUBDOMAIN}"
+# Haber sitesi bu domainden herkese açık servis edilir (bkz. auth_middleware, index()).
+# Site hakanerbas.wizaicorp.com alt alan adından kök domaine (wizaicorp.com) taşındı —
+# eski alt alan adı NEWS_LEGACY_HOSTS'ta tutuluyor, hâlâ aynı içeriği servis eder
+# (eski linkler/yer imleri kırılmasın) ama kanonik URL'ler artık yeni domaini kullanıyor.
+NEWS_DOMAIN = "wizaicorp.com"
+NEWS_LEGACY_HOSTS = {"hakanerbas.wizaicorp.com"}
+SITE_URL = f"https://{NEWS_DOMAIN}"
 
 
 def _timesince(ts: int) -> str:
@@ -40,8 +47,17 @@ def _isoformat(ts: int) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(ts))
 
 
+def _tr_sayi(n) -> str:
+    """1234567 -> '1.234.567' (Türkçe binlik ayıracı = nokta)."""
+    try:
+        return f"{int(n):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return str(n)
+
+
 templates.env.filters["timesince"] = _timesince
 templates.env.filters["isoformat"] = _isoformat
+templates.env.filters["trsayi"] = _tr_sayi
 templates.env.globals["SITE_URL"] = SITE_URL
 
 PER_PAGE = 12
@@ -67,6 +83,8 @@ CONTACT_WHATSAPP = "905530930325"
 
 templates.env.globals["CATEGORIES"] = ALL_CATEGORIES
 templates.env.globals["CURRENT_YEAR"] = time.strftime("%Y")
+templates.env.globals["CONTACT_EMAIL"] = CONTACT_EMAIL
+templates.env.globals["CONTACT_WHATSAPP"] = CONTACT_WHATSAPP
 
 
 def guess_category(title: str) -> tuple[str, str]:
@@ -93,8 +111,12 @@ def init_db() -> None:
             category_color TEXT,
             thumbnail TEXT,
             ig_permalink TEXT,
-            created_at REAL
+            created_at REAL,
+            source TEXT
         )""")
+        cols = [r["name"] for r in c.execute("PRAGMA table_info(articles)").fetchall()]
+        if "source" not in cols:
+            c.execute("ALTER TABLE articles ADD COLUMN source TEXT")
         c.execute("""CREATE TABLE IF NOT EXISTS comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             article_id INTEGER NOT NULL,
@@ -126,14 +148,14 @@ def _can_comment(ip: str) -> bool:
     return True
 
 
-def add_article(title: str, description: str, thumbnail: str, ig_permalink: str) -> int:
+def add_article(title: str, description: str, thumbnail: str, ig_permalink: str, source: str = "") -> int:
     label, color = guess_category(title)
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO articles (title, description, category, category_color, thumbnail, ig_permalink, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO articles (title, description, category, category_color, thumbnail, ig_permalink, created_at, source) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (title.strip()[:200], (description or "").strip()[:600], label, color,
-             thumbnail or "", ig_permalink or "", time.time()),
+             thumbnail or "", ig_permalink or "", time.time(), (source or "").strip()[:120]),
         )
         return cur.lastrowid
 
@@ -186,6 +208,67 @@ def get_all_ids_and_dates():
         return c.execute("SELECT id, created_at FROM articles ORDER BY id DESC").fetchall()
 
 
+def _load_ig_stats() -> dict | None:
+    """ig_analytics_full.fetch_full_analytics() tarafından yazılan cache dosyasını okur.
+    Cache app.py'de her gece 05:15'te tazelenir — burada sadece okunur, ağ isteği atılmaz."""
+    if not IG_STATS_CACHE_FILE.exists():
+        return None
+    try:
+        return json.loads(IG_STATS_CACHE_FILE.read_text())
+    except Exception:
+        return None
+
+
+def _build_stats_view(data: dict) -> dict:
+    """Ham analytics cache'ini /istatistikler sayfası için sunuma hazır hale getirir."""
+    profile = data.get("profile", {}) or {}
+    summary = data.get("summary", {}) or {}
+    posts = data.get("posts", []) or []
+
+    cutoff_30 = time.time() - 30 * 86400
+    views_30d = 0
+    for p in posts:
+        ts = p.get("timestamp") or ""
+        try:
+            t = time.mktime(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
+        except Exception:
+            continue
+        if t >= cutoff_30:
+            views_30d += p.get("views", 0) or 0
+
+    follower_daily = data.get("follower_daily", []) or []
+    max_abs = max([abs(v.get("value", 0)) for v in follower_daily], default=0) or 1
+    chart_points = [
+        {
+            "date": (v.get("end_time") or "")[5:10],
+            "value": v.get("value", 0),
+            "pct": round(abs(v.get("value", 0)) / max_abs * 100, 1),
+        }
+        for v in follower_daily
+    ]
+
+    total_interactions = (
+        (summary.get("total_likes") or 0) + (summary.get("total_comments") or 0)
+        + (summary.get("total_shares") or 0) + (summary.get("total_saved") or 0)
+    )
+
+    fetched_at = data.get("fetched_at")
+    updated_label = time.strftime("%d.%m.%Y %H:%M", time.localtime(fetched_at)) if fetched_at else ""
+
+    return {
+        "followers": profile.get("followers_count", 0),
+        "total_posts": data.get("total_posts", 0),
+        "total_views": summary.get("total_views", 0),
+        "avg_views": summary.get("avg_views", 0),
+        "max_views": summary.get("max_views", 0),
+        "views_30d": views_30d,
+        "total_interactions": total_interactions,
+        "chart_points": chart_points,
+        "top_posts": summary.get("top_posts", [])[:5],
+        "updated_label": updated_label,
+    }
+
+
 router = APIRouter()
 
 
@@ -201,10 +284,47 @@ _AI_CRAWLERS = [
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
-    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", ""]
+    lines = ["User-agent: *", "Allow: /haberler", "Allow: /haber/", "Allow: /hakkinda", "Allow: /iletisim", "Allow: /istatistikler", "Allow: /gizlilik-politikasi", "Allow: /llms.txt", ""]
     for ua in _AI_CRAWLERS:
         lines += [f"User-agent: {ua}", "Allow: /", ""]
     lines.append(f"Sitemap: {SITE_URL}/sitemap.xml")
+    return "\n".join(lines) + "\n"
+
+
+@router.get("/llms.txt", response_class=PlainTextResponse)
+async def llms_txt():
+    """AI asistanlarının (ChatGPT, Claude, Gemini vb.) siteyi hızlıca anlaması için
+    llmstxt.org taslağına uygun özet dosya. Henüz büyük sağlayıcılar tarafından
+    garanti okunmuyor ama maliyeti yok — robots.txt'deki AI crawler izinleriyle birlikte
+    çalışır."""
+    rows, _ = get_articles(page=1)
+    lines = [
+        "# Hakan Erbaş | Güncel Haberler",
+        "",
+        "> Türkiye ve dünya gündeminden derlenen güncel haberler; yapay zeka destekli olarak "
+        "günlük özetlenip önce Instagram Reels'te kısa video formatında paylaşılır, ardından bu "
+        "sitede kaynak belirtilerek arşivlenir.",
+        "",
+        "## Sayfalar",
+        "",
+        f"- [Tüm Haberler]({SITE_URL}/haberler): Kategori bazlı (ekonomi, afet, dünya, teknoloji, gündem) güncel haber arşivi",
+        f"- [İstatistikler]({SITE_URL}/istatistikler): Hesabın gerçek erişim ve etkileşim verileri",
+        f"- [Hakkında]({SITE_URL}/hakkinda): Site ve içerik üretim süreci hakkında bilgi",
+        f"- [İletişim]({SITE_URL}/iletisim): İletişim bilgileri",
+        f"- [Gizlilik Politikası]({SITE_URL}/gizlilik-politikasi): Veri ve çerez kullanımı",
+        "",
+        "## Son Haberler",
+        "",
+    ]
+    for r in rows[:20]:
+        lines.append(f"- [{r['title']}]({SITE_URL}/haber/{r['id']})")
+    lines += [
+        "",
+        "## Notlar",
+        "",
+        "- Haberler güvenilir kaynaklardan (Google News, GNews API) derlenir; her haber sayfasında kaynak belirtilir.",
+        "- Bu bir haber ajansı değildir; bağımsız, yapay zeka destekli üretilen bir içerik projesidir.",
+    ]
     return "\n".join(lines) + "\n"
 
 
@@ -215,6 +335,8 @@ async def sitemap_xml():
         f"<url><loc>{SITE_URL}/haberler</loc><changefreq>hourly</changefreq></url>",
         f"<url><loc>{SITE_URL}/hakkinda</loc><changefreq>monthly</changefreq></url>",
         f"<url><loc>{SITE_URL}/iletisim</loc><changefreq>monthly</changefreq></url>",
+        f"<url><loc>{SITE_URL}/istatistikler</loc><changefreq>daily</changefreq></url>",
+        f"<url><loc>{SITE_URL}/gizlilik-politikasi</loc><changefreq>yearly</changefreq></url>",
     ]
     for r in rows:
         urls.append(
@@ -269,10 +391,24 @@ async def hakkinda(request: Request):
     return templates.TemplateResponse("hakkinda.html", {"request": request})
 
 
+@router.get("/gizlilik-politikasi", response_class=HTMLResponse)
+async def gizlilik(request: Request):
+    return templates.TemplateResponse("gizlilik.html", {"request": request})
+
+
 @router.get("/iletisim", response_class=HTMLResponse)
 async def iletisim(request: Request):
     return templates.TemplateResponse("iletisim.html", {
         "request": request, "contact_email": CONTACT_EMAIL, "contact_whatsapp": CONTACT_WHATSAPP,
+    })
+
+
+@router.get("/istatistikler", response_class=HTMLResponse)
+async def istatistikler(request: Request):
+    data = _load_ig_stats()
+    stats = _build_stats_view(data) if data else None
+    return templates.TemplateResponse("istatistikler.html", {
+        "request": request, "stats": stats,
     })
 
 

@@ -43,6 +43,33 @@ def fetch_google_news(lang="tr", region="TR", max_items=20):
         return []
 
 
+_TOPIC_FEEDS = ["BUSINESS", "WORLD"]  # ekonomi / dünya — spor kesin filtreleniyor (app.py _HARD_EXCLUDE_CATS), boşuna çekilmesin
+
+
+def fetch_google_news_topic(topic_code, lang="tr", region="TR", max_items=15):
+    """Google News'in kategori bazlı (ekonomi/spor/dünya vb.) section RSS'inden başlık çeker.
+    Genel top-stories feed'i tek bir günün baskın haberiyle dolup taşabiliyor — kategori
+    feed'leri ham havuzu büyütüp _ig_same_topic_posted dedup filtresine eleyecek daha fazla
+    malzeme veriyor, böylece yoğun paylaşım programında (günde 12 slot) havuz erken tükenmiyor."""
+    url = f"https://news.google.com/rss/headlines/section/topic/{topic_code}?hl={lang}&gl={region}&ceid={region}:{lang}"
+    try:
+        resp = httpx.get(url, timeout=10, follow_redirects=True,
+                         headers={"User-Agent": "Mozilla/5.0"})
+        root = ET.fromstring(resp.text)
+        titles = []
+        for item in root.findall(".//item"):
+            title = item.findtext("title", "")
+            if title and " - " in title:
+                title = title.rsplit(" - ", 1)[0].strip()
+            if title:
+                titles.append(title)
+            if len(titles) >= max_items:
+                break
+        return titles
+    except Exception:
+        return []
+
+
 def fetch_youtube_trending(youtube_client, region_code="TR", max_results=25):
     """YouTube trending videolarından frekans bazlı popüler hashtag'leri çeker."""
     try:
@@ -87,8 +114,11 @@ def get_trends(youtube_client=None, region_code="TR", lang="tr"):
     if cached:
         return cached
 
-    # Google News haberleri
+    # Google News haberleri — genel top-stories + kategori bazlı (ekonomi/spor/dünya)
     news_topics = fetch_google_news(lang=lang, region=region_code)
+    for topic_code in _TOPIC_FEEDS:
+        news_topics += fetch_google_news_topic(topic_code, lang=lang, region=region_code)
+    news_topics = list(dict.fromkeys(news_topics))  # sırayı koruyarak tekilleştir
 
     # YouTube trending (varsa)
     yt_topics, yt_hashtags = [], []
@@ -106,7 +136,7 @@ def get_trends(youtube_client=None, region_code="TR", lang="tr"):
     trend_hashtags = list(dict.fromkeys(yt_hashtags + base))[:20]
 
     result = {
-        "topics": topics[:20],
+        "topics": topics[:60],  # kategori feed'leri eklenince ham havuz büyüdü, kapak da büyütüldü
         "hashtags": trend_hashtags,          # prompt'a giden liste
         "yt_trending_tags": yt_hashtags,     # sadece YouTube kaynaklılar
         "region": region_code,

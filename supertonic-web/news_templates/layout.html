@@ -2,8 +2,22 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="google-site-verification" content="IyAmeMZNxDEuPDXmoXTaL1rd3tdbKbVjErmElvrPXDI" />
+<link rel="manifest" href="/static/news-manifest.json">
+<meta name="theme-color" content="#d5000a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HB Haberler">
+<link rel="apple-touch-icon" href="/static/news-icons/icon-192.png">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7820582813827252" crossorigin="anonymous"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-TEVMGQLW44"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-TEVMGQLW44');
+</script>
 {% block titletag %}<title>{% block title %}Hakan Erbaş | Güncel Haberler{% endblock %}</title>{% endblock %}
 {% block metadesc %}<meta name="description" content="Türkiye ve dünyadan seni doğrudan ilgilendiren güncel haberler, günlük kısa videolarla.">{% endblock %}
 <link rel="canonical" href="{{ SITE_URL }}{{ request.url.path }}">
@@ -42,11 +56,33 @@
   }
   .brand .name{ font-weight:800; font-size:20px; letter-spacing:-.2px; }
   .brand .name span{ color:var(--red); }
+  nav.top{ display:flex; align-items:center; gap:2px; background:var(--bg); padding:4px; border-radius:999px; }
   nav.top a{
-    font-size:14px; font-weight:600; color:var(--sub); margin-left:22px;
+    display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:700;
+    color:var(--sub); padding:9px 15px; border-radius:999px; transition:background .15s, color .15s;
   }
-  nav.top a:hover{ color:var(--ink); }
+  nav.top a svg{ width:16px; height:16px; flex-shrink:0; }
+  nav.top a:hover{ color:var(--ink); background:rgba(20,21,26,.05); }
+  nav.top a.active{ color:#fff; background:var(--red); }
   main{ max-width:1080px; margin:0 auto; padding:24px 20px 60px; }
+
+  .tabbar{ display:none; }
+  @media (max-width:700px){
+    nav.top{ display:none; }
+    .tabbar{
+      display:flex; position:fixed; left:0; right:0; bottom:0; z-index:20;
+      background:var(--card); border-top:1px solid var(--line);
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      box-shadow:0 -6px 20px rgba(20,21,26,.07);
+    }
+    .tabbar a{
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+      padding:6px 2px 5px; border-radius:12px; color:var(--sub); font-size:10.5px; font-weight:700;
+    }
+    .tabbar a svg{ width:22px; height:22px; }
+    .tabbar a.active{ color:var(--red); }
+    main{ padding-bottom:90px; }
+  }
   footer{
     border-top:1px solid var(--line); margin-top:40px; padding:26px 20px;
     text-align:center; color:var(--sub); font-size:13px;
@@ -108,9 +144,69 @@
   .cat-filters a.active{ background:var(--chip-color, var(--red)); color:#fff; border-color:var(--chip-color, var(--red)); }
   .cat-filters a:not(.active):hover{ background:rgba(0,0,0,.03); }
 
+  .stat-hero{ text-align:center; padding:8px 0 4px; }
+  .stat-hero h1{ font-size:26px; margin:0 0 8px; }
+  .stat-hero p{ color:var(--sub); font-size:15px; max-width:560px; margin:0 auto; line-height:1.6; }
+  .stat-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr));
+    gap:14px; margin:28px 0;
+  }
+  .stat-card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:18px 16px; text-align:center; border-top:3px solid var(--stat-color, var(--red));
+  }
+  .stat-card .num{ font-size:26px; font-weight:800; letter-spacing:-.3px; }
+  .stat-card .lbl{ font-size:12.5px; color:var(--sub); font-weight:600; margin-top:4px; }
+  .stat-section-title{ font-size:16px; font-weight:800; margin:36px 0 4px; }
+  .stat-section-sub{ font-size:13px; color:var(--sub); margin:0 0 14px; }
+  .chart-wrap{
+    display:flex; align-items:flex-end; gap:3px; height:120px; overflow-x:auto;
+    background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 10px 0;
+  }
+  .chart-bar{ flex:1 0 6px; min-width:6px; display:flex; flex-direction:column; justify-content:flex-end; height:100%; }
+  .chart-bar i{
+    display:block; border-radius:2px 2px 0 0; background:var(--chart-color, var(--red));
+    min-height:2px;
+  }
+  .chart-legend{ display:flex; justify-content:space-between; font-size:11px; color:var(--sub); margin-top:6px; }
+  .top-post{
+    display:flex; gap:12px; align-items:center; background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:10px; margin-bottom:10px;
+  }
+  .top-post .rank{
+    flex-shrink:0; width:28px; height:28px; border-radius:50%; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; color:var(--sub);
+  }
+  .top-post .thumb{
+    width:44px; height:66px; border-radius:6px; object-fit:cover; background:#eee; flex-shrink:0;
+  }
+  .top-post .info{ flex:1; min-width:0; }
+  .top-post .info .cap{ font-size:13.5px; font-weight:600; line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .top-post .info .m{ font-size:12px; color:var(--sub); margin-top:4px; }
+  .top-post .info .m b{ color:var(--ink); }
+  .stat-updated{ text-align:center; font-size:12px; color:var(--sub); margin-top:24px; }
+
+  .ad-cta{
+    margin-top:36px; background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:30px 24px; text-align:center;
+  }
+  .ad-cta .eyebrow{ font-size:11px; font-weight:800; letter-spacing:.6px; color:var(--red); text-transform:uppercase; }
+  .ad-cta h2{ font-size:19px; margin:6px 0 10px; }
+  .ad-cta p{ font-size:14px; color:var(--sub); max-width:480px; margin:0 auto; line-height:1.65; }
+  .ad-cta-actions{ display:flex; justify-content:center; gap:10px; margin-top:20px; flex-wrap:wrap; }
+  .ad-btn{
+    display:inline-flex; align-items:center; gap:7px; padding:11px 22px; border-radius:999px;
+    font-size:13.5px; font-weight:700; background:var(--red); color:#fff; border:1.5px solid var(--red);
+  }
+  .ad-btn svg{ width:16px; height:16px; }
+  .ad-btn.alt{ background:transparent; color:var(--ink); border-color:var(--line); }
+  .ad-btn:hover{ opacity:.9; }
+
   .page-narrow{ max-width:640px; margin:0 auto; }
   .page-narrow h1{ font-size:24px; margin:0 0 16px; }
+  .page-narrow h2{ font-size:17px; margin:28px 0 8px; }
   .page-narrow p{ font-size:15px; line-height:1.75; color:#26272c; }
+  .page-narrow a{ color:var(--red); font-weight:600; }
   .contact-list{ list-style:none; padding:0; margin:20px 0 0; display:flex; flex-direction:column; gap:12px; }
   .contact-list li{
     display:flex; align-items:center; gap:10px; background:var(--card);
@@ -131,6 +227,7 @@
     text-align:center; color:var(--sub); font-size:12px;
   }
   @media (max-width:700px){ .footer-grid{ grid-template-columns:1fr 1fr; } }
+
 </style>
 </head>
 <body>
@@ -140,16 +237,52 @@
       <span class="mark">SON DAKİKA</span>
       <span class="name">Hakan <span>Erbaş</span></span>
     </a>
+    {% set path = request.url.path %}
+    {% set nav_haberler = path == '/haberler' or path.startswith('/haber/') %}
+    {% set nav_stats = path == '/istatistikler' %}
+    {% set nav_hakkinda = path == '/hakkinda' %}
+    {% set nav_iletisim = path == '/iletisim' %}
     <nav class="top">
-      <a href="/haberler">Haberler</a>
-      <a href="/hakkinda">Hakkında</a>
-      <a href="/iletisim">İletişim</a>
+      <a href="/haberler" class="{{ 'active' if nav_haberler }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+        Haberler
+      </a>
+      <a href="/istatistikler" class="{{ 'active' if nav_stats }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>
+        İstatistikler
+      </a>
+      <a href="/hakkinda" class="{{ 'active' if nav_hakkinda }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg>
+        Hakkında
+      </a>
+      <a href="/iletisim" class="{{ 'active' if nav_iletisim }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+        İletişim
+      </a>
     </nav>
   </div>
 </header>
 <main>
   {% block content %}{% endblock %}
 </main>
+<nav class="tabbar">
+  <a href="/haberler" class="{{ 'active' if nav_haberler }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+    <span>Haberler</span>
+  </a>
+  <a href="/istatistikler" class="{{ 'active' if nav_stats }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>
+    <span>İstatistik</span>
+  </a>
+  <a href="/hakkinda" class="{{ 'active' if nav_hakkinda }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg>
+    <span>Hakkında</span>
+  </a>
+  <a href="/iletisim" class="{{ 'active' if nav_iletisim }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+    <span>İletişim</span>
+  </a>
+</nav>
 <footer class="site">
   <div class="footer-grid">
     <div class="footer-col">
@@ -162,9 +295,11 @@
     </div>
     <div class="footer-col">
       <div class="footer-title">Kurumsal</div>
+      <a href="/istatistikler">İstatistikler</a>
       <a href="/hakkinda">Hakkında</a>
       <a href="/iletisim">İletişim</a>
       <a href="/haberler">Tüm Haberler</a>
+      <a href="/gizlilik-politikasi">Gizlilik Politikası</a>
     </div>
     <div class="footer-col">
       <div class="footer-title">Bizi Takip Et</div>
@@ -173,8 +308,16 @@
     </div>
   </div>
   <div class="footer-bottom">
-    &copy; {{ CURRENT_YEAR }} Hakan Erbaş &middot; Bu içerikler yapay zeka destekli olarak üretilmiştir.
+    &copy; {{ CURRENT_YEAR }} Hakan Erbaş &middot; Bu içerikler yapay zeka destekli olarak üretilmiştir. &middot;
+    <a href="/gizlilik-politikasi">Gizlilik Politikası</a>
   </div>
 </footer>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/news-sw.js').catch(() => {});
+  }
+
+</script>
 </body>
 </html>
