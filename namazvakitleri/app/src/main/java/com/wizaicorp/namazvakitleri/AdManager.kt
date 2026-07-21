@@ -68,6 +68,13 @@ object AdManager {
         } else { onDone() }
     }
 
+    // App Open koruma: ilk acilista, interstitial'dan hemen sonra ve
+    // kisa kesintilerde (izin diyalogu, UMP formu) gosterme
+    private val appStartMs = System.currentTimeMillis()
+    private var lastPauseMs = 0L
+
+    fun notePause() { lastPauseMs = System.currentTimeMillis() }
+
     private fun loadAppOpen() {
         AppOpenAd.load(ctx, APP_OPEN_ID, AdRequest.Builder().build(),
             object : AppOpenAd.AppOpenAdLoadCallback() {
@@ -77,8 +84,12 @@ object AdManager {
     }
 
     fun showAppOpen(activity: Activity) {
+        val now = System.currentTimeMillis()
+        if (now - appStartMs < 15_000) return                       // ilk acilis
+        if (now - lastInterstitialMs < 60_000) return               // interstitial yeni kapandi
+        if (lastPauseMs == 0L || now - lastPauseMs < 30_000) return // kisa kesinti
         val ad = appOpen ?: return
-        if (System.currentTimeMillis() - appOpenLoadTime > 4 * 3600_000) { loadAppOpen(); return }
+        if (now - appOpenLoadTime > 4 * 3600_000) { loadAppOpen(); return }
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() { appOpen = null; loadAppOpen() }
         }

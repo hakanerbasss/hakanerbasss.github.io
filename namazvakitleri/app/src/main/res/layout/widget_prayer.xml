@@ -18,6 +18,17 @@
         android:singleLine="true"
         android:ellipsize="end" />
 
+    <TextView
+        android:id="@+id/w_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text=""
+        android:textColor="#B7E4C7"
+        android:textSize="10sp"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

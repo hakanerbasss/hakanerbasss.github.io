@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
@@ -78,6 +79,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         AdManager.showAppOpen(this)
     }
+
+    override fun onPause() {
+        super.onPause()
+        AdManager.notePause()
+    }
 }
 
 @Composable
@@ -123,6 +129,18 @@ private fun NamazNavHost() {
     }
 
     LaunchedEffect(Unit) { loadTimes() }
+
+    // Geri tusu: uygulamadan cikmak yerine ust ekrana doner
+    BackHandler(enabled = screen != Screen.PrayerTimes) {
+        screen = when (screen) {
+            is Screen.LibDetail -> Screen.Library
+            is Screen.EduDetail -> Screen.Education
+            Screen.Library, Screen.Education, Screen.Zikir, Screen.Kaza,
+            Screen.HolyDays, Screen.Esma, Screen.News, Screen.Assistant,
+            Screen.ApiSettings, Screen.Settings -> Screen.More
+            else -> Screen.PrayerTimes
+        }
+    }
 
     when (screen) {
         Screen.PrayerTimes,

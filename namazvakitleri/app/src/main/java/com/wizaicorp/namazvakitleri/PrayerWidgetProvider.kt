@@ -7,9 +7,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import com.wizaicorp.namazvakitleri.data.HolyDays
 import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.TimesCache
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class PrayerWidgetProvider : AppWidgetProvider() {
 
@@ -34,6 +38,15 @@ class PrayerWidgetProvider : AppWidgetProvider() {
         private fun render(ctx: Context, mgr: AppWidgetManager, widgetId: Int) {
             val rv = RemoteViews(ctx.packageName, R.layout.widget_prayer)
             val times = TimesCache.getToday(ctx)
+
+            // Tarih satiri: miladi + hicri
+            try {
+                val locale = if (Lang.code == "tr") Locale("tr") else Locale.ENGLISH
+                val miladi = SimpleDateFormat("d MMMM", locale).format(Date())
+                rv.setTextViewText(R.id.w_date, "$miladi  •  ${HolyDays.hijriToday()}")
+            } catch (e: Exception) {
+                rv.setTextViewText(R.id.w_date, "")
+            }
 
             if (times == null) {
                 rv.setTextViewText(R.id.w_header, ctx.getString(R.string.app_name))

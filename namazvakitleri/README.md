@@ -3,7 +3,16 @@
 Android uygulaması — Kotlin + Jetpack Compose. Termux'ta geliştirilir ve build alınır
 (`~/namazvakitleri`), kaynak kodun ana kopyası bu depodadır.
 
-## Özellikler (v2.0)
+## Özellikler (v2.6)
+
+v2.1+: Zikirmatik sesi (TTS/kayıt) • dini gün + kaza bildirimleri • Esma sesli okuma
+v2.2: Dini Kütüphane — 12 sure + 9 dua (Arapça/okunuş/meal, sesli + imleç takibi)
+v2.3: API Anahtarları ekranı (Pexels/DeepSeek, BYOK) • Günün Sözü + görseli • Dini Haberler (Google News RSS) • AI Asistan (sesli) • kıblede Kabe simgesi
+v2.4: Namaz Eğitimi — abdest/gusül/teyemmüm, kadın-erkek namaz kılınışı, rekât tablosu
+v2.5: Hafız kıraati (everyayah stream, Alafasy) • Ramazan modu (iftar/imsak sayacı)
+v2.6: Geri tuşu navigasyonu • App Open reklam korumaları • widget'a tarih/hicri satırı
+
+### v2.0 tabanı
 
 - Aladhan API'den (Diyanet metodu 13) şehir adına göre namaz vakitleri
 - **Ana ekran widget'ı** — günün 6 vakti, sıradaki vakit vurgulu
