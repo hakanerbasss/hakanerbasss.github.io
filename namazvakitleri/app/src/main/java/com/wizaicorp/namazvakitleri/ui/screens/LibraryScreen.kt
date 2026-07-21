@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.LibraryData
 import com.wizaicorp.namazvakitleri.data.LibraryItem
+import com.wizaicorp.namazvakitleri.util.QuranPlayer
 import com.wizaicorp.namazvakitleri.util.Speech
 
 /** Sure/dua listesi */
@@ -94,11 +95,12 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
     val listState = rememberLazyListState()
     var current by remember { mutableIntStateOf(-1) }
     var isPlaying by remember { mutableStateOf(false) }
-    // Okuma modu: "reading" = okunus, "meaning" = meal
-    var readMode by remember { mutableStateOf("reading") }
+    // Okuma modu: "audio" = hafiz kiraati, "reading" = okunus, "meaning" = meal
+    val hasAudio = item.audioIds.isNotEmpty()
+    var readMode by remember { mutableStateOf(if (hasAudio) "audio" else "reading") }
 
     LaunchedEffect(Unit) { Speech.init(ctx) }
-    DisposableEffect(Unit) { onDispose { Speech.stop() } }
+    DisposableEffect(Unit) { onDispose { Speech.stop(); QuranPlayer.stop() } }
 
     // Okunan ayete otomatik kaydir (imlec takibi)
     LaunchedEffect(current) {
@@ -106,20 +108,31 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
     }
 
     fun play() {
-        val texts = item.verses.map { v ->
-            if (readMode == "reading") v.reading else v.meaning
-        }
         isPlaying = true
         current = -1
-        Speech.speakSequence(
-            texts,
-            onIndex = { current = it },
-            onFinished = { isPlaying = false; current = -1 }
-        )
+        if (readMode == "audio") {
+            // Ayet kodu sayisi kart sayisiyla eslesiyorsa vurgu takibi yapilir
+            val sync = item.audioIds.size == item.verses.size
+            QuranPlayer.playSequence(
+                item.audioIds,
+                onIndex = { if (sync) current = it },
+                onFinished = { isPlaying = false; current = -1 }
+            )
+        } else {
+            val texts = item.verses.map { v ->
+                if (readMode == "reading") v.reading else v.meaning
+            }
+            Speech.speakSequence(
+                texts,
+                onIndex = { current = it },
+                onFinished = { isPlaying = false; current = -1 }
+            )
+        }
     }
 
     fun stop() {
         Speech.stop()
+        QuranPlayer.stop()
         isPlaying = false
         current = -1
     }
@@ -133,14 +146,21 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (hasAudio) {
+                    FilterChip(
+                        selected = readMode == "audio",
+                        onClick = { stop(); readMode = "audio" },
+                        label = { Text(Lang.get("mode_audio")) }
+                    )
+                }
                 FilterChip(
                     selected = readMode == "reading",
-                    onClick = { readMode = "reading" },
+                    onClick = { stop(); readMode = "reading" },
                     label = { Text(Lang.get("mode_reading")) }
                 )
                 FilterChip(
                     selected = readMode == "meaning",
-                    onClick = { readMode = "meaning" },
+                    onClick = { stop(); readMode = "meaning" },
                     label = { Text(Lang.get("mode_meaning")) }
                 )
                 Spacer(Modifier.weight(1f))
@@ -170,9 +190,17 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                Speech.speak(
-                                    if (readMode == "reading") verse.reading else verse.meaning
-                                )
+                                if (readMode == "audio" && item.audioIds.size == item.verses.size) {
+                                    QuranPlayer.playSequence(
+                                        listOf(item.audioIds[i]),
+                                        onIndex = { },
+                                        onFinished = { }
+                                    )
+                                } else {
+                                    Speech.speak(
+                                        if (readMode == "reading") verse.reading else verse.meaning
+                                    )
+                                }
                             }
                     ) {
                         Column(Modifier.padding(16.dp)) {

@@ -16,7 +16,9 @@ data class LibraryItem(
     val nameAr: String,
     val infoTr: String,
     val infoEn: String,
-    val verses: List<Verse>
+    val verses: List<Verse>,
+    // everyayah.com ayet kodlari (SSSAAA) - bos ise kiraat modu gosterilmez
+    val audioIds: List<String> = emptyList()
 ) {
     val name: String get() = if (Lang.code == "tr") nameTr else nameEn
     val info: String get() = if (Lang.code == "tr") infoTr else infoEn
@@ -66,7 +68,8 @@ object LibraryData {
                     "Sırâtallezîne en'amte aleyhim gayril mağdûbi aleyhim veleddâllîn",
                     "Nimet verdiklerinin yoluna; gazaba uğrayanların ve sapanların yoluna değil.",
                     "The path of those You have blessed, not of those who earned Your anger or went astray.")
-            )
+            ),
+            audioIds = listOf("001001", "001002", "001003", "001004", "001005", "001006", "001007")
         ),
         LibraryItem(
             "ayetel_kursi", "Âyetel Kürsî", "Ayat al-Kursi", "آية الكرسي",
@@ -93,7 +96,8 @@ object LibraryData {
                     "Velâ yeûdühû hıfzuhümâ ve hüvel aliyyül azîm",
                     "Onları korumak O'na ağır gelmez. O, yücedir, büyüktür.",
                     "Preserving both does not tire Him. He is the Most High, the Most Great.")
-            )
+            ),
+            audioIds = listOf("002255")
         ),
         LibraryItem(
             "fil", "Fîl Suresi", "Surah Al-Fil", "الفيل",
@@ -121,7 +125,8 @@ object LibraryData {
                     "Fecealehüm keasfin me'kûl",
                     "Sonunda onları yenilmiş ekin yaprağı gibi yaptı.",
                     "so He made them like chewed-up straw.")
-            )
+            ),
+            audioIds = listOf("001001", "105001", "105002", "105003", "105004", "105005")
         ),
         LibraryItem(
             "kureys", "Kureyş Suresi", "Surah Quraysh", "قريش",
@@ -145,7 +150,8 @@ object LibraryData {
                     "Ellezî at'amehüm min cû'in ve âmenehüm min havf",
                     "O, onları açlıktan doyurdu ve korkudan emin kıldı.",
                     "who fed them against hunger and secured them from fear.")
-            )
+            ),
+            audioIds = listOf("001001", "106001", "106002", "106003", "106004")
         ),
         LibraryItem(
             "maun", "Mâûn Suresi", "Surah Al-Ma'un", "الماعون",
@@ -181,7 +187,8 @@ object LibraryData {
                     "Ve yemneûnel mâûn",
                     "ve en küçük yardımı bile esirgerler.",
                     "and withhold simple assistance.")
-            )
+            ),
+            audioIds = listOf("001001", "107001", "107002", "107003", "107004", "107005", "107006", "107007")
         ),
         LibraryItem(
             "kevser", "Kevser Suresi", "Surah Al-Kawthar", "الكوثر",
@@ -201,7 +208,8 @@ object LibraryData {
                     "İnne şânieke hüvel ebter",
                     "Asıl soyu kesik olan, sana buğzedendir.",
                     "Indeed, your enemy is the one cut off.")
-            )
+            ),
+            audioIds = listOf("001001", "108001", "108002", "108003")
         ),
         LibraryItem(
             "kafirun", "Kâfirûn Suresi", "Surah Al-Kafirun", "الكافرون",
@@ -233,7 +241,8 @@ object LibraryData {
                     "Leküm dînüküm veliye dîn",
                     "Sizin dininiz size, benim dinim banadır.",
                     "You have your religion, and I have mine.")
-            )
+            ),
+            audioIds = listOf("001001", "109001", "109002", "109003", "109004", "109005", "109006")
         ),
         LibraryItem(
             "nasr", "Nasr Suresi", "Surah An-Nasr", "النصر",
@@ -253,7 +262,8 @@ object LibraryData {
                     "Fesebbih bihamdi rabbike vestağfirh, innehû kâne tevvâbâ",
                     "Rabbini hamd ile tesbih et ve O'ndan bağışlanma dile. Çünkü O, tövbeleri çok kabul edendir.",
                     "then glorify the praises of your Lord and seek His forgiveness. He is ever Accepting of repentance.")
-            )
+            ),
+            audioIds = listOf("001001", "110001", "110002", "110003")
         ),
         LibraryItem(
             "tebbet", "Tebbet Suresi", "Surah Al-Masad", "المسد",
@@ -281,7 +291,8 @@ object LibraryData {
                     "Fî cîdihâ hablün min mesed",
                     "Boynunda hurma lifinden bir ip olduğu halde.",
                     "around her neck a rope of palm fiber.")
-            )
+            ),
+            audioIds = listOf("001001", "111001", "111002", "111003", "111004", "111005")
         ),
         LibraryItem(
             "ihlas", "İhlâs Suresi", "Surah Al-Ikhlas", "الإخلاص",
@@ -305,7 +316,8 @@ object LibraryData {
                     "Velem yekün lehû küfüven ehad",
                     "Hiçbir şey O'na denk değildir.",
                     "And there is none comparable to Him.")
-            )
+            ),
+            audioIds = listOf("001001", "112001", "112002", "112003", "112004")
         ),
         LibraryItem(
             "felak", "Felak Suresi", "Surah Al-Falaq", "الفلق",
@@ -333,7 +345,8 @@ object LibraryData {
                     "Ve min şerri hâsidin izâ hased",
                     "ve haset ettiğinde hasetçinin şerrinden.",
                     "and from the evil of the envier when he envies.")
-            )
+            ),
+            audioIds = listOf("001001", "113001", "113002", "113003", "113004", "113005")
         ),
         LibraryItem(
             "nas", "Nâs Suresi", "Surah An-Nas", "الناس",
@@ -365,7 +378,8 @@ object LibraryData {
                     "Minel cinneti vennâs",
                     "cinlerden ve insanlardan.",
                     "from among jinn and mankind.")
-            )
+            ),
+            audioIds = listOf("001001", "114001", "114002", "114003", "114004", "114005", "114006")
         )
     )
 

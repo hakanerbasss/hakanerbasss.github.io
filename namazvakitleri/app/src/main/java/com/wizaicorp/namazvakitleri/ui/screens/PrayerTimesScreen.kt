@@ -56,12 +56,68 @@ fun PrayerTimesContent(
                 }
                 DateCard(prayerTimes.date)
                 Spacer(Modifier.height(12.dp))
+                if (isRamadan()) {
+                    RamadanCard(prayerTimes)
+                    Spacer(Modifier.height(12.dp))
+                }
                 NextPrayerCard(prayerTimes)
                 Spacer(Modifier.height(12.dp))
                 PrayerList(prayerTimes)
                 Spacer(Modifier.height(12.dp))
                 TodayCard()
                 Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+}
+
+private fun isRamadan(): Boolean = try {
+    java.time.chrono.HijrahDate.from(java.time.LocalDate.now())
+        .get(java.time.temporal.ChronoField.MONTH_OF_YEAR) == 9
+} catch (e: Exception) { false }
+
+/** Ramazan ayinda otomatik gorunur: iftara / imsaka geri sayim */
+@Composable
+private fun RamadanCard(times: PrayerTimes) {
+    var label by remember { mutableStateOf("") }
+    var countdown by remember { mutableStateOf("") }
+    LaunchedEffect(times) {
+        while (true) {
+            val now = currentTimeStr()
+            if (now < times.aksam) {
+                label = Lang.get("iftar_left")
+                countdown = remainingTime(times.aksam)
+            } else {
+                // Aksamdan sonra hedef imsak (yarinki imsak bugunkune cok yakindir)
+                label = Lang.get("sahur_left")
+                countdown = remainingTime(times.imsak)
+            }
+            delay(1000)
+        }
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.secondary
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("🌙", style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "${Lang.get("ramadan")} • $label",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.85f)
+                )
+                Text(
+                    countdown,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondary
+                )
             }
         }
     }

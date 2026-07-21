@@ -197,7 +197,12 @@ object Lang {
         "qibla_label" to "Qibla",
         // Education
         "education" to "Prayer Guide",
-        "edu_disclaimer" to "This guide follows the Hanafi school and Diyanet sources. Consult a scholar for details."
+        "edu_disclaimer" to "This guide follows the Hanafi school and Diyanet sources. Consult a scholar for details.",
+        // Recitation + Ramadan
+        "mode_audio" to "Recitation",
+        "ramadan" to "Ramadan",
+        "iftar_left" to "Until iftar",
+        "sahur_left" to "Until imsak (suhoor ends)"
     )
 
     private val tr = mapOf(
@@ -362,6 +367,11 @@ object Lang {
         "qibla_label" to "Kıble",
         // Education
         "education" to "Namaz Eğitimi",
-        "edu_disclaimer" to "Anlatım Hanefî mezhebine ve Diyanet kaynaklarına göredir. Ayrıntılar için ilmihale veya müftülüğe başvurunuz."
+        "edu_disclaimer" to "Anlatım Hanefî mezhebine ve Diyanet kaynaklarına göredir. Ayrıntılar için ilmihale veya müftülüğe başvurunuz.",
+        // Recitation + Ramadan
+        "mode_audio" to "Kıraat",
+        "ramadan" to "Ramazan",
+        "iftar_left" to "İftara kalan",
+        "sahur_left" to "İmsaka kalan"
     )
 }
