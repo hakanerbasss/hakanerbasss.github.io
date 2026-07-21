@@ -3,15 +3,24 @@
 Android uygulaması — Kotlin + Jetpack Compose. Termux'ta geliştirilir ve build alınır
 (`~/namazvakitleri`), kaynak kodun ana kopyası bu depodadır.
 
-## Özellikler
+## Özellikler (v2.0)
 
 - Aladhan API'den (Diyanet metodu 13) şehir adına göre namaz vakitleri
-- Aylık takvim (imsakiye) ekranı
-- Kıble pusulası
-- Vakit bildirimleri — tamamen yerel (AlarmManager, exact alarm)
+- **Ana ekran widget'ı** — günün 6 vakti, sıradaki vakit vurgulu
+- **Çevrimdışı mod** — vakitler önbelleğe alınır, internetsiz de gösterilir
+- **Arka plan bildirim zinciri** — uygulama açılmasa da her gece 00:05'te
+  yeni günün alarmları kurulur; telefon yeniden başlayınca geri yüklenir
+- Hicri tarih (ana ekranda) + sıradaki vakte ilerleme çubuğu
+- **Zikirmatik** — dokunmatik sayaç, titreşim, hedef 33/99/500/1000, toplam
+- **Dini Günler** — kandiller/bayramlar hicri takvimden otomatik + geri sayım
+- **Kaza Takibi** — vakit başına sayaç, +1 gün toplu ekleme
+- **Esmaül Hüsna** — 99 isim + günün esması kartı
+- **TR/EN dil desteği** (cihaz diline göre otomatik, ayarlardan seçilebilir)
+- Aylık takvim (imsakiye), kıble pusulası
+- Vakit bildirimleri: tam vakitte + X dk önce hatırlatma (ikisi birden)
 - Firebase FCM (uzaktan bildirim)
-- AdMob (banner + interstitial + app open) ve UMP consent
-- Gizlilik politikası: depo kökündeki `namaz-gizlilik.html`
+- AdMob: banner (tüm ekranlar) + frekans korumalı interstitial + app open + UMP
+- Paylaş / Play'de değerlendir / gizlilik politikası bağlantıları
   → https://hakanerbasss.github.io/namaz-gizlilik.html
 
 ## Depoda OLMAYAN dosyalar (Termux'ta kalır / git'e girmez)

@@ -3,6 +3,7 @@ package com.wizaicorp.namazvakitleri.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
@@ -21,6 +22,7 @@ import com.wizaicorp.namazvakitleri.R
 import com.wizaicorp.namazvakitleri.BannerAd
 import com.wizaicorp.namazvakitleri.Screen
 import com.wizaicorp.namazvakitleri.data.City
+import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,16 +33,19 @@ fun MainScreen(
     prayerTimes: PrayerTimes?,
     isLoading: Boolean,
     error: String?,
+    isOffline: Boolean,
     selectedCity: City,
     onRefresh: () -> Unit,
     onCityClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onOpen: (Screen) -> Unit
 ) {
     val topBarTitle = when (currentTab) {
-        Screen.PrayerTimes -> prayerTimes?.city ?: "Namaz Vakitleri"
-        Screen.Qibla       -> "Kıble"
-        Screen.Calendar    -> "Takvim"
-        else               -> "Namaz Vakitleri"
+        Screen.PrayerTimes -> prayerTimes?.city ?: Lang.get("tab_times")
+        Screen.Qibla       -> Lang.get("tab_qibla")
+        Screen.Calendar    -> Lang.get("tab_calendar")
+        Screen.More        -> Lang.get("tab_more")
+        else               -> Lang.get("tab_times")
     }
 
     Scaffold(
@@ -61,13 +66,13 @@ fun MainScreen(
                 actions = {
                     if (currentTab == Screen.PrayerTimes) {
                         IconButton(onClick = onSettingsClick) {
-                            Icon(Icons.Default.Notifications, contentDescription = "Bildirim Ayarları")
+                            Icon(Icons.Default.Notifications, contentDescription = Lang.get("notif_settings"))
                         }
                         IconButton(onClick = onCityClick) {
-                            Icon(Icons.Default.LocationCity, contentDescription = "Şehir seç")
+                            Icon(Icons.Default.LocationCity, contentDescription = Lang.get("change_city"))
                         }
                         IconButton(onClick = onRefresh, enabled = !isLoading) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Yenile")
+                            Icon(Icons.Default.Refresh, contentDescription = null)
                         }
                     }
                 },
@@ -85,19 +90,25 @@ fun MainScreen(
                         selected = currentTab == Screen.PrayerTimes,
                         onClick  = { onTabChange(Screen.PrayerTimes) },
                         icon     = { Icon(Icons.Default.Home, contentDescription = null) },
-                        label    = { Text("Vakitler") }
+                        label    = { Text(Lang.get("tab_times")) }
                     )
                     NavigationBarItem(
                         selected = currentTab == Screen.Qibla,
                         onClick  = { onTabChange(Screen.Qibla) },
                         icon     = { Icon(Icons.Default.Explore, contentDescription = null) },
-                        label    = { Text("Kıble") }
+                        label    = { Text(Lang.get("tab_qibla")) }
                     )
                     NavigationBarItem(
                         selected = currentTab == Screen.Calendar,
                         onClick  = { onTabChange(Screen.Calendar) },
                         icon     = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                        label    = { Text("Takvim") }
+                        label    = { Text(Lang.get("tab_calendar")) }
+                    )
+                    NavigationBarItem(
+                        selected = currentTab == Screen.More,
+                        onClick  = { onTabChange(Screen.More) },
+                        icon     = { Icon(Icons.Default.Apps, contentDescription = null) },
+                        label    = { Text(Lang.get("tab_more")) }
                     )
                 }
                 BannerAd()
@@ -109,11 +120,17 @@ fun MainScreen(
                 prayerTimes = prayerTimes,
                 isLoading   = isLoading,
                 error       = error,
+                isOffline   = isOffline,
                 onRefresh   = onRefresh,
                 modifier    = Modifier.padding(padding)
             )
             Screen.Qibla    -> QiblaContent(modifier = Modifier.padding(padding))
             Screen.Calendar -> CalendarContent(city = selectedCity, modifier = Modifier.padding(padding))
+            Screen.More     -> MoreContent(
+                prayerTimes = prayerTimes,
+                onOpen      = onOpen,
+                modifier    = Modifier.padding(padding)
+            )
             else            -> {}
         }
     }

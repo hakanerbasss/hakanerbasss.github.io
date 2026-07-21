@@ -1,6 +1,7 @@
 package com.wizaicorp.namazvakitleri
 
 import android.Manifest
+import android.app.Activity
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -16,11 +17,17 @@ import com.google.android.ump.UserMessagingPlatform
 import com.wizaicorp.namazvakitleri.data.City
 import com.wizaicorp.namazvakitleri.data.CityManager
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
+import com.wizaicorp.namazvakitleri.data.TimesCache
 import com.wizaicorp.namazvakitleri.api.AladhanApi
 import com.wizaicorp.namazvakitleri.ui.screens.CitySelectScreen
+import com.wizaicorp.namazvakitleri.ui.screens.EsmaScreen
+import com.wizaicorp.namazvakitleri.ui.screens.HolyDaysScreen
+import com.wizaicorp.namazvakitleri.ui.screens.KazaScreen
 import com.wizaicorp.namazvakitleri.ui.screens.MainScreen
 import com.wizaicorp.namazvakitleri.ui.screens.SettingsScreen
+import com.wizaicorp.namazvakitleri.ui.screens.ZikirScreen
 import com.wizaicorp.namazvakitleri.ui.theme.NamazTheme
+import com.wizaicorp.namazvakitleri.data.Lang
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -72,6 +79,7 @@ private fun NamazNavHost() {
     var screen by remember { mutableStateOf<Screen>(Screen.PrayerTimes) }
     var prayerTimes by remember { mutableStateOf<PrayerTimes?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var isOffline by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedCity by remember { mutableStateOf(CityManager.getSelected(ctx)) }
     val scope = rememberCoroutineScope()
@@ -80,14 +88,31 @@ private fun NamazNavHost() {
         scope.launch {
             isLoading = true; error = null
             try {
-                prayerTimes = AladhanApi.getPrayerTimes(city.apiName, city.country)
-                AlarmScheduler.schedule(ctx, prayerTimes!!)
+                val t = AladhanApi.getPrayerTimes(city.apiName, city.country).copy(city = city.name)
+                prayerTimes = t
+                isOffline = false
+                TimesCache.saveDay(ctx, TimesCache.isoToday(), t)
+                AlarmScheduler.schedule(ctx, t)
             } catch (e: Exception) {
-                error = "Vakitler yuklenemedi. Internet baglantinizi kontrol edin."
+                // Cevrimdisi: onbellekten gosterelim
+                val cached = TimesCache.getToday(ctx)
+                if (cached != null) {
+                    prayerTimes = cached
+                    isOffline = true
+                    AlarmScheduler.schedule(ctx, cached)
+                } else {
+                    error = Lang.get("err_load")
+                }
             } finally {
                 isLoading = false
             }
         }
+    }
+
+    // Alt ekrandan ana sekmeye donus + gecislerde frekans korumali interstitial
+    fun goTab(tab: Screen) {
+        screen = tab
+        (ctx as? Activity)?.let { AdManager.maybeShowInterstitial(it) }
     }
 
     LaunchedEffect(Unit) { loadTimes() }
@@ -95,18 +120,25 @@ private fun NamazNavHost() {
     when (screen) {
         Screen.PrayerTimes,
         Screen.Qibla,
-        Screen.Calendar -> MainScreen(
-            currentTab     = screen,
-            onTabChange    = { screen = it },
-            prayerTimes    = prayerTimes,
-            isLoading      = isLoading,
-            error          = error,
-            selectedCity   = selectedCity,
-            onRefresh      = { loadTimes() },
-            onCityClick    = { screen = Screen.CitySelect },
-            onSettingsClick = { screen = Screen.Settings }
+        Screen.Calendar,
+        Screen.More -> MainScreen(
+            currentTab      = screen,
+            onTabChange     = { goTab(it) },
+            prayerTimes     = prayerTimes,
+            isLoading       = isLoading,
+            error           = error,
+            isOffline       = isOffline,
+            selectedCity    = selectedCity,
+            onRefresh       = { loadTimes() },
+            onCityClick     = { screen = Screen.CitySelect },
+            onSettingsClick = { screen = Screen.Settings },
+            onOpen          = { screen = it }
         )
-        Screen.Settings   -> SettingsScreen(onBack = { screen = Screen.PrayerTimes })
+        Screen.Settings -> SettingsScreen(onBack = { goTab(Screen.More) })
+        Screen.Zikir    -> ZikirScreen(onBack = { goTab(Screen.More) })
+        Screen.Kaza     -> KazaScreen(onBack = { goTab(Screen.More) })
+        Screen.HolyDays -> HolyDaysScreen(onBack = { goTab(Screen.More) })
+        Screen.Esma     -> EsmaScreen(onBack = { goTab(Screen.More) })
         Screen.CitySelect -> CitySelectScreen(
             selectedCity = selectedCity,
             onCitySelected = { city ->
@@ -115,7 +147,7 @@ private fun NamazNavHost() {
                 loadTimes(city)
                 screen = Screen.PrayerTimes
             },
-            onBack = { screen = Screen.PrayerTimes }
+            onBack = { goTab(Screen.PrayerTimes) }
         )
     }
 }
@@ -124,6 +156,11 @@ sealed class Screen {
     object PrayerTimes : Screen()
     object Qibla       : Screen()
     object Calendar    : Screen()
+    object More        : Screen()
     object CitySelect  : Screen()
     object Settings    : Screen()
+    object Zikir       : Screen()
+    object Kaza        : Screen()
+    object HolyDays    : Screen()
+    object Esma        : Screen()
 }

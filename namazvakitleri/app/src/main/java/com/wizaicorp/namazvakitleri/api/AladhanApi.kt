@@ -1,6 +1,7 @@
 package com.wizaicorp.namazvakitleri.api
 
 import com.google.gson.annotations.SerializedName
+import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -54,6 +55,7 @@ data class AladhanHijriMonth(val en: String, val ar: String)
 data class CalendarDayItem(
     val dayNum: Int,
     val weekdayTr: String,
+    val weekdayEn: String,
     val hijriDate: String,
     val times: PrayerTimes
 )
@@ -70,7 +72,8 @@ object AladhanApi {
     suspend fun getPrayerTimes(city: String, country: String = "Turkey"): PrayerTimes {
         val resp = service.getTimes(city, country)
         val t = resp.data.timings
-        val today = SimpleDateFormat("d MMMM yyyy", Locale("tr")).format(Date())
+        val locale = if (Lang.code == "tr") Locale("tr") else Locale.ENGLISH
+        val today = SimpleDateFormat("d MMMM yyyy", locale).format(Date())
         return PrayerTimes(
             imsak  = t.fajr.take(5),
             gunes  = t.sunrise.take(5),
@@ -83,6 +86,31 @@ object AladhanApi {
         )
     }
 
+    private val weekdayMap = mapOf(
+        "Monday"    to "Pazartesi",
+        "Tuesday"   to "Salı",
+        "Wednesday" to "Çarşamba",
+        "Thursday"  to "Perşembe",
+        "Friday"    to "Cuma",
+        "Saturday"  to "Cumartesi",
+        "Sunday"    to "Pazar"
+    )
+
+    private val hijriMonthMap = mapOf(
+        "Muharram" to "Muharrem", "Muḥarram" to "Muharrem",
+        "Safar" to "Safer", "Ṣafar" to "Safer",
+        "Rabi al-Awwal" to "Rebiülevvel", "Rabī' al-awwal" to "Rebiülevvel", "Rabīʿ al-awwal" to "Rebiülevvel",
+        "Rabi al-Thani" to "Rebiülahir", "Rabī' al-thānī" to "Rebiülahir", "Rabīʿ al-thānī" to "Rebiülahir",
+        "Jumada al-Awwal" to "Cemaziyelevvel", "Jumādá al-ūlá" to "Cemaziyelevvel",
+        "Jumada al-Thani" to "Cemaziyelahir", "Jumādá al-ākhirah" to "Cemaziyelahir",
+        "Rajab" to "Recep",
+        "Shaban" to "Şaban", "Sha'bān" to "Şaban", "Shaʿbān" to "Şaban",
+        "Ramadan" to "Ramazan", "Ramaḍān" to "Ramazan", "Ramaḏān" to "Ramazan",
+        "Shawwal" to "Şevval", "Shawwāl" to "Şevval",
+        "Dhu al-Qadah" to "Zilkade", "Dhū al-Qa'dah" to "Zilkade", "Dhūl-Qaʿdah" to "Zilkade",
+        "Dhu al-Hijjah" to "Zilhicce", "Dhū al-Ḥijjah" to "Zilhicce", "Dhūl-Ḥijjah" to "Zilhicce"
+    )
+
     suspend fun getMonthlyTimes(
         city: String,
         country: String,
@@ -90,36 +118,17 @@ object AladhanApi {
         month: Int
     ): List<CalendarDayItem> {
         val resp = service.getCalendar(year, month, city, country)
-        val weekdayMap = mapOf(
-            "Monday"    to "Pazartesi",
-            "Tuesday"   to "Salı",
-            "Wednesday" to "Çarşamba",
-            "Thursday"  to "Perşembe",
-            "Friday"    to "Cuma",
-            "Saturday"  to "Cumartesi",
-            "Sunday"    to "Pazar"
-        )
-        val hijriMonthMap = mapOf(
-            "Muharram"  to "Muharrem",
-            "Muḥarram" to "Muharrem",
-            "Safar"     to "Safer",
-            "Ṣafar" to "Safer",
-            "Rajab"     to "Recep",
-            "Ramadan"   to "Ramazan",
-            "Ramaḏān" to "Ramazan",
-            "Shawwal"   to "Şevval",
-            "Shawwāl" to "Şevval"
-        )
         return resp.data.map { day ->
             val t = day.timings
             val weekdayEn = day.date.gregorian.weekday.en
             val weekdayTr = weekdayMap[weekdayEn] ?: weekdayEn
             val hijriMonthEn = day.date.hijri.month.en
-            val hijriMonthTr = hijriMonthMap[hijriMonthEn] ?: hijriMonthEn
-            val hijriDate = "${day.date.hijri.day} $hijriMonthTr ${day.date.hijri.year}"
+            val hijriMonth = if (Lang.code == "tr") (hijriMonthMap[hijriMonthEn] ?: hijriMonthEn) else hijriMonthEn
+            val hijriDate = "${day.date.hijri.day} $hijriMonth ${day.date.hijri.year}"
             CalendarDayItem(
                 dayNum    = day.date.gregorian.day.toIntOrNull() ?: 0,
                 weekdayTr = weekdayTr,
+                weekdayEn = weekdayEn,
                 hijriDate = hijriDate,
                 times     = PrayerTimes(
                     imsak  = t.fajr.take(5),

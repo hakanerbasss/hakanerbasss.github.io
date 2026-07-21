@@ -1,7 +1,9 @@
 package com.wizaicorp.namazvakitleri.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -9,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.wizaicorp.namazvakitleri.data.HolyDays
+import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -18,12 +22,14 @@ fun PrayerTimesContent(
     prayerTimes: PrayerTimes?,
     isLoading: Boolean,
     error: String?,
+    isOffline: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
     ) {
         Spacer(Modifier.height(12.dp))
@@ -31,32 +37,65 @@ fun PrayerTimesContent(
             isLoading -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
-            error != null -> ErrorCard(error, onRefresh)
+            error != null && prayerTimes == null -> ErrorCard(error, onRefresh)
             prayerTimes != null -> {
+                if (isOffline) {
+                    OfflineNotice()
+                    Spacer(Modifier.height(8.dp))
+                }
                 DateCard(prayerTimes.date)
                 Spacer(Modifier.height(12.dp))
                 NextPrayerCard(prayerTimes)
                 Spacer(Modifier.height(12.dp))
                 PrayerList(prayerTimes)
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
 }
 
 @Composable
+private fun OfflineNotice() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
+    ) {
+        Text(
+            Lang.get("offline_cached"),
+            modifier = Modifier.padding(10.dp),
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+        )
+    }
+}
+
+@Composable
 private fun DateCard(date: String) {
+    val hijri = remember { HolyDays.hijriToday() }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.primaryContainer
     ) {
-        Text(
-            text = date,
+        Column(
             modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            textAlign = TextAlign.Center
-        )
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = date,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = hijri,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -64,8 +103,13 @@ private fun DateCard(date: String) {
 private fun NextPrayerCard(times: PrayerTimes) {
     val (label, timeStr) = remember(times) { nextPrayer(times) }
     var countdown by remember { mutableStateOf("") }
+    var progress by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(timeStr) {
-        while (true) { countdown = remainingTime(timeStr); delay(1000) }
+        while (true) {
+            countdown = remainingTime(timeStr)
+            progress = intervalProgress(times, timeStr)
+            delay(1000)
+        }
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -77,7 +121,7 @@ private fun NextPrayerCard(times: PrayerTimes) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "Sıradaki Vakit",
+                Lang.get("next_prayer"),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
             )
@@ -90,10 +134,17 @@ private fun NextPrayerCard(times: PrayerTimes) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "$countdown kaldı",
+                "$countdown ${Lang.get("left")}",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.secondary
+            )
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.secondary,
+                trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
             )
         }
     }
@@ -151,7 +202,7 @@ private fun ErrorCard(error: String, onRetry: () -> Unit) {
         ) {
             Text(error, color = MaterialTheme.colorScheme.onErrorContainer, textAlign = TextAlign.Center)
             Spacer(Modifier.height(8.dp))
-            Button(onClick = onRetry) { Text("Tekrar Dene") }
+            Button(onClick = onRetry) { Text(Lang.get("retry")) }
         }
     }
 }
@@ -166,6 +217,26 @@ private fun nextPrayer(t: PrayerTimes): Pair<String, String> {
     return t.asList().firstOrNull { (_, time) -> time > now } ?: t.asList().first()
 }
 
+private fun toMin(time: String): Int = try {
+    val (h, m) = time.split(":").map { it.toInt() }
+    h * 60 + m
+} catch (e: Exception) { 0 }
+
+/** Onceki vakitten siradaki vakte gecen surenin orani (0..1) */
+private fun intervalProgress(t: PrayerTimes, nextTime: String): Float {
+    val timesList = t.asList().map { it.second }
+    val nowCal = Calendar.getInstance()
+    val nowMin = nowCal.get(Calendar.HOUR_OF_DAY) * 60 + nowCal.get(Calendar.MINUTE)
+    val nextMin = toMin(nextTime)
+    val prevMin = timesList.map { toMin(it) }.filter { it <= nowMin }.maxOrNull()
+        ?: (toMin(timesList.last()) - 24 * 60)
+    var total = nextMin - prevMin
+    if (total <= 0) total += 24 * 60
+    var elapsed = nowMin - prevMin
+    if (elapsed < 0) elapsed += 24 * 60
+    return (elapsed.toFloat() / total).coerceIn(0f, 1f)
+}
+
 private fun remainingTime(target: String): String {
     val cal = Calendar.getInstance()
     val nowMin = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
@@ -174,9 +245,11 @@ private fun remainingTime(target: String): String {
     if (diff < 0) diff += 24 * 60
     val hours = diff / 60
     val mins = diff % 60
+    val hs = Lang.get("h_short")
+    val ms = Lang.get("m_short")
     return when {
-        hours > 0 && mins > 0 -> "$hours saat $mins dakika"
-        hours > 0 -> "$hours saat"
-        else -> "$mins dakika"
+        hours > 0 && mins > 0 -> "$hours $hs $mins $ms"
+        hours > 0 -> "$hours $hs"
+        else -> "$mins $ms"
     }
 }

@@ -6,14 +6,17 @@ object NotifPrefs {
     private const val PREF       = "notif_prefs"
     private const val KEY_OFFSET = "offset_min"
 
+    // (anahtar, Lang isim anahtari)
     val allPrayers = listOf(
-        "imsak"  to "İmsak",
-        "gunes"  to "Güneş",
-        "ogle"   to "Öğle",
-        "ikindi" to "İkindi",
-        "aksam"  to "Akşam",
-        "yatsi"  to "Yatsı"
+        "imsak"  to "p_imsak",
+        "gunes"  to "p_gunes",
+        "ogle"   to "p_ogle",
+        "ikindi" to "p_ikindi",
+        "aksam"  to "p_aksam",
+        "yatsi"  to "p_yatsi"
     )
+
+    fun labelOf(key: String): String = Lang.get("p_$key")
 
     fun isEnabled(ctx: Context, key: String): Boolean =
         ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)

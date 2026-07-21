@@ -11,12 +11,12 @@ data class PrayerTimes(
     val date: String
 ) {
     fun asList(): List<Pair<String, String>> = listOf(
-        "İmsak" to imsak,
-        "Güneş" to gunes,
-        "Öğle" to ogle,
-        "İkindi" to ikindi,
-        "Akşam" to aksam,
-        "Yatsı" to yatsi
+        Lang.get("p_imsak")  to imsak,
+        Lang.get("p_gunes")  to gunes,
+        Lang.get("p_ogle")   to ogle,
+        Lang.get("p_ikindi") to ikindi,
+        Lang.get("p_aksam")  to aksam,
+        Lang.get("p_yatsi")  to yatsi
     )
 }
 

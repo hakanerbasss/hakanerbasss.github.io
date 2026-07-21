@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,9 +16,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.wizaicorp.namazvakitleri.api.AladhanApi
 import com.wizaicorp.namazvakitleri.data.City
+import com.wizaicorp.namazvakitleri.data.Lang
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CitySelectScreen(
     selectedCity: City,
@@ -46,30 +45,14 @@ fun CitySelectScreen(
                 AladhanApi.getPrayerTimes(city, country)
                 foundCity = City(city, city, country)
             } catch (e: Exception) {
-                error = "Şehir bulunamadı. Şehir ve ülke adını kontrol edin."
+                error = Lang.get("city_not_found")
             } finally {
                 isSearching = false
             }
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Şehir Ara") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor             = MaterialTheme.colorScheme.primary,
-                    titleContentColor          = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { padding ->
+    FeatureScaffold(title = Lang.get("city_search"), onBack = onBack) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -80,8 +63,8 @@ fun CitySelectScreen(
             OutlinedTextField(
                 value         = cityInput,
                 onValueChange = { cityInput = it; foundCity = null; error = null },
-                label         = { Text("Şehir") },
-                placeholder   = { Text("Örn: Istanbul, London, Dubai, Mecca") },
+                label         = { Text(Lang.get("city_label")) },
+                placeholder   = { Text(Lang.get("city_hint")) },
                 modifier      = Modifier.fillMaxWidth().focusRequester(cityFocus),
                 singleLine    = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
@@ -90,8 +73,8 @@ fun CitySelectScreen(
             OutlinedTextField(
                 value         = countryInput,
                 onValueChange = { countryInput = it; foundCity = null; error = null },
-                label         = { Text("Ülke (İngilizce)") },
-                placeholder   = { Text("Örn: Turkey, United Kingdom, Saudi Arabia") },
+                label         = { Text(Lang.get("country_label")) },
+                placeholder   = { Text(Lang.get("country_hint")) },
                 modifier      = Modifier.fillMaxWidth(),
                 singleLine    = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -110,11 +93,11 @@ fun CitySelectScreen(
                         color       = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Aranıyor...")
+                    Text(Lang.get("searching"))
                 } else {
                     Icon(Icons.Default.Search, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Ara")
+                    Text(Lang.get("search"))
                 }
             }
 
@@ -150,7 +133,7 @@ fun CitySelectScreen(
                             onClick  = { onCitySelected(city) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Bu Şehri Seç")
+                            Text(Lang.get("select_this_city"))
                         }
                     }
                 }
@@ -159,7 +142,7 @@ fun CitySelectScreen(
             Spacer(Modifier.weight(1f))
 
             Text(
-                text     = "Mevcut: ${selectedCity.name}, ${selectedCity.country}",
+                text     = "${Lang.get("current_city")}: ${selectedCity.name}, ${selectedCity.country}",
                 style    = MaterialTheme.typography.bodySmall,
                 color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 modifier = Modifier.align(Alignment.CenterHorizontally)

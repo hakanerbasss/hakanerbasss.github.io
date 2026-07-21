@@ -42,6 +42,21 @@ object AdManager {
             })
     }
 
+    // Ekran gecislerinde frekans korumali gosterim:
+    // en az 4 gecis VE son gosterimden 2 dk gecmis olmali
+    private var lastInterstitialMs = 0L
+    private var actionCount = 0
+
+    fun maybeShowInterstitial(activity: Activity) {
+        actionCount++
+        val now = System.currentTimeMillis()
+        if (actionCount >= 4 && now - lastInterstitialMs > 120_000 && interstitial != null) {
+            actionCount = 0
+            lastInterstitialMs = now
+            showInterstitial(activity)
+        }
+    }
+
     fun showInterstitial(activity: Activity, onDone: () -> Unit = {}) {
         val ad = interstitial
         if (ad != null) {

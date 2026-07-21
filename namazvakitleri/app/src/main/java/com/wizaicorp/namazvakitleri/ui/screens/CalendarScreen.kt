@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.wizaicorp.namazvakitleri.api.AladhanApi
 import com.wizaicorp.namazvakitleri.api.CalendarDayItem
 import com.wizaicorp.namazvakitleri.data.City
+import com.wizaicorp.namazvakitleri.data.Lang
 import kotlinx.coroutines.launch
 import java.util.Calendar as JCalendar
 
@@ -32,10 +33,7 @@ fun CalendarContent(city: City, modifier: Modifier = Modifier) {
     val todayMonth = remember { now.get(JCalendar.MONTH) + 1 }
     val todayDay   = remember { now.get(JCalendar.DAY_OF_MONTH) }
 
-    val monthNames = listOf(
-        "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-        "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-    )
+    val monthNames = (1..12).map { Lang.get("month_$it") }
 
     fun loadCalendar() {
         scope.launch {
@@ -44,7 +42,7 @@ fun CalendarContent(city: City, modifier: Modifier = Modifier) {
             try {
                 days = AladhanApi.getMonthlyTimes(city.apiName, city.country, year, month)
             } catch (e: Exception) {
-                error = "Takvim yüklenemedi. İnternet bağlantınızı kontrol edin."
+                error = Lang.get("err_calendar")
             } finally {
                 isLoading = false
             }
@@ -66,7 +64,7 @@ fun CalendarContent(city: City, modifier: Modifier = Modifier) {
             TextButton(onClick = {
                 if (month == 1) { month = 12; year-- } else month--
             }) {
-                Text("< Önceki")
+                Text("<<")
             }
 
             Text(
@@ -78,7 +76,7 @@ fun CalendarContent(city: City, modifier: Modifier = Modifier) {
             TextButton(onClick = {
                 if (month == 12) { month = 1; year++ } else month++
             }) {
-                Text("Sonraki >")
+                Text(">>")
             }
         }
 
@@ -126,10 +124,10 @@ private fun CalendarDayCard(day: CalendarDayItem, isToday: Boolean) {
                                  else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text  = day.weekdayTr,
+                    text  = if (Lang.code == "tr") day.weekdayTr else day.weekdayEn,
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
-                        day.weekdayTr == "Cuma" -> fridayGold
+                        day.weekdayEn == "Friday" -> fridayGold
                         isToday -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         else    -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     }
@@ -151,18 +149,18 @@ private fun CalendarDayCard(day: CalendarDayItem, isToday: Boolean) {
                     modifier  = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    PrayerTimeEntry("İmsak",  day.times.imsak,  isToday)
-                    PrayerTimeEntry("Öğle",   day.times.ogle,   isToday)
-                    PrayerTimeEntry("Akşam",  day.times.aksam,  isToday)
+                    PrayerTimeEntry(Lang.get("p_imsak"),  day.times.imsak,  isToday)
+                    PrayerTimeEntry(Lang.get("p_ogle"),   day.times.ogle,   isToday)
+                    PrayerTimeEntry(Lang.get("p_aksam"),  day.times.aksam,  isToday)
                 }
                 // Right column: Güneş, İkindi, Yatsı
                 Column(
                     modifier  = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    PrayerTimeEntry("Güneş",  day.times.gunes,  isToday)
-                    PrayerTimeEntry("İkindi", day.times.ikindi, isToday)
-                    PrayerTimeEntry("Yatsı",  day.times.yatsi,  isToday)
+                    PrayerTimeEntry(Lang.get("p_gunes"),  day.times.gunes,  isToday)
+                    PrayerTimeEntry(Lang.get("p_ikindi"), day.times.ikindi, isToday)
+                    PrayerTimeEntry(Lang.get("p_yatsi"),  day.times.yatsi,  isToday)
                 }
             }
         }
