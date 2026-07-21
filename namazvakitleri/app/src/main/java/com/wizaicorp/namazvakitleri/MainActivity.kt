@@ -68,6 +68,8 @@ class MainActivity : ComponentActivity() {
             notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        maybeAskReview()
+
         setContent {
             NamazTheme {
                 NamazNavHost()
@@ -83,6 +85,25 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         AdManager.notePause()
+    }
+
+    /**
+     * 7. acilista Play'in resmi uygulama ici degerlendirme penceresini gosterir.
+     * Bir kez sorulur; Play kotasi doluysa sessizce gecilir, hata firlatmaz.
+     */
+    private fun maybeAskReview() {
+        try {
+            val p = getSharedPreferences("namaz_prefs", MODE_PRIVATE)
+            val opens = p.getInt("open_count", 0) + 1
+            p.edit().putInt("open_count", opens).apply()
+            if (opens < 7 || p.getBoolean("review_asked", false)) return
+            p.edit().putBoolean("review_asked", true).apply()
+
+            val mgr = com.google.android.play.core.review.ReviewManagerFactory.create(this)
+            mgr.requestReviewFlow().addOnSuccessListener { info ->
+                mgr.launchReviewFlow(this, info)
+            }
+        } catch (e: Exception) { /* degerlendirme akisi kritik degil */ }
     }
 }
 

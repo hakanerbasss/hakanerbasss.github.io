@@ -12,8 +12,8 @@ android {
         applicationId "com.wizaicorp.namazvakitleri"
         minSdk 26
         targetSdk 35
-        versionCode 10
-        versionName "2.6"
+        versionCode 11
+        versionName "2.7"
     }
 
     buildTypes {
@@ -70,6 +70,9 @@ dependencies {
 
     // UMP - kullanici rizasi
     implementation 'com.google.android.ump:user-messaging-platform:3.1.0'
+
+    // Play In-App Review - uygulama icinden yildiz/yorum isteme
+    implementation 'com.google.android.play:review-ktx:2.0.1'
 
     // Retrofit + Gson
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
