@@ -47,6 +47,8 @@ configurations.all {
         force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24'
         force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24'
         force 'androidx.graphics:graphics-path:1.1.0-rc01'
+        // Play Console uyarisi: gecisli fragment 1.1.0 eski - guncel surume zorla
+        force 'androidx.fragment:fragment:1.6.2'
     }
 }
 
