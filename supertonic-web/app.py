@@ -4155,8 +4155,8 @@ async def auto_shorts_job():
 
 # Namaz Vakitleri uygulama tanıtımı — otomatik gönderilerde ortalama 3'te 1 eklenir
 NAMAZ_APP_PROMO = (
-    "\U0001F4F1 Namaz Vakitleri uygulamamız Google Play'de! "
-    "Ezan bildirimi, kıble, zikirmatik, dini takvim — link bio'da \U0001F517"
+    "\U0001F54C Vakitleri kaçırmayın: ezan bildirimi, kıble ve zikirmatik cebinizde. "
+    "Namaz Vakitleri — link bio'da \U0001F932"
 )
 
 
