@@ -17,7 +17,12 @@ else
 fi
 
 echo ">> Proje uzerine yaziliyor: $PROJ"
-rsync -a "$SYNC/namazvakitleri/" "$PROJ/"
+mkdir -p "$PROJ"
+if command -v rsync >/dev/null 2>&1; then
+    rsync -a "$SYNC/namazvakitleri/" "$PROJ/"
+else
+    cp -rf "$SYNC/namazvakitleri/." "$PROJ/"
+fi
 
 echo ""
 git -C "$SYNC" log -1 --format=">> Son guncelleme: %s (%cr)"
