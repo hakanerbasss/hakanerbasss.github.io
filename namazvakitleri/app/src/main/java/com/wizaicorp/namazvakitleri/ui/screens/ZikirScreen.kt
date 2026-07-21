@@ -115,6 +115,11 @@ fun ZikirScreen(onBack: () -> Unit) {
     fun playSound() {
         when (soundMode) {
             "tts" -> Speech.speak(Lang.get(zikirKey))
+            "arabic" -> {
+                val arabicOk = Speech.arabicAvailable()
+                val text = ZikirPrefs.arabic[zikirKey] ?: Lang.get(zikirKey)
+                Speech.speak(if (arabicOk) text else Lang.get(zikirKey), arabic = arabicOk)
+            }
             "rec" -> {
                 val p = player
                 if (p == null) {
@@ -194,6 +199,7 @@ fun ZikirScreen(onBack: () -> Unit) {
                 listOf(
                     "off" to Lang.get("sound_off"),
                     "tts" to Lang.get("sound_tts"),
+                    "arabic" to Lang.get("mode_audio"),
                     "rec" to Lang.get("sound_rec")
                 ).forEach { (mode, label) ->
                     TextButton(onClick = {

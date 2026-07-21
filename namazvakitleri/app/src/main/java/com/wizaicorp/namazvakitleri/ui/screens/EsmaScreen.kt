@@ -23,11 +23,46 @@ import com.wizaicorp.namazvakitleri.util.Speech
 fun EsmaScreen(onBack: () -> Unit) {
     val ctx = LocalContext.current
     val todayEsma = remember { EsmaData.ofToday() }
+    var isPlaying by remember { mutableStateOf(false) }
+    // Okuma modu: "audio" = Arapca kiraat, "meaning" = isim+anlam
+    var readMode by remember { mutableStateOf("audio") }
 
     LaunchedEffect(Unit) { Speech.init(ctx) }
     DisposableEffect(Unit) { onDispose { Speech.stop() } }
 
-    FeatureScaffold(title = Lang.get("esma"), onBack = onBack) { padding ->
+    fun stop() {
+        Speech.stop()
+        isPlaying = false
+    }
+
+    fun speakOne(name: String, arabic: String, meaning: String) {
+        if (readMode == "audio") {
+            val arabicOk = Speech.arabicAvailable()
+            Speech.speak(if (arabicOk) arabic else name, arabic = arabicOk)
+        } else {
+            Speech.speak("$name. $meaning")
+        }
+    }
+
+    fun playAll() {
+        isPlaying = true
+        val arabicOk = readMode == "audio" && Speech.arabicAvailable()
+        val texts = EsmaData.list.map { esma ->
+            when {
+                readMode == "audio" && arabicOk -> esma.arabic
+                readMode == "audio" -> esma.name
+                else -> "${esma.name}. ${esma.meaning}"
+            }
+        }
+        Speech.speakSequence(
+            texts,
+            onIndex = { },
+            onFinished = { isPlaying = false },
+            arabic = arabicOk
+        )
+    }
+
+    FeatureScaffold(title = Lang.get("esma"), onBack = { stop(); onBack() }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -39,7 +74,7 @@ fun EsmaScreen(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { Speech.speak("${todayEsma.name}. ${todayEsma.meaning}") }
+                        .clickable { speakOne(todayEsma.name, todayEsma.arabic, todayEsma.meaning) }
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -52,10 +87,16 @@ fun EsmaScreen(onBack: () -> Unit) {
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            todayEsma.name,
+                            todayEsma.arabic,
                             style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            todayEsma.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
@@ -67,28 +108,35 @@ fun EsmaScreen(onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(8.dp))
 
+                // Okuma modu
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = readMode == "audio",
+                        onClick = { stop(); readMode = "audio" },
+                        label = { Text(Lang.get("mode_audio")) }
+                    )
+                    FilterChip(
+                        selected = readMode == "meaning",
+                        onClick = { stop(); readMode = "meaning" },
+                        label = { Text(Lang.get("mode_meaning")) }
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+
                 // Sesli okuma kontrolleri
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = {
-                            Speech.stop()
-                            EsmaData.list.forEachIndexed { i, esma ->
-                                Speech.speak("${esma.name}. ${esma.meaning}", flush = i == 0)
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(Lang.get("read_all"))
-                    }
-                    OutlinedButton(
-                        onClick = { Speech.stop() },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(Lang.get("stop"))
+                    if (isPlaying) {
+                        Button(onClick = { stop() }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Stop, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(Lang.get("stop"))
+                        }
+                    } else {
+                        Button(onClick = { playAll() }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(Lang.get("read_all"))
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -100,7 +148,7 @@ fun EsmaScreen(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { Speech.speak("${esma.name}. ${esma.meaning}") }
+                        .clickable { speakOne(esma.name, esma.arabic, esma.meaning) }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -110,9 +158,9 @@ fun EsmaScreen(onBack: () -> Unit) {
                             "${i + 1}",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.width(32.dp)
+                            modifier = Modifier.width(28.dp)
                         )
-                        Column {
+                        Column(Modifier.weight(1f)) {
                             Text(
                                 esma.name,
                                 style = MaterialTheme.typography.titleMedium,
@@ -125,6 +173,11 @@ fun EsmaScreen(onBack: () -> Unit) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
                         }
+                        Text(
+                            esma.arabic,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }

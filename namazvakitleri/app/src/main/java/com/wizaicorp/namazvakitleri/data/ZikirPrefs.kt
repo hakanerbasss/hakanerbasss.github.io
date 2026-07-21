@@ -8,6 +8,16 @@ object ZikirPrefs {
     val zikirKeys = listOf("z_1", "z_2", "z_3", "z_4", "z_5", "z_6")
     val targets = listOf(33, 99, 500, 1000, 0) // 0 = serbest
 
+    /** Zikirlerin Arapca yazimi - kiraat (Arapca TTS) icin */
+    val arabic = mapOf(
+        "z_1" to "سُبْحَانَ اللَّهِ",
+        "z_2" to "الْحَمْدُ لِلَّهِ",
+        "z_3" to "اللَّهُ أَكْبَرُ",
+        "z_4" to "لَا إِلَٰهَ إِلَّا اللَّهُ",
+        "z_5" to "أَسْتَغْفِرُ اللَّهَ",
+        "z_6" to "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ"
+    )
+
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
 
     fun getCount(ctx: Context, zikirKey: String): Int = prefs(ctx).getInt("count_$zikirKey", 0)
