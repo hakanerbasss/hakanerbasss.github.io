@@ -34,5 +34,41 @@ object Speech {
 
     fun stop() {
         try { tts?.stop() } catch (e: Exception) { }
+        try { tts?.setOnUtteranceProgressListener(null) } catch (e: Exception) { }
+    }
+
+    /**
+     * Parcalari sirayla okur; her parca baslarken onIndex(i) cagirilir
+     * (imlec takibi / otomatik kaydirma icin), hepsi bitince onFinished().
+     * Geri cagrilar ana thread'e post edilir.
+     */
+    fun speakSequence(
+        texts: List<String>,
+        onIndex: (Int) -> Unit,
+        onFinished: () -> Unit
+    ) {
+        if (!ready || texts.isEmpty()) return
+        val t = tts ?: return
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                utteranceId?.removePrefix("seq_")?.toIntOrNull()?.let { i ->
+                    main.post { onIndex(i) }
+                }
+            }
+            override fun onDone(utteranceId: String?) {
+                if (utteranceId == "seq_${texts.size - 1}") main.post { onFinished() }
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) { }
+        })
+        texts.forEachIndexed { i, s ->
+            t.speak(
+                s,
+                if (i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
+                null,
+                "seq_$i"
+            )
+        }
     }
 }

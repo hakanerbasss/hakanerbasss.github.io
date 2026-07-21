@@ -160,7 +160,13 @@ object Lang {
         "holy_today_notif" to "Today is %s",
         "holy_eve_notif" to "%s begins tonight",
         "kaza_left" to "Remaining",
-        "channel_reminder" to "Reminders"
+        "channel_reminder" to "Reminders",
+        // Library
+        "library" to "Islamic Library",
+        "lib_sure_tab" to "Surahs",
+        "lib_dua_tab" to "Duas",
+        "mode_reading" to "Transliteration",
+        "mode_meaning" to "Meaning"
     )
 
     private val tr = mapOf(
@@ -288,6 +294,12 @@ object Lang {
         "holy_today_notif" to "Bugün %s",
         "holy_eve_notif" to "Bu akşam %s başlıyor",
         "kaza_left" to "Kalan kaza",
-        "channel_reminder" to "Hatırlatmalar"
+        "channel_reminder" to "Hatırlatmalar",
+        // Library
+        "library" to "Dini Kütüphane",
+        "lib_sure_tab" to "Sureler",
+        "lib_dua_tab" to "Dualar",
+        "mode_reading" to "Okunuş",
+        "mode_meaning" to "Meal"
     )
 }

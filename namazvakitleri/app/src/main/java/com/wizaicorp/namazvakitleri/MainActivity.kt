@@ -23,6 +23,8 @@ import com.wizaicorp.namazvakitleri.ui.screens.CitySelectScreen
 import com.wizaicorp.namazvakitleri.ui.screens.EsmaScreen
 import com.wizaicorp.namazvakitleri.ui.screens.HolyDaysScreen
 import com.wizaicorp.namazvakitleri.ui.screens.KazaScreen
+import com.wizaicorp.namazvakitleri.ui.screens.LibraryDetailScreen
+import com.wizaicorp.namazvakitleri.ui.screens.LibraryScreen
 import com.wizaicorp.namazvakitleri.ui.screens.MainScreen
 import com.wizaicorp.namazvakitleri.ui.screens.SettingsScreen
 import com.wizaicorp.namazvakitleri.ui.screens.ZikirScreen
@@ -135,6 +137,14 @@ private fun NamazNavHost() {
             onOpen          = { screen = it }
         )
         Screen.Settings -> SettingsScreen(onBack = { goTab(Screen.More) })
+        Screen.Library  -> LibraryScreen(
+            onOpen = { item -> screen = Screen.LibDetail(item) },
+            onBack = { goTab(Screen.More) }
+        )
+        is Screen.LibDetail -> LibraryDetailScreen(
+            item = (screen as Screen.LibDetail).item,
+            onBack = { screen = Screen.Library }
+        )
         Screen.Zikir    -> ZikirScreen(onBack = { goTab(Screen.More) })
         Screen.Kaza     -> KazaScreen(onBack = { goTab(Screen.More) })
         Screen.HolyDays -> HolyDaysScreen(onBack = { goTab(Screen.More) })
@@ -163,4 +173,6 @@ sealed class Screen {
     object Kaza        : Screen()
     object HolyDays    : Screen()
     object Esma        : Screen()
+    object Library     : Screen()
+    data class LibDetail(val item: com.wizaicorp.namazvakitleri.data.LibraryItem) : Screen()
 }

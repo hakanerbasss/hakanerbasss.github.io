@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
@@ -47,6 +48,7 @@ fun MoreContent(
     val ctx = LocalContext.current
 
     val items = listOf(
+        MoreItem("library",        Icons.Filled.Book,          "library"),
         MoreItem("zikir",          Icons.Filled.TouchApp,      "zikir"),
         MoreItem("kaza",           Icons.Filled.History,       "kaza"),
         MoreItem("holy_days",      Icons.Filled.CalendarMonth, "holy"),
@@ -71,6 +73,7 @@ fun MoreContent(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.clickable {
                     when (item.action) {
+                        "library"  -> onOpen(Screen.Library)
                         "zikir"    -> onOpen(Screen.Zikir)
                         "kaza"     -> onOpen(Screen.Kaza)
                         "holy"     -> onOpen(Screen.HolyDays)
