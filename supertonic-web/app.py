@@ -1516,6 +1516,12 @@ async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output:
 
 _IG_POWER_TAGS = ["sondakika", "haberler", "gündem", "keşfet", "türkiye", "viral"]
 
+# Namaz Vakitleri uygulama tanıtımı — caption'lara ortalama 3'te 1 eklenir
+_NAMAZ_APP_PROMO = (
+    "\U0001F54C Vakitleri kaçırmayın: ezan bildirimi, kıble ve zikirmatik cebinizde. "
+    "Namaz Vakitleri uygulaması — link bio'da \U0001F932"
+)
+
 
 def _build_ig_caption(title: str, description: str = "", source_text: str = "", suggested_tags: str = "") -> str:
     """Instagram için tam formatlı açıklama: başlık + özet + kaynak + etkileşim CTA'ları
@@ -1534,6 +1540,8 @@ def _build_ig_caption(title: str, description: str = "", source_text: str = "", 
     parts.append("Siz ne düşünüyorsunuz? 👇")
     parts.append("⚠️ Haberin doğruluğunu kendi kaynaklarınızdan teyit ediniz.")
     parts.append("🔗 Tüm haberler için link bio'da")
+    if secrets.randbelow(3) == 0:
+        parts.append(_NAMAZ_APP_PROMO)
     parts.append(full_tags)
     caption = "\n\n".join(parts)
     # Instagram caption limiti 2200 karakter — güvenli taraf
