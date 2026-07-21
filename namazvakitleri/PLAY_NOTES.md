@@ -62,10 +62,15 @@ EN: `Prayer times, adhan alerts, qibla, tasbih, surahs and Islamic calendar`
 - RECORD_AUDIO: Zikirmatikte isteğe bağlı kişisel ses kaydı için (kayıt cihazda kalır)
 - RECEIVE_BOOT_COMPLETED: Telefon yeniden başlayınca bildirim alarmlarını geri kurmak için
 
-## Veri Güvenliği formu özeti
+## Veri Güvenliği formu — DOLDURMA REHBERİ
 
-- Konum: cihazda işlenir, paylaşılmaz (kıble)
-- Ses kaydı: cihazda saklanır, paylaşılmaz (zikirmatik)
-- API anahtarları: yalnızca cihazda (kullanıcının kendi anahtarları)
-- Reklam: AdMob (Google) — reklam kimliği toplanır
-- FCM: bildirim için anonim topic aboneliği
+Google tanımı: "toplama" = verinin cihaz DIŞINA gönderilmesi.
+Cihazda kalan veri (ses kaydı, konum, API anahtarları) BEYAN EDİLMEZ.
+
+- Adım 2: Veri topluyor mu? → EVET (yalnızca AdMob nedeniyle)
+- Adım 2: Aktarımda şifreleme? → Evet (HTTPS)
+- Adım 2: Silme talebi yolu? → Hayır (hesap yok)
+- Adım 3: SADECE "Cihaz veya diğer kimlikler" işaretle.
+  Ses kaydı İŞARETLENMEZ (cihazda kalır), Konum İŞARETLENMEZ (kıble cihazda).
+- Adım 4 (Cihaz kimlikleri): Toplanıyor=Evet, Paylaşılıyor=Evet (Google AdMob),
+  Geçici değil, Zorunlu, Amaç: Reklamcılık veya pazarlama
