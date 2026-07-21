@@ -23,4 +23,15 @@ object ZikirPrefs {
 
     fun getTarget(ctx: Context): Int = prefs(ctx).getInt("target", 33)
     fun setTarget(ctx: Context, t: Int) = prefs(ctx).edit().putInt("target", t).apply()
+
+    // Ses modu: "off" | "tts" | "rec"
+    fun getSoundMode(ctx: Context): String =
+        prefs(ctx).getString("sound_mode", "off") ?: "off"
+
+    fun setSoundMode(ctx: Context, mode: String) =
+        prefs(ctx).edit().putString("sound_mode", mode).apply()
+
+    /** Zikire ozel kullanici ses kaydinin dosyasi */
+    fun recFile(ctx: Context, zikirKey: String): java.io.File =
+        java.io.File(ctx.filesDir, "zikir_rec_$zikirKey.m4a")
 }

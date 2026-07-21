@@ -140,7 +140,27 @@ object Lang {
         "notif_pre" to "%2\$d minutes until %1\$s.",
         "notif_channel" to "Prayer Times",
         // Widget
-        "w_next" to "Next"
+        "w_next" to "Next",
+        // Sound (zikir + esma)
+        "sound_label" to "Sound",
+        "sound_off" to "Off",
+        "sound_tts" to "Voice",
+        "sound_rec" to "My recording",
+        "record_start" to "Record",
+        "record_stop" to "Stop recording",
+        "rec_missing" to "No recording yet - press Record and say the dhikr",
+        "rec_saved" to "Recording saved",
+        "mic_perm" to "Microphone permission required",
+        "read_all" to "Read All",
+        "stop" to "Stop",
+        // Reminders
+        "holy_notif_label" to "Islamic day alerts",
+        "kaza_notif_label" to "Missed prayer reminder",
+        "reminder_hour" to "Reminder time",
+        "holy_today_notif" to "Today is %s",
+        "holy_eve_notif" to "%s begins tonight",
+        "kaza_left" to "Remaining",
+        "channel_reminder" to "Reminders"
     )
 
     private val tr = mapOf(
@@ -248,6 +268,26 @@ object Lang {
         "notif_pre" to "%1\$s vaktine %2\$d dakika kaldı.",
         "notif_channel" to "Namaz Vakitleri",
         // Widget
-        "w_next" to "Sıradaki"
+        "w_next" to "Sıradaki",
+        // Sound (zikir + esma)
+        "sound_label" to "Ses",
+        "sound_off" to "Kapalı",
+        "sound_tts" to "Seslendir",
+        "sound_rec" to "Kaydım",
+        "record_start" to "Kayıt Al",
+        "record_stop" to "Kaydı Bitir",
+        "rec_missing" to "Henüz kayıt yok - Kayıt Al'a basıp zikri söyle",
+        "rec_saved" to "Kayıt kaydedildi",
+        "mic_perm" to "Mikrofon izni gerekli",
+        "read_all" to "Sırayla Oku",
+        "stop" to "Durdur",
+        // Reminders
+        "holy_notif_label" to "Dini gün bildirimleri",
+        "kaza_notif_label" to "Kaza hatırlatması",
+        "reminder_hour" to "Hatırlatma saati",
+        "holy_today_notif" to "Bugün %s",
+        "holy_eve_notif" to "Bu akşam %s başlıyor",
+        "kaza_left" to "Kalan kaza",
+        "channel_reminder" to "Hatırlatmalar"
     )
 }

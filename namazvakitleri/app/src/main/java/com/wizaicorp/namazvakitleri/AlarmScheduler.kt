@@ -4,9 +4,13 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import com.wizaicorp.namazvakitleri.data.HolyDays
+import com.wizaicorp.namazvakitleri.data.KazaPrefs
+import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.NotifPrefs
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
 import com.wizaicorp.namazvakitleri.data.TimesCache
+import java.time.LocalDate
 import java.util.Calendar
 
 object AlarmScheduler {
@@ -47,7 +51,73 @@ object AlarmScheduler {
         }
 
         scheduleDailyRefresh(ctx)
+        scheduleReminders(ctx)
         PrayerWidgetProvider.updateAll(ctx)
+    }
+
+    /** Dini gun ve kaza hatirlatma alarmlarini kurar (bugun icin). */
+    fun scheduleReminders(ctx: Context) {
+        val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        // Dini gunler: bugun etkinlikse 09:00, yarin etkinlikse bu aksam 20:00
+        val piToday = reminderPi(ctx, 9101, "", "")
+        val piEve   = reminderPi(ctx, 9102, "", "")
+        am.cancel(piToday)
+        am.cancel(piEve)
+        if (NotifPrefs.holyDaysEnabled(ctx)) {
+            val events = HolyDays.upcoming()
+            val today = LocalDate.now()
+            events.firstOrNull { it.date == today }?.let { e ->
+                val name = Lang.get(e.nameKey)
+                atHour(9, 0)?.let { ms ->
+                    setExact(am, ms, reminderPi(ctx, 9101, name, Lang.fmt("holy_today_notif", name)))
+                }
+            }
+            events.firstOrNull { it.date == today.plusDays(1) }?.let { e ->
+                val name = Lang.get(e.nameKey)
+                atHour(20, 0)?.let { ms ->
+                    setExact(am, ms, reminderPi(ctx, 9102, name, Lang.fmt("holy_eve_notif", name)))
+                }
+            }
+        }
+
+        // Kaza hatirlatmasi: kayitli kaza varsa secilen saatte
+        val piKaza = reminderPi(ctx, 9103, "", "")
+        am.cancel(piKaza)
+        if (NotifPrefs.kazaReminderEnabled(ctx) && KazaPrefs.totalAll(ctx) > 0) {
+            atHour(NotifPrefs.kazaHour(ctx), 0)?.let { ms ->
+                setExact(
+                    am, ms,
+                    reminderPi(
+                        ctx, 9103,
+                        Lang.get("kaza"),
+                        "${Lang.get("kaza_left")}: ${KazaPrefs.summary(ctx)}"
+                    )
+                )
+            }
+        }
+    }
+
+    /** Bugun icin verilen saat; gecmisse null */
+    private fun atHour(hour: Int, minute: Int): Long? {
+        val ms = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return if (ms > System.currentTimeMillis()) ms else null
+    }
+
+    private fun reminderPi(ctx: Context, reqCode: Int, title: String, body: String): PendingIntent {
+        val intent = Intent(ctx, ReminderReceiver::class.java)
+            .putExtra(ReminderReceiver.EXTRA_TITLE, title)
+            .putExtra(ReminderReceiver.EXTRA_BODY, body)
+            .putExtra(ReminderReceiver.EXTRA_ID, reqCode)
+        return PendingIntent.getBroadcast(
+            ctx, reqCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     /** Her gece 00:05'te DailyReceiver'i uyandirip yeni gunun alarmlarini kurdurur. */

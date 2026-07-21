@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.wizaicorp.namazvakitleri.AlarmScheduler
 import com.wizaicorp.namazvakitleri.data.KazaPrefs
 import com.wizaicorp.namazvakitleri.data.Lang
 
@@ -47,6 +48,7 @@ fun KazaScreen(onBack: () -> Unit) {
                     KazaPrefs.prayers.forEach { (key, _) ->
                         counts[key]?.intValue = KazaPrefs.get(ctx, key)
                     }
+                    AlarmScheduler.scheduleReminders(ctx)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text(Lang.get("add_one_day")) }
@@ -72,6 +74,7 @@ fun KazaScreen(onBack: () -> Unit) {
                             val v = (state.intValue - 1).coerceAtLeast(0)
                             state.intValue = v
                             KazaPrefs.set(ctx, key, v)
+                            AlarmScheduler.scheduleReminders(ctx)
                         }) {
                             Icon(Icons.Filled.Remove, contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary)
@@ -88,6 +91,7 @@ fun KazaScreen(onBack: () -> Unit) {
                             val v = state.intValue + 1
                             state.intValue = v
                             KazaPrefs.set(ctx, key, v)
+                            AlarmScheduler.scheduleReminders(ctx)
                         }) {
                             Icon(Icons.Filled.Add, contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary)

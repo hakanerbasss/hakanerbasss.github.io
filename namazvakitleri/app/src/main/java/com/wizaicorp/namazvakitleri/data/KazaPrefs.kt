@@ -27,4 +27,13 @@ object KazaPrefs {
         prayers.forEach { (key, _) -> e.putInt("kaza_$key", get(ctx, key) + 1) }
         e.apply()
     }
+
+    fun totalAll(ctx: Context): Int = prayers.sumOf { (key, _) -> get(ctx, key) }
+
+    /** "Sabah 3, Öğle 2" gibi kisa ozet - sifir olanlar atlanir */
+    fun summary(ctx: Context): String =
+        prayers.mapNotNull { (key, nameKey) ->
+            val c = get(ctx, key)
+            if (c > 0) "${Lang.get(nameKey)} $c" else null
+        }.joinToString(", ")
 }

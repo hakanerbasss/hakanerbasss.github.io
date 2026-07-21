@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.wizaicorp.namazvakitleri.AlarmScheduler
 import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.NotifPrefs
 
@@ -21,6 +22,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     val offsets = listOf(0, 5, 10, 15, 20, 30, 45)
     var selectedOffset by remember { mutableIntStateOf(NotifPrefs.getOffsetMin(ctx)) }
     var langSetting by remember { mutableStateOf(Lang.getSetting(ctx)) }
+    var holyOn by remember { mutableStateOf(NotifPrefs.holyDaysEnabled(ctx)) }
+    var kazaOn by remember { mutableStateOf(NotifPrefs.kazaReminderEnabled(ctx)) }
+    var kazaHour by remember { mutableIntStateOf(NotifPrefs.kazaHour(ctx)) }
     val toggles = remember {
         NotifPrefs.allPrayers.associate { (key, _) ->
             key to mutableStateOf(NotifPrefs.isEnabled(ctx, key))
@@ -85,6 +89,66 @@ fun SettingsScreen(onBack: () -> Unit) {
                             Toast.makeText(ctx, Lang.get("saved"), Toast.LENGTH_SHORT).show()
                         }
                     )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // Dini gun bildirimleri
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(Lang.get("holy_notif_label"), style = MaterialTheme.typography.bodyLarge)
+                Switch(
+                    checked = holyOn,
+                    onCheckedChange = { on ->
+                        holyOn = on
+                        NotifPrefs.setHolyDaysEnabled(ctx, on)
+                        AlarmScheduler.scheduleReminders(ctx)
+                        Toast.makeText(ctx, Lang.get("saved"), Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+
+            // Kaza hatirlatmasi
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(Lang.get("kaza_notif_label"), style = MaterialTheme.typography.bodyLarge)
+                Switch(
+                    checked = kazaOn,
+                    onCheckedChange = { on ->
+                        kazaOn = on
+                        NotifPrefs.setKazaReminderEnabled(ctx, on)
+                        AlarmScheduler.scheduleReminders(ctx)
+                        Toast.makeText(ctx, Lang.get("saved"), Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+
+            if (kazaOn) {
+                Text(
+                    Lang.get("reminder_hour"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(19, 20, 21, 22).forEach { h ->
+                        FilterChip(
+                            selected = kazaHour == h,
+                            onClick = {
+                                kazaHour = h
+                                NotifPrefs.setKazaHour(ctx, h)
+                                AlarmScheduler.scheduleReminders(ctx)
+                                Toast.makeText(ctx, Lang.get("saved"), Toast.LENGTH_SHORT).show()
+                            },
+                            label = { Text("%02d:00".format(h)) }
+                        )
+                    }
                 }
             }
 
