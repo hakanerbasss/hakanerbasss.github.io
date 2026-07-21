@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TouchApp
@@ -55,6 +56,7 @@ fun MoreContent(
 
     val items = buildList {
         add(MoreItem("library",        Icons.Filled.Book,          "library"))
+        add(MoreItem("education",      Icons.Filled.School,        "education"))
         add(MoreItem("zikir",          Icons.Filled.TouchApp,      "zikir"))
         add(MoreItem("kaza",           Icons.Filled.History,       "kaza"))
         add(MoreItem("holy_days",      Icons.Filled.CalendarMonth, "holy"))
@@ -83,6 +85,7 @@ fun MoreContent(
                 modifier = Modifier.clickable {
                     when (item.action) {
                         "library"  -> onOpen(Screen.Library)
+                        "education" -> onOpen(Screen.Education)
                         "zikir"    -> onOpen(Screen.Zikir)
                         "kaza"     -> onOpen(Screen.Kaza)
                         "holy"     -> onOpen(Screen.HolyDays)

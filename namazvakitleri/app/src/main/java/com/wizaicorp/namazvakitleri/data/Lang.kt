@@ -194,7 +194,10 @@ object Lang {
         "qibla_aligned" to "You are facing the Qibla!",
         "qibla_hint" to "Point the arrow toward the Kaaba",
         "qibla_dist" to "%s km to the Kaaba",
-        "qibla_label" to "Qibla"
+        "qibla_label" to "Qibla",
+        // Education
+        "education" to "Prayer Guide",
+        "edu_disclaimer" to "This guide follows the Hanafi school and Diyanet sources. Consult a scholar for details."
     )
 
     private val tr = mapOf(
@@ -356,6 +359,9 @@ object Lang {
         "qibla_aligned" to "Kıbleye Dönüksünüz!",
         "qibla_hint" to "Oku Kabe'ye doğrultun",
         "qibla_dist" to "Kabe'ye %s km",
-        "qibla_label" to "Kıble"
+        "qibla_label" to "Kıble",
+        // Education
+        "education" to "Namaz Eğitimi",
+        "edu_disclaimer" to "Anlatım Hanefî mezhebine ve Diyanet kaynaklarına göredir. Ayrıntılar için ilmihale veya müftülüğe başvurunuz."
     )
 }

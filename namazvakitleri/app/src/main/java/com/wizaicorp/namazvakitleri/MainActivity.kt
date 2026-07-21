@@ -22,6 +22,8 @@ import com.wizaicorp.namazvakitleri.api.AladhanApi
 import com.wizaicorp.namazvakitleri.ui.screens.ApiSettingsScreen
 import com.wizaicorp.namazvakitleri.ui.screens.AssistantScreen
 import com.wizaicorp.namazvakitleri.ui.screens.CitySelectScreen
+import com.wizaicorp.namazvakitleri.ui.screens.EducationDetailScreen
+import com.wizaicorp.namazvakitleri.ui.screens.EducationScreen
 import com.wizaicorp.namazvakitleri.ui.screens.EsmaScreen
 import com.wizaicorp.namazvakitleri.ui.screens.NewsScreen
 import com.wizaicorp.namazvakitleri.ui.screens.HolyDaysScreen
@@ -148,6 +150,14 @@ private fun NamazNavHost() {
             item = (screen as Screen.LibDetail).item,
             onBack = { screen = Screen.Library }
         )
+        Screen.Education -> EducationScreen(
+            onOpen = { topic -> screen = Screen.EduDetail(topic) },
+            onBack = { goTab(Screen.More) }
+        )
+        is Screen.EduDetail -> EducationDetailScreen(
+            topic = (screen as Screen.EduDetail).topic,
+            onBack = { screen = Screen.Education }
+        )
         Screen.News        -> NewsScreen(onBack = { goTab(Screen.More) })
         Screen.Assistant   -> AssistantScreen(onBack = { goTab(Screen.More) })
         Screen.ApiSettings -> ApiSettingsScreen(onBack = { goTab(Screen.More) })
@@ -184,4 +194,6 @@ sealed class Screen {
     object Assistant   : Screen()
     object ApiSettings : Screen()
     data class LibDetail(val item: com.wizaicorp.namazvakitleri.data.LibraryItem) : Screen()
+    object Education   : Screen()
+    data class EduDetail(val topic: com.wizaicorp.namazvakitleri.data.EduTopic) : Screen()
 }
