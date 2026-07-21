@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "909896494745",
+    "project_id": "namaz-vakitleri-449b5",
+    "storage_bucket": "namaz-vakitleri-449b5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909896494745:android:573e4bc50466cc42119208",
+        "android_client_info": {
+          "package_name": "com.wizaicorp.namazvakitleri"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDT-fxzswDwWohHF9vtjnENueClQRCKYEo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

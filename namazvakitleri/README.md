@@ -18,23 +18,28 @@ Android uygulaması — Kotlin + Jetpack Compose. Termux'ta geliştirilir ve bui
 
 | Dosya | Durum |
 |-------|-------|
-| `app/google-services.json` | Firebase config — build için zorunlu, Termux'tan alınacak |
-| `app/src/main/res/mipmap-*/` | Launcher ikonları (binary) — Termux'tan alınacak |
-| `app/src/main/res/drawable/mosque_logo.*` | MainScreen logosu (binary) — Termux'tan alınacak |
 | `local.properties` | `sdk.dir` + API anahtarları — gitignore'da |
 | `*.keystore / *.jks` | İmza anahtarı — ASLA git'e koyma, ayrıca yedekle |
 | `gradlew`, `gradle/wrapper/gradle-wrapper.jar` | Wrapper binary'leri — Termux'ta mevcut |
+| `.gradle/`, `build/` | Build çıktıları — gitignore'da |
+
+`google-services.json`, launcher ikonları ve `mosque_logo.png` depodadır —
+depo Termux projesinin tam yedeğidir (yukarıdaki satırlar hariç).
 
 ## Termux ↔ GitHub akışı
 
-```bash
-# Termux'ta ilk kurulum (mevcut klasörü git'e bağla):
-cd ~/namazvakitleri
-git init && git remote add origin https://github.com/hakanerbasss/hakanerbasss.github.io.git
-# Not: bu depo monorepo — namazvakitleri/ alt klasöründe yaşar.
-# Pratik yol: depoyu ayrı klasöre klonla, namazvakitleri/ içeriğini rsync ile eşitle.
+Build GitHub'da ALINMAZ — build her zaman Termux'ta. GitHub yedekleme +
+senkronizasyon içindir: Claude branch'e push eder, Termux'ta çekilip
+`~/namazvakitleri` üzerine yazılır.
 
-# Build (Termux):
+```bash
+# Termux'ta ilk kurulum (bir kez):
+cd ~ && git clone --branch claude/namaz-vakitleri-app-ck3cx4 \
+  https://github.com/hakanerbasss/hakanerbasss.github.io.git repo-sync
+
+# Her guncellemede — GitHub'dan cek, projenin uzerine yaz, build al:
+cd ~/repo-sync && git pull
+rsync -av ~/repo-sync/namazvakitleri/ ~/namazvakitleri/
 cd ~/namazvakitleri && gp        # veya: prj d (debug) / prj b (release)
 ```
 
