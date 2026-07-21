@@ -32,16 +32,21 @@ Build GitHub'da ALINMAZ — build her zaman Termux'ta. GitHub yedekleme +
 senkronizasyon içindir: Claude branch'e push eder, Termux'ta çekilip
 `~/namazvakitleri` üzerine yazılır.
 
-```bash
-# Termux'ta ilk kurulum (bir kez):
-cd ~ && git clone --branch claude/namaz-vakitleri-app-ck3cx4 \
-  https://github.com/hakanerbasss/hakanerbasss.github.io.git repo-sync
+Termux'ta `namaz` komutu kuruludur (`tools/namaz` scripti,
+`$PREFIX/bin/namaz` olarak). Tek komutla GitHub'dan son sürümü çekip
+`~/namazvakitleri` üzerine yazar:
 
-# Her guncellemede — GitHub'dan cek, projenin uzerine yaz, build al:
-cd ~/repo-sync && git pull
-rsync -av ~/repo-sync/namazvakitleri/ ~/namazvakitleri/
-cd ~/namazvakitleri && gp        # veya: prj d (debug) / prj b (release)
+```bash
+namaz          # GitHub'dan guncelle
+tos 15 d       # APK build (test)
+tos 15 2       # imzali AAB (release)
 ```
+
+Script kaybolursa yeniden kurulum:
+`cp ~/repo-sync/namazvakitleri/tools/namaz $PREFIX/bin/namaz && chmod +x $PREFIX/bin/namaz`
+
+Kural: Termux'ta elle kod değişikliği yapılmaz — `namaz` komutu depodaki
+halin üzerine yazar. Tüm kod değişiklikleri GitHub (Claude) üzerinden gelir.
 
 ## Sürüm
 
