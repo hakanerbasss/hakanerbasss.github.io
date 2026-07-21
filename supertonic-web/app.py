@@ -4153,6 +4153,13 @@ async def auto_shorts_job():
         lock.release()
 
 
+# Namaz Vakitleri uygulama tanıtımı — otomatik gönderilerde ortalama 3'te 1 eklenir
+NAMAZ_APP_PROMO = (
+    "\U0001F4F1 Namaz Vakitleri uygulamamız Google Play'de! "
+    "Ezan bildirimi, kıble, zikirmatik, dini takvim — link bio'da \U0001F517"
+)
+
+
 async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "") -> tuple[bool, str]:
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     ig_user_id = ig_cfg["ig_user_id"]
@@ -4161,13 +4168,15 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
     existing_lower = suggested_tags.lower()
     extra = " ".join(f"#{t}" for t in _POWER_TAGS if t not in existing_lower)
     full_tags = f"{suggested_tags} {extra}".strip() if extra else suggested_tags
-    desc_excerpt = _smart_truncate(description, limit=1800) if description else ""
+    desc_excerpt = _smart_truncate(description, limit=1600) if description else ""
     parts = [title]
     if desc_excerpt:
         parts.append(desc_excerpt)
     if source_text:
         parts.append(source_text)
     parts.append("Siz ne düşünüyorsunuz? 👇")
+    if secrets.randbelow(3) == 0:
+        parts.append(NAMAZ_APP_PROMO)
     parts.append(full_tags)
     caption = "\n\n".join(parts)
     # Instagram caption limiti 2200 karakter — güvenli taraf
