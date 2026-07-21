@@ -1,5 +1,7 @@
 package com.wizaicorp.namazvakitleri.ui.screens
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,12 +10,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.wizaicorp.namazvakitleri.api.PexelsApi
+import com.wizaicorp.namazvakitleri.data.ApiPrefs
 import com.wizaicorp.namazvakitleri.data.HolyDays
 import com.wizaicorp.namazvakitleri.data.Lang
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
+import com.wizaicorp.namazvakitleri.data.QuoteData
+import com.wizaicorp.namazvakitleri.util.ImageLoader
 import kotlinx.coroutines.delay
 import java.util.Calendar
 
@@ -49,6 +60,82 @@ fun PrayerTimesContent(
                 Spacer(Modifier.height(12.dp))
                 PrayerList(prayerTimes)
                 Spacer(Modifier.height(12.dp))
+                TodayCard()
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+}
+
+/** Gunun sozu + (Pexels anahtari girildiyse) gunun dini gorseli */
+@Composable
+private fun TodayCard() {
+    val ctx = LocalContext.current
+    val quote = remember { QuoteData.ofToday() }
+    val pexelsKey = remember { ApiPrefs.getPexelsKey(ctx) }
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var photographer by remember { mutableStateOf("") }
+
+    LaunchedEffect(pexelsKey) {
+        if (pexelsKey.isNotBlank()) {
+            try {
+                val photo = PexelsApi.photoOfToday(pexelsKey)
+                if (photo != null) {
+                    photographer = photo.photographer
+                    bitmap = ImageLoader.load(photo.src.large)
+                }
+            } catch (e: Exception) { /* gorsel yoksa sadece soz gosterilir */ }
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Column {
+            bitmap?.let { bmp ->
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(170.dp)
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                )
+            }
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    Lang.get("quote_of_day"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "“${quote.text}”",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        quote.source,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    if (photographer.isNotEmpty() && bitmap != null) {
+                        Text(
+                            "Pexels / $photographer",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
+                }
             }
         }
     }

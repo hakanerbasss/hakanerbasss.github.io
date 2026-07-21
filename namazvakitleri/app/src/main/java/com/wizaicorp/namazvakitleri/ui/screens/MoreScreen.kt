@@ -10,8 +10,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationCity
@@ -47,18 +50,24 @@ fun MoreContent(
 ) {
     val ctx = LocalContext.current
 
-    val items = listOf(
-        MoreItem("library",        Icons.Filled.Book,          "library"),
-        MoreItem("zikir",          Icons.Filled.TouchApp,      "zikir"),
-        MoreItem("kaza",           Icons.Filled.History,       "kaza"),
-        MoreItem("holy_days",      Icons.Filled.CalendarMonth, "holy"),
-        MoreItem("esma",           Icons.Filled.MenuBook,      "esma"),
-        MoreItem("notif_settings", Icons.Filled.Notifications, "settings"),
-        MoreItem("change_city",    Icons.Filled.LocationCity,  "city"),
-        MoreItem("share_app",      Icons.Filled.Share,         "share"),
-        MoreItem("rate_app",       Icons.Filled.Star,          "rate"),
-        MoreItem("privacy",        Icons.Filled.Info,          "privacy")
-    )
+    // AI Asistan karti yalnizca DeepSeek anahtari girilmisse gorunur
+    val hasAi = com.wizaicorp.namazvakitleri.data.ApiPrefs.hasDeepSeek(ctx)
+
+    val items = buildList {
+        add(MoreItem("library",        Icons.Filled.Book,          "library"))
+        add(MoreItem("zikir",          Icons.Filled.TouchApp,      "zikir"))
+        add(MoreItem("kaza",           Icons.Filled.History,       "kaza"))
+        add(MoreItem("holy_days",      Icons.Filled.CalendarMonth, "holy"))
+        add(MoreItem("esma",           Icons.Filled.MenuBook,      "esma"))
+        add(MoreItem("news",           Icons.Filled.Article,       "news"))
+        if (hasAi) add(MoreItem("assistant", Icons.Filled.SmartToy, "assistant"))
+        add(MoreItem("notif_settings", Icons.Filled.Notifications, "settings"))
+        add(MoreItem("change_city",    Icons.Filled.LocationCity,  "city"))
+        add(MoreItem("api_settings",   Icons.Filled.Key,           "api"))
+        add(MoreItem("share_app",      Icons.Filled.Share,         "share"))
+        add(MoreItem("rate_app",       Icons.Filled.Star,          "rate"))
+        add(MoreItem("privacy",        Icons.Filled.Info,          "privacy"))
+    }
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -78,8 +87,11 @@ fun MoreContent(
                         "kaza"     -> onOpen(Screen.Kaza)
                         "holy"     -> onOpen(Screen.HolyDays)
                         "esma"     -> onOpen(Screen.Esma)
+                        "news"     -> onOpen(Screen.News)
+                        "assistant" -> onOpen(Screen.Assistant)
                         "settings" -> onOpen(Screen.Settings)
                         "city"     -> onOpen(Screen.CitySelect)
+                        "api"      -> onOpen(Screen.ApiSettings)
                         "share"    -> shareTimes(ctx, prayerTimes)
                         "rate"     -> openUrl(ctx, PLAY_URL)
                         "privacy"  -> openUrl(ctx, PRIVACY_URL)

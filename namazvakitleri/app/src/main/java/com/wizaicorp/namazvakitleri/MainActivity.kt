@@ -19,8 +19,11 @@ import com.wizaicorp.namazvakitleri.data.CityManager
 import com.wizaicorp.namazvakitleri.data.PrayerTimes
 import com.wizaicorp.namazvakitleri.data.TimesCache
 import com.wizaicorp.namazvakitleri.api.AladhanApi
+import com.wizaicorp.namazvakitleri.ui.screens.ApiSettingsScreen
+import com.wizaicorp.namazvakitleri.ui.screens.AssistantScreen
 import com.wizaicorp.namazvakitleri.ui.screens.CitySelectScreen
 import com.wizaicorp.namazvakitleri.ui.screens.EsmaScreen
+import com.wizaicorp.namazvakitleri.ui.screens.NewsScreen
 import com.wizaicorp.namazvakitleri.ui.screens.HolyDaysScreen
 import com.wizaicorp.namazvakitleri.ui.screens.KazaScreen
 import com.wizaicorp.namazvakitleri.ui.screens.LibraryDetailScreen
@@ -145,6 +148,9 @@ private fun NamazNavHost() {
             item = (screen as Screen.LibDetail).item,
             onBack = { screen = Screen.Library }
         )
+        Screen.News        -> NewsScreen(onBack = { goTab(Screen.More) })
+        Screen.Assistant   -> AssistantScreen(onBack = { goTab(Screen.More) })
+        Screen.ApiSettings -> ApiSettingsScreen(onBack = { goTab(Screen.More) })
         Screen.Zikir    -> ZikirScreen(onBack = { goTab(Screen.More) })
         Screen.Kaza     -> KazaScreen(onBack = { goTab(Screen.More) })
         Screen.HolyDays -> HolyDaysScreen(onBack = { goTab(Screen.More) })
@@ -174,5 +180,8 @@ sealed class Screen {
     object HolyDays    : Screen()
     object Esma        : Screen()
     object Library     : Screen()
+    object News        : Screen()
+    object Assistant   : Screen()
+    object ApiSettings : Screen()
     data class LibDetail(val item: com.wizaicorp.namazvakitleri.data.LibraryItem) : Screen()
 }

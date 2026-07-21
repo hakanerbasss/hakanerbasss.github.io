@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -39,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.wizaicorp.namazvakitleri.data.Lang
 import kotlin.math.*
 
 @SuppressLint("MissingPermission")
@@ -217,11 +217,14 @@ fun QiblaContent(modifier: Modifier = Modifier) {
                 // Cardinal direction labels using Compose drawText (no nativeCanvas)
                 val northStyle = TextStyle(color = Color.Red, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 val cardinalStyle = TextStyle(color = Color(0xFFD4AF37), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                val cardinalLabels = listOf("K" to 0, "D" to 18, "G" to 36, "B" to 54)
+                val cardinalLabels = if (Lang.code == "tr")
+                    listOf("K" to 0, "D" to 18, "G" to 36, "B" to 54)
+                else
+                    listOf("N" to 0, "E" to 18, "S" to 36, "W" to 54)
                 for ((label, tick) in cardinalLabels) {
                     val angleRad = Math.toRadians((tick * 5.0) - 90.0)
                     val labelR   = radius * 0.68f
-                    val style    = if (label == "K") northStyle else cardinalStyle
+                    val style    = if (tick == 0) northStyle else cardinalStyle
                     val measured = textMeasurer.measure(label, style)
                     val x = cx + labelR * cos(angleRad).toFloat() - measured.size.width / 2f
                     val y = cy + labelR * sin(angleRad).toFloat() - measured.size.height / 2f
@@ -269,12 +272,17 @@ fun QiblaContent(modifier: Modifier = Modifier) {
                 }
                 drawPath(arrowPath, color = arrowColor)
 
-                // Kaaba symbol — tiny black square at the arrow tip
-                val sq = 7.dp.toPx()
-                drawRect(
-                    color    = Color.Black,
-                    topLeft  = Offset(cx - sq / 2f, arrowTipY - sq / 2f),
-                    size     = Size(sq, sq)
+                // Ok ucunda Kabe simgesi
+                val kaaba = textMeasurer.measure(
+                    "🕋",
+                    TextStyle(fontSize = if (isAligned) 30.sp else 24.sp)
+                )
+                drawText(
+                    kaaba,
+                    topLeft = Offset(
+                        cx - kaaba.size.width / 2f,
+                        arrowTipY - kaaba.size.height + 4.dp.toPx()
+                    )
                 )
             }
 
@@ -297,7 +305,7 @@ fun QiblaContent(modifier: Modifier = Modifier) {
                     permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
                 }
             ) {
-                Text("Konum İzni Ver")
+                Text(Lang.get("qibla_perm"))
             }
         } else {
             if (isAligned) {
@@ -306,7 +314,7 @@ fun QiblaContent(modifier: Modifier = Modifier) {
                     color = Color(0xFF1B6B45)
                 ) {
                     Text(
-                        text     = "✓ Kıbleye Dönüksünüz!",
+                        text     = "✓ ${Lang.get("qibla_aligned")}",
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                         color    = Color.White,
                         fontWeight = FontWeight.Bold,
@@ -315,7 +323,7 @@ fun QiblaContent(modifier: Modifier = Modifier) {
                 }
             } else {
                 Text(
-                    text      = "Yeşil oku kıbleye doğrultun",
+                    text      = Lang.get("qibla_hint"),
                     style     = MaterialTheme.typography.bodyMedium,
                     color     = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
@@ -325,13 +333,13 @@ fun QiblaContent(modifier: Modifier = Modifier) {
             if (hasLocation) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text  = "Kabe'ye ${"%.0f".format(distance)} km",
+                    text  = Lang.fmt("qibla_dist", "%.0f".format(distance)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text  = "Kıble: ${"%.1f".format(qibla)}°",
+                    text  = "${Lang.get("qibla_label")}: ${"%.1f".format(qibla)}°",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
