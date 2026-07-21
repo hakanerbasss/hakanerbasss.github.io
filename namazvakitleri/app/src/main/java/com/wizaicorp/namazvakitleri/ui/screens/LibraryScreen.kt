@@ -95,9 +95,9 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
     val listState = rememberLazyListState()
     var current by remember { mutableIntStateOf(-1) }
     var isPlaying by remember { mutableStateOf(false) }
-    // Okuma modu: "audio" = hafiz kiraati, "reading" = okunus, "meaning" = meal
+    // Okuma modu: "audio" = kiraat (hafiz kaydi ya da Arapca TTS), "reading" = okunus, "meaning" = meal
     val hasAudio = item.audioIds.isNotEmpty()
-    var readMode by remember { mutableStateOf(if (hasAudio) "audio" else "reading") }
+    var readMode by remember { mutableStateOf("audio") }
 
     LaunchedEffect(Unit) { Speech.init(ctx) }
     DisposableEffect(Unit) { onDispose { Speech.stop(); QuranPlayer.stop() } }
@@ -110,13 +110,23 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
     fun play() {
         isPlaying = true
         current = -1
-        if (readMode == "audio") {
-            // Ayet kodu sayisi kart sayisiyla eslesiyorsa vurgu takibi yapilir
+        if (readMode == "audio" && hasAudio) {
+            // Gercek hafiz kaydi - ayet kodu sayisi kart sayisiyla eslesiyorsa vurgu takibi
             val sync = item.audioIds.size == item.verses.size
             QuranPlayer.playSequence(
                 item.audioIds,
                 onIndex = { if (sync) current = it },
                 onFinished = { isPlaying = false; current = -1 }
+            )
+        } else if (readMode == "audio") {
+            // Hafiz kaydi olmayan dualar: Arapca TTS ile kiraat;
+            // Arapca ses paketi yoksa okunusa duser
+            val arabicOk = Speech.arabicAvailable()
+            Speech.speakSequence(
+                item.verses.map { if (arabicOk) it.arabic else it.reading },
+                onIndex = { current = it },
+                onFinished = { isPlaying = false; current = -1 },
+                arabic = arabicOk
             )
         } else {
             val texts = item.verses.map { v ->
@@ -146,13 +156,11 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (hasAudio) {
-                    FilterChip(
-                        selected = readMode == "audio",
-                        onClick = { stop(); readMode = "audio" },
-                        label = { Text(Lang.get("mode_audio")) }
-                    )
-                }
+                FilterChip(
+                    selected = readMode == "audio",
+                    onClick = { stop(); readMode = "audio" },
+                    label = { Text(Lang.get("mode_audio")) }
+                )
                 FilterChip(
                     selected = readMode == "reading",
                     onClick = { stop(); readMode = "reading" },
@@ -190,14 +198,21 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                if (readMode == "audio" && item.audioIds.size == item.verses.size) {
-                                    QuranPlayer.playSequence(
-                                        listOf(item.audioIds[i]),
-                                        onIndex = { },
-                                        onFinished = { }
-                                    )
-                                } else {
-                                    Speech.speak(
+                                when {
+                                    readMode == "audio" && item.audioIds.size == item.verses.size ->
+                                        QuranPlayer.playSequence(
+                                            listOf(item.audioIds[i]),
+                                            onIndex = { },
+                                            onFinished = { }
+                                        )
+                                    readMode == "audio" && !hasAudio -> {
+                                        val arabicOk = Speech.arabicAvailable()
+                                        Speech.speak(
+                                            if (arabicOk) verse.arabic else verse.reading,
+                                            arabic = arabicOk
+                                        )
+                                    }
+                                    else -> Speech.speak(
                                         if (readMode == "reading") verse.reading else verse.meaning
                                     )
                                 }

@@ -473,7 +473,8 @@ object LibraryData {
                     "Rabbenâ âtinâ fiddünyâ haseneten ve fil âhirati haseneten ve kınâ azâbennâr",
                     "Rabbimiz! Bize dünyada da iyilik ver, ahirette de iyilik ver; bizi ateşin azabından koru.",
                     "Our Lord! Grant us good in this world and good in the Hereafter, and protect us from the punishment of the Fire.")
-            )
+            ),
+            audioIds = listOf("002201")
         ),
         LibraryItem(
             "rabbenagfirli", "Rabbenâğfirlî", "Rabbanaghfirli", "ربنا اغفر لي",
@@ -484,7 +485,8 @@ object LibraryData {
                     "Rabbenâğfirlî ve livâlideyye ve lil mü'minîne yevme yekûmül hisâb",
                     "Rabbimiz! Hesabın görüleceği gün beni, anne babamı ve müminleri bağışla.",
                     "Our Lord! Forgive me, my parents and the believers on the Day the reckoning takes place.")
-            )
+            ),
+            audioIds = listOf("014041")
         ),
         LibraryItem(
             "kunut1", "Kunut Duası 1", "Qunut Dua 1", "دعاء القنوت ١",

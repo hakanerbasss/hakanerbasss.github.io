@@ -15,21 +15,42 @@ object Speech {
         if (tts != null) return
         tts = TextToSpeech(ctx.applicationContext) { status ->
             ready = status == TextToSpeech.SUCCESS
-            if (ready) {
-                val locale = if (Lang.code == "tr") Locale("tr", "TR") else Locale.US
-                try { tts?.language = locale } catch (e: Exception) { }
-            }
+            if (ready) applyLocale(arabic = false)
         }
     }
 
-    fun speak(text: String, flush: Boolean = true) {
+    /** Konusma dilini ayarlar; Arapca ses paketi yoksa false doner. */
+    private fun applyLocale(arabic: Boolean): Boolean {
+        val t = tts ?: return false
+        return try {
+            val locale = when {
+                arabic -> Locale("ar")
+                Lang.code == "tr" -> Locale("tr", "TR")
+                else -> Locale.US
+            }
+            val res = t.setLanguage(locale)
+            res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED
+        } catch (e: Exception) { false }
+    }
+
+    fun speak(text: String, flush: Boolean = true, arabic: Boolean = false) {
         if (!ready) return
+        applyLocale(arabic)
         tts?.speak(
             text,
             if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
             null,
             "namaz_tts_${System.currentTimeMillis()}"
         )
+    }
+
+    /** Cihazda Arapca TTS sesi var mi? */
+    fun arabicAvailable(): Boolean {
+        val t = tts ?: return false
+        return try {
+            val res = t.isLanguageAvailable(Locale("ar"))
+            res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED
+        } catch (e: Exception) { false }
     }
 
     fun stop() {
@@ -45,10 +66,12 @@ object Speech {
     fun speakSequence(
         texts: List<String>,
         onIndex: (Int) -> Unit,
-        onFinished: () -> Unit
+        onFinished: () -> Unit,
+        arabic: Boolean = false
     ) {
         if (!ready || texts.isEmpty()) return
         val t = tts ?: return
+        applyLocale(arabic)
         val main = android.os.Handler(android.os.Looper.getMainLooper())
         t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
