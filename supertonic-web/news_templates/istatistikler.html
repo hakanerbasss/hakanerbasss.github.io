@@ -1,0 +1,100 @@
+{% extends "layout.html" %}
+{% block title %}İstatistikler | Hakan Erbaş{% endblock %}
+{% block metadesc %}<meta name="description" content="Instagram hesabımızın gerçek zamanlı erişim, izlenme ve etkileşim istatistikleri — takipçi sayısının ötesinde gerçek performans.">{% endblock %}
+{% block og_title %}<meta property="og:title" content="İstatistikler | Hakan Erbaş">{% endblock %}
+{% block og_desc %}<meta property="og:description" content="Takipçi sayısı bir yana, gerçek erişim rakamlarımıza bakın.">{% endblock %}
+
+{% block content %}
+{% if stats %}
+<div class="stat-hero">
+  <h1>İstatistiklerimiz</h1>
+  <p>Takipçi sayısı tek başına bir şey ifade etmez — asıl önemlisi içeriklerin kaç kişiye ulaştığı. İşte hesabımızın Instagram'dan doğrudan çektiğimiz güncel rakamları.</p>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card" style="--stat-color:#d5000a">
+    <div class="num">{{ stats.followers | trsayi }}</div>
+    <div class="lbl">Takipçi</div>
+  </div>
+  <div class="stat-card" style="--stat-color:#00aa37">
+    <div class="num">{{ stats.total_views | trsayi }}</div>
+    <div class="lbl">Toplam İzlenme</div>
+  </div>
+  <div class="stat-card" style="--stat-color:#00afc3">
+    <div class="num">{{ stats.views_30d | trsayi }}</div>
+    <div class="lbl">Son 30 Gün İzlenme</div>
+  </div>
+  <div class="stat-card" style="--stat-color:#ffd000">
+    <div class="num">{{ stats.avg_views | trsayi }}</div>
+    <div class="lbl">Gönderi Başı Ort. İzlenme</div>
+  </div>
+  <div class="stat-card" style="--stat-color:#8c32d7">
+    <div class="num">{{ stats.max_views | trsayi }}</div>
+    <div class="lbl">En Yüksek İzlenme</div>
+  </div>
+  <div class="stat-card" style="--stat-color:#e66900">
+    <div class="num">{{ stats.total_interactions | trsayi }}</div>
+    <div class="lbl">Toplam Etkileşim</div>
+  </div>
+</div>
+
+{% if stats.chart_points %}
+<div class="stat-section-title">Takipçi Büyümesi — Son 30 Gün</div>
+<div class="stat-section-sub">Her çubuk o günkü net takipçi değişimini gösterir (yeşil: artış, kırmızı: azalış).</div>
+<div class="chart-wrap">
+  {% for pt in stats.chart_points %}
+  <div class="chart-bar" title="{{ pt.date }}: {{ pt.value }}">
+    <i style="height:{{ pt.pct }}%; --chart-color:{{ '#00aa37' if pt.value >= 0 else '#d5000a' }}"></i>
+  </div>
+  {% endfor %}
+</div>
+<div class="chart-legend">
+  <span>{{ stats.chart_points[0].date }}</span>
+  <span>{{ stats.chart_points[-1].date }}</span>
+</div>
+{% endif %}
+
+{% if stats.top_posts %}
+<div class="stat-section-title">En İyi Performans Gösteren Gönderiler</div>
+<div class="stat-section-sub">İzlenme sayısına göre sıralanmış en başarılı 5 içerik.</div>
+{% for p in stats.top_posts %}
+<a class="top-post" href="{{ p.permalink }}" target="_blank" rel="noopener">
+  <span class="rank">{{ loop.index }}</span>
+  {% if p.thumbnail %}
+    <img class="thumb" src="{{ p.thumbnail }}" alt="" loading="lazy" onerror="this.style.display='none'">
+  {% endif %}
+  <span class="info">
+    <span class="cap">{{ p.caption or "Instagram gönderisi" }}</span>
+    <span class="m"><b>{{ p.views | trsayi }}</b> izlenme &middot; <b>{{ p.reach | trsayi }}</b> erişim &middot; <b>{{ p.likes | trsayi }}</b> beğeni</span>
+  </span>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if stats.updated_label %}
+<div class="stat-updated">Veriler Instagram'dan otomatik senkronize edilir. Son güncelleme: {{ stats.updated_label }}</div>
+{% endif %}
+
+{% else %}
+<div class="stat-hero">
+  <h1>İstatistiklerimiz</h1>
+  <p>İstatistikler yakında burada olacak — veriler hazırlanıyor.</p>
+</div>
+{% endif %}
+
+<div class="ad-cta">
+  <div class="eyebrow">Reklam Verenler İçin</div>
+  <h2>İçeriğinize uygun bir kitleye ulaşın</h2>
+  <p>Ekonomi, afet, spor, dünya ve teknoloji kategorilerinde her gün ürettiğimiz haber içerikleri geniş ve ilgili bir kitleye ulaşıyor. Kategoriye özel sponsorlu içerik ve site içi reklam alanları için bize ulaşın.</p>
+  <div class="ad-cta-actions">
+    <a class="ad-btn" href="mailto:{{ CONTACT_EMAIL }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      E-posta Gönder
+    </a>
+    <a class="ad-btn alt" href="https://wa.me/{{ CONTACT_WHATSAPP }}" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.1 20L3 21Z"/><path d="M8.5 9.5c0 3.5 2.5 6 6 6"/></svg>
+      WhatsApp'tan Yaz
+    </a>
+  </div>
+</div>
+{% endblock %}
