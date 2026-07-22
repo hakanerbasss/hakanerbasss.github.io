@@ -202,7 +202,8 @@ object Lang {
         "mode_audio" to "Recitation",
         "ramadan" to "Ramadan",
         "iftar_left" to "Until iftar",
-        "sahur_left" to "Until imsak (suhoor ends)"
+        "sahur_left" to "Until imsak (suhoor ends)",
+        "news_notif_label" to "News notifications"
     )
 
     private val tr = mapOf(
@@ -372,6 +373,7 @@ object Lang {
         "mode_audio" to "Kıraat",
         "ramadan" to "Ramazan",
         "iftar_left" to "İftara kalan",
-        "sahur_left" to "İmsaka kalan"
+        "sahur_left" to "İmsaka kalan",
+        "news_notif_label" to "Dini haber bildirimleri"
     )
 }

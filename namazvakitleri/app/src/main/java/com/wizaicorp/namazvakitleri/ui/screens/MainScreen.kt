@@ -49,6 +49,7 @@ fun MainScreen(
     }
 
     Scaffold(
+        modifier = Modifier.navigationBarsPadding(),
         topBar = {
             TopAppBar(
                 navigationIcon = {

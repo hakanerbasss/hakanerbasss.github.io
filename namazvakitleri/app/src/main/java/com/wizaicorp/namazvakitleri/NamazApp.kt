@@ -14,5 +14,6 @@ class NamazApp : Application() {
         FirebaseMessaging.getInstance().subscribeToTopic(CityManager.topicFor(city))
         // Gece yarisi yenileme zinciri her acilista garanti altina alinir
         AlarmScheduler.scheduleDailyRefresh(this)
+        AlarmScheduler.scheduleNewsCheck(this)
     }
 }

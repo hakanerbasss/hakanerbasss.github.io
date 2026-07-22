@@ -24,6 +24,9 @@ class DailyReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(ctx: Context, intent: Intent) {
+        // Reboot sonrasi haber kontrol zincirinin de ayakta oldugundan emin ol
+        AlarmScheduler.scheduleNewsCheck(ctx)
+
         val cached = TimesCache.getToday(ctx)
         if (cached != null) {
             AlarmScheduler.schedule(ctx, cached)

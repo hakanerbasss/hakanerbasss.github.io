@@ -55,4 +55,19 @@ object NotifPrefs {
     fun setKazaHour(ctx: Context, h: Int) =
         ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
             .putInt("kaza_hour", h).apply()
+
+    // Dini haber bildirimleri
+    fun newsNotifEnabled(ctx: Context): Boolean =
+        ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getBoolean("news_enabled", true)
+
+    fun setNewsNotifEnabled(ctx: Context, on: Boolean) =
+        ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
+            .putBoolean("news_enabled", on).apply()
+
+    fun lastNewsLink(ctx: Context): String =
+        ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("news_last_link", "") ?: ""
+
+    fun setLastNewsLink(ctx: Context, link: String) =
+        ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
+            .putString("news_last_link", link).apply()
 }

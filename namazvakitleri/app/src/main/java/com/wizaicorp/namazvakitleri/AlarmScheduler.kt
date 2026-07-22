@@ -15,6 +15,20 @@ import java.util.Calendar
 
 object AlarmScheduler {
 
+    private const val NEWS_CHECK_INTERVAL_MS = 4 * 3600_000L // 4 saat
+
+    /** Dini haber kontrolunu NEWS_CHECK_INTERVAL_MS sonraya kurar (self-chaining). */
+    fun scheduleNewsCheck(ctx: Context) {
+        val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(ctx, NewsCheckReceiver::class.java)
+        val pi = PendingIntent.getBroadcast(
+            ctx, 9200, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        am.cancel(pi)
+        setExact(am, System.currentTimeMillis() + NEWS_CHECK_INTERVAL_MS, pi)
+    }
+
     /** Onbellekteki bugunun vakitlerinden alarmlari kurar (arka plan icin). */
     fun scheduleFromCache(ctx: Context) {
         TimesCache.getToday(ctx)?.let { schedule(ctx, it) }

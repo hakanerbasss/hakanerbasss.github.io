@@ -25,6 +25,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var holyOn by remember { mutableStateOf(NotifPrefs.holyDaysEnabled(ctx)) }
     var kazaOn by remember { mutableStateOf(NotifPrefs.kazaReminderEnabled(ctx)) }
     var kazaHour by remember { mutableIntStateOf(NotifPrefs.kazaHour(ctx)) }
+    var newsOn by remember { mutableStateOf(NotifPrefs.newsNotifEnabled(ctx)) }
     val toggles = remember {
         NotifPrefs.allPrayers.associate { (key, _) ->
             key to mutableStateOf(NotifPrefs.isEnabled(ctx, key))
@@ -150,6 +151,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
                 }
+            }
+
+            // Dini haber bildirimleri
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(Lang.get("news_notif_label"), style = MaterialTheme.typography.bodyLarge)
+                Switch(
+                    checked = newsOn,
+                    onCheckedChange = { on ->
+                        newsOn = on
+                        NotifPrefs.setNewsNotifEnabled(ctx, on)
+                        Toast.makeText(ctx, Lang.get("saved"), Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
