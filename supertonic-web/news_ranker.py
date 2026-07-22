@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import html
+import json
 import re
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -1880,3 +1884,435 @@ def build_ranked_news_pool(
     )
 
     return cleaned[:max_candidates]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AI JÜRİSİ — kural tabanlı sıralamanın ÜSTÜNE eklenen ikinci katman.
+#
+# Kod kendi kendini değiştirmez; AI yalnızca aday değerlendirir, son karar
+# ve sınırlar bu dosyadaki Python kodunda kalır. Herhangi bir AI çağrısı
+# hata/timeout/bozuk JSON verirse run_ai_jury() sessizce kural tabanlı
+# sıralamaya döner — çağıran taraf (app.py) hiçbir şey yapmasa bile akış
+# durmaz.
+# ═══════════════════════════════════════════════════════════════════════
+
+AI_JURY_CACHE_FILE = Path("ai_jury_cache.json")
+AI_JURY_CACHE_TTL_HOURS = 18
+
+# AI alt puanlarının (0-100) kural puanı ölçeğine katkısı. Ağırlıklar ve
+# ölçek okunabilir sabitler olarak tutuluyor, ileride kolayca ayarlanabilir.
+_AI_SCALE = 30
+_AI_WEIGHT_CONCRETE = 0.30
+_AI_WEIGHT_VERIFIABILITY = 0.15
+_AI_WEIGHT_AUDIENCE = 0.20
+_AI_WEIGHT_WALLET_RIGHTS = 0.20
+_AI_WEIGHT_URGENCY = 0.10
+_AI_PENALTY_CLICKBAIT = 0.35
+_AI_PENALTY_DUPLICATE = 0.30
+
+# Sert eleme eşikleri — yüksek ilgi puanı olsa bile bunlardan biri
+# doğruysa haber listeye alınmaz.
+_AI_CLICKBAIT_HARD_LIMIT = 75
+_AI_CONCRETE_HARD_FLOOR = 20
+
+
+def _ai_jury_extract_json(text: str) -> Any:
+    """LLM yanıtından JSON dizisini veya nesnesini güvenilir şekilde çıkarır."""
+    t = (text or "").strip()
+
+    if "```json" in t:
+        t = t.split("```json", 1)[1].split("```", 1)[0]
+    elif "```" in t:
+        t = t.split("```", 1)[1].split("```", 1)[0]
+
+    t = t.strip()
+
+    start_obj = t.find("{")
+    start_arr = t.find("[")
+
+    if start_arr != -1 and (start_obj == -1 or start_arr < start_obj):
+        start, end = start_arr, t.rfind("]") + 1
+    else:
+        start, end = start_obj, t.rfind("}") + 1
+
+    if start >= 0 and end > start:
+        t = t[start:end]
+
+    t = re.sub(r",\s*([}\]])", r"\1", t)
+    t = re.sub(r"(?<!\\)\n", " ", t)
+    t = re.sub(r"(?<!\\)\r", "", t)
+
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        t2 = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", t)
+        return json.loads(t2)
+
+
+def _ai_jury_cache_key(item: dict) -> str:
+    base = _normalize(item.get("title", "")) + "|" + (item.get("link", "") or "").strip()[:150]
+    return hashlib.sha1(base.encode("utf-8")).hexdigest()
+
+
+def _load_ai_jury_cache() -> dict:
+    if not AI_JURY_CACHE_FILE.exists():
+        return {}
+    try:
+        return json.loads(AI_JURY_CACHE_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _save_ai_jury_cache(cache: dict) -> None:
+    # Süresi geçmiş kayıtları temizleyerek dosyanın sınırsız büyümesini önle.
+    cutoff = time.time() - AI_JURY_CACHE_TTL_HOURS * 3600
+    pruned = {k: v for k, v in cache.items() if v.get("ts", 0) > cutoff}
+    try:
+        AI_JURY_CACHE_FILE.write_text(json.dumps(pruned, ensure_ascii=False))
+    except Exception as error:
+        print(f"[ai-jury] cache yazılamadı: {error}", flush=True)
+
+
+def _ai_jury_assign_clusters(candidates: list[dict]) -> list[int]:
+    """Aynı olayı anlatan adaylara aynı küme numarasını verir (mevcut
+    _is_same_event mantığını kullanır) — AI'ya olası tekrarları işaret
+    etmek için, kesin dedup kararı yine AI/turnuva aşamasında verilir."""
+    cluster_ids = [-1] * len(candidates)
+    next_id = 0
+
+    for i, item in enumerate(candidates):
+        if cluster_ids[i] != -1:
+            continue
+
+        cluster_ids[i] = next_id
+
+        for j in range(i + 1, len(candidates)):
+            if cluster_ids[j] != -1:
+                continue
+            if _is_same_event(item.get("title", ""), candidates[j].get("title", "")):
+                cluster_ids[j] = next_id
+
+        next_id += 1
+
+    return cluster_ids
+
+
+_AI_JURY_STAGE2_RULES = """SEN BİR HABER JÜRİSİSİN. Aşağıdaki haber adaylarını değerlendir.
+
+DEĞERLENDİRME KURALLARI:
+- Sadece ilgi çekici olduğu için haber seçme.
+- Yeni bir olay, karar, tarih, tutar, resmi açıklama veya doğrulanabilir değişiklik yoksa ele.
+- "Çıkacak mı?", "gelecek mi?", "belli oldu mu?", "zam var mı?" gibi sadece soru soran ve cevap vermeyen başlıkları ele.
+- Başlık kesin konuşup içerik belirsizse clickbait puanını yükselt.
+- "Kritik uyarı", "son dakika", "milyonları ilgilendiriyor" gibi kalıplar tek başına haber değeri sayılmasın.
+- Aynı olayın yeniden yazılmış sürümlerinden yalnızca en güvenilir ve somut olanı bırak (OLAY_KUMESI numarası aynı olanlar muhtemelen aynı olaydır).
+- Resmi kurum duyurusu olsa bile vatandaş üzerindeki etkisi açıklanmıyorsa düşük puan ver.
+- Emekli, SGK, maaş, ödeme takvimi, vergi, sağlık hakkı, ulaşım zammı, yakıt fiyatı, deprem ve ciddi hava uyarıları hedef kitle açısından değerlendirilsin.
+- Spekülasyon, köşe yazısı, beklenti haberi ve yalnızca SEO trafiği hedefleyen içerikler elensin.
+
+Her aday için TAM OLARAK bu alanları içeren bir JSON nesnesi üret:
+{"index": <numara>, "clickbait_score": 0-100, "concrete_development_score": 0-100, "verifiability_score": 0-100, "audience_relevance_score": 0-100, "wallet_or_rights_impact_score": 0-100, "urgency_score": 0-100, "duplicate_or_rehash_score": 0-100, "decision": "KEEP" veya "REJECT", "reason": "kısa Türkçe gerekçe"}
+
+SADECE bu nesnelerin bir JSON DİZİSİ olarak yanıt ver. Başka hiçbir açıklama, markdown veya metin ekleme."""
+
+
+def _ai_jury_format_batch_prompt(batch: list[dict], cluster_ids: list[int]) -> str:
+    lines = []
+
+    for i, item in enumerate(batch, start=1):
+        published_at = item.get("published_at")
+
+        if published_at:
+            published_text = published_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        else:
+            published_text = "bilinmiyor"
+
+        description = (item.get("description") or "").strip()
+
+        if len(description) > 300:
+            description = description[:300].rstrip() + "…"
+
+        lines.append(
+            f"{i}. BAŞLIK: {item.get('title', '')}\n"
+            f"   KAYNAK: {item.get('source', '') or 'bilinmiyor'}\n"
+            f"   YAYIN: {published_text}\n"
+            f"   AÇIKLAMA: {description or 'yok'}\n"
+            f"   URL: {item.get('link', '') or 'yok'}\n"
+            f"   KURAL_PUANI: {item.get('score', 0)}\n"
+            f"   OLAY_KUMESI: {cluster_ids[i - 1]}"
+        )
+
+    return "\n\n".join(lines)
+
+
+def _ai_jury_call_stage2(
+    batch: list[dict],
+    cluster_ids: list[int],
+    api_key: str,
+    timeout_seconds: float = 20.0,
+) -> list | None:
+    """Tek bir DeepSeek çağrısıyla tüm partiyi puanlar (haber başına ayrı
+    çağrı yapmaz — maliyet ve gecikmeyi düşük tutmak için). En fazla bir
+    kez yeniden dener, ikisi de başarısız olursa None döner."""
+    from openai import OpenAI
+
+    prompt = _AI_JURY_STAGE2_RULES + "\n\nADAYLAR:\n" + _ai_jury_format_batch_prompt(batch, cluster_ids)
+    last_error: Any = None
+
+    for attempt in range(2):
+        try:
+            client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=timeout_seconds)
+            resp = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=2500,
+            )
+            data = _ai_jury_extract_json(resp.choices[0].message.content or "")
+
+            if isinstance(data, list):
+                return data
+
+            last_error = "beklenmeyen yanıt biçimi (dizi değil)"
+        except Exception as error:
+            last_error = error
+            print(f"[ai-jury] aşama-2 deneme {attempt + 1} hatası: {error}", flush=True)
+
+    print(f"[ai-jury] aşama-2 tamamen başarısız: {last_error}", flush=True)
+    return None
+
+
+_AI_JURY_STAGE3_RULES = """AŞAĞIDAKİ HABERLER arasında bir turnuva yap. Amaç: aynı olayı anlatan
+haberleri gruplayıp her gruptan en güvenilir ve somut olanı seçmek, farklı
+haber türleri arasında denge kurmak ve en fazla {max_output} güçlü aday
+bırakmak. Aynı listede iki benzer emeklilik spekülasyonu veya iki aynı
+İstanbul hava haberi gibi tekrarlar OLMASIN.
+
+SADECE şu JSON nesnesini döndür, başka hiçbir şey yazma:
+{{"selected_indices": [numaralar], "rejected": [{{"index": numara, "reason": "kısa Türkçe gerekçe"}}]}}"""
+
+
+def _ai_jury_format_tournament_prompt(survivors: list[dict]) -> str:
+    lines = []
+
+    for i, item in enumerate(survivors, start=1):
+        ev = item.get("ai_eval") or {}
+        lines.append(
+            f"{i}. BAŞLIK: {item.get('title', '')}\n"
+            f"   KAYNAK: {item.get('source', '') or 'bilinmiyor'}\n"
+            f"   NİHAİ_PUAN: {round(item.get('final_score', 0), 1)}\n"
+            f"   AI_GEREKÇE: {ev.get('reason', '')}"
+        )
+
+    return "\n\n".join(lines)
+
+
+def _ai_jury_call_stage3(
+    survivors: list[dict],
+    api_key: str,
+    max_output: int,
+    timeout_seconds: float = 20.0,
+) -> dict | None:
+    from openai import OpenAI
+
+    prompt = (
+        _AI_JURY_STAGE3_RULES.format(max_output=max_output)
+        + "\n\nHABERLER:\n"
+        + _ai_jury_format_tournament_prompt(survivors)
+    )
+    last_error: Any = None
+
+    for attempt in range(2):
+        try:
+            client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=timeout_seconds)
+            resp = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=800,
+            )
+            data = _ai_jury_extract_json(resp.choices[0].message.content or "")
+
+            if isinstance(data, dict) and "selected_indices" in data:
+                return data
+
+            last_error = "beklenmeyen yanıt biçimi"
+        except Exception as error:
+            last_error = error
+            print(f"[ai-jury] aşama-3 deneme {attempt + 1} hatası: {error}", flush=True)
+
+    print(f"[ai-jury] aşama-3 tamamen başarısız: {last_error}", flush=True)
+    return None
+
+
+def _ai_hard_reject(evaluation: dict) -> bool:
+    if evaluation.get("decision") == "REJECT":
+        return True
+    if evaluation.get("clickbait_score", 0) >= _AI_CLICKBAIT_HARD_LIMIT:
+        return True
+    if evaluation.get("concrete_development_score", 100) <= _AI_CONCRETE_HARD_FLOOR:
+        return True
+    return False
+
+
+def _ai_final_score(rule_score: float, evaluation: dict) -> float:
+    def _pct(key: str, default: float = 50) -> float:
+        try:
+            return max(0.0, min(100.0, float(evaluation.get(key, default))))
+        except (TypeError, ValueError):
+            return default
+
+    boost = _AI_SCALE * (
+        _AI_WEIGHT_CONCRETE * _pct("concrete_development_score") / 100
+        + _AI_WEIGHT_VERIFIABILITY * _pct("verifiability_score") / 100
+        + _AI_WEIGHT_AUDIENCE * _pct("audience_relevance_score") / 100
+        + _AI_WEIGHT_WALLET_RIGHTS * _pct("wallet_or_rights_impact_score") / 100
+        + _AI_WEIGHT_URGENCY * _pct("urgency_score") / 100
+    )
+    penalty = _AI_SCALE * (
+        _AI_PENALTY_CLICKBAIT * _pct("clickbait_score", 0) / 100
+        + _AI_PENALTY_DUPLICATE * _pct("duplicate_or_rehash_score", 0) / 100
+    )
+
+    return rule_score + boost - penalty
+
+
+_SEO_TAIL_PATTERN = re.compile(r"\s*\|.*$")
+_TRAILING_QUESTION_PATTERN = re.compile(
+    r"[,\-–—]\s*[^,\-–—]{0,60}\b(mi|mı|mu|mü)\?\s*$", re.IGNORECASE
+)
+
+
+def clean_display_title(title: str) -> str:
+    """Telegram'da GÖRÜNTÜLENECEK başlığı SEO kuyruğundan arındırır. Yeni bir
+    gerçek uydurmaz — sadece görüntüleme metnini kısaltır; asıl işlenen/
+    üretilen video başlığı bu fonksiyondan etkilenmez."""
+    cleaned = _clean(title)
+    cleaned = _SEO_TAIL_PATTERN.sub("", cleaned).strip()
+
+    for _ in range(3):
+        new_cleaned = _TRAILING_QUESTION_PATTERN.sub("", cleaned).strip()
+        if new_cleaned == cleaned:
+            break
+        cleaned = new_cleaned
+
+    return cleaned or _clean(title)
+
+
+def run_ai_jury(
+    candidates: list[dict],
+    api_key: str,
+    max_input: int = 25,
+    max_output: int = 12,
+) -> list[dict]:
+    """Kural tabanlı sıralamanın (candidates, zaten puana göre sıralı)
+    üstüne AI jürisi ekler: aşama 2 (tek tek puanlama + sert eleme) ve
+    aşama 3 (turnuva ile olay bazlı dedup, en fazla max_output aday).
+
+    Herhangi bir hata/timeout/bozuk JSON durumunda candidates'ın İLK
+    max_output kadarını DEĞİŞTİRMEDEN döner — bu fonksiyon asla exception
+    fırlatmaz, çağıran tarafın (app.py) otomatik akışı hiçbir zaman durmaz.
+    """
+    if not candidates or not api_key:
+        return candidates[:max_output]
+
+    fallback = candidates[:max_output]
+
+    try:
+        batch = candidates[:max_input]
+        cluster_ids = _ai_jury_assign_clusters(batch)
+
+        cache = _load_ai_jury_cache()
+        now = time.time()
+        cutoff = now - AI_JURY_CACHE_TTL_HOURS * 3600
+
+        cache_keys = [_ai_jury_cache_key(item) for item in batch]
+        to_fetch = []
+        to_fetch_indices = []
+
+        for i, key in enumerate(cache_keys):
+            cached = cache.get(key)
+            if cached and cached.get("ts", 0) > cutoff:
+                continue
+            to_fetch.append(batch[i])
+            to_fetch_indices.append(i)
+
+        if to_fetch:
+            fetch_cluster_ids = [cluster_ids[i] for i in to_fetch_indices]
+            evaluations = _ai_jury_call_stage2(to_fetch, fetch_cluster_ids, api_key)
+
+            if evaluations:
+                for ev in evaluations:
+                    try:
+                        local_idx = int(ev.get("index", 0)) - 1
+                    except (TypeError, ValueError):
+                        continue
+                    if 0 <= local_idx < len(to_fetch):
+                        real_idx = to_fetch_indices[local_idx]
+                        cache[cache_keys[real_idx]] = {"eval": ev, "ts": now}
+
+        _save_ai_jury_cache(cache)
+
+        evaluated = []
+        for i, item in enumerate(batch):
+            cached = cache.get(cache_keys[i])
+            ev = cached.get("eval") if cached else None
+
+            if not ev:
+                # AI bu haber için değerlendirme üretemedi (kısmi hata) —
+                # kural puanını koru, cezalandırma.
+                evaluated.append({**item, "ai_eval": None, "final_score": item.get("score", 0)})
+                continue
+
+            evaluated.append({
+                **item,
+                "ai_eval": ev,
+                "final_score": _ai_final_score(item.get("score", 0), ev),
+            })
+
+        survivors = [
+            item for item in evaluated
+            if not item.get("ai_eval") or not _ai_hard_reject(item["ai_eval"])
+        ]
+
+        if not survivors:
+            print("[ai-jury] tüm adaylar elendi, kural tabanlı yedek kullanılıyor", flush=True)
+            return fallback
+
+        survivors.sort(key=lambda x: x.get("final_score", 0), reverse=True)
+
+        tournament = _ai_jury_call_stage3(survivors, api_key, max_output)
+
+        if tournament and tournament.get("selected_indices"):
+            try:
+                selected = []
+                for idx in tournament["selected_indices"]:
+                    pos = int(idx) - 1
+                    if 0 <= pos < len(survivors):
+                        selected.append(survivors[pos])
+
+                if selected:
+                    for rej in tournament.get("rejected", []):
+                        print(f"[ai-jury] turnuva elemesi: {rej}", flush=True)
+                    return selected[:max_output]
+            except Exception as merge_error:
+                print(f"[ai-jury] turnuva sonucu işlenemedi: {merge_error}", flush=True)
+
+        # Turnuva AI'sı başarısız olduysa, mevcut olay-tekrarı mantığıyla
+        # (_is_same_event) yerel dedup yap — ikinci bir güvenli geri dönüş.
+        deduped: list[dict] = []
+        for item in survivors:
+            if any(
+                _is_same_event(existing.get("title", ""), item.get("title", ""))
+                for existing in deduped
+            ):
+                continue
+            deduped.append(item)
+            if len(deduped) >= max_output:
+                break
+
+        return deduped or fallback
+
+    except Exception as error:
+        print(f"[ai-jury] beklenmeyen hata, kural tabanlı yedek kullanılıyor: {error}", flush=True)
+        return fallback

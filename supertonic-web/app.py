@@ -7502,12 +7502,6 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                         5,
                     )
 
-                    ranked_pool = [
-                        item.get("title", "").strip()
-                        for item in ranked_items
-                        if item.get("title", "").strip()
-                    ]
-
                     print(
                         "[news-ranker][telegram] "
                         + " | ".join(
@@ -7516,6 +7510,36 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                         ),
                         flush=True,
                     )
+
+                    # AI jürisi: kural tabanlı havuzun üstüne ikinci bir
+                    # değerlendirme katmanı (clickbait/somutluk/tekrar vb.).
+                    # Kendi içinde hata yutar; başarısız olursa ranked_items
+                    # DEĞİŞMEDEN kalır, aşağıdaki akış hiç etkilenmez.
+                    try:
+                        from news_ranker import run_ai_jury
+
+                        ranked_items = await asyncio.to_thread(
+                            run_ai_jury, ranked_items, api_key
+                        )
+                        print(
+                            "[ai-jury][telegram] "
+                            + " | ".join(
+                                f"{round(item.get('final_score', item.get('score', 0)), 1)}:{item.get('title')}"
+                                for item in ranked_items[:10]
+                            ),
+                            flush=True,
+                        )
+                    except Exception as jury_error:
+                        print(
+                            f"[ai-jury][telegram] devre dışı, kural tabanlı sıralama kullanılıyor: {jury_error}",
+                            flush=True,
+                        )
+
+                    ranked_pool = [
+                        item.get("title", "").strip()
+                        for item in ranked_items
+                        if item.get("title", "").strip()
+                    ]
 
                 except Exception as rank_error:
                     print(
@@ -7838,7 +7862,15 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                 pool = _dedupe_pool_against_recent(pool)[:12]
                 if pool:
                     offset = await _telegram_mark_offset_to_latest()
-                    numbered = "\n\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
+                    # Telegram'da SEO kuyruğundan arındırılmış başlık gösterilir,
+                    # ama seçim ("forced_topic = pool[choice-1]") ve üretim hâlâ
+                    # pool'daki orijinal başlığı kullanır — sadece görüntü temizlenir.
+                    try:
+                        from news_ranker import clean_display_title
+                        display_titles = [clean_display_title(t) for t in pool]
+                    except Exception:
+                        display_titles = pool
+                    numbered = "\n\n".join(f"{i+1}. {t}" for i, t in enumerate(display_titles))
                     sent = await send_telegram_plain(
                         f"📰 TR Instagram-Only — 5 dakika içinde numara yaz, o haberi yapayım.\n"
                         f"Uygun haber yoksa 'iptal' veya 'c' yaz, bu saat dilimi hiç paylaşılmasın.\n"
