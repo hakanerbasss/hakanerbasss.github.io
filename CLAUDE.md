@@ -31,4 +31,4 @@ Ana proje: `supertonic-web/` klasörü.
 
 - `baretim-mavi-admob/` — Mobil uygulama
 - `whatsapp-api-server/` — WhatsApp servisi (`wa.wizaicorp.com`)
-- `namazvakitleri/` — Namaz Vakitleri Android uygulaması (Kotlin/Compose, Termux'ta build alınır; detay: `namazvakitleri/README.md`)
+- Namaz Vakitleri Android uygulaması → **kendi deposuna taşındı**: https://github.com/hakanerbasss/namaz-vakitleri (2026-07-22). Bu depoda değil.
