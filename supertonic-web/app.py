@@ -5803,7 +5803,12 @@ async def _live_stream_supervisor():
     try:
         info = await asyncio.to_thread(youtube_live.create_broadcast, creds, cfg.get("title", ""), cfg.get("description", ""))
     except Exception as e:
-        save_live_state(status="error", error=f"Yayın oluşturulamadı: {e}")
+        # str(e) bazı Google API hatalarında boş dönebiliyor (örn. çıplak
+        # Exception() veya bazı auth hataları) — tip adı + tam traceback'i
+        # her zaman journalctl'e basıyoruz ki teşhis edilebilsin.
+        detail = str(e).strip() or f"{type(e).__name__} (detay yok)"
+        print(f"[LIVE] Yayın oluşturulamadı: {detail}\n{traceback.format_exc()}", flush=True)
+        save_live_state(status="error", error=f"Yayın oluşturulamadı: {detail}")
         return
 
     rtmp_url = f"{info['ingestion_address']}/{info['stream_name']}"
