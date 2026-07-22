@@ -5830,6 +5830,58 @@ async def stop_live_stream_endpoint():
 # kullanıcı basmazsa hiçbir şey olmaz.
 _lv_roundup_busy = False
 
+_LABEL_FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+]
+
+
+async def _label_roundup_segment(video_path: Path, seg_num: int, seg_total: int, date_str: str, source_text: str) -> Path:
+    """Segmentin ilk 3 saniyesine 'HABER N/TOPLAM' + tarih/kaynak bandı ekler —
+    mevcut 'SON DAKİKA' bandının hemen altındaki boş alana. _generate_shorts_core'a
+    hiç dokunmuyor, sadece roundup için ayrı bir son işleme adımı — tekli postlar
+    etkilenmez. Etiketleme başarısız olursa (font yok, ffmpeg hatası vb.) orijinal
+    videoyu olduğu gibi döner, tüm işi çökertmez."""
+    font_path = next((f for f in _LABEL_FONT_CANDIDATES if Path(f).exists()), None)
+    if not font_path:
+        return video_path
+
+    uid = uuid.uuid4().hex
+    line1 = f"GÜNÜN ÖZETİ · HABER {seg_num}/{seg_total}"
+    source_clean = (source_text or "").replace("Kaynak: ", "").strip() or "çeşitli kaynaklar"
+    line2 = f"{date_str} · Kaynak: {source_clean}"
+
+    txt1 = UPLOAD_DIR / f"{uid}_l1.txt"
+    txt2 = UPLOAD_DIR / f"{uid}_l2.txt"
+    txt1.write_text(line1)
+    txt2.write_text(line2)
+    out_path = video_path.with_name(video_path.stem + "_lbl.mp4")
+
+    vf = (
+        f"drawtext=textfile={txt1}:fontfile={font_path}:fontsize=42:fontcolor=white:"
+        f"x=(w-text_w)/2:y=1220:box=1:boxcolor=black@0.6:boxborderw=14:enable='between(t,0,3)',"
+        f"drawtext=textfile={txt2}:fontfile={font_path}:fontsize=32:fontcolor=0xFFD000:"
+        f"x=(w-text_w)/2:y=1300:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t,0,3)'"
+    )
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-i", str(video_path), "-vf", vf,
+            "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "copy",
+            str(out_path),
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode == 0 and out_path.exists():
+            video_path.unlink(missing_ok=True)
+            return out_path
+        print(f"[LV-ROUNDUP] etiketleme başarısız: {(stderr or b'').decode(errors='ignore')[-300:]}", flush=True)
+        return video_path
+    finally:
+        txt1.unlink(missing_ok=True)
+        txt2.unlink(missing_ok=True)
+
 
 async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voice: str = "M1") -> tuple:
     """Her konuyu TEK TEK _generate_shorts_core (platform=instagram) ile üretir —
@@ -5838,10 +5890,14 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     için codec parametreleri zaten aynı) ile tek bir uzun videoda birleştirir.
     _generate_shorts_core kendi başına paylaşım yapmaz (sadece üretir), o yüzden
     bu fonksiyon da Instagram'a/habere sitesine hiç dokunmamış olur."""
+    from datetime import datetime as _dt2
+    today_str = _dt2.now().strftime("%d.%m.%Y")
+
     clip_paths = []
     used_titles = []
     all_tags = []
-    for topic in topics:
+    total = len(topics)
+    for i, topic in enumerate(topics, start=1):
         try:
             result = await _generate_shorts_core(
                 topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
@@ -5849,6 +5905,12 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
             )
             clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
             if clip_file.exists():
+                # Haber geçişinde "HABER N/TOPLAM + tarih + kaynak" bandı — izleyici
+                # hangi haberde olduğunu anlasın diye. _generate_shorts_core'un
+                # kendisine dokunmuyor, ayrı bir son işleme adımı.
+                clip_file = await _label_roundup_segment(
+                    clip_file, i, total, today_str, result.get("source_text", "")
+                )
                 clip_paths.append(clip_file)
                 used_titles.append(result.get("title", topic))
                 all_tags += [t.strip() for t in (result.get("suggested_tags") or "").replace("#", "").split(",") if t.strip()]
@@ -5881,11 +5943,15 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
 
     # Elle YouTube'a yüklemek isteyenler için hazır başlık/açıklama/etiket —
     # otomatik yükleme yapmıyoruz, sadece indirip elle eklenebilsin diye üretiyoruz.
-    from datetime import datetime as _dt
-    today = _dt.now().strftime("%d.%m.%Y")
-    title = f"Günün Gündemi — {today}"
+    # Etiketler segment üretiminden Instagram formatında geliyor (keşfet, reels vb.)
+    # — YouTube'da anlamsız/uyumsuz durduğu için burada temizlenip genel YouTube
+    # arama kelimeleriyle değiştiriliyor.
+    title = f"Günün Gündemi — {today_str}"
     description = "Bugünün öne çıkan haberleri:\n\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(used_titles))
-    tags = ", ".join(dict.fromkeys(all_tags))[:500]
+    _IG_ONLY_TAGS = {"reels", "instareels", "keşfet", "kesfet", "shorts", "viral", "trending"}
+    _YT_BASE_TAGS = ["haberler", "gündem", "son dakika", "türkiye haberleri", "dünya haberleri", "güncel haberler"]
+    cleaned_tags = [t for t in dict.fromkeys(all_tags) if t.lower() not in _IG_ONLY_TAGS]
+    tags = ", ".join(dict.fromkeys(_YT_BASE_TAGS + cleaned_tags))[:500]
 
     return {
         "video_filename": output_file.name,
