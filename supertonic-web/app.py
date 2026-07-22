@@ -5892,6 +5892,55 @@ async def _label_roundup_segment(video_path: Path, title: str, date_str: str, so
         txt2.unlink(missing_ok=True)
 
 
+_TR_MONTH_ABBR = {1: "Oca", 2: "Şub", 3: "Mar", 4: "Nis", 5: "May", 6: "Haz",
+                   7: "Tem", 8: "Ağu", 9: "Eyl", 10: "Eki", 11: "Kas", 12: "Ara"}
+
+
+def _fmt_roundup_timestamp(seconds: float) -> str:
+    m = int(seconds // 60)
+    s = int(seconds % 60)
+    return f"{m}. dakika {s:02d}. saniye" if s else f"{m}. dakika"
+
+
+async def _roundup_title_and_tags(api_key: str, used_titles: list, date_label: str) -> tuple:
+    """DeepSeek ile videodaki gerçek haber başlıklarından çarpıcı bir özet başlık
+    ('Günün Öne Çıkan Haberleri: Çifte zam, Havalar -5° [22 Tem '26]' gibi) ve
+    SADECE bu haberlerin içeriğine dayalı etiket listesi üretir — genel/rastgele
+    etiket eklenmez. DeepSeek çağrısı başarısız olursa (bakiye, ağ vb.) basit bir
+    yedek başlık/etiket setine düşer, roundup üretimini asla çökertmez."""
+    fallback_title = f"Günün Öne Çıkan Haberleri — {date_label}"
+    fallback_tags = ", ".join(["haberler", "gündem", "son dakika", "türkiye haberleri", "dünya haberleri", "güncel haberler"])
+    try:
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        headlines_block = "\n".join(f"- {t}" for t in used_titles)
+        prompt = f"""Aşağıda bugün üretilen {len(used_titles)} haber başlığı var. Bunlardan tek bir YouTube video başlığı ve etiket listesi üret.
+
+Haberler:
+{headlines_block}
+
+Kurallar:
+- Başlık TAM OLARAK şu formatta olsun: "Günün Öne Çıkan Haberleri: <2-3 çarpıcı kısa özet, virgülle ayrılmış> [{date_label}]"
+- Her özet 2-4 kelime olsun (örnek: "Çifte zam", "Havalar -5°"), en dikkat çekici 2-3 haberi seç
+- Etiketler SADECE bu haberlerin gerçek içeriğinden türetilsin, alakasız/genel etiket ekleme
+- Etiketleri virgülle ayrılmış, başında # olmadan, küçük harfli liste olarak ver (8-15 adet)
+
+Yanıtı SADECE şu JSON formatında ver, başka hiçbir açıklama yazma:
+{{"title": "...", "tags": "etiket1, etiket2, etiket3"}}"""
+        resp = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7, max_tokens=300,
+        )
+        data = _parse_llm_json(resp.choices[0].message.content or "")
+        title = (data.get("title") or "").strip() or fallback_title
+        tags = (data.get("tags") or "").strip() or fallback_tags
+        return title, tags
+    except Exception as e:
+        print(f"[LV-ROUNDUP] başlık/etiket üretilemedi, yedek kullanılıyor: {e}", flush=True)
+        return fallback_title, fallback_tags
+
+
 async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voice: str = "M1") -> tuple:
     """Her konuyu TEK TEK _generate_shorts_core (platform=instagram) ile üretir —
     yani gerçek tekli Instagram postuyla BİREBİR AYNI görsel bant/CTA/ses. Sonra
@@ -5900,12 +5949,16 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     _generate_shorts_core kendi başına paylaşım yapmaz (sadece üretir), o yüzden
     bu fonksiyon da Instagram'a/habere sitesine hiç dokunmamış olur."""
     from datetime import datetime as _dt2
-    today_str = _dt2.now().strftime("%d.%m.%Y")
+    now = _dt2.now()
+    today_str = now.strftime("%d.%m.%Y")
+    date_label = f"{now.day} {_TR_MONTH_ABBR[now.month]} '{now.strftime('%y')}"
 
     clip_paths = []
     used_titles = []
-    all_tags = []
+    segment_sources = []
+    segment_starts = []
     total = len(topics)
+    cursor = 0.0
     for i, topic in enumerate(topics, start=1):
         try:
             # "Takip et/beğen" kapanışı SADECE gerçekten son segmentte olsun — her
@@ -5924,9 +5977,12 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
                 clip_file = await _label_roundup_segment(
                     clip_file, result.get("title", topic), today_str, result.get("source_text", "")
                 )
+                dur = await _probe_duration(clip_file)
                 clip_paths.append(clip_file)
                 used_titles.append(result.get("title", topic))
-                all_tags += [t.strip() for t in (result.get("suggested_tags") or "").replace("#", "").split(",") if t.strip()]
+                segment_sources.append((result.get("source_text") or "").replace("Kaynak: ", "").strip() or "çeşitli kaynaklar")
+                segment_starts.append(cursor)
+                cursor += dur or 0.0
         except Exception as e:
             print(f"[LV-ROUNDUP] '{topic[:50]}' üretilemedi: {e}", flush=True)
 
@@ -5956,15 +6012,12 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
 
     # Elle YouTube'a yüklemek isteyenler için hazır başlık/açıklama/etiket —
     # otomatik yükleme yapmıyoruz, sadece indirip elle eklenebilsin diye üretiyoruz.
-    # Etiketler segment üretiminden Instagram formatında geliyor (keşfet, reels vb.)
-    # — YouTube'da anlamsız/uyumsuz durduğu için burada temizlenip genel YouTube
-    # arama kelimeleriyle değiştiriliyor.
-    title = f"Günün Gündemi — {today_str}"
-    description = "Bugünün öne çıkan haberleri:\n\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(used_titles))
-    _IG_ONLY_TAGS = {"reels", "instareels", "keşfet", "kesfet", "shorts", "viral", "trending"}
-    _YT_BASE_TAGS = ["haberler", "gündem", "son dakika", "türkiye haberleri", "dünya haberleri", "güncel haberler"]
-    cleaned_tags = [t for t in dict.fromkeys(all_tags) if t.lower() not in _IG_ONLY_TAGS]
-    tags = ", ".join(dict.fromkeys(_YT_BASE_TAGS + cleaned_tags))[:500]
+    # Başlık ve etiketler gerçek haber başlıklarından türetilir (rastgele değil).
+    title, tags = await _roundup_title_and_tags(api_key, used_titles, date_label)
+    description = f"Bugünün öne çıkan {len(used_titles)} haberi:\n\n" + "\n".join(
+        f"{i+1}/{len(used_titles)} {t} haberi — Kaynak: {src} — Zaman damgası: {_fmt_roundup_timestamp(start)}"
+        for i, (t, src, start) in enumerate(zip(used_titles, segment_sources, segment_starts))
+    )
 
     return {
         "video_filename": output_file.name,

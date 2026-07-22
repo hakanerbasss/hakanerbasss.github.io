@@ -1554,14 +1554,17 @@
             <div class="field">
               <label>Başlık</label>
               <input type="text" id="live-roundup-title" readonly onclick="this.select()" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+              <button onclick="copyRoundupField('live-roundup-title', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:#1a1a2a;">📋 Başlığı Kopyala</button>
             </div>
             <div class="field" style="margin-top:8px;">
               <label>Açıklama</label>
-              <textarea id="live-roundup-desc" readonly onclick="this.select()" style="min-height:120px;width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;"></textarea>
+              <textarea id="live-roundup-desc" readonly onclick="this.select()" style="min-height:180px;width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;"></textarea>
+              <button onclick="copyRoundupField('live-roundup-desc', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:#1a1a2a;">📋 Açıklamayı Kopyala</button>
             </div>
             <div class="field" style="margin-top:8px;">
               <label>Etiketler</label>
               <input type="text" id="live-roundup-tags" readonly onclick="this.select()" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+              <button onclick="copyRoundupField('live-roundup-tags', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:#1a1a2a;">🏷️ Etiket Öner (Kopyala)</button>
             </div>
             <a id="live-roundup-download" href="#" download class="dl-btn" style="margin-top:10px;">⬇ Videoyu İndir</a>
           </div>
@@ -2381,6 +2384,21 @@ async function refreshLiveStatus() {
   }
   clearInterval(_liveStatusPoll);
   _liveStatusPoll = setInterval(refreshLiveStatus, 15000);
+}
+
+async function copyRoundupField(fieldId, btn) {
+  const el = document.getElementById(fieldId);
+  const text = el ? el.value : '';
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    el.select();
+    document.execCommand('copy');
+  }
+  const orig = btn.textContent;
+  btn.textContent = '✓ Kopyalandı';
+  setTimeout(() => { btn.textContent = orig; }, 1500);
 }
 
 async function generateLiveRoundup() {
