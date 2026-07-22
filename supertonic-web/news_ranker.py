@@ -6,6 +6,7 @@ import json
 import re
 import time
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -2011,7 +2012,7 @@ DEĞERLENDİRME KURALLARI:
 - Spekülasyon, köşe yazısı, beklenti haberi ve yalnızca SEO trafiği hedefleyen içerikler elensin.
 
 Her aday için TAM OLARAK bu alanları içeren bir JSON nesnesi üret:
-{"index": <numara>, "clickbait_score": 0-100, "concrete_development_score": 0-100, "verifiability_score": 0-100, "audience_relevance_score": 0-100, "wallet_or_rights_impact_score": 0-100, "urgency_score": 0-100, "duplicate_or_rehash_score": 0-100, "decision": "KEEP" veya "REJECT", "reason": "kısa Türkçe gerekçe"}
+{"index": <numara>, "clickbait_score": 0-100, "concrete_development_score": 0-100, "verifiability_score": 0-100, "audience_relevance_score": 0-100, "wallet_or_rights_impact_score": 0-100, "urgency_score": 0-100, "duplicate_or_rehash_score": 0-100, "decision": "KEEP" veya "REJECT", "reason": "en fazla 8 kelimelik kısa Türkçe gerekçe"}
 
 SADECE bu nesnelerin bir JSON DİZİSİ olarak yanıt ver. Başka hiçbir açıklama, markdown veya metin ekleme."""
 
@@ -2045,18 +2046,26 @@ def _ai_jury_format_batch_prompt(batch: list[dict], cluster_ids: list[int]) -> s
     return "\n\n".join(lines)
 
 
-def _ai_jury_call_stage2(
-    batch: list[dict],
-    cluster_ids: list[int],
+# Partiyi bu boyutta parçalara böleriz — tek çağrıda 20-25 haberin tamamını
+# puanlamak DeepSeek yanıtını max_tokens sınırında yarıda kesebiliyordu
+# (gözlemlenen hata: "Unterminated string" — JSON yarıda kopuyordu). Küçük
+# parçalar bu riski ortadan kaldırır; paralel çalıştırıldığı için toplam
+# gecikme tek büyük çağrıyla neredeyse aynı kalır.
+_AI_JURY_STAGE2_CHUNK_SIZE = 8
+
+
+def _ai_jury_call_stage2_chunk(
+    chunk: list[dict],
+    chunk_cluster_ids: list[int],
     api_key: str,
-    timeout_seconds: float = 20.0,
+    timeout_seconds: float,
 ) -> list | None:
-    """Tek bir DeepSeek çağrısıyla tüm partiyi puanlar (haber başına ayrı
-    çağrı yapmaz — maliyet ve gecikmeyi düşük tutmak için). En fazla bir
-    kez yeniden dener, ikisi de başarısız olursa None döner."""
+    """Küçük bir parçayı (en fazla _AI_JURY_STAGE2_CHUNK_SIZE haber) tek
+    DeepSeek çağrısıyla puanlar. En fazla bir kez yeniden dener, ikisi de
+    başarısız olursa None döner (bu parçanın haberleri nötr geçer)."""
     from openai import OpenAI
 
-    prompt = _AI_JURY_STAGE2_RULES + "\n\nADAYLAR:\n" + _ai_jury_format_batch_prompt(batch, cluster_ids)
+    prompt = _AI_JURY_STAGE2_RULES + "\n\nADAYLAR:\n" + _ai_jury_format_batch_prompt(chunk, chunk_cluster_ids)
     last_error: Any = None
 
     for attempt in range(2):
@@ -2066,7 +2075,7 @@ def _ai_jury_call_stage2(
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                max_tokens=2500,
+                max_tokens=1500,
             )
             data = _ai_jury_extract_json(resp.choices[0].message.content or "")
 
@@ -2076,10 +2085,60 @@ def _ai_jury_call_stage2(
             last_error = "beklenmeyen yanıt biçimi (dizi değil)"
         except Exception as error:
             last_error = error
-            print(f"[ai-jury] aşama-2 deneme {attempt + 1} hatası: {error}", flush=True)
+            print(f"[ai-jury] aşama-2 parça denemesi {attempt + 1} hatası: {error}", flush=True)
 
-    print(f"[ai-jury] aşama-2 tamamen başarısız: {last_error}", flush=True)
+    print(f"[ai-jury] aşama-2 parçası tamamen başarısız (bu parçadaki haberler nötr geçer): {last_error}", flush=True)
     return None
+
+
+def _ai_jury_call_stage2(
+    batch: list[dict],
+    cluster_ids: list[int],
+    api_key: str,
+    timeout_seconds: float = 20.0,
+) -> list | None:
+    """batch'i _AI_JURY_STAGE2_CHUNK_SIZE'lık parçalara bölüp paralel olarak
+    değerlendirir, sonuçları (global index'e çevrilmiş olarak) birleştirir.
+    Bir parça başarısız olursa sadece o parçanın haberleri değerlendirmesiz
+    kalır — tüm aşama çökmez."""
+    chunks = [
+        (i, batch[i:i + _AI_JURY_STAGE2_CHUNK_SIZE], cluster_ids[i:i + _AI_JURY_STAGE2_CHUNK_SIZE])
+        for i in range(0, len(batch), _AI_JURY_STAGE2_CHUNK_SIZE)
+    ]
+
+    if not chunks:
+        return None
+
+    all_evaluations: list = []
+
+    with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as executor:
+        future_map = {
+            executor.submit(_ai_jury_call_stage2_chunk, chunk, chunk_clusters, api_key, timeout_seconds): (offset, len(chunk))
+            for offset, chunk, chunk_clusters in chunks
+        }
+
+        for future in as_completed(future_map):
+            offset, chunk_len = future_map[future]
+            try:
+                chunk_evaluations = future.result()
+            except Exception as error:
+                print(f"[ai-jury] aşama-2 parçası (offset={offset}) beklenmeyen hata: {error}", flush=True)
+                continue
+
+            if not chunk_evaluations:
+                continue
+
+            for ev in chunk_evaluations:
+                try:
+                    local_idx = int(ev.get("index", 0)) - 1
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= local_idx < chunk_len:
+                    ev = dict(ev)
+                    ev["index"] = offset + local_idx + 1
+                    all_evaluations.append(ev)
+
+    return all_evaluations or None
 
 
 _AI_JURY_STAGE3_RULES = """AŞAĞIDAKİ HABERLER arasında bir turnuva yap. Amaç: aynı olayı anlatan
@@ -2129,7 +2188,7 @@ def _ai_jury_call_stage3(
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                max_tokens=800,
+                max_tokens=1200,
             )
             data = _ai_jury_extract_json(resp.choices[0].message.content or "")
 
