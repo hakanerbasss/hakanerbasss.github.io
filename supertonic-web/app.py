@@ -1612,6 +1612,7 @@ async def _generate_shorts_core(
     avatar_path: Path = None,
     info_format: str = None,
     cover_image_path: Path = None,
+    skip_closing_cta: bool = False,
 ):
     import json
     import httpx
@@ -1900,8 +1901,11 @@ Rules:
             except Exception:
                 pass
 
-        # Son sahne TTS metnini platforma göre sabit CTA ile değiştir (haber shorts)
-        if scenes:
+        # Son sahne TTS metnini platforma göre sabit CTA ile değiştir (haber shorts).
+        # skip_closing_cta=True olursa (örn. uzun özet videosunun ARA segmentleri —
+        # sadece son segment gerçek kapanış olsun, 12 kez "takip et" tekrarlanmasın)
+        # bu değişiklik atlanır, sahne kendi doğal metnini korur.
+        if scenes and not skip_closing_cta:
             _cta = {
                 "tr": {
                     "youtube": "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
@@ -2012,9 +2016,10 @@ Rules:
         except Exception:
             pass
 
-    # Son sahneye platform bandı ekle — endcard varsa overlay ekleme (görsel zaten tasarımlı)
+    # Son sahneye platform bandı ekle — endcard varsa overlay ekleme (görsel zaten tasarımlı).
+    # skip_closing_cta=True'da bu da atlanır (bkz. yukarıdaki CTA metni notu).
     endcard_used = (Path("static/endcard_tr.jpg").exists() and not info_format) or (info_format and INFO_ENDCARD_FILE.exists())
-    if png_files and not endcard_used:
+    if png_files and not endcard_used and not skip_closing_cta:
         try:
             if platform == "instagram":
                 overlay_ig_follow_banner(png_files[-1])
@@ -5900,11 +5905,15 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     clip_paths = []
     used_titles = []
     all_tags = []
-    for topic in topics:
+    total = len(topics)
+    for i, topic in enumerate(topics, start=1):
         try:
+            # "Takip et/beğen" kapanışı SADECE gerçekten son segmentte olsun — her
+            # segment kendi başına tam bir Instagram Reels gibi üretildiği için,
+            # bu koruma olmadan 12 haberde 12 kez "takip et" tekrarlanırdı.
             result = await _generate_shorts_core(
                 topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
-                platform="instagram",
+                platform="instagram", skip_closing_cta=(i < total),
             )
             clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
             if clip_file.exists():
