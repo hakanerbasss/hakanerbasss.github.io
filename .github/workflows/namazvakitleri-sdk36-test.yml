@@ -41,6 +41,15 @@ jobs:
           sed -i '/android.aapt2FromMavenOverride/d' gradle.properties
           cat gradle.properties
 
+      # Termux'un telefon RAM'i icin kisitli -Xmx512m ayari GitHub runner'inda
+      # OutOfMemoryError'a yol aciyor (ilk denemede build 4 dk surup 25 gorevden
+      # sonra bellek yetersizliginden dustu - aapt2/SDK36 sorunu degildi).
+      # CI'da bol RAM oldugu icin bunu buyutuyoruz.
+      - name: Increase JVM heap for CI runner
+        run: |
+          sed -i 's/-Xmx512m -XX:MaxMetaspaceSize=256m/-Xmx3072m -XX:MaxMetaspaceSize=1024m/' gradle.properties
+          cat gradle.properties
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
