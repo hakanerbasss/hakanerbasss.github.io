@@ -5840,6 +5840,7 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     bu fonksiyon da Instagram'a/habere sitesine hiç dokunmamış olur."""
     clip_paths = []
     used_titles = []
+    all_tags = []
     for topic in topics:
         try:
             result = await _generate_shorts_core(
@@ -5850,6 +5851,7 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
             if clip_file.exists():
                 clip_paths.append(clip_file)
                 used_titles.append(result.get("title", topic))
+                all_tags += [t.strip() for t in (result.get("suggested_tags") or "").replace("#", "").split(",") if t.strip()]
         except Exception as e:
             print(f"[LV-ROUNDUP] '{topic[:50]}' üretilemedi: {e}", flush=True)
 
@@ -5877,7 +5879,21 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     if proc.returncode != 0 or not output_file.exists():
         raise RuntimeError(f"Birleştirme başarısız: {(stderr or b'').decode(errors='ignore')[-300:]}")
 
-    return output_file, used_titles
+    # Elle YouTube'a yüklemek isteyenler için hazır başlık/açıklama/etiket —
+    # otomatik yükleme yapmıyoruz, sadece indirip elle eklenebilsin diye üretiyoruz.
+    from datetime import datetime as _dt
+    today = _dt.now().strftime("%d.%m.%Y")
+    title = f"Günün Gündemi — {today}"
+    description = "Bugünün öne çıkan haberleri:\n\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(used_titles))
+    tags = ", ".join(dict.fromkeys(all_tags))[:500]
+
+    return {
+        "video_filename": output_file.name,
+        "title": title,
+        "description": description,
+        "tags": tags,
+        "used_titles": used_titles,
+    }
 
 
 async def _run_live_roundup_job(api_key: str):
@@ -5895,11 +5911,19 @@ async def _run_live_roundup_job(api_key: str):
             return
         save_live_state(roundup_status="running", roundup_note=f"{len(topics)} konu üretiliyor…")
         ig_voice = load_ig_only_tr_config().get("voice", "F1")
-        video_file, used_titles = await _generate_ig_roundup(topics, api_key, voice=ig_voice)
+        roundup = await _generate_ig_roundup(topics, api_key, voice=ig_voice)
+        video_file = OUTPUT_DIR / roundup["video_filename"]
         shutil.copy2(str(video_file), str(LIVE_QUEUE_DIR / video_file.name))
         _live_duration_cache.pop(video_file.name, None)
-        save_live_state(roundup_status="done", roundup_error="",
-                         roundup_note=f"{len(used_titles)} haber eklendi: " + ", ".join(used_titles[:3]) + ("…" if len(used_titles) > 3 else ""))
+        used_titles = roundup["used_titles"]
+        save_live_state(
+            roundup_status="done", roundup_error="",
+            roundup_note=f"{len(used_titles)} haber eklendi: " + ", ".join(used_titles[:3]) + ("…" if len(used_titles) > 3 else ""),
+            roundup_video_filename=roundup["video_filename"],
+            roundup_title=roundup["title"],
+            roundup_description=roundup["description"],
+            roundup_tags=roundup["tags"],
+        )
     except Exception as e:
         save_live_state(roundup_status="error", roundup_error=str(e))
     finally:

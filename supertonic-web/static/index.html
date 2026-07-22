@@ -1546,6 +1546,25 @@
             <div class="spinner" id="spin-live-roundup"></div>🎬 Uzun Video Üret
           </button>
           <div id="live-roundup-status" style="font-size:12px;color:#888;margin-top:8px;"></div>
+
+          <div id="live-roundup-result" style="display:none;margin-top:14px;">
+            <p style="color:#666;font-size:12px;margin-bottom:8px;">
+              Elle YouTube'a yüklemek için hazır — videoyu indir, aşağıdaki başlık/açıklama/etiketleri kopyala.
+            </p>
+            <div class="field">
+              <label>Başlık</label>
+              <input type="text" id="live-roundup-title" readonly onclick="this.select()" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+            </div>
+            <div class="field" style="margin-top:8px;">
+              <label>Açıklama</label>
+              <textarea id="live-roundup-desc" readonly onclick="this.select()" style="min-height:120px;width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;"></textarea>
+            </div>
+            <div class="field" style="margin-top:8px;">
+              <label>Etiketler</label>
+              <input type="text" id="live-roundup-tags" readonly onclick="this.select()" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+            </div>
+            <a id="live-roundup-download" href="#" download class="dl-btn" style="margin-top:10px;">⬇ Videoyu İndir</a>
+          </div>
         </div>
       </div>
     </div>
@@ -2338,6 +2357,19 @@ async function refreshLiveStatus() {
       if (d.roundup_note) rHtml += d.roundup_note;
       if (d.roundup_status === 'error' && d.roundup_error) rHtml += `<span style="color:#f87171;"> ${d.roundup_error}</span>`;
       rEl.innerHTML = rHtml;
+
+      const resultEl = document.getElementById('live-roundup-result');
+      if (resultEl) {
+        if (d.roundup_status === 'done' && d.roundup_video_filename) {
+          resultEl.style.display = 'block';
+          document.getElementById('live-roundup-title').value = d.roundup_title || '';
+          document.getElementById('live-roundup-desc').value = d.roundup_description || '';
+          document.getElementById('live-roundup-tags').value = d.roundup_tags || '';
+          document.getElementById('live-roundup-download').href = '/api/video/' + d.roundup_video_filename;
+        } else {
+          resultEl.style.display = 'none';
+        }
+      }
     }
   } catch(e) {
     el.textContent = 'Durum alınamadı';
