@@ -5944,6 +5944,38 @@ async def generate_live_roundup_endpoint():
     return {"ok": True}
 
 
+@app.get("/api/live/pool-files")
+async def get_live_pool_files():
+    """Havuzdaki TÜM videoları listeler (indirme özelliği eklenmeden ÖNCE üretilmiş
+    olanlar dahil) — canlı yayın için bekleyen her dosya, en yeni önce."""
+    files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+    result = []
+    for f in files:
+        dur = _live_duration_cache.get(f.name)
+        if dur is None:
+            dur = await _probe_duration(f)
+            _live_duration_cache[f.name] = dur
+        result.append({
+            "filename": f.name,
+            "size_mb": round(f.stat().st_size / 1024 / 1024, 1),
+            "duration_seconds": dur,
+        })
+    return {"files": result}
+
+
+@app.get("/api/live/pool-video/{filename}")
+async def get_live_pool_video(filename: str):
+    """Havuzdaki bir videoyu indirir — /api/video/ (OUTPUT_DIR, 3 günde silinir)
+    yerine doğrudan live_queue'dan servis eder, çünkü havuzdaki dosyalar 3 günden
+    çok daha uzun kalabiliyor (12 saatlik tavan dolana kadar)."""
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "Geçersiz dosya adı")
+    path = LIVE_QUEUE_DIR / filename
+    if not path.exists():
+        raise HTTPException(404, "Dosya bulunamadı")
+    return FileResponse(str(path), media_type="video/mp4")
+
+
 @app.get("/api/yt/analytics")
 async def get_yt_analytics(days: int = 28, channel: str = "tr"):
     """YouTube Analytics API — genişletilmiş kanal raporu."""

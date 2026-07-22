@@ -1565,6 +1565,11 @@
             </div>
             <a id="live-roundup-download" href="#" download class="dl-btn" style="margin-top:10px;">⬇ Videoyu İndir</a>
           </div>
+
+          <div style="margin-top:14px;">
+            <button onclick="loadLivePoolFiles()" style="font-size:12px;padding:7px 14px;background:#1a1a2a;">📂 Havuzdaki Videoları Göster</button>
+            <div id="live-pool-files" style="margin-top:10px;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -2392,6 +2397,29 @@ async function generateLiveRoundup() {
     refreshLiveStatus();
   } catch(e) {
     showError('err-live', e.message);
+  }
+}
+
+async function loadLivePoolFiles() {
+  const el = document.getElementById('live-pool-files');
+  if (!el) return;
+  el.textContent = 'Yükleniyor…';
+  try {
+    const r = await fetch('/api/live/pool-files');
+    const d = await r.json();
+    const files = d.files || [];
+    if (!files.length) {
+      el.innerHTML = '<span style="color:#888;font-size:12px;">Havuz boş</span>';
+      return;
+    }
+    el.innerHTML = files.map(f => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#111;border:1px solid #222;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;">
+        <span style="color:#ccc;word-break:break-all;">${f.filename} <span style="color:#666;">(${_fmtMinSec(f.duration_seconds)}, ${f.size_mb} MB)</span></span>
+        <a href="/api/live/pool-video/${encodeURIComponent(f.filename)}" download style="color:#7c3aed;flex-shrink:0;">⬇ İndir</a>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = '<span style="color:#f87171;font-size:12px;">Liste alınamadı</span>';
   }
 }
 
