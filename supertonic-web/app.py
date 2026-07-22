@@ -7755,6 +7755,20 @@ async def startup_event():
 
     asyncio.create_task(_rescue_interrupted_jobs_task())
 
+    # Restart öncesi "Uzun Video Üret" işlemi yarıda kalmışsa (dosyaya "running"
+    # yazılmış ama işlemin kendisi restart ile ölmüş), buton kilitli görünmesin.
+    if LIVE_STATE_FILE.exists():
+        try:
+            _lv_state = json.loads(LIVE_STATE_FILE.read_text())
+            if _lv_state.get("roundup_status") == "running":
+                save_live_state(
+                    roundup_status="error",
+                    roundup_error="Sunucu yeniden başladığı için üretim yarıda kesildi, tekrar deneyebilirsiniz",
+                    roundup_note="",
+                )
+        except Exception:
+            pass
+
 
 @app.post("/api/namaz/register-city")
 async def namaz_register_city(request: Request):
