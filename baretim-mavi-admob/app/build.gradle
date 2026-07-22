@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace 'com.bluechip.finance'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.bluechip.finance"
         minSdk 24
-        targetSdk 35
-        versionCode 143
-        versionName "2.70"
+        targetSdk 36
+        versionCode 144
+        versionName "2.71"
 
         def localProps = new Properties()
         def localPropsFile = rootProject.file('local.properties')
