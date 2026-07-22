@@ -98,15 +98,37 @@ class NewsAlarmReceiver : BroadcastReceiver() {
             val conn = java.net.URL(url).openConnection()
             conn.connectTimeout = 5000
             conn.readTimeout = 5000
-            conn.getInputStream().use { BitmapFactory.decodeStream(it) }
+            val bytes = conn.getInputStream().use { it.readBytes() }
+
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+            options.inSampleSize = calculateInSampleSize(options, MAX_BITMAP_DIMEN, MAX_BITMAP_DIMEN)
+            options.inJustDecodeBounds = false
+
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     companion object {
         private const val PREFS = "notif_settings"
         private const val KEY_LAST_SEEN_ID = "last_seen_haber_id"
         private const val NOTIF_ID_BASE = 500
+        private const val MAX_BITMAP_DIMEN = 1024
     }
 }
