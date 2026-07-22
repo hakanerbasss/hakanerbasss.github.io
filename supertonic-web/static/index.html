@@ -1506,9 +1506,12 @@
       <div class="acc-body" id="acc-body-live-stream">
         <p style="color:#666;font-size:12px;margin-bottom:12px;">
           Kısa video yerine 7/24 açık kalan bir yayın — izleyici sekmeyi arka planda bıraksa bile
-          izlenme saati birikiyor, watch-hour eşiğini kısa videolardan çok daha hızlı doldurur.
-          TR Instagram-Only'nin ürettiği her video, başarıyla paylaşıldıktan sonra otomatik olarak
-          bu yayının kuyruğuna eklenir. Kuyruk boşken ffmpeg bir bekleme ekranı akıtır, yayın hiç kesilmez.
+          izlenme saati birikiyor. TR Instagram-Only'nin ürettiği her video, başarıyla
+          paylaşıldıktan sonra otomatik olarak havuza eklenir — ekstra üretim yapılmaz.
+          Havuzda <b>1 saatlik</b> video birikmeden yayın hiç açılmaz (aşağıda ilerlemeyi
+          görebilirsin). Yayın açılınca videolar sırayla oynar, bitince başa sarar; havuz
+          <b>24 saati</b> geçince en eski video havuzdan düşer — yayın her zaman "son 24 saat"i
+          gösterir.
         </p>
         <div class="field">
           <label>Yayın Başlığı</label>
@@ -2280,6 +2283,14 @@ async function stopLiveStream() {
   }
 }
 
+function _fmtMinSec(totalSeconds) {
+  const s = Math.round(totalSeconds || 0);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h} sa ${m} dk`;
+  return `${m} dk`;
+}
+
 async function refreshLiveStatus() {
   const el = document.getElementById('live-status');
   if (!el) return;
@@ -2287,11 +2298,16 @@ async function refreshLiveStatus() {
     const r = await fetch('/api/live/status');
     const d = await r.json();
     const statusLabel = {
+      accumulating: '🟠 Biriktiriliyor (henüz yayında değil)',
       live: '🔴 Yayında', idle: '🟡 Yayında (bekleme ekranı)', starting: '⏳ Başlatılıyor',
       stopped: '⚪ Durduruldu', error: '❌ Hata',
     }[d.status] || d.status;
     let html = `<div><b>${statusLabel}</b></div>`;
-    html += `<div style="color:#888;">Kuyrukta ${d.queue_count ?? 0} video bekliyor</div>`;
+    html += `<div style="color:#888;">Havuz: ${d.pool_count ?? 0} video, ${_fmtMinSec(d.pool_seconds)}`;
+    if (d.status === 'accumulating') {
+      html += ` / ${_fmtMinSec(d.pool_min_seconds)} gerekiyor`;
+    }
+    html += `</div>`;
     if (d.current_file) html += `<div style="color:#888;">Şu an: ${d.current_file}</div>`;
     if (d.watch_url) html += `<div><a href="${d.watch_url}" target="_blank" style="color:#7c3aed;">İzleme linki ↗</a></div>`;
     if (d.error) html += `<div style="color:#f87171;">${d.error}</div>`;

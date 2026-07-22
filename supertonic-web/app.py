@@ -5511,9 +5511,13 @@ LIVE_FAILED_DIR.mkdir(exist_ok=True)
 LIVE_CONFIG_FILE = Path("live_stream_config.json")
 LIVE_STATE_FILE = Path("live_stream_state.json")
 
+_LIVE_MIN_SECONDS = 3600    # 1 saat — havuz bu kadar dolmadan yayın hiç başlamaz
+_LIVE_MAX_SECONDS = 86400   # 24 saat — havuz tavanı, üstü en eskiden silinir
+
 _live_stream_task: asyncio.Task | None = None
 _live_stream_proc = None
 _live_stream_stop_flag = False
+_live_duration_cache: dict[str, float] = {}  # dosya adı -> saniye (dosyalar değişmez, güvenle önbelleklenir)
 
 
 def load_live_config() -> dict:
@@ -5559,7 +5563,8 @@ def _get_live_creds():
 
 def queue_video_for_live(filename: str) -> None:
     """Başarıyla paylaşılan bir haber videosunu, canlı yayın açıksa kuyruğa ekler.
-    Yayın kapalıysa disk boşuna dolmasın diye hiçbir şey yapmaz."""
+    Yayın kapalıysa disk boşuna dolmasın diye hiçbir şey yapmaz. Ekstra üretim YOK —
+    havuz sadece zaten çalışan üretimlerden (şu an TR Instagram-Only) doğal olarak dolar."""
     try:
         if not load_live_config().get("enabled"):
             return
@@ -5570,12 +5575,60 @@ def queue_video_for_live(filename: str) -> None:
         print(f"[LIVE] kuyruğa eklenemedi: {e}", flush=True)
 
 
+async def _probe_duration(path: Path) -> float:
+    """ffprobe ile video süresini saniye cinsinden ölçer, başarısız olursa 0 döner."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", str(path),
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        out, _ = await proc.communicate()
+        return float(out.decode().strip())
+    except Exception:
+        return 0.0
+
+
+async def _live_pool_stats() -> dict:
+    """Havuzdaki video sayısı + toplam süresi (saniye). Süreler dosya adına göre
+    önbelleklenir — aynı dosya tekrar tekrar ffprobe ile ölçülmesin (durum sık
+    sorgulanıyor, panelde her 15 saniyede bir)."""
+    files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+    total = 0.0
+    for f in files:
+        dur = _live_duration_cache.get(f.name)
+        if dur is None:
+            dur = await _probe_duration(f)
+            _live_duration_cache[f.name] = dur
+        total += dur
+    return {"count": len(files), "seconds": total}
+
+
 async def _live_stream_supervisor():
-    """Kuyruktaki videoları sırayla RTMP'ye akıtan sürekli döngü. Kuyruk boşsa
-    ffmpeg'in kendi ürettiği bir "bekleme ekranı" akıtılır ki RTMP bağlantısı
-    hiç kesilmesin (kesilirse YouTube birkaç dakika sonra yayını sonlandırabilir)."""
+    """1) Havuz 1 saati (_LIVE_MIN_SECONDS) doldurana kadar YouTube'a hiç bağlanmaz,
+    sadece bekler. 2) Dolunca yayını açar, havuzdaki videoları sırayla RTMP'ye akıtır.
+    3) Bir video bitince: havuz 24 saati (_LIVE_MAX_SECONDS) aşmıyorsa sona koyulur
+    (döngü — "bittikçe başa sarar"), aşıyorsa silinir (en eski önce atılır, havuz
+    sürekli "son 24 saat" olacak şekilde kendini tazeler)."""
     global _live_stream_proc
     cfg = load_live_config()
+
+    # ── 1. aşama: havuz 1 saate ulaşana kadar bekle, YouTube'a hiç dokunma ──────
+    save_live_state(status="accumulating", error="", current_file=None)
+    while not _live_stream_stop_flag:
+        stats = await _live_pool_stats()
+        save_live_state(status="accumulating", pool_count=stats["count"], pool_seconds=stats["seconds"])
+        if stats["seconds"] >= _LIVE_MIN_SECONDS:
+            break
+        for _ in range(60):  # 60x1sn — "Durdur" tıklandığında ~1sn içinde fark edilsin
+            if _live_stream_stop_flag:
+                break
+            await asyncio.sleep(1)
+    if _live_stream_stop_flag:
+        save_live_state(status="stopped", current_file=None)
+        return
+
+    # ── 2. aşama: havuz dolu, yayını gerçekten aç ───────────────────────────────
     creds = _get_live_creds()
     if not creds:
         save_live_state(status="error", error="YouTube hesabı bağlı değil veya yetkisi eksik")
@@ -5603,8 +5656,12 @@ async def _live_stream_supervisor():
                     "-c:a", "aac", "-ar", "44100", "-b:a", "128k",
                     "-f", "flv", rtmp_url,
                 ]
-                save_live_state(status="live", current_file=current.name, error="")
+                stats = await _live_pool_stats()
+                save_live_state(status="live", current_file=current.name,
+                                 pool_count=stats["count"], pool_seconds=stats["seconds"], error="")
             else:
+                # Teorik olarak buraya gelinmemeli (1 saat dolmadan yayın başlamıyor)
+                # ama güvenlik ağı olarak bir bekleme ekranı — RTMP hiç kesilmesin.
                 current = None
                 cmd = [
                     "ffmpeg", "-re",
@@ -5625,7 +5682,15 @@ async def _live_stream_supervisor():
 
             if current is not None:
                 if _live_stream_proc.returncode == 0:
-                    current.unlink(missing_ok=True)
+                    stats = await _live_pool_stats()
+                    if stats["seconds"] > _LIVE_MAX_SECONDS:
+                        # Havuz 24 saati aşıyor — en eski (az önce oynayan) video atılır,
+                        # havuz sürekli "son 24 saat" olacak şekilde kendini tazeler.
+                        current.unlink(missing_ok=True)
+                        _live_duration_cache.pop(current.name, None)
+                    else:
+                        # Havuz henüz 24 saatin altında — sona koy (döngü), silme.
+                        current.touch()
                 elif _live_stream_stop_flag:
                     # Kasıtlı durdurma (Durdur butonu) ffmpeg'i kesiyor, bu bir hata
                     # değil — dosyaya dokunma, bir sonraki başlatmada baştan denensin.
@@ -5636,6 +5701,7 @@ async def _live_stream_supervisor():
                     # Bozuk dosya kuyruğu tıkamasın — alt klasöre taşı (glob "*.mp4" alt
                     # klasörlere inmiyor, bir daha seçilmez), tekrar denenmesin
                     current.rename(LIVE_FAILED_DIR / current.name)
+                    _live_duration_cache.pop(current.name, None)
     finally:
         try:
             await asyncio.to_thread(youtube_live.end_broadcast, creds, info["broadcast_id"])
@@ -5671,7 +5737,13 @@ async def get_live_status_endpoint():
     else:
         state = {}
     state.setdefault("status", "stopped")
-    state["queue_count"] = len(list(LIVE_QUEUE_DIR.glob("*.mp4")))
+    # Havuz istatistikleri her zaman taze hesaplanır — yayın kapalıyken de
+    # panelde "ne kadar birikti" görünsün (süreler önbelleklendiği için ucuz).
+    stats = await _live_pool_stats()
+    state["pool_count"] = stats["count"]
+    state["pool_seconds"] = stats["seconds"]
+    state["pool_min_seconds"] = _LIVE_MIN_SECONDS
+    state["pool_max_seconds"] = _LIVE_MAX_SECONDS
     return state
 
 
