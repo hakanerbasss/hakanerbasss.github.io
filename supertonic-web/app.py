@@ -1689,6 +1689,43 @@ Rules:
         # HABER SHORTS — mevcut trend/haber akışı
         trend_data = get_trends(region_code=region.upper(), lang=lang)
 
+        # Instagram hedef kitlesine göre puanlanmış güncel haber havuzu.
+        ranked_candidates = []
+        ranked_candidates_prompt = ""
+
+        if lang == "tr" and not topic.strip():
+            try:
+                from news_ranker import (
+                    build_ranked_news_pool,
+                    format_candidates_for_prompt,
+                )
+
+                ranked_candidates = await asyncio.to_thread(
+                    build_ranked_news_pool,
+                    20,
+                    5,
+                )
+
+                ranked_candidates_prompt = format_candidates_for_prompt(
+                    ranked_candidates[:12]
+                )
+
+                if ranked_candidates:
+                    print(
+                        "[news-ranker] en güçlü adaylar: "
+                        + " | ".join(
+                            f"{item.get('score')}:{item.get('title')}"
+                            for item in ranked_candidates[:5]
+                        ),
+                        flush=True,
+                    )
+
+            except Exception as rank_error:
+                print(
+                    f"[news-ranker] puanlı havuz hatası: {rank_error}",
+                    flush=True,
+                )
+
         # TR için: normal trend + gurbetçi havuzunu birleştirip aynı filtreden geçir
         # (ölüm/vefat/dedikodu + ASAYİŞ kategorisi elenir) — Telegram seçim listesiyle
         # aynı havuz, artık otomatik seçimde de kullanılıyor. Konu zaten belirtilmişse
@@ -1696,9 +1733,29 @@ Rules:
         if lang == "tr" and not topic.strip():
             try:
                 gurbetci_topics = await fetch_gurbetci_topics()
-                merged = _filter_low_value_topics(trend_data.get("topics", []))
-                merged = _interleave_topics(merged, gurbetci_topics)
+                merged = _filter_low_value_topics(
+                    trend_data.get("topics", [])
+                )
+                merged = _interleave_topics(
+                    merged,
+                    gurbetci_topics,
+                )
+
+                # Puanlama motorunun seçtiği güçlü haberleri
+                # mevcut Google News sırasının önüne al.
+                ranked_titles = [
+                    item.get("title", "")
+                    for item in ranked_candidates
+                    if item.get("title")
+                ]
+                ranked_titles = _filter_low_value_topics(ranked_titles)
+
+                merged = list(
+                    dict.fromkeys(ranked_titles + merged)
+                )
+
                 merged = _dedupe_pool_against_recent(merged)
+
                 if merged:
                     trend_data["topics"] = merged
             except Exception as _ge:
@@ -1725,13 +1782,50 @@ Rules:
         search_query = topic.strip()
         if not search_query:
             try:
-                sel_prompt = (
-                    f"From this list of trending topics, pick ONE to make a breaking news Short video about. "
-                    f"The list is already sorted by popularity — prefer topics near the top. "
-                    f"Return ONLY the topic name, nothing else.\n\nTopics: {trend_topics}"
-                    + (f"\n\nAvoid (already posted today): {exclude_topics}" if exclude_topics.strip() else "")
-                    + perf_instruction
-                )
+                if ranked_candidates_prompt:
+                    sel_prompt = (
+                        "Aşağıdaki haber adayları, kullanıcının gerçek Instagram "
+                        "hedef kitlesine göre puanlandı. Yalnızca bir haber seç.\n\n"
+                        "HEDEF KİTLE:\n"
+                        "- Türkiye ağırlıklı\n"
+                        "- Kadın oranı yüksek\n"
+                        "- İzleyicilerin büyük kısmı 55 yaş üstü\n"
+                        "- En güçlü konular: emekli, SGK, maaş, ödeme, zam, "
+                        "vatandaşın hakkı, deprem, hava ve acil uyarılar\n\n"
+                        "SEÇİM KURALLARI:\n"
+                        "1. Yüksek puanlı ve bugün yayımlanmış haberi tercih et.\n"
+                        "2. İnsanların cebine, güvenliğine veya günlük hayatına "
+                        "doğrudan dokunan haberi seç.\n"
+                        "3. Net ödeme, tarih, başvuru, son gün veya kimlerin "
+                        "etkileneceği bilgisi bulunan haberleri öne al.\n"
+                        "4. Resmî veya birden fazla güvenilir kaynağı olan haberi tercih et.\n"
+                        "5. Kulis, soru başlığı, eski SEO haberi veya protokol haberi seçme.\n"
+                        "6. Genel dünya haberi yerine Türkiye kitlesini doğrudan "
+                        "etkileyen güçlü bir haber varsa onu seç.\n"
+                        "7. Yalnızca seçtiğin başlığı aynen döndür. Başka hiçbir şey yazma.\n\n"
+                        f"PUANLANMIŞ ADAYLAR:\n{ranked_candidates_prompt}"
+                        + (
+                            f"\n\nBUGÜN DAHA ÖNCE PAYLAŞILANLAR — SEÇME:\n"
+                            f"{exclude_topics}"
+                            if exclude_topics.strip()
+                            else ""
+                        )
+                        + perf_instruction
+                    )
+                else:
+                    sel_prompt = (
+                        "From this list of current news topics, choose ONE strong "
+                        "breaking-news topic. Prioritize wallet, rights, payments, "
+                        "retirement, SGK, safety and urgent weather. "
+                        "Return ONLY the topic name.\n\n"
+                        f"Topics: {trend_topics}"
+                        + (
+                            f"\n\nAvoid already posted topics: {exclude_topics}"
+                            if exclude_topics.strip()
+                            else ""
+                        )
+                        + perf_instruction
+                    )
                 sel_resp = client.chat.completions.create(
                     model="deepseek-chat",
                     messages=[{"role": "user", "content": sel_prompt}],
@@ -1739,8 +1833,20 @@ Rules:
                     max_tokens=60,
                 )
                 search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
-            except Exception:
-                search_query = trend_data["topics"][0] if trend_data["topics"] else ""
+            except Exception as selection_error:
+                print(
+                    f"[news-ranker] DeepSeek seçim hatası: {selection_error}",
+                    flush=True,
+                )
+
+                if ranked_candidates:
+                    search_query = ranked_candidates[0].get("title", "")
+                else:
+                    search_query = (
+                        trend_data["topics"][0]
+                        if trend_data["topics"]
+                        else ""
+                    )
         if search_query:
             gnews_data = await fetch_gnews_summary(search_query, lang)
 
@@ -7376,9 +7482,360 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
             try:
                 trend_data = get_trends(region_code="TR", lang="tr")
                 gurbetci_topics = await fetch_gurbetci_topics()
-                pool = _filter_low_value_topics(trend_data.get("topics", []))
-                pool = _interleave_topics(pool, gurbetci_topics)
-                pool = _dedupe_pool_against_recent(pool)[:30]
+
+                legacy_pool = _filter_low_value_topics(
+                    trend_data.get("topics", [])
+                )
+                legacy_pool = _interleave_topics(
+                    legacy_pool,
+                    gurbetci_topics,
+                )
+
+                ranked_pool = []
+
+                try:
+                    from news_ranker import build_ranked_news_pool
+
+                    ranked_items = await asyncio.to_thread(
+                        build_ranked_news_pool,
+                        30,
+                        5,
+                    )
+
+                    ranked_pool = [
+                        item.get("title", "").strip()
+                        for item in ranked_items
+                        if item.get("title", "").strip()
+                    ]
+
+                    print(
+                        "[news-ranker][telegram] "
+                        + " | ".join(
+                            f"{item.get('score')}:{item.get('title')}"
+                            for item in ranked_items[:10]
+                        ),
+                        flush=True,
+                    )
+
+                except Exception as rank_error:
+                    print(
+                        f"[news-ranker][telegram] hata: {rank_error}",
+                        flush=True,
+                    )
+
+                # Telegram listesinde yalnızca puanlama motorunun
+                # uygun bulduğu haberleri kullan. Kaliteli aday sayısı
+                # azsa listeyi vasat eski başlıklarla doldurma.
+                if ranked_pool:
+                    ranked_pool = _filter_low_value_topics(ranked_pool)
+                    raw_pool = list(dict.fromkeys(ranked_pool))
+                else:
+                    # Sıralama motoru teknik olarak çalışamazsa
+                    # eski havuz yalnızca güvenli yedek olarak kullanılır.
+                    raw_pool = list(dict.fromkeys(legacy_pool))
+
+                def _telegram_topic_normalize(title: str) -> str:
+                    value = title.casefold()
+                    value = re.sub(r"[^a-z0-9çğıöşü\s]", " ", value)
+                    return re.sub(r"\s+", " ", value).strip()
+
+                def _telegram_topic_event_key(title: str) -> str:
+                    normalized = _telegram_topic_normalize(title)
+
+                    weather_terms = (
+                        "meteoroloji",
+                        "akom",
+                        "sağanak",
+                        "yağış",
+                        "fırtına",
+                        "dolu",
+                        "sel",
+                        "hava durumu",
+                    )
+
+                    location_groups = {
+                        "istanbul-hava": (
+                            "istanbul",
+                            "akom",
+                            "trakya",
+                        ),
+                        "ankara-hava": (
+                            "ankara",
+                        ),
+                        "izmir-hava": (
+                            "izmir",
+                        ),
+                    }
+
+                    if any(term in normalized for term in weather_terms):
+                        for event_name, locations in location_groups.items():
+                            if any(
+                                location in normalized
+                                for location in locations
+                            ):
+                                return event_name
+
+                    # Aynı emekli maaş farkı / ödeme tarihi haberlerini tek olay say.
+                    if (
+                        "emekli" in normalized
+                        and any(
+                            term in normalized
+                            for term in (
+                                "maaş farkı",
+                                "ödeme takvimi",
+                                "ne zaman yat",
+                                "hangi gün yat",
+                                "fark ödemeleri",
+                                "tahsis numarası",
+                            )
+                        )
+                    ):
+                        return "emekli-maas-farki-odeme"
+
+                    # Aynı gün yayımlanan genel deprem uyarılarından
+                    # yalnızca en güçlü olanı Telegram listesinde tut.
+                    if (
+                        "deprem" in normalized
+                        and any(
+                            term in normalized
+                            for term in (
+                                "uyarı",
+                                "fay",
+                                "yapı stoku",
+                                "ruhsatsız yapı",
+                                "kaçak yapı",
+                            )
+                        )
+                    ):
+                        return "genel-deprem-uyarisi"
+
+                    # Aynı akaryakıt zam haberlerini tek olay say.
+                    if (
+                        any(
+                            term in normalized
+                            for term in (
+                                "benzin",
+                                "motorin",
+                                "mazot",
+                                "akaryakıt",
+                            )
+                        )
+                        and any(
+                            term in normalized
+                            for term in (
+                                "zam",
+                                "fiyatlar değişiyor",
+                                "tabela değişecek",
+                                "gece yarısı",
+                            )
+                        )
+                    ):
+                        return "akaryakit-zammi"
+
+                    # Spot elektrik fiyatı başlıkları aynı günlük veridir.
+                    if (
+                        "spot" in normalized
+                        and "elektrik" in normalized
+                        and "fiyat" in normalized
+                    ):
+                        return "spot-elektrik-fiyati"
+
+                    # Kesinleşmemiş bölgesel asgari ücret tartışmalarını
+                    # aynı spekülatif olay olarak değerlendir.
+                    if (
+                        "asgari ücret" in normalized
+                        and any(
+                            term in normalized
+                            for term in (
+                                "bölgesel",
+                                "yeni hazırlık",
+                                "gerçekçi olabilir mi",
+                                "tartışma yarattı",
+                            )
+                        )
+                    ):
+                        return "asgari-ucret-tartismasi"
+
+                    # Başka haberlerde yalnızca tam normalize edilmiş
+                    # başlıklar aynı olay kabul edilir.
+                    return normalized
+
+                def _telegram_topic_is_allowed(title: str) -> bool:
+                    normalized = _telegram_topic_normalize(title)
+
+                    protocol_terms = (
+                        "ziyaret etti",
+                        "ziyarette bulundu",
+                        "kabul etti",
+                        "bir araya geldi",
+                        "heyeti ağırladı",
+                        "gurbetçi mesaisi",
+                        "mesaj yayımladı",
+                    )
+
+                    if any(term in normalized for term in protocol_terms):
+                        return False
+
+                    foreign_markers = (
+                        "japonya",
+                        "vietnam",
+                        "hindistan",
+                        "güney kore",
+                        "avustralya",
+                        "kanada",
+                    )
+
+                    turkey_connection = (
+                        "türkiye",
+                        "türk",
+                        "istanbul",
+                        "ankara",
+                        "izmir",
+                        "sgk",
+                        "emekli",
+                        "gurbetçi",
+                    )
+
+                    # Türkiye ile açık bağlantısı olmayan genel dış haberleri ele.
+                    if (
+                        any(
+                            marker in normalized
+                            for marker in foreign_markers
+                        )
+                        and not any(
+                            marker in normalized
+                            for marker in turkey_connection
+                        )
+                    ):
+                        return False
+
+                    # Somut fiyat değişikliği veya karar içermeyen
+                    # analiz/clickbait ekonomi başlıklarını çıkar.
+                    vague_analysis_terms = (
+                        "gizlenen gerçek",
+                        "ne durdurdu",
+                        "gerçekçi olabilir mi",
+                        "tartışma yarattı",
+                        "çok büyük bir kaosa neden olur",
+                        "ara zam gelecek mi",
+                        "yeni zam dalgası kapıda",
+                        "zam kapıda",
+                        "ne kadar olacak",
+                    )
+
+                    if any(
+                        term in normalized
+                        for term in vague_analysis_terms
+                    ):
+                        return False
+
+                    # Başlıksız veya aşırı genel piyasa özetleri
+                    # Instagram videosu için yeterince keskin değildir.
+                    if normalized in (
+                        "spot piyasada elektrik fiyatları",
+                        "spot elektrik fiyatları",
+                    ):
+                        return False
+
+                    low_audience_value_terms = (
+                        "spot elektrik fiyatı",
+                        "elektrik kesintisi programı",
+                        "sgk hizmetleri e devlet te rekor kırdı",
+                        "erişim rekoru",
+                        "petrolün varil fiyatı",
+                        "gsb personel alımı",
+                    )
+
+                    if any(
+                        term in normalized
+                        for term in low_audience_value_terms
+                    ):
+                        return False
+
+                    # Sadece genel bir şekilde “akaryakıta zam” diyen,
+                    # tarih/rakam/tür bilgisi vermeyen başlıkları çıkar.
+                    if (
+                        "akaryakıt" in normalized
+                        and "zam" in normalized
+                        and not any(
+                            detail in normalized
+                            for detail in (
+                                "benzin",
+                                "motorin",
+                                "mazot",
+                                "gece yarısı",
+                                "tarih",
+                                "tl",
+                                "lira",
+                            )
+                        )
+                    ):
+                        return False
+
+                    # Sendika/dernek çağrıları karar veya ödeme değildir.
+                    demand_terms = (
+                        "çağrısı",
+                        "talep etti",
+                        "yükseltilsin",
+                        "artırılsın",
+                        "zam istedi",
+                        "ek zam talebi",
+                    )
+
+                    if (
+                        "emekli" in normalized
+                        and any(term in normalized for term in demand_terms)
+                    ):
+                        return False
+
+                    retirement_terms = (
+                        "erken emeklilik",
+                        "malulen emeklilik",
+                        "emeklilik hakkı",
+                        "emeklilik şartları",
+                    )
+
+                    seo_terms = (
+                        "özgün haberler",
+                        "kritik şart ve detaylar",
+                        "bu kişiler erken emekli olamayacak",
+                        "bu şartı taşımayana",
+                        "emeklilik hakkı yanıyor",
+                    )
+
+                    # Resmî bağlantı veya somut yeni gelişme göstermeyen
+                    # tekrarlı emeklilik SEO başlıklarını Telegram'dan çıkar.
+                    if (
+                        any(term in normalized for term in retirement_terms)
+                        and any(term in normalized for term in seo_terms)
+                    ):
+                        return False
+
+                    return True
+
+                pool = []
+                seen_event_keys = set()
+
+                for candidate in raw_pool:
+                    if not _telegram_topic_is_allowed(candidate):
+                        continue
+
+                    event_key = _telegram_topic_event_key(candidate)
+
+                    if event_key in seen_event_keys:
+                        print(
+                            f"[news-ranker][telegram] benzer olay elendi: "
+                            f"{candidate}",
+                            flush=True,
+                        )
+                        continue
+
+                    seen_event_keys.add(event_key)
+                    pool.append(candidate)
+
+                # Kaliteli aday sayısı kadar göster; en fazla 12.
+                # Listeyi belirli bir sayıya tamamlamak zorunda değiliz.
+                pool = _dedupe_pool_against_recent(pool)[:12]
                 if pool:
                     offset = await _telegram_mark_offset_to_latest()
                     numbered = "\n\n".join(f"{i+1}. {t}" for i, t in enumerate(pool))
@@ -7505,15 +7962,15 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
 # 09:00–15:00 altın pencere (ort. 4.415 izlenme, 10:00'da 5.727 + 37.6 paylaşım),
 # 06:00–09:00 ölü bölge (ort. 1.040), 22:00 civarı iyi (2.923).
 # Slotlar sabah yerine öğlen penceresine yığıldı; 18:40 tek akşam + 22:00 korundu.
-_IG_SCHED_VERSION = 3
+_IG_SCHED_VERSION = 4
 _IG_WEEKLY_SCHEDULE = {
-    "mon": ["09:00", "09:50", "10:40", "11:30", "12:20", "13:10", "14:05", "15:00", "16:00", "17:05", "18:40", "22:00"],
-    "tue": ["09:05", "09:55", "10:45", "11:35", "12:25", "13:15", "14:10", "15:05", "16:05", "17:10", "18:45", "22:05"],
-    "wed": ["09:10", "10:00", "10:50", "11:40", "12:30", "13:20", "14:15", "15:10", "16:10", "17:15", "18:50", "22:10"],
-    "thu": ["09:00", "09:52", "10:42", "11:32", "12:22", "13:12", "14:07", "15:02", "16:02", "17:07", "18:42", "22:02"],
-    "fri": ["09:05", "09:57", "10:47", "11:37", "12:27", "13:17", "14:12", "15:07", "16:07", "17:12", "18:47", "22:07"],
-    "sat": ["09:30", "10:30", "11:30", "12:30", "13:45", "15:00", "16:30", "22:00"],
-    "sun": ["09:35", "10:35", "11:35", "12:35", "13:50", "15:05", "16:35", "22:05"],
+    "mon": ["10:27", "14:34", "20:41"],
+    "tue": ["10:36", "14:22", "20:33"],
+    "wed": ["10:18", "14:41", "20:26"],
+    "thu": ["10:32", "14:17", "20:44"],
+    "fri": ["10:24", "14:38", "20:29"],
+    "sat": ["11:13", "20:37"],
+    "sun": ["11:26", "20:18"],
 }
 
 
