@@ -1282,16 +1282,17 @@ _LOW_VALUE_KW = ["öldü", "ölü bulundu", "vefat", "kaza yaptı", "hayatını 
 _HARD_EXCLUDE_CATS = {"ASAYİŞ", "SPOR"}
 
 
-def _filter_low_value_topics(titles: list) -> list:
-    """Kişisel ölüm/vefat/dedikodu + ASAYİŞ (cinayet/gözaltı/skandal) + SPOR
-    kategorisindeki başlıkları eler. Etkisiz/düşük değerli haberleri her havuzdan
-    da tutarlı şekilde çıkarmak için kullanılır."""
+def _filter_low_value_topics(titles: list, exclude_cats: set = None) -> list:
+    """Kişisel ölüm/vefat/dedikodu + (varsayılan) ASAYİŞ+SPOR kategorisindeki
+    başlıkları eler. exclude_cats verilirse varsayılan sert kural yerine onu kullanır —
+    örn. uzun özet videosu havuzu SPOR'u yasaklamıyor, sadece ASAYİŞ'i eliyor."""
+    exclude = _HARD_EXCLUDE_CATS if exclude_cats is None else exclude_cats
     filtered = []
     for t in titles:
         low = t.lower()
         if any(kw in low for kw in _LOW_VALUE_KW):
             continue
-        if ig_perf.categorize(t) in _HARD_EXCLUDE_CATS:
+        if ig_perf.categorize(t) in exclude:
             continue
         filtered.append(t)
     return filtered
@@ -1382,6 +1383,51 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
     except Exception as e:
         print(f"[gurbetci-trends] genel hata: {e}", flush=True)
         return []
+
+
+async def fetch_long_video_topic_pool() -> list:
+    """Uzun özet video (canlı yayın havuzu için manuel üretilen 12'li roundup)
+    için AYRI, bağımsız bir havuz — tekli Instagram postlarının havuzuyla hiçbir
+    ilişkisi yok, 8 saatlik 'zaten atıldı' kontrolünden hiç geçmez (kullanıcı
+    isteği: tekli akış olduğu gibi kalsın). SPOR ve TEKNOLOJİ burada YASAKLI
+    DEĞİL — tekli postlarda SPOR sert yasaklı ama 12 haberden biri olarak
+    roundup'ta sorun değil, havuzu büyütüp canlı yayın havuzunu daha hızlı
+    doldurmaya yardımcı olur."""
+    from trends import fetch_google_news, fetch_google_news_topic
+
+    def _sync_fetch():
+        pool = fetch_google_news(lang="tr", region="TR", max_items=30)
+        for cat in ("BUSINESS", "WORLD", "SPORTS", "TECHNOLOGY"):
+            pool += fetch_google_news_topic(cat, lang="tr", region="TR", max_items=15)
+        return pool
+
+    try:
+        topics = await asyncio.to_thread(_sync_fetch)
+    except Exception as e:
+        print(f"[LV-ROUNDUP] havuz çekilemedi: {e}", flush=True)
+        return []
+    topics = list(dict.fromkeys(topics))  # sırayı koruyarak tekilleştir
+    # Sadece ASAYİŞ + ölüm/dedikodu elenir — SPOR ve teknoloji serbest
+    return _filter_low_value_topics(topics, exclude_cats={"ASAYİŞ"})
+
+
+def _select_distinct_topics(pool: list, n: int) -> list:
+    """Havuzdan, birbirleriyle konu çakışması olmayan (3+ ortak anahtar kelime)
+    en fazla n başlık seçer — aynı olayın 2 farklı başlıkla listede olup ikisinin
+    de aynı roundup videosuna girmesini önler."""
+    selected = []
+    selected_kw = []
+    for title in pool:
+        kw = _extract_topic_keywords(title)
+        if len(kw) < 2:
+            continue
+        if any(len(kw & prev) >= 3 for prev in selected_kw):
+            continue
+        selected.append(title)
+        selected_kw.append(kw)
+        if len(selected) >= n:
+            break
+    return selected
 
 
 async def _trim_audio_for_longcat(src: Path, dst: Path, max_sec: int = 5) -> bool:
@@ -5512,7 +5558,7 @@ LIVE_CONFIG_FILE = Path("live_stream_config.json")
 LIVE_STATE_FILE = Path("live_stream_state.json")
 
 _LIVE_MIN_SECONDS = 3600    # 1 saat — havuz bu kadar dolmadan yayın hiç başlamaz
-_LIVE_MAX_SECONDS = 86400   # 24 saat — havuz tavanı, üstü en eskiden silinir
+_LIVE_MAX_SECONDS = 43200   # 12 saat — havuz tavanı, üstü en eskiden silinir
 
 _live_stream_task: asyncio.Task | None = None
 _live_stream_proc = None
@@ -5744,6 +5790,12 @@ async def get_live_status_endpoint():
     state["pool_seconds"] = stats["seconds"]
     state["pool_min_seconds"] = _LIVE_MIN_SECONDS
     state["pool_max_seconds"] = _LIVE_MAX_SECONDS
+    try:
+        state["pool_disk_mb"] = round(
+            sum(f.stat().st_size for f in LIVE_QUEUE_DIR.glob("*.mp4")) / 1024 / 1024, 1
+        )
+    except Exception:
+        state["pool_disk_mb"] = 0
     return state
 
 
@@ -5768,6 +5820,103 @@ async def stop_live_stream_endpoint():
             _live_stream_proc.terminate()
         except Exception:
             pass
+    return {"ok": True}
+
+
+# ── Uzun Özet Video (canlı yayın havuzu için, SADECE elle tetiklenir) ───────
+# Otomasyon YOK — "Uzun Video Üret" butonuna basılınca bir kere üretir, sonucu
+# sadece canlı yayın havuzuna ekler. Instagram'a göndermez, haber sitesine
+# eklemez. Havuz dolunca artık gerekmez, otomatik kapanan bir şey de yok —
+# kullanıcı basmazsa hiçbir şey olmaz.
+_lv_roundup_busy = False
+
+
+async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voice: str = "M1") -> tuple:
+    """Her konuyu TEK TEK _generate_shorts_core (platform=instagram) ile üretir —
+    yani gerçek tekli Instagram postuyla BİREBİR AYNI görsel bant/CTA/ses. Sonra
+    ffmpeg concat (stream copy, yeniden encode yok — hepsi aynı üreticiden çıktığı
+    için codec parametreleri zaten aynı) ile tek bir uzun videoda birleştirir.
+    _generate_shorts_core kendi başına paylaşım yapmaz (sadece üretir), o yüzden
+    bu fonksiyon da Instagram'a/habere sitesine hiç dokunmamış olur."""
+    clip_paths = []
+    used_titles = []
+    for topic in topics:
+        try:
+            result = await _generate_shorts_core(
+                topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
+                platform="instagram",
+            )
+            clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
+            if clip_file.exists():
+                clip_paths.append(clip_file)
+                used_titles.append(result.get("title", topic))
+        except Exception as e:
+            print(f"[LV-ROUNDUP] '{topic[:50]}' üretilemedi: {e}", flush=True)
+
+    if not clip_paths:
+        raise RuntimeError("Hiçbir segment üretilemedi")
+
+    uid = uuid.uuid4().hex
+    concat_list = UPLOAD_DIR / f"{uid}_concat.txt"
+    concat_list.write_text("\n".join(f"file '{p.resolve()}'" for p in clip_paths))
+    output_file = OUTPUT_DIR / f"{uid}_roundup.mp4"
+
+    proc = await asyncio.create_subprocess_exec(
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+        "-c", "copy", str(output_file),
+        stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    concat_list.unlink(missing_ok=True)
+
+    # Ayrı segment dosyalarını temizle — artık birleşik dosyada var, tekrar
+    # yayınlanmasınlar (silinmezse hem tekli hem birleşik hâli canlıya girer)
+    for p in clip_paths:
+        p.unlink(missing_ok=True)
+
+    if proc.returncode != 0 or not output_file.exists():
+        raise RuntimeError(f"Birleştirme başarısız: {(stderr or b'').decode(errors='ignore')[-300:]}")
+
+    return output_file, used_titles
+
+
+async def _run_live_roundup_job(api_key: str):
+    global _lv_roundup_busy
+    lock = _get_gen_lock()
+    save_live_state(roundup_status="running", roundup_error="")
+    if lock.locked():
+        save_live_state(roundup_status="running", roundup_error="", roundup_note="⏳ Kuyruğa alındı, başka bir üretim bitince başlayacak")
+    await lock.acquire()
+    try:
+        pool = await fetch_long_video_topic_pool()
+        topics = _select_distinct_topics(pool, 12)
+        if len(topics) < 3:
+            save_live_state(roundup_status="error", roundup_error="Yeterli sayıda farklı konu bulunamadı, havuz yetersiz")
+            return
+        save_live_state(roundup_status="running", roundup_note=f"{len(topics)} konu üretiliyor…")
+        ig_voice = load_ig_only_tr_config().get("voice", "F1")
+        video_file, used_titles = await _generate_ig_roundup(topics, api_key, voice=ig_voice)
+        shutil.copy2(str(video_file), str(LIVE_QUEUE_DIR / video_file.name))
+        _live_duration_cache.pop(video_file.name, None)
+        save_live_state(roundup_status="done", roundup_error="",
+                         roundup_note=f"{len(used_titles)} haber eklendi: " + ", ".join(used_titles[:3]) + ("…" if len(used_titles) > 3 else ""))
+    except Exception as e:
+        save_live_state(roundup_status="error", roundup_error=str(e))
+    finally:
+        lock.release()
+        _lv_roundup_busy = False
+
+
+@app.post("/api/live/generate-roundup")
+async def generate_live_roundup_endpoint():
+    global _lv_roundup_busy
+    if _lv_roundup_busy:
+        raise HTTPException(409, "Zaten bir uzun video üretimi devam ediyor")
+    api_key = get_deepseek_key()
+    if not api_key:
+        raise HTTPException(400, "DeepSeek API key sunucuda kayıtlı değil")
+    _lv_roundup_busy = True
+    asyncio.create_task(_run_live_roundup_job(api_key))
     return {"ok": True}
 
 

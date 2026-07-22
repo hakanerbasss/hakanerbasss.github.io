@@ -1534,6 +1534,19 @@
           Kontrol ediliyor...
         </div>
         <div class="error" id="err-live" style="margin-top:8px;"></div>
+
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid #222;">
+          <p style="color:#666;font-size:12px;margin-bottom:10px;">
+            Havuzu hızlandırmak istersen: 12 farklı haberi tek uzun videoda birleştirip
+            (aynı Instagram görsel/ses formatında) havuza ekler. Instagram'a göndermez,
+            haber sitesine eklemez — sadece canlı yayın havuzu için. Otomasyon yok,
+            sadece bastığında bir kere çalışır.
+          </p>
+          <button onclick="generateLiveRoundup()" id="btn-live-roundup" style="background:#2a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-live-roundup"></div>🎬 Uzun Video Üret
+          </button>
+          <div id="live-roundup-status" style="font-size:12px;color:#888;margin-top:8px;"></div>
+        </div>
       </div>
     </div>
 
@@ -2306,17 +2319,48 @@ async function refreshLiveStatus() {
     html += `<div style="color:#888;">Havuz: ${d.pool_count ?? 0} video, ${_fmtMinSec(d.pool_seconds)}`;
     if (d.status === 'accumulating') {
       html += ` / ${_fmtMinSec(d.pool_min_seconds)} gerekiyor`;
+    } else {
+      html += ` (tavan ${_fmtMinSec(d.pool_max_seconds)})`;
     }
     html += `</div>`;
+    html += `<div style="color:#888;">Disk: ${d.pool_disk_mb ?? 0} MB</div>`;
     if (d.current_file) html += `<div style="color:#888;">Şu an: ${d.current_file}</div>`;
     if (d.watch_url) html += `<div><a href="${d.watch_url}" target="_blank" style="color:#7c3aed;">İzleme linki ↗</a></div>`;
     if (d.error) html += `<div style="color:#f87171;">${d.error}</div>`;
     el.innerHTML = html;
+
+    // Uzun video üretim durumu (ayrı, elle tetiklenen özellik)
+    const rEl = document.getElementById('live-roundup-status');
+    if (rEl) {
+      const busy = d.roundup_status === 'running';
+      setLoading('btn-live-roundup', 'spin-live-roundup', busy);
+      let rHtml = '';
+      if (d.roundup_note) rHtml += d.roundup_note;
+      if (d.roundup_status === 'error' && d.roundup_error) rHtml += `<span style="color:#f87171;"> ${d.roundup_error}</span>`;
+      rEl.innerHTML = rHtml;
+    }
   } catch(e) {
     el.textContent = 'Durum alınamadı';
   }
   clearInterval(_liveStatusPoll);
   _liveStatusPoll = setInterval(refreshLiveStatus, 15000);
+}
+
+async function generateLiveRoundup() {
+  const rEl = document.getElementById('live-roundup-status');
+  showError('err-live', '');
+  try {
+    const r = await fetch('/api/live/generate-roundup', { method: 'POST' });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      throw new Error(ct.includes('json') ? (await r.json()).detail : await r.text());
+    }
+    if (rEl) rEl.textContent = 'Başlatıldı, üretim sürebilir…';
+    setLoading('btn-live-roundup', 'spin-live-roundup', true);
+    refreshLiveStatus();
+  } catch(e) {
+    showError('err-live', e.message);
+  }
 }
 
 async function loadBannedTopics() {
