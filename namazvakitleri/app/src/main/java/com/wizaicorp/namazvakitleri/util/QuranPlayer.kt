@@ -2,6 +2,8 @@ package com.wizaicorp.namazvakitleri.util
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 
 /**
  * Gercek hafiz kiraati - everyayah.com'dan ayet ayet stream eder
@@ -13,6 +15,7 @@ object QuranPlayer {
 
     private var mp: MediaPlayer? = null
     private var stopped = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun playSequence(ids: List<String>, onIndex: (Int) -> Unit, onFinished: () -> Unit) {
         stop()
@@ -22,8 +25,7 @@ object QuranPlayer {
 
     private fun playAt(i: Int, ids: List<String>, onIndex: (Int) -> Unit, onFinished: () -> Unit) {
         if (stopped) return
-        if (i >= ids.size) { onFinished(); return }
-        onIndex(i)
+        if (i >= ids.size) { mainHandler.post { onFinished() }; return }
         try {
             val p = MediaPlayer()
             mp = p
@@ -34,7 +36,15 @@ object QuranPlayer {
                     .build()
             )
             p.setDataSource(BASE + ids[i] + ".mp3")
-            p.setOnPreparedListener { if (!stopped) it.start() else it.release() }
+            p.setOnPreparedListener {
+                if (!stopped) {
+                    // Vurgu/kaydirma tam bu ayetin sesi baslarken tetiklenir
+                    mainHandler.post { onIndex(i) }
+                    it.start()
+                } else {
+                    it.release()
+                }
+            }
             p.setOnCompletionListener {
                 it.release()
                 if (mp == it) mp = null

@@ -102,7 +102,7 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
     LaunchedEffect(Unit) { Speech.init(ctx) }
     DisposableEffect(Unit) { onDispose { Speech.stop(); QuranPlayer.stop() } }
 
-    // Okunan ayete otomatik kaydir (imlec takibi)
+    // Okunan ayete otomatik kaydir (imlec takibi) - -2 = tum kartlar birlikte vurgulu, kaydirma yok
     LaunchedEffect(current) {
         if (current >= 0) listState.animateScrollToItem(current)
     }
@@ -111,11 +111,13 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
         isPlaying = true
         current = -1
         if (readMode == "audio" && hasAudio) {
-            // Gercek hafiz kaydi - ayet kodu sayisi kart sayisiyla eslesiyorsa vurgu takibi
+            // Gercek hafiz kaydi. Ayet kodu sayisi kart sayisiyla eslesiyorsa
+            // kart kart takip; tek ses dosyasi birden fazla karti kapsiyorsa
+            // (orn. Ayetel Kursi) butun kartlar birlikte vurgulanir.
             val sync = item.audioIds.size == item.verses.size
             QuranPlayer.playSequence(
                 item.audioIds,
-                onIndex = { if (sync) current = it },
+                onIndex = { current = if (sync) it else -2 },
                 onFinished = { isPlaying = false; current = -1 }
             )
         } else if (readMode == "audio") {
@@ -190,7 +192,7 @@ fun LibraryDetailScreen(item: LibraryItem, onBack: () -> Unit) {
                 modifier = Modifier.weight(1f)
             ) {
                 itemsIndexed(item.verses) { i, verse ->
-                    val active = i == current
+                    val active = current == -2 || i == current
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = if (active) MaterialTheme.colorScheme.primary
