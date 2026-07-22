@@ -5838,18 +5838,22 @@ _LABEL_FONT_CANDIDATES = [
 ]
 
 
-async def _label_roundup_segment(video_path: Path, seg_num: int, seg_total: int, date_str: str, source_text: str) -> Path:
-    """Segmentin ilk 3 saniyesine 'HABER N/TOPLAM' + tarih/kaynak bandı ekler —
-    mevcut 'SON DAKİKA' bandının hemen altındaki boş alana. _generate_shorts_core'a
-    hiç dokunmuyor, sadece roundup için ayrı bir son işleme adımı — tekli postlar
-    etkilenmez. Etiketleme başarısız olursa (font yok, ffmpeg hatası vb.) orijinal
-    videoyu olduğu gibi döner, tüm işi çökertmez."""
+async def _label_roundup_segment(video_path: Path, title: str, date_str: str, source_text: str) -> Path:
+    """Segmentin ilk 3 saniyesine sade bir başlık satırı + tarih/kaynak bandı ekler —
+    mevcut 'SON DAKİKA' bandının hemen altındaki boş alana. Büyük sarı banttaki
+    dramatik parçalı başlığın YANINDA, düz okunabilir bir özet satırı ("İstanbul'da
+    Kavurucu Sıcaklar" gibi) + kaynak bilgisi (videoda başka hiçbir yerde yok).
+    _generate_shorts_core'a hiç dokunmuyor, sadece roundup için ayrı bir son işleme
+    adımı — tekli postlar etkilenmez. Etiketleme başarısız olursa (font yok, ffmpeg
+    hatası vb.) orijinal videoyu olduğu gibi döner, tüm işi çökertmez."""
     font_path = next((f for f in _LABEL_FONT_CANDIDATES if Path(f).exists()), None)
     if not font_path:
         return video_path
 
     uid = uuid.uuid4().hex
-    line1 = f"GÜNÜN ÖZETİ · HABER {seg_num}/{seg_total}"
+    line1 = (title or "").strip()
+    if len(line1) > 55:
+        line1 = line1[:52].rstrip() + "…"
     source_clean = (source_text or "").replace("Kaynak: ", "").strip() or "çeşitli kaynaklar"
     line2 = f"{date_str} · Kaynak: {source_clean}"
 
@@ -5860,9 +5864,9 @@ async def _label_roundup_segment(video_path: Path, seg_num: int, seg_total: int,
     out_path = video_path.with_name(video_path.stem + "_lbl.mp4")
 
     vf = (
-        f"drawtext=textfile={txt1}:fontfile={font_path}:fontsize=42:fontcolor=white:"
+        f"drawtext=textfile={txt1}:fontfile={font_path}:fontsize=38:fontcolor=white:"
         f"x=(w-text_w)/2:y=1220:box=1:boxcolor=black@0.6:boxborderw=14:enable='between(t,0,3)',"
-        f"drawtext=textfile={txt2}:fontfile={font_path}:fontsize=32:fontcolor=0xFFD000:"
+        f"drawtext=textfile={txt2}:fontfile={font_path}:fontsize=30:fontcolor=0xFFD000:"
         f"x=(w-text_w)/2:y=1300:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t,0,3)'"
     )
     try:
@@ -5896,8 +5900,7 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     clip_paths = []
     used_titles = []
     all_tags = []
-    total = len(topics)
-    for i, topic in enumerate(topics, start=1):
+    for topic in topics:
         try:
             result = await _generate_shorts_core(
                 topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
@@ -5905,11 +5908,12 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
             )
             clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
             if clip_file.exists():
-                # Haber geçişinde "HABER N/TOPLAM + tarih + kaynak" bandı — izleyici
-                # hangi haberde olduğunu anlasın diye. _generate_shorts_core'un
+                # Haber geçişinde sade başlık + tarih/kaynak bandı — büyük dramatik
+                # banttaki parçalı başlığın yanında düz okunabilir bir özet + kaynak
+                # bilgisi (videoda başka hiçbir yerde yok). _generate_shorts_core'un
                 # kendisine dokunmuyor, ayrı bir son işleme adımı.
                 clip_file = await _label_roundup_segment(
-                    clip_file, i, total, today_str, result.get("source_text", "")
+                    clip_file, result.get("title", topic), today_str, result.get("source_text", "")
                 )
                 clip_paths.append(clip_file)
                 used_titles.append(result.get("title", topic))
