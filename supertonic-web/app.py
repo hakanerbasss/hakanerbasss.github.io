@@ -1923,6 +1923,15 @@ Rules:
     scene_dir = UPLOAD_DIR / uid
     scene_dir.mkdir()
 
+    # skip_closing_cta=True olan sahnelerde (uzun özet videosunun ARA segmentleri)
+    # sabit "Beğen & Takip Et" endcard görseli de kullanılmasın — yoksa CTA sesi/
+    # bandı kapalı olsa bile bu tasarımlı görsel her segment sonunda tekrar tekrar
+    # görünmeye devam ederdi. Sadece gerçek son segmentte endcard kullanılır.
+    endcard_used = (
+        (Path("static/endcard_tr.jpg").exists() and not info_format)
+        or (info_format and INFO_ENDCARD_FILE.exists())
+    ) and not skip_closing_cta
+
     audio_files = []
     png_files = []
     durations = []
@@ -1940,7 +1949,7 @@ Rules:
         png_path = scene_dir / f"scene_{i}.jpg"
         scene_raw_video = None  # video modunda indirilen ham video
 
-        if is_last_scene:
+        if is_last_scene and endcard_used:
             endcard = Path("static/endcard_tr.jpg")
             if info_format and INFO_ENDCARD_FILE.exists():
                 import shutil as _sh
@@ -2017,8 +2026,8 @@ Rules:
             pass
 
     # Son sahneye platform bandı ekle — endcard varsa overlay ekleme (görsel zaten tasarımlı).
-    # skip_closing_cta=True'da bu da atlanır (bkz. yukarıdaki CTA metni notu).
-    endcard_used = (Path("static/endcard_tr.jpg").exists() and not info_format) or (info_format and INFO_ENDCARD_FILE.exists())
+    # skip_closing_cta=True'da bu da atlanır (bkz. yukarıdaki CTA metni notu, endcard_used
+    # döngüden önce zaten skip_closing_cta'yı hesaba katarak hesaplandı).
     if png_files and not endcard_used and not skip_closing_cta:
         try:
             if platform == "instagram":
