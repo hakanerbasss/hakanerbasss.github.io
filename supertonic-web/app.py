@@ -31,6 +31,7 @@ import ig_perf
 from ig_analytics_full import fetch_full_analytics
 from namaz_bildirim import start_namaz_scheduler
 import xtts_clone
+import youtube_live
 
 app = FastAPI()
 app.include_router(news_site.router)
@@ -4463,6 +4464,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/yt-analytics.readonly",
     "https://www.googleapis.com/auth/youtube.readonly",
+    # Canlı yayın (liveBroadcasts/liveStreams) yönetimi için — youtube.upload
+    # kapsamı bunu içermiyor, tam "youtube" kapsamı gerekiyor. Bu eklendikten
+    # sonra kayıtlı eski token yetersiz kalır, /auth/youtube ile yeniden
+    # bağlanmak (re-consent) gerekir.
+    "https://www.googleapis.com/auth/youtube",
 ]
 
 
@@ -5490,6 +5496,207 @@ async def youtube_callback_en(request: Request, code: str):
 @app.get("/api/yt/en/config")
 async def get_yt_en_config():
     return {"authorized": TOKEN_FILE_EN.exists()}
+
+
+# ── YouTube Canlı Yayın (7/24 otomatik) ─────────────────────────────────────
+# Fikir: kısa video yerine sürekli açık kalan bir yayın, watch-hour biriktirmede
+# çok daha verimli (izleyici sekmeyi arka planda açık bıraksa bile sayılıyor).
+# Video/ses aktarımı ffmpeg ile RTMP üzerinden yapılıyor; YouTube Data API sadece
+# yayının "kabuğunu" (broadcast+stream) bir kere oluşturuyor (bkz. youtube_live.py).
+
+LIVE_QUEUE_DIR = Path("live_queue")
+LIVE_QUEUE_DIR.mkdir(exist_ok=True)
+LIVE_FAILED_DIR = LIVE_QUEUE_DIR / "hatali"
+LIVE_FAILED_DIR.mkdir(exist_ok=True)
+LIVE_CONFIG_FILE = Path("live_stream_config.json")
+LIVE_STATE_FILE = Path("live_stream_state.json")
+
+_live_stream_task: asyncio.Task | None = None
+_live_stream_proc = None
+_live_stream_stop_flag = False
+
+
+def load_live_config() -> dict:
+    if LIVE_CONFIG_FILE.exists():
+        try:
+            return json.loads(LIVE_CONFIG_FILE.read_text())
+        except Exception:
+            pass
+    return {
+        "enabled": False,
+        "title": "Son Dakika — Canlı Haber Akışı",
+        "description": "Güncel haberler yapay zeka destekli olarak otomatik üretilip burada akıyor.",
+    }
+
+
+def save_live_state(**kwargs) -> None:
+    state = {}
+    if LIVE_STATE_FILE.exists():
+        try:
+            state = json.loads(LIVE_STATE_FILE.read_text())
+        except Exception:
+            pass
+    state.update(kwargs)
+    state["ts"] = time.time()
+    LIVE_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False))
+
+
+def _get_live_creds():
+    """Canlı yayın için YouTube kimlik bilgisi — TOKEN_FILE'daki mevcut OAuth
+    token'ı kullanır. Token eski (geniş "youtube" kapsamı olmadan) alınmışsa
+    liveBroadcasts çağrıları 403 döner — kullanıcının /auth/youtube ile
+    yeniden bağlanması (re-consent) gerekir."""
+    if not TOKEN_FILE.exists():
+        return None
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request as GRequest
+    creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(GRequest())
+        TOKEN_FILE.write_text(creds.to_json())
+    return creds
+
+
+def queue_video_for_live(filename: str) -> None:
+    """Başarıyla paylaşılan bir haber videosunu, canlı yayın açıksa kuyruğa ekler.
+    Yayın kapalıysa disk boşuna dolmasın diye hiçbir şey yapmaz."""
+    try:
+        if not load_live_config().get("enabled"):
+            return
+        src = OUTPUT_DIR / filename
+        if src.exists():
+            shutil.copy2(str(src), str(LIVE_QUEUE_DIR / filename))
+    except Exception as e:
+        print(f"[LIVE] kuyruğa eklenemedi: {e}", flush=True)
+
+
+async def _live_stream_supervisor():
+    """Kuyruktaki videoları sırayla RTMP'ye akıtan sürekli döngü. Kuyruk boşsa
+    ffmpeg'in kendi ürettiği bir "bekleme ekranı" akıtılır ki RTMP bağlantısı
+    hiç kesilmesin (kesilirse YouTube birkaç dakika sonra yayını sonlandırabilir)."""
+    global _live_stream_proc
+    cfg = load_live_config()
+    creds = _get_live_creds()
+    if not creds:
+        save_live_state(status="error", error="YouTube hesabı bağlı değil veya yetkisi eksik")
+        return
+
+    try:
+        info = await asyncio.to_thread(youtube_live.create_broadcast, creds, cfg.get("title", ""), cfg.get("description", ""))
+    except Exception as e:
+        save_live_state(status="error", error=f"Yayın oluşturulamadı: {e}")
+        return
+
+    rtmp_url = f"{info['ingestion_address']}/{info['stream_name']}"
+    save_live_state(status="starting", broadcast_id=info["broadcast_id"], watch_url=info["watch_url"],
+                     started_at=time.time(), error="")
+
+    try:
+        while not _live_stream_stop_flag:
+            files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+            if files:
+                current = files[0]
+                cmd = [
+                    "ffmpeg", "-re", "-i", str(current),
+                    "-c:v", "libx264", "-preset", "veryfast", "-b:v", "2500k",
+                    "-maxrate", "2500k", "-bufsize", "5000k", "-pix_fmt", "yuv420p", "-g", "60",
+                    "-c:a", "aac", "-ar", "44100", "-b:a", "128k",
+                    "-f", "flv", rtmp_url,
+                ]
+                save_live_state(status="live", current_file=current.name, error="")
+            else:
+                current = None
+                cmd = [
+                    "ffmpeg", "-re",
+                    "-f", "lavfi", "-i", "color=c=0x14151a:s=1080x1920:rate=30",
+                    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+                    "-vf", "drawtext=text='Yayın devam ediyor — yeni haber bekleniyor':"
+                           "fontcolor=white:fontsize=42:x=(w-text_w)/2:y=(h-text_h)/2",
+                    "-c:v", "libx264", "-preset", "veryfast", "-b:v", "1500k",
+                    "-c:a", "aac", "-t", "30",
+                    "-f", "flv", rtmp_url,
+                ]
+                save_live_state(status="idle", current_file=None, error="")
+
+            _live_stream_proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await _live_stream_proc.communicate()
+
+            if current is not None:
+                if _live_stream_proc.returncode == 0:
+                    current.unlink(missing_ok=True)
+                elif _live_stream_stop_flag:
+                    # Kasıtlı durdurma (Durdur butonu) ffmpeg'i kesiyor, bu bir hata
+                    # değil — dosyaya dokunma, bir sonraki başlatmada baştan denensin.
+                    pass
+                else:
+                    err_tail = (stderr or b"").decode(errors="ignore")[-500:]
+                    print(f"[LIVE] ffmpeg hatası ({current.name}): {err_tail}", flush=True)
+                    # Bozuk dosya kuyruğu tıkamasın — alt klasöre taşı (glob "*.mp4" alt
+                    # klasörlere inmiyor, bir daha seçilmez), tekrar denenmesin
+                    current.rename(LIVE_FAILED_DIR / current.name)
+    finally:
+        try:
+            await asyncio.to_thread(youtube_live.end_broadcast, creds, info["broadcast_id"])
+        except Exception as ee:
+            print(f"[LIVE] yayın sonlandırma hatası: {ee}", flush=True)
+        save_live_state(status="stopped", current_file=None)
+        _live_stream_proc = None
+
+
+@app.get("/api/live/config")
+async def get_live_config_endpoint():
+    return load_live_config()
+
+
+@app.post("/api/live/config")
+async def set_live_config_endpoint(enabled: str = Form(...), title: str = Form(...), description: str = Form("")):
+    cfg = {
+        "enabled": enabled.lower() in ("true", "1", "yes"),
+        "title": title.strip()[:100] or "Canlı Yayın",
+        "description": description.strip()[:1000],
+    }
+    LIVE_CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False))
+    return {"ok": True}
+
+
+@app.get("/api/live/status")
+async def get_live_status_endpoint():
+    if LIVE_STATE_FILE.exists():
+        try:
+            state = json.loads(LIVE_STATE_FILE.read_text())
+        except Exception:
+            state = {}
+    else:
+        state = {}
+    state.setdefault("status", "stopped")
+    state["queue_count"] = len(list(LIVE_QUEUE_DIR.glob("*.mp4")))
+    return state
+
+
+@app.post("/api/live/start")
+async def start_live_stream_endpoint():
+    global _live_stream_task, _live_stream_stop_flag
+    if _live_stream_task and not _live_stream_task.done():
+        raise HTTPException(409, "Yayın zaten çalışıyor")
+    if not TOKEN_FILE.exists():
+        raise HTTPException(400, "Önce YouTube hesabını bağla (/auth/youtube)")
+    _live_stream_stop_flag = False
+    _live_stream_task = asyncio.create_task(_live_stream_supervisor())
+    return {"ok": True}
+
+
+@app.post("/api/live/stop")
+async def stop_live_stream_endpoint():
+    global _live_stream_stop_flag
+    _live_stream_stop_flag = True
+    if _live_stream_proc:
+        try:
+            _live_stream_proc.terminate()
+        except Exception:
+            pass
+    return {"ok": True}
 
 
 @app.get("/api/yt/analytics")
@@ -6861,6 +7068,7 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
             )
             if ig_ok:
                 save_ig_only_tr_log("success", log_title)
+                queue_video_for_live(filename)
             else:
                 save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
         finally:
