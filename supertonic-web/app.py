@@ -5992,7 +5992,12 @@ async def _run_live_roundup_job(api_key: str):
         ig_voice = load_ig_only_tr_config().get("voice", "F1")
         roundup = await _generate_ig_roundup(topics, api_key, voice=ig_voice)
         video_file = OUTPUT_DIR / roundup["video_filename"]
-        shutil.copy2(str(video_file), str(LIVE_QUEUE_DIR / video_file.name))
+        # KOPYALAMA değil TAŞIMA — outputs/ klasöründe kalmasın. Orada kalsaydı hem
+        # "Biriken Videolar" listesinde diğer 3-günlük videolarla karışıp yanlışlıkla
+        # silinme riski olurdu, hem de 3 gün sonra otomatik temizlikle asıl kopyası
+        # (havuzdaki, çok daha uzun yaşayan kopya değil) silinirdi. İndirme linki de
+        # zaten /api/live/pool-video/ üzerinden live_queue'dan servis ediliyor.
+        shutil.move(str(video_file), str(LIVE_QUEUE_DIR / video_file.name))
         _live_duration_cache.pop(video_file.name, None)
         used_titles = roundup["used_titles"]
         save_live_state(

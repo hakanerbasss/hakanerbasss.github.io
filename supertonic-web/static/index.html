@@ -2370,7 +2370,7 @@ async function refreshLiveStatus() {
           document.getElementById('live-roundup-title').value = d.roundup_title || '';
           document.getElementById('live-roundup-desc').value = d.roundup_description || '';
           document.getElementById('live-roundup-tags').value = d.roundup_tags || '';
-          document.getElementById('live-roundup-download').href = '/api/video/' + d.roundup_video_filename;
+          document.getElementById('live-roundup-download').href = '/api/live/pool-video/' + d.roundup_video_filename;
         } else {
           resultEl.style.display = 'none';
         }
