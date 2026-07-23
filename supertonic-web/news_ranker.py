@@ -2346,7 +2346,14 @@ def run_ai_jury(
 
         survivors.sort(key=lambda x: x.get("final_score", 0), reverse=True)
 
+        print(
+            f"[ai-jury] aşama-2 sonrası: {len(batch)} girdi → {len(survivors)} survivor (hard-reject: {len(batch) - len(survivors)}) — "
+            + " | ".join(f"{i+1}:{s.get('title', '')[:40]}" for i, s in enumerate(survivors)),
+            flush=True,
+        )
+
         tournament = _ai_jury_call_stage3(survivors, api_key, max_output)
+        print(f"[ai-jury] aşama-3 ham yanıt: {tournament}", flush=True)
 
         if tournament and tournament.get("selected_indices"):
             try:
