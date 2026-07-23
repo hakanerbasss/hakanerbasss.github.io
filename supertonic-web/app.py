@@ -1385,6 +1385,44 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
         return []
 
 
+async def get_ai_ranked_news_pool(api_key: str, max_candidates: int = 30, per_query: int = 5) -> list:
+    """Kural tabanlı + AI jürili haber havuzu — hem otomatik tekli haber seçimi
+    (_generate_shorts_core) hem Telegram aday listesi (auto_ig_only_tr_job) TAM
+    OLARAK bu fonksiyonu kullanır, aralarında hiçbir fark olmasın diye (aynı
+    sorgular, aynı puanlama, aynı AI jüri). AI jüri hata verirse kural tabanlı
+    sıralama DEĞİŞMEDEN döner — bu fonksiyon hiçbir zaman exception fırlatmaz,
+    çağıran taraf her zaman kullanılabilir bir liste alır (boş olabilir)."""
+    from news_ranker import build_ranked_news_pool, run_ai_jury
+
+    try:
+        ranked_items = await asyncio.to_thread(build_ranked_news_pool, max_candidates, per_query)
+    except Exception as rank_error:
+        print(f"[news-ranker] puanlı havuz hatası: {rank_error}", flush=True)
+        return []
+
+    if ranked_items:
+        print(
+            "[news-ranker] en güçlü adaylar: "
+            + " | ".join(f"{item.get('score')}:{item.get('title')}" for item in ranked_items[:10]),
+            flush=True,
+        )
+
+    try:
+        ranked_items = await asyncio.to_thread(run_ai_jury, ranked_items, api_key)
+        print(
+            "[ai-jury] jüri sonrası: "
+            + " | ".join(
+                f"{round(item.get('final_score', item.get('score', 0)), 1)}:{item.get('title')}"
+                for item in ranked_items[:10]
+            ),
+            flush=True,
+        )
+    except Exception as jury_error:
+        print(f"[ai-jury] devre dışı, kural tabanlı sıralama kullanılıyor: {jury_error}", flush=True)
+
+    return ranked_items
+
+
 async def fetch_long_video_topic_pool() -> list:
     """Uzun özet video (canlı yayın havuzu için manuel üretilen 12'li roundup)
     için AYRI, bağımsız bir havuz — tekli Instagram postlarının havuzuyla hiçbir
@@ -1695,31 +1733,14 @@ Rules:
 
         if lang == "tr" and not topic.strip():
             try:
-                from news_ranker import (
-                    build_ranked_news_pool,
-                    format_candidates_for_prompt,
-                )
+                from news_ranker import format_candidates_for_prompt
 
-                ranked_candidates = await asyncio.to_thread(
-                    build_ranked_news_pool,
-                    20,
-                    5,
-                )
-
+                # Telegram aday listesiyle BİREBİR aynı fonksiyon — aynı sorgular,
+                # aynı puanlama, aynı AI jüri. İki taraf arasında fark olmasın diye.
+                ranked_candidates = await get_ai_ranked_news_pool(api_key)
                 ranked_candidates_prompt = format_candidates_for_prompt(
                     ranked_candidates[:12]
                 )
-
-                if ranked_candidates:
-                    print(
-                        "[news-ranker] en güçlü adaylar: "
-                        + " | ".join(
-                            f"{item.get('score')}:{item.get('title')}"
-                            for item in ranked_candidates[:5]
-                        ),
-                        flush=True,
-                    )
-
             except Exception as rank_error:
                 print(
                     f"[news-ranker] puanlı havuz hatası: {rank_error}",
@@ -7502,61 +7523,15 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                     gurbetci_topics,
                 )
 
-                ranked_pool = []
-
-                try:
-                    from news_ranker import build_ranked_news_pool
-
-                    ranked_items = await asyncio.to_thread(
-                        build_ranked_news_pool,
-                        30,
-                        5,
-                    )
-
-                    print(
-                        "[news-ranker][telegram] "
-                        + " | ".join(
-                            f"{item.get('score')}:{item.get('title')}"
-                            for item in ranked_items[:10]
-                        ),
-                        flush=True,
-                    )
-
-                    # AI jürisi: kural tabanlı havuzun üstüne ikinci bir
-                    # değerlendirme katmanı (clickbait/somutluk/tekrar vb.).
-                    # Kendi içinde hata yutar; başarısız olursa ranked_items
-                    # DEĞİŞMEDEN kalır, aşağıdaki akış hiç etkilenmez.
-                    try:
-                        from news_ranker import run_ai_jury
-
-                        ranked_items = await asyncio.to_thread(
-                            run_ai_jury, ranked_items, api_key
-                        )
-                        print(
-                            "[ai-jury][telegram] "
-                            + " | ".join(
-                                f"{round(item.get('final_score', item.get('score', 0)), 1)}:{item.get('title')}"
-                                for item in ranked_items[:10]
-                            ),
-                            flush=True,
-                        )
-                    except Exception as jury_error:
-                        print(
-                            f"[ai-jury][telegram] devre dışı, kural tabanlı sıralama kullanılıyor: {jury_error}",
-                            flush=True,
-                        )
-
-                    ranked_pool = [
-                        item.get("title", "").strip()
-                        for item in ranked_items
-                        if item.get("title", "").strip()
-                    ]
-
-                except Exception as rank_error:
-                    print(
-                        f"[news-ranker][telegram] hata: {rank_error}",
-                        flush=True,
-                    )
+                # Otomatik tekli haber seçimiyle BİREBİR aynı fonksiyon — aynı
+                # sorgular, aynı puanlama, aynı AI jüri. İki taraf arasında fark
+                # olmasın diye (kendi içinde hata yutar, hiçbir zaman fırlatmaz).
+                ranked_items = await get_ai_ranked_news_pool(api_key)
+                ranked_pool = [
+                    item.get("title", "").strip()
+                    for item in ranked_items
+                    if item.get("title", "").strip()
+                ]
 
                 # Telegram listesinde yalnızca puanlama motorunun
                 # uygun bulduğu haberleri kullan. Kaliteli aday sayısı
