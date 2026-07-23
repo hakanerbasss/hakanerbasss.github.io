@@ -553,6 +553,21 @@
     </div>
   </div>
 
+  <div class="field" style="margin-bottom:14px;">
+    <label>Hangi platform için?</label>
+    <div style="display:flex;gap:8px;">
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#1a1a1a;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;color:#e0e0e0;">
+        <input type="radio" name="shorts-platform" value="instagram" checked style="accent-color:#e1306c;">
+        📸 Instagram için üret
+      </label>
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#1a1a1a;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;color:#e0e0e0;">
+        <input type="radio" name="shorts-platform" value="youtube" style="accent-color:#ff0000;">
+        ▶️ YouTube için üret
+      </label>
+    </div>
+    <div style="font-size:11px;color:#555;margin-top:6px;">Seçtiğine göre kapanış çağrısı (Takip Et vs Abone Ol) ve video sonundaki kapanış görseli değişir.</div>
+  </div>
+
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
     <button onclick="generateShorts()" id="btn-shorts">
       <div class="spinner" id="spin-shorts"></div>
@@ -2805,9 +2820,10 @@ async function generateShorts(allowEmpty = false) {
     fd.append('voice', document.getElementById('shorts-voice').value);
     fd.append('speed', document.getElementById('shorts-speed').value);
     fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
-    // Bu panel artık Instagram için üretiyor — otomatik IG-Only-TR job'uyla aynı CTA
-    // metni, aynı kapanış bandı ve aynı hazır Instagram açıklaması (ig-caption) üretilsin.
-    fd.append('platform', 'instagram');
+    // Seçilen platforma göre kapanış CTA metni, kapanış görseli (endcard) ve
+    // (Instagram seçiliyse) hazır Instagram açıklaması (ig-caption) değişir.
+    const selectedPlatform = document.querySelector('input[name="shorts-platform"]:checked')?.value || 'instagram';
+    fd.append('platform', selectedPlatform);
 
     if (document.getElementById('use-custom-images').checked) {
       const files = document.getElementById('custom-images-input').files;

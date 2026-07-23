@@ -2060,8 +2060,14 @@ Rules:
     # sabit "Beğen & Takip Et" endcard görseli de kullanılmasın — yoksa CTA sesi/
     # bandı kapalı olsa bile bu tasarımlı görsel her segment sonunda tekrar tekrar
     # görünmeye devam ederdi. Sadece gerçek son segmentte endcard kullanılır.
+    # Platforma göre farklı endcard: YouTube "Abone Ol/Bildirimleri Aç", Instagram
+    # "Takip Et/Beğen" — youtube görseli yoksa Instagram'ınkine güvenli düşer.
+    _endcard_path = Path("static/endcard_youtube.jpg") if platform == "youtube" else Path("static/endcard_tr.jpg")
+    if not _endcard_path.exists():
+        _endcard_path = Path("static/endcard_tr.jpg")
+
     endcard_used = (
-        (Path("static/endcard_tr.jpg").exists() and not info_format)
+        (_endcard_path.exists() and not info_format)
         or (info_format and INFO_ENDCARD_FILE.exists())
     ) and not skip_closing_cta
 
@@ -2083,7 +2089,7 @@ Rules:
         scene_raw_video = None  # video modunda indirilen ham video
 
         if is_last_scene and endcard_used:
-            endcard = Path("static/endcard_tr.jpg")
+            endcard = _endcard_path
             if info_format and INFO_ENDCARD_FILE.exists():
                 import shutil as _sh
                 _sh.copy2(str(INFO_ENDCARD_FILE), str(png_path))
