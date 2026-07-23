@@ -2141,11 +2141,17 @@ def _ai_jury_call_stage2(
     return all_evaluations or None
 
 
-_AI_JURY_STAGE3_RULES = """AŞAĞIDAKİ HABERLER arasında bir turnuva yap. Amaç: aynı olayı anlatan
-haberleri gruplayıp her gruptan en güvenilir ve somut olanı seçmek, farklı
-haber türleri arasında denge kurmak ve en fazla {max_output} güçlü aday
-bırakmak. Aynı listede iki benzer emeklilik spekülasyonu veya iki aynı
-İstanbul hava haberi gibi tekrarlar OLMASIN.
+_AI_JURY_STAGE3_RULES = """AŞAĞIDAKİ {n} HABER arasında bir turnuva yap. Amaç SADECE aynı olayı
+anlatan tekrarları elemek — farklı, gerçek haberleri ASLA sebepsiz düşürme.
+Aynı listede iki benzer emeklilik spekülasyonu veya iki aynı İstanbul hava
+haberi gibi TEKRARLAR olmasın; ama birbirinden farklı konular (emeklilik,
+hava durumu, akaryakıt, sağlık, ulaşım vb.) hepsi FARKLI haberdir, aralarında
+denge kurarak MÜMKÜN OLDUĞUNCA ÇOĞUNU tut. Havuzda gerçekten {max_output}
+kadar farklı/tekrarsız haber varsa listeyi yapay şekilde kısaltma.
+
+ZORUNLU KURAL: 1'den {n}'e kadar HER numara ya selected_indices'te ya da
+rejected'te olmalı — hiçbir numarayı sessizce atlama. Bir haberi elerken
+mutlaka rejected'e bir sebep ile ekle; sebepsiz eleme YOK.
 
 SADECE şu JSON nesnesini döndür, başka hiçbir şey yazma:
 {{"selected_indices": [numaralar], "rejected": [{{"index": numara, "reason": "kısa Türkçe gerekçe"}}]}}"""
@@ -2175,7 +2181,7 @@ def _ai_jury_call_stage3(
     from openai import OpenAI
 
     prompt = (
-        _AI_JURY_STAGE3_RULES.format(max_output=max_output)
+        _AI_JURY_STAGE3_RULES.format(max_output=max_output, n=len(survivors))
         + "\n\nHABERLER:\n"
         + _ai_jury_format_tournament_prompt(survivors)
     )
@@ -2344,11 +2350,38 @@ def run_ai_jury(
 
         if tournament and tournament.get("selected_indices"):
             try:
+                selected_positions: set = set()
                 selected = []
                 for idx in tournament["selected_indices"]:
                     pos = int(idx) - 1
-                    if 0 <= pos < len(survivors):
+                    if 0 <= pos < len(survivors) and pos not in selected_positions:
                         selected.append(survivors[pos])
+                        selected_positions.add(pos)
+
+                rejected_positions: set = set()
+                for rej in tournament.get("rejected", []):
+                    try:
+                        rejected_positions.add(int(rej.get("index", 0)) - 1)
+                    except (TypeError, ValueError):
+                        pass
+
+                # AI'nin ne seçtiği ne reddettiği (kuralı unuttuğu) haberler
+                # sessizce kaybolmasın — gözlemlenen gerçek hata: turnuva 20
+                # haberden sadece 4'ünü selected_indices'e koyup 3'ünü rejected
+                # yapmış, geri kalan 13 haber hiç hesaba katılmadan düşmüştü.
+                # Puana göre sıralı survivors listesinden, hesaba katılmamış
+                # olanları max_output'a kadar geri ekliyoruz.
+                for pos, item in enumerate(survivors):
+                    if len(selected) >= max_output:
+                        break
+                    if pos in selected_positions or pos in rejected_positions:
+                        continue
+                    selected.append(item)
+                    selected_positions.add(pos)
+                    print(
+                        f"[ai-jury] turnuva bu haberi hesaba katmamış, geri eklendi: {item.get('title', '')[:70]}",
+                        flush=True,
+                    )
 
                 if selected:
                     for rej in tournament.get("rejected", []):
