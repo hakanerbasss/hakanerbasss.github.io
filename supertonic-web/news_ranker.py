@@ -40,6 +40,18 @@ TARGETED_QUERIES = [
     '"dövizle askerlik" when:2d',
     '"yurt dışı borçlanması" when:2d',
     '"Türkiye’ye araçla giriş" when:2d',
+    # Emekli/SGK/maaş dışındaki genel kategoriler — havuz sadece cüzdan/emeklilik
+    # haberleriyle sınırlı kalmasın, ÖSYM, ehliyet, eğitim, genel gündem gibi
+    # geniş kitleyi ilgilendiren başka güncel konular da havuza girsin.
+    '"ehliyet" when:1d',
+    '"YKS" when:1d',
+    '"ÖSYM" when:1d',
+    '"üniversite tercih" when:1d',
+    '"MEB" açıklama when:1d',
+    '"trafik cezası" when:1d',
+    '"Resmi Gazete" when:1d',
+    '"TBMM" kabul when:1d',
+    '"Bakanlık" açıklama when:1d',
 ]
 
 WALLET_TERMS = {
