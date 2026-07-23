@@ -7845,7 +7845,15 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
 
                 # Kaliteli aday sayısı kadar göster; en fazla 12.
                 # Listeyi belirli bir sayıya tamamlamak zorunda değiliz.
+                _before_recent_dedup = list(pool)
                 pool = _dedupe_pool_against_recent(pool)[:12]
+                _dropped_as_recent = [t for t in _before_recent_dedup if t not in pool]
+                if _dropped_as_recent:
+                    print(
+                        "[news-ranker][telegram] son saatlerde zaten paylaşıldığı için elendi: "
+                        + " | ".join(t[:60] for t in _dropped_as_recent),
+                        flush=True,
+                    )
                 if pool:
                     offset = await _telegram_mark_offset_to_latest()
                     # Telegram'da SEO kuyruğundan arındırılmış başlık gösterilir,
