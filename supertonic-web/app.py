@@ -1934,6 +1934,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 {{
   "title": "catchy YouTube title for this video (max 80 chars, in {lang_name})",
   "hashtags": ["Shorts", "topic", "specific", "tags", "no", "hash", "symbol"],
+  "comment_hook": "one short question in {lang_name}, specific to this exact story, designed to make viewers comment their opinion",
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
@@ -1954,9 +1955,10 @@ Rules:
 - NO EMPTY PROMISES: NEVER write a sentence that promises information without immediately delivering it in the same or next sentence — e.g. "detaylar açıklandı", "işte merak edilenler", "peki bakalım neler var" followed by ending the video without saying what those details/answers actually are. Every scene must contain a real, concrete piece of information from the facts list. If you don't have enough facts to fill a promised detail, do NOT tease it — cut that sentence entirely instead. Ending a video on an unfulfilled setup reads as clickbait and destroys trust, even if no fact was technically wrong.
 {get_hook_rule()}
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
+- comment_hook: ONE short question in {lang_name}, tailored to what actually happened in THIS story, meant to provoke viewers to comment their opinion/reaction (e.g. "Sence doğru bir karar mı?", "Sen olsan ne yapardın?", "Katılıyor musun?"). Must be specific to this news — never a generic template, never reused across videos.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration between 45 and 55 seconds — NEVER shorter than 45 seconds. If the facts feel thin, elaborate naturally on the facts you have (implications, who it affects, timing) instead of cutting the video short or inventing new details.
-- hashtags: 10-15 tags — FIRST 5 MUST be specific to this video's topic/people/places (e.g. if video is about Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya"). Then add: "sondakika", "gündem", "keşfet", "haberler", "viral". ALWAYS include "Shorts" as the last tag. No # symbol, NO spaces within a tag.
+- hashtags: 10-15 tags — ALL of them must be specific to THIS video's actual topic/people/places/institutions (e.g. if the video is about the Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya", "erişim", "keşfetsayfası"...). Do NOT pad the list with generic filler tags like "sondakika", "gündem", "haberler", "güncel", "viral" — only ONE fixed/generic tag is allowed in the entire list: "Shorts" (always last). Every other tag must be traceable to something specific in this exact story.
 {_custom_block}"""
 
         for attempt in range(3):
@@ -2023,7 +2025,11 @@ Rules:
                 },
             }
             _lang_cta = _cta.get(lang, _cta["tr"])
-            scenes[-1]["text"] = _lang_cta.get(platform, _lang_cta["youtube"])
+            cta_text = _lang_cta.get(platform, _lang_cta["youtube"])
+            comment_hook = (data.get("comment_hook") or "").strip()
+            # comment_hook DeepSeek'ten gelmezse (eski davranış, alan boşsa) sadece
+            # sabit CTA kullanılır — geriye dönük uyumlu, asla boş sahne bırakmaz.
+            scenes[-1]["text"] = f"{comment_hook} {cta_text}".strip() if comment_hook else cta_text
 
     uid = uuid.uuid4().hex
     scene_dir = UPLOAD_DIR / uid
