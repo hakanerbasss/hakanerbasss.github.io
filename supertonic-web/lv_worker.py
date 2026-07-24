@@ -429,7 +429,7 @@ Rules:
 - keyword: English, specific and visual"""
 
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=4000,

@@ -1222,7 +1222,7 @@ async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -
     )
     try:
         resp = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": extract_prompt}],
             temperature=0.1,
         )
@@ -1262,7 +1262,7 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
     )
     try:
         resp = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": verify_prompt}],
             temperature=0.0,
         )
@@ -1704,7 +1704,7 @@ Rules:
 - keyword: English, 2-3 words, visual and specific"""
         for attempt in range(3):
             _resp = client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek-v4-pro",
                 messages=[{"role": "user", "content": info_prompt}],
                 temperature=0.7,
             )
@@ -1848,7 +1848,7 @@ Rules:
                         + perf_instruction
                     )
                 sel_resp = client.chat.completions.create(
-                    model="deepseek-chat",
+                    model="deepseek-v4-pro",
                     messages=[{"role": "user", "content": sel_prompt}],
                     temperature=0.3,
                     max_tokens=60,
@@ -1984,7 +1984,7 @@ Rules:
 
         for attempt in range(3):
             response = client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek-v4-pro",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
             )
@@ -2013,7 +2013,7 @@ Rules:
                 )
                 try:
                     _fix_resp = client.chat.completions.create(
-                        model="deepseek-chat",
+                        model="deepseek-v4-pro",
                         messages=[{"role": "user", "content": correction_prompt}],
                         temperature=0.5,
                     )
@@ -2440,7 +2440,7 @@ Kurallar:
 """
             )
         cap_resp = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": cap_prompt}],
             temperature=0.4,
             max_tokens=700,
@@ -3693,7 +3693,7 @@ Rules:
 - keyword: English, specific and visual"""
 
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=4000,
@@ -4039,7 +4039,7 @@ Rules:
 - If the uploaded script contains numbers in English format (comma as thousands separator, e.g. "1,287"), convert them to Turkish format ("1.287") or spell them out — Turkish uses comma ONLY as the decimal separator, English-style thousands-commas break the TTS reading"""
 
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         messages=[{"role": "user", "content": parse_prompt}],
         temperature=0.3,
         max_tokens=8000,
@@ -4174,7 +4174,7 @@ Return ONLY a JSON object, no markdown:
 {{"topic": "the specific topic in {lang_name}", "hook": "one sentence that captures the hook in {lang_name}"}}"""
     try:
         resp = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.9,
             max_tokens=200,
@@ -4215,7 +4215,7 @@ Return ONLY a JSON object, no markdown:
 {{"topic": "the specific topic in {lang_name}", "hook": "one sentence curiosity-gap description in {lang_name}"}}"""
     try:
         resp = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.9,
             max_tokens=200,
@@ -4291,7 +4291,7 @@ Rules:
 - keyword: English, 2-3 words, visual and specific"""
 
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=4000,
@@ -6081,7 +6081,7 @@ Yanıtı SADECE şu JSON formatında ver, başka hiçbir açıklama yazma:
 {{"title": "...", "tags": "etiket1, etiket2, etiket3"}}"""
         resp = await asyncio.to_thread(
             client.chat.completions.create,
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7, max_tokens=300,
         )
@@ -7001,7 +7001,7 @@ async def auto_long_video_job():
         from openai import OpenAI
         ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
         topic_resp = ds.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": f"""Pick ONE specific, interesting and educational documentary topic in {lang_name}.
 Categories to choose from: {categories}
 Return ONLY valid JSON: {{"topic": "specific topic in {lang_name}"}}
@@ -7134,7 +7134,7 @@ async def auto_lv_en_job():
             f"\nDo NOT pick any of these already-covered topics:\n" + "\n".join(f"- {t}" for t in used_topics) + "\n"
         ) if used_topics else ""
         topic_resp = ds.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",
             messages=[{"role": "user", "content": f"""Pick ONE specific, fascinating and educational documentary topic in English.
 Categories to choose from: {categories}
 {exclude_block}Return ONLY valid JSON: {{"topic": "specific topic in English"}}

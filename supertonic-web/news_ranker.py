@@ -2084,7 +2084,7 @@ def _ai_jury_call_stage2_chunk(
         try:
             client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=timeout_seconds)
             resp = client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek-v4-pro",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=1500,
@@ -2203,7 +2203,7 @@ def _ai_jury_call_stage3(
         try:
             client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=timeout_seconds)
             resp = client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek-v4-pro",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=1200,
