@@ -6504,14 +6504,25 @@ async def upload_youtube(
         },
         "status": {
             "privacyStatus": privacy,
-            **({"selfDeclaredMadeForKids": False} if age_restricted == "true" else {"selfDeclaredMadeForKids": False}),
+            "selfDeclaredMadeForKids": False,
+            "license": "youtube",
+            # Kanaldaki tüm videolar yapay zeka sesi + senaryosuyla üretiliyor —
+            # sabit True, video bazlı seçime gerek yok (bkz. panel bio'sundaki
+            # "Yapay Zeka İçerik Üreticisi" konumu).
+            "containsSyntheticMedia": True,
+        },
+        "paidProductPlacementDetails": {
+            # Markalı/ücretli tanıtım içeriği yok — sabit Hayır.
+            "hasPaidProductPlacement": False,
         },
     }
     if age_restricted == "true":
         body["ageGating"] = {"restricted": True}
 
     media = MediaFileUpload(str(video_path), mimetype="video/mp4", resumable=True)
-    req = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+    req = youtube.videos().insert(
+        part="snippet,status,paidProductPlacementDetails", body=body, media_body=media
+    )
 
     response = None
     while response is None:
