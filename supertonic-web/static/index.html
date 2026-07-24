@@ -617,8 +617,8 @@
           <textarea id="yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Hashtagler (virgülle ayır)</label>
-          <input type="text" id="yt-tags" placeholder="#shorts, #yapay zeka, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <label>Etiketler (virgülle ayır, # gerekmez)</label>
+          <input type="text" id="yt-tags" placeholder="shorts, yapay zeka, teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
         <div class="field" style="margin-top:12px;">
           <label>Instagram Açıklaması (hazır format — kaynak, etkileşim CTA'ları, hashtag dahil)</label>
@@ -806,8 +806,8 @@
           <textarea id="lv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Hashtagler (virgülle ayır)</label>
-          <input type="text" id="lv-yt-tags" placeholder="#belgesel, #eğitim, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <label>Etiketler (virgülle ayır, # gerekmez)</label>
+          <input type="text" id="lv-yt-tags" placeholder="belgesel, eğitim, teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
           <div class="field">
@@ -908,8 +908,8 @@
           <textarea id="tnlv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Hashtagler (virgülle ayır)</label>
-          <input type="text" id="tnlv-yt-tags" placeholder="#gündem, #haberler, #trendler" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <label>Etiketler (virgülle ayır, # gerekmez)</label>
+          <input type="text" id="tnlv-yt-tags" placeholder="gündem, haberler, trendler" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
           <div class="field">
@@ -1797,6 +1797,14 @@
 <script>
 let voices = [], langs = {};
 
+// YouTube "Etiketler" alanı # kabul etmiyor — sunucu yükleme anında zaten
+// temizliyor ama kutuda #'li gösterilmesi kafa karıştırıyordu (gerçekte
+// gönderilecek değerle ekranda görünen birebir eşleşsin diye burada da temizliyoruz).
+// Instagram açıklamasındaki hashtag'lere (ig-caption) dokunmuyor, onlar # istiyor.
+function _stripHashtags(str) {
+  return (str || '').split(/\s+/).map(t => t.replace(/^#+/, '')).join(' ').trim();
+}
+
 async function loadMeta() {
   const r = await fetch('/api/voices');
   const d = await r.json();
@@ -1912,7 +1920,7 @@ function _displayLVResult(d) {
   }
   document.getElementById('lv-yt-title').value = d.title || '';
   document.getElementById('lv-yt-desc').value = d.description || '';
-  document.getElementById('lv-yt-tags').value = d.suggested_tags || '';
+  document.getElementById('lv-yt-tags').value = _stripHashtags(d.suggested_tags);
   document.getElementById('lv-yt-upload-section').style.display = 'block';
   document.getElementById('result-lv').classList.add('show');
   checkYTStatus();
@@ -2773,7 +2781,7 @@ function _showShortsResult(d) {
   document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
   if (d.title) document.getElementById('yt-title').value = d.title;
   if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
-  if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
+  if (d.suggested_tags) document.getElementById('yt-tags').value = _stripHashtags(d.suggested_tags);
   currentSourceText = d.source_text || '';
   document.getElementById('ig-caption').value = d.instagram_caption || '';
   currentThumbnailFilename = null;
@@ -3310,7 +3318,7 @@ async function generateTrendLongVideo() {
 
     document.getElementById('tnlv-yt-title').value = d.title;
     document.getElementById('tnlv-yt-desc').value = d.description || '';
-    document.getElementById('tnlv-yt-tags').value = d.suggested_tags || '';
+    document.getElementById('tnlv-yt-tags').value = _stripHashtags(d.suggested_tags);
 
     document.getElementById('tnlv-yt-upload-section').style.display = 'block';
     document.getElementById('tnlv-yt-success').style.display = 'none';
