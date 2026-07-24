@@ -4572,13 +4572,12 @@ function buildYTTagAnalysis(videos) {
   });
   const tags = Object.entries(tagMap)
     .map(([tag, x]) => ({tag, count:x.count, avgScore:Math.round(x.totalScore/x.count), avgViews:Math.round(x.totalViews/x.count)}))
-    .filter(t => t.count >= 2)
-    .sort((a,b) => b.avgScore - a.avgScore)
+    .sort((a,b) => (b.count - a.count) || (b.avgScore - a.avgScore))
     .slice(0, 10);
-  if (!tags.length) return '<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;"><div style="color:#ccc;font-size:13px;font-weight:bold;">🏷 Etiket Analizi</div><div style="color:#555;font-size:12px;margin-top:6px;">Yeterli veri yok (en az 2 videoda geçen etiket gerekiyor)</div></div>';
+  if (!tags.length) return '<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;"><div style="color:#ccc;font-size:13px;font-weight:bold;">🏷 Etiket Analizi</div><div style="color:#555;font-size:12px;margin-top:6px;">Henüz etiket verisi yok</div></div>';
   const maxScore = Math.max(...tags.map(t => t.avgScore), 1);
   return `<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
-    <div style="color:#38bdf8;font-size:13px;font-weight:bold;margin-bottom:12px;">🏷 Etiket Analizi <span style="color:#555;font-weight:400;font-size:11px;">(en az 2 videoda geçen)</span></div>
+    <div style="color:#38bdf8;font-size:13px;font-weight:bold;margin-bottom:12px;">🏷 Etiket Analizi <span style="color:#555;font-weight:400;font-size:11px;">(x = kaç videoda geçtiği, az videolu etiketler daha az güvenilir)</span></div>
     <div style="display:flex;flex-direction:column;gap:7px;">
     ${tags.map((t, i) => {
       const pct = Math.round(t.avgScore / maxScore * 100);
