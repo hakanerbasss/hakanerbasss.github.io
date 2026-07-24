@@ -6497,8 +6497,8 @@ async def upload_youtube(
 
     # Sadece uzun süredir kanıtlanmış/kararlı alanlar ana yüklemede — containsSyntheticMedia
     # ve paidProductPlacementDetails çok yeni API alanları, bazı hesaplarda 403 "forbidden"
-    # (muhtemelen yetki/uygunluk kısıtı) veriyor. Ana yükleme bunlara bağımlı olmasın diye
-    # ayrı, "olursa iyi olur" bir ikinci deneme olarak aşağıda ayrıştırıldı.
+    # (proje/kanal doğrulama eksikliği — kod değil) veriyor. Ana yükleme bunlara bağımlı
+    # olmasın diye ayrı, "olursa iyi olur" bir ikinci deneme olarak aşağıda ayrıştırıldı.
     body = {
         "snippet": {
             "title": yt_title[:100],
@@ -6509,10 +6509,7 @@ async def upload_youtube(
         "status": {
             "privacyStatus": privacy,
             "selfDeclaredMadeForKids": False,
-            # GEÇİCİ TEST: "license" burada devre dışı — 403 hatasının bugünkü
-            # eklemelerden mi yoksa hesap/projeden mi kaynaklandığını netleştirmek
-            # için ana çağrı bugünden önceki hâline birebir eşitlendi.
-            # "license": "youtube",
+            "license": "youtube",
         },
     }
     upload_parts = ["snippet", "status"]
