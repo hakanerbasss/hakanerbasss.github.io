@@ -1956,6 +1956,9 @@ Return ONLY valid JSON, no markdown, no explanation:
   "title": "catchy YouTube title for this video (max 80 chars, in {lang_name})",
   "hashtags": ["Shorts", "topic", "specific", "tags", "no", "hash", "symbol"],
   "comment_hook": "one short question in {lang_name}, specific to this exact story, designed to make viewers comment their opinion",
+  "badge_text": "short punchy attention phrase in {lang_name} for the opening banner, genuinely varied per story",
+  "emphasis_word": "the single word or short phrase from the title that is the core subject",
+  "color_scheme": "one of: sari_kirmizi, mavi_beyaz, yesil_siyah, mor_altin, turuncu_lacivert, kirmizi_siyah, turkuaz_beyaz",
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
@@ -1977,6 +1980,9 @@ Rules:
 {get_hook_rule()}
 - LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
 - comment_hook: ONE short question in {lang_name}, tailored to what actually happened in THIS story, meant to provoke viewers to comment their opinion/reaction (e.g. "Sence doğru bir karar mı?", "Sen olsan ne yapardın?", "Katılıyor musun?"). Must be specific to this news — never a generic template, never reused across videos.
+- badge_text: a short (max 3-4 words), punchy, attention-grabbing phrase in {lang_name} for the opening banner. GENUINELY VARY this per story based on its actual tone/urgency/surprise — do NOT default to the same phrase (e.g. "SON DAKİKA") every time. It's fine to use "SON DAKİKA" when a story is truly breaking, but for other stories write whatever authentically fits (surprise, gravity, human-interest, curiosity — your call). Never reuse the exact same phrase across consecutive videos.
+- emphasis_word: exactly one word or short phrase (max 2 words) copied VERBATIM from the title, representing the core subject the story is actually about — this word will be visually highlighted in the opening banner.
+- color_scheme: pick whichever of the 7 palettes best fits this story's tone (e.g. turuncu_lacivert for weather/disaster warnings, mavi_beyaz for economy/official announcements, kirmizi_siyah for grave/serious news, yesil_siyah for health, mor_altin for surprising/notable stories, turkuaz_beyaz for tech/science, sari_kirmizi as a versatile default). Vary it — do not pick the same scheme for every video.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration between 45 and 55 seconds — NEVER shorter than 45 seconds. If the facts feel thin, elaborate naturally on the facts you have (implications, who it affects, timing) instead of cutting the video short or inventing new details.
 - hashtags: 10-15 tags — ALL of them must be specific to THIS video's actual topic/people/places/institutions (e.g. if the video is about the Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya", "erişim", "keşfetsayfası"...). Do NOT pad the list with generic filler tags like "sondakika", "gündem", "haberler", "güncel", "viral" — only ONE fixed/generic tag is allowed in the entire list: "Shorts" (always last). Every other tag must be traceable to something specific in this exact story.
@@ -2160,7 +2166,12 @@ Rules:
     if png_files and not info_format:
         try:
             first_title = data.get("title", topic or scenes[0]["text"][:60])
-            overlay_first_scene_banner(png_files[0], first_title, lang=lang)
+            overlay_first_scene_banner(
+                png_files[0], first_title, lang=lang,
+                badge_text=data.get("badge_text"),
+                emphasis_word=data.get("emphasis_word"),
+                color_scheme=data.get("color_scheme"),
+            )
         except Exception:
             pass
 
@@ -3233,8 +3244,31 @@ async def _append_outro_template(main_video: Path, final_output: Path) -> bool:
         return False
 
 
-def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -> None:
-    """İlk sahne fotoğrafına haber overlay: bantsız büyük sarı yazılar + dar eğik SON DAKİKA."""
+# Her video farklı hissettirsin diye AI'nin seçtiği 7 hazır renk paleti — her biri
+# özenle test edilmiş, okunabilir bir kombinasyon (bant/başlık/vurgu/rozet birlikte
+# tanımlı). AI ham RGB üretmiyor, sadece bu listeden birini seçiyor — çirkin/okunmaz
+# kombinasyon riski yok.
+_BANNER_COLOR_SCHEMES = {
+    "sari_kirmizi":     {"band": (255, 208, 0), "band_txt": (17, 17, 17),   "headline": (255, 208, 0),  "emphasis": (255, 255, 255), "badge": (213, 0, 0),   "badge_hl": (255, 40, 60),  "badge_txt": (255, 255, 255), "glow": (255, 30, 40, 80)},
+    "mavi_beyaz":       {"band": (20, 90, 200),  "band_txt": (255, 255, 255), "headline": (255, 255, 255), "emphasis": (255, 208, 0),   "badge": (15, 60, 150), "badge_hl": (40, 110, 220), "badge_txt": (255, 255, 255), "glow": (30, 90, 220, 90)},
+    "yesil_siyah":      {"band": (0, 140, 70),   "band_txt": (255, 255, 255), "headline": (255, 255, 255), "emphasis": (0, 255, 140),   "badge": (20, 20, 20),  "badge_hl": (0, 170, 90),   "badge_txt": (255, 255, 255), "glow": (0, 200, 100, 80)},
+    "mor_altin":        {"band": (110, 30, 160), "band_txt": (255, 255, 255), "headline": (255, 208, 0),   "emphasis": (255, 255, 255), "badge": (90, 20, 140), "badge_hl": (180, 80, 230), "badge_txt": (255, 215, 0),   "glow": (150, 50, 220, 90)},
+    "turuncu_lacivert": {"band": (230, 105, 0),  "band_txt": (17, 17, 17),   "headline": (255, 255, 255), "emphasis": (255, 208, 0),   "badge": (20, 30, 90),  "badge_hl": (50, 70, 160),  "badge_txt": (255, 208, 0),   "glow": (255, 140, 0, 90)},
+    "kirmizi_siyah":    {"band": (20, 20, 20),   "band_txt": (255, 255, 255), "headline": (230, 20, 20),   "emphasis": (255, 255, 255), "badge": (180, 0, 0),   "badge_hl": (230, 30, 30),  "badge_txt": (255, 255, 255), "glow": (255, 0, 0, 90)},
+    "turkuaz_beyaz":    {"band": (0, 150, 170),  "band_txt": (255, 255, 255), "headline": (255, 255, 255), "emphasis": (0, 230, 255),   "badge": (0, 110, 130), "badge_hl": (0, 190, 210),  "badge_txt": (255, 255, 255), "glow": (0, 200, 220, 80)},
+}
+_DEFAULT_BANNER_SCHEME = "sari_kirmizi"
+
+
+def overlay_first_scene_banner(
+    photo_path: Path, title: str, lang: str = "tr",
+    badge_text: str = None, emphasis_word: str = None, color_scheme: str = None,
+) -> None:
+    """İlk sahne fotoğrafına haber overlay. Renk şeması, vurgu kelimesi ve rozet
+    metni AI'den geliyor (bkz. _generate_shorts_core prompt'undaki badge_text/
+    emphasis_word/color_scheme alanları) — her video farklı görünsün, hepsi aynı
+    sarı/kırmızı/"SON DAKİKA" kalıbına düşmesin diye. Alanlardan biri boş/geçersiz
+    gelirse güvenli varsayılana düşer, hiçbir zaman görseli bozmaz."""
     from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
     W, H = 1080, 1920
@@ -3273,6 +3307,25 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
             draw.text((x + dx, y + dy), text, font=font, fill=(0, 0, 0))
         draw.text((x, y), text, font=font, fill=fill)
 
+    def shadow_text_emphasized(cx, y, text, font, base_fill, emphasis_fill, emphasis_words):
+        """shadow_text ile aynı ama emphasis_words'e uyan kelimeleri farklı renkte çizer."""
+        words = text.split()
+        if not words:
+            return
+        if not emphasis_words or not any(w.upper() in emphasis_words for w in words):
+            shadow_text(cx, y, text, font, base_fill)
+            return
+        space_w = tw(" ", font)
+        widths = [tw(w, font) for w in words]
+        total_w = int(sum(widths) + space_w * (len(words) - 1))
+        x = cx - total_w // 2
+        for w, ww in zip(words, widths):
+            fill = emphasis_fill if w.upper() in emphasis_words else base_fill
+            for dx, dy in [(5, 5), (4, 4), (3, 3)]:
+                draw.text((x + dx, y + dy), w, font=font, fill=(0, 0, 0))
+            draw.text((x, y), w, font=font, fill=fill)
+            x += int(ww + space_w)
+
     def fit_font(text, start_sz, max_w):
         sz = start_sz
         while sz > 40:
@@ -3282,37 +3335,31 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
             sz -= 10
         return lf(sz), sz
 
-    # Başlık anahtar kelimesinden kategori rengi tespiti
-    _tl = title.lower()
-    _CATS = [
-        (["ekonomi","borsa","döviz","faiz","enflasyon","dolar","euro","piyasa","merkez ban","bütçe","liret"],
-         (30, 130, 220), "EKONOMİ"),
-        (["deprem","sel","yangın","afet","fırtına","kasırga","tsunami","volkan","heyelan"],
-         (230, 105, 0), "AFET"),
-        (["futbol","basketbol","spor","şampiyona","lig","maç","gol","transfer","milli takım","teniz","formula"],
-         (0, 170, 55), "SPOR"),
-        (["dünya","nato","avrupa","ukrayna","rusya","gazze","suriye","savaş","uluslararası","filistin","İsrail"],
-         (140, 50, 215), "DÜNYA"),
-        (["teknoloji","yapay zeka","nasa","uzay","bilim","robot","chatgpt","iphone","android","yapay","ai"],
-         (0, 175, 195), "TEKNOLOJİ"),
-    ]
-    _accent = (255, 208, 0)
+    scheme = _BANNER_COLOR_SCHEMES.get(
+        (color_scheme or "").strip().lower().replace(" ", "_"),
+        _BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME],
+    )
+    BAND_COLOR = scheme["band"]
+    BAND_TXT   = scheme["band_txt"]
+    HEADLINE   = scheme["headline"]
+    EMPHASIS   = scheme["emphasis"]
+    BADGE      = scheme["badge"]
+    BADGE_HL   = scheme["badge_hl"]
+    BADGE_TXT  = scheme["badge_txt"]
+    GLOW       = scheme["glow"]
+    BLACK      = (17, 17, 17)
+    CX = W // 2
     cat_text = "GÜNDEM" if lang == "tr" else "BREAKING"
-    _band_txt_dark = True
-    for _kws, _color, _label in _CATS:
-        if any(k in _tl for k in _kws):
-            _accent = _color
-            cat_text = _label
-            _band_txt_dark = False
-            break
-    BAND_COLOR = _accent          # bant arka planı → kategori rengi
-    YELLOW     = (255, 208, 0)    # başlık metni her zaman sarı (okunabilirlik)
-    RED    = (213,   0,   0)
-    BLACK  = ( 17,  17,  17)
-    WHITE  = (255, 255, 255)
-    BAND_TXT = BLACK if _band_txt_dark else WHITE
-    CX     = W // 2
-    badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
+
+    # Rozet metni AI'den serbestçe geliyor — sabit "SON DAKİKA" değil, boşsa/aşırı
+    # uzunsa güvenli varsayılana düşer.
+    badge_text = (badge_text or "").strip().upper()
+    if not badge_text:
+        badge_text = "SON DAKİKA" if lang == "tr" else "BREAKING NEWS"
+    if len(badge_text.split()) > 4:
+        badge_text = " ".join(badge_text.split()[:4])
+
+    emphasis_words = {w.strip().upper() for w in (emphasis_word or "").split() if w.strip()}
 
     # Başlığı 3 parçaya böl
     words = title.upper().split()
@@ -3328,7 +3375,7 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
         part_b = " ".join(words[2:-2])
         part_c = " ".join(words[-2:])
 
-    # ① Üst kategori bandı — renk kategoriye göre değişir, başlık metni her zaman sarı
+    # ① Üst kategori bandı — renk şemaya göre değişir
     y1, h1 = 150, 120
     draw.rectangle([(0, y1), (W, y1 + h1)], fill=BAND_COLOR)
     draw.rectangle([(0, y1), (W, y1 + 7)], fill=BLACK)
@@ -3339,12 +3386,12 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
     draw.text((CX - cw // 2, y1 + (h1 - 52) // 2), cat_text, font=cf, fill=BAND_TXT)
     draw.text((W - 60 - int(tw("««", af)), y1 + (h1 - 52) // 2), "««", font=af, fill=BAND_TXT)
 
-    # ② part_a — bantsız büyük sarı yazı
+    # ② part_a — bantsız büyük başlık yazısı, vurgu kelimesi ayrı renkte
     if part_a:
         a_font, a_sz = fit_font(part_a, 190, W - 120)
-        shadow_text(CX, 330, part_a, a_font, YELLOW)
+        shadow_text_emphasized(CX, 330, part_a, a_font, HEADLINE, EMPHASIS, emphasis_words)
 
-    # ③ part_b — koyu eğik arka plan + sarı yazı (bant değil)
+    # ③ part_b — koyu eğik arka plan + başlık yazısı (bant değil)
     if part_b:
         b_font, b_sz = fit_font(part_b, 88, W - 100)
         b_w = int(tw(part_b, b_font))
@@ -3355,30 +3402,30 @@ def overlay_first_scene_banner(photo_path: Path, title: str, lang: str = "tr") -
         ImageDraw.Draw(acc).polygon(poly, fill=(10, 10, 10, 185))
         img = Image.alpha_composite(img.convert("RGBA"), acc).convert("RGB")
         draw = ImageDraw.Draw(img)
-        shadow_text(CX, by + 18, part_b, b_font, YELLOW)
+        shadow_text_emphasized(CX, by + 18, part_b, b_font, HEADLINE, EMPHASIS, emphasis_words)
 
-    # ④ part_c — bantsız büyük sarı yazı
+    # ④ part_c — bantsız büyük başlık yazısı, vurgu kelimesi ayrı renkte
     if part_c:
         c_font, c_sz = fit_font(part_c, 190, W - 120)
         y_c = 750 if part_b else 600
-        shadow_text(CX, y_c, part_c, c_font, YELLOW)
+        shadow_text_emphasized(CX, y_c, part_c, c_font, HEADLINE, EMPHASIS, emphasis_words)
 
-    # ⑤ SON DAKİKA — dar eğik kırmızı badge (tam genişlik değil)
+    # ⑤ Rozet — dar eğik badge (tam genişlik değil), renk şemaya göre
     bdf = lf(80); bt = badge_text; btw = int(tw(bt, bdf))
     bw2 = btw + 130; bx_b = CX - bw2 // 2; byy = 1050; bhh = 140; sk2 = 28
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse([(CX - 360, byy + 60), (CX + 360, byy + 240)], fill=(255, 30, 40, 80))
+    ImageDraw.Draw(glow).ellipse([(CX - 360, byy + 60), (CX + 360, byy + 240)], fill=GLOW)
     glow = glow.filter(ImageFilter.GaussianBlur(40))
     img = Image.alpha_composite(img.convert("RGBA"), glow).convert("RGB")
     draw = ImageDraw.Draw(img)
     rp = [(bx_b + sk2, byy), (bx_b + bw2 + sk2, byy), (bx_b + bw2 - sk2, byy + bhh), (bx_b - sk2, byy + bhh)]
     rib = Image.new("RGBA", (W, H), (0, 0, 0, 0)); rd = ImageDraw.Draw(rib)
-    rd.polygon(rp, fill=(213, 0, 0, 255))
+    rd.polygon(rp, fill=BADGE + (255,))
     rd.polygon([(bx_b + sk2, byy), (bx_b + bw2 + sk2, byy),
-                (bx_b + bw2 + sk2 - 6, byy + 10), (bx_b + sk2 - 6, byy + 10)], fill=(255, 40, 60, 255))
+                (bx_b + bw2 + sk2 - 6, byy + 10), (bx_b + sk2 - 6, byy + 10)], fill=BADGE_HL + (255,))
     img = Image.alpha_composite(img.convert("RGBA"), rib).convert("RGB")
     draw = ImageDraw.Draw(img)
-    shadow_text(CX, byy + (bhh - 80) // 2, bt, bdf, WHITE)
+    shadow_text(CX, byy + (bhh - 80) // 2, bt, bdf, BADGE_TXT)
 
     img.save(str(photo_path), "JPEG", quality=92)
 
