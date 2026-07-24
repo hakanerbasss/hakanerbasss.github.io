@@ -2459,9 +2459,20 @@ Kurallar:
             model="deepseek-v4-pro",
             messages=[{"role": "user", "content": cap_prompt}],
             temperature=0.4,
-            max_tokens=700,
+            # 700 çoğu zaman 900-1400 karakterlik hedefe yetmiyordu, cümle
+            # ortasında kesiliyordu (Türkçe karakter başına token oranı İngilizce'den
+            # yüksek) — güvenli pay için yükseltildi.
+            max_tokens=1400,
         )
         ig_caption_desc = cap_resp.choices[0].message.content.strip()
+        # Yine de token sınırında kesilirse (cümle ortasında biterse) son tam
+        # cümleye kırp — yarım kelimeyle bitmesin.
+        if ig_caption_desc and ig_caption_desc[-1] not in ".!?":
+            for _end_ch in (".", "!", "?"):
+                _idx = ig_caption_desc.rfind(_end_ch)
+                if _idx > len(ig_caption_desc) * 0.5:
+                    ig_caption_desc = ig_caption_desc[:_idx + 1]
+                    break
     except Exception as _cap_e:
         print(f"[CAPTION-GEN] Açıklama üretilemedi: {_cap_e}", flush=True)
         ig_caption_desc = full_script
