@@ -2327,7 +2327,7 @@ Rules:
         f"drawtext=textfile={disclaimer_file.absolute()}"
         f":fontsize=20:fontcolor=white@0.9"
         f":box=1:boxcolor=black@0.55:boxborderw=6"
-        f":x=(w-text_w)/2:y=h-th-260"
+        f":x=(w-text_w)/2:y=h-th-16"
     )
     if font_path:
         disclaimer_filter += f":fontfile={font_path}"
@@ -3928,7 +3928,7 @@ Rules:
         f"drawtext=textfile={lv_disclaimer_file.absolute()}"
         f":fontsize=20:fontcolor=white@0.9"
         f":box=1:boxcolor=black@0.55:boxborderw=6"
-        f":x=(w-text_w)/2:y=h-th-260"
+        f":x=(w-text_w)/2:y=h-th-16"
     )
     if font_path:
         lv_disclaimer_filter += f":fontfile={font_path}"
