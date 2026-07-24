@@ -6495,6 +6495,10 @@ async def upload_youtube(
 
     yt_title = title
 
+    # Sadece uzun süredir kanıtlanmış/kararlı alanlar ana yüklemede — containsSyntheticMedia
+    # ve paidProductPlacementDetails çok yeni API alanları, bazı hesaplarda 403 "forbidden"
+    # (muhtemelen yetki/uygunluk kısıtı) veriyor. Ana yükleme bunlara bağımlı olmasın diye
+    # ayrı, "olursa iyi olur" bir ikinci deneme olarak aşağıda ayrıştırıldı.
     body = {
         "snippet": {
             "title": yt_title[:100],
@@ -6506,17 +6510,9 @@ async def upload_youtube(
             "privacyStatus": privacy,
             "selfDeclaredMadeForKids": False,
             "license": "youtube",
-            # Kanaldaki tüm videolar yapay zeka sesi + senaryosuyla üretiliyor —
-            # sabit True, video bazlı seçime gerek yok (bkz. panel bio'sundaki
-            # "Yapay Zeka İçerik Üreticisi" konumu).
-            "containsSyntheticMedia": True,
-        },
-        "paidProductPlacementDetails": {
-            # Markalı/ücretli tanıtım içeriği yok — sabit Hayır.
-            "hasPaidProductPlacement": False,
         },
     }
-    upload_parts = ["snippet", "status", "paidProductPlacementDetails"]
+    upload_parts = ["snippet", "status"]
     if age_restricted == "true":
         body["ageGating"] = {"restricted": True}
         # ageGating body'de varken "part"a eklenmezse YouTube 400 "unexpectedPart" döner.
@@ -6532,6 +6528,27 @@ async def upload_youtube(
         _, response = req.next_chunk()
 
     video_id = response["id"]
+
+    # Yapay zeka işaretleme + ücretli tanıtım=Hayır — ayrı, best-effort bir update çağrısı.
+    # YouTube'un update'i PATCH değil TAM DEĞİŞİM yapıyor — sadece yeni alanı gönderirsek
+    # privacyStatus/license gibi az önce yazdığımız diğer status alanlarını sıfırlama riski
+    # var. Önce mevcut status'u okuyup üstüne ekliyoruz. Başarısız olursa (403/yetki, hesap
+    # henüz uygun değil vb.) sadece loglanır, video zaten yüklenmiş olduğu için ana işlemi
+    # bozmaz.
+    try:
+        current = youtube.videos().list(part="status", id=video_id).execute()
+        current_status = current["items"][0]["status"]
+        current_status["containsSyntheticMedia"] = True
+        youtube.videos().update(
+            part="status,paidProductPlacementDetails",
+            body={
+                "id": video_id,
+                "status": current_status,
+                "paidProductPlacementDetails": {"hasPaidProductPlacement": False},
+            },
+        ).execute()
+    except Exception as meta_err:
+        print(f"[YT-UPLOAD] Yapay zeka/ücretli tanıtım işaretlemesi başarısız (video zaten yüklendi): {meta_err}", flush=True)
 
     # Thumbnail yükle
     if thumbnail_filename:
