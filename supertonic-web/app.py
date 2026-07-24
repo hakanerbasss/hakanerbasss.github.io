@@ -6393,7 +6393,8 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
     def safe_query(**kw):
         try:
             return analytics.reports().query(**kw).execute()
-        except Exception:
+        except Exception as e:
+            print(f"[YT-ANALYTICS] sorgu başarısız ({kw.get('dimensions', '?')}): {e}", flush=True)
             return {}
 
     try:
