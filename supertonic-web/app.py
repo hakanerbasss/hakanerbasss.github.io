@@ -6444,13 +6444,17 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
                 "video_count": int(s.get("videoCount", 0)),
             }
 
-        # ── Video başlıkları
+        # ── Video başlıkları + etiketleri + yayın zamanı (hashtag/saat analizi için)
         video_ids = [row[0] for row in top_videos.get("rows", [])]
         video_titles = {}
+        video_tags = {}
+        video_published = {}
         if video_ids:
             vr = yt.videos().list(part="snippet", id=",".join(video_ids)).execute()
             for item in vr.get("items", []):
                 video_titles[item["id"]] = item["snippet"]["title"]
+                video_tags[item["id"]] = item["snippet"].get("tags", [])
+                video_published[item["id"]] = item["snippet"].get("publishedAt", "")
 
         # ── Özet toplamlar
         rows_d = daily.get("rows", [])
@@ -6505,6 +6509,8 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
                     "avg_view_sec": int(r[3]),
                     "avg_view_pct": round(float(r[4]), 1),
                     "likes": int(r[5]),
+                    "tags": video_tags.get(r[0], []),
+                    "published_at": video_published.get(r[0], ""),
                 }
                 for r in top_videos.get("rows", [])
             ],

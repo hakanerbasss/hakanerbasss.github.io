@@ -1048,6 +1048,12 @@
       <div id="an-countries"></div>
     </div>
 
+    <!-- Yayın saati analizi -->
+    <div id="an-yt-time" style="margin-bottom:16px;"></div>
+
+    <!-- Etiket/Hashtag analizi -->
+    <div id="an-yt-tags" style="margin-bottom:16px;"></div>
+
     <!-- Top videolar tablosu -->
     <div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
       <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:10px;">En İyi Videolar</div>
@@ -4320,6 +4326,12 @@ async function loadAnalytics() {
       </div>`;
     }).join('') || '<div style="color:#555;font-size:12px;">Veri yok</div>';
 
+    // Yayın saati + etiket analizi (top_videos üzerinden — instagram tarafındaki
+    // buildTimeAnalysis/buildTopicAnalysis ile aynı görsel dil, YouTube veri
+    // şekline uyarlanmış)
+    document.getElementById('an-yt-time').innerHTML = buildYTTimeAnalysis(d.top_videos || []);
+    document.getElementById('an-yt-tags').innerHTML = buildYTTagAnalysis(d.top_videos || []);
+
     // Top videolar tablosu
     document.getElementById('an-top-videos').innerHTML = (d.top_videos||[]).map((v, i) => {
       const mins = Math.floor(v.avg_view_sec / 60);
@@ -4487,6 +4499,96 @@ function buildTopicAnalysis(posts) {
         </div>
         <div style="width:24px;color:#555;font-size:10px;text-align:right;">${t.count}x</div>
         <div style="width:50px;text-align:right;font-size:11px;color:${i<3?'#f97316':'#555'};">❤ ${t.avgLikes}</div>
+      </div>`;
+    }).join('')}
+    </div>
+  </div>`;
+}
+
+// ─── YOUTUBE KANAL ANALİTİK — saat/etiket analizi (Instagram'daki
+// buildTimeAnalysis/buildTopicAnalysis ile aynı görsel dil, top_videos'un
+// veri şekline uyarlanmış: views/avg_view_pct/likes/tags/published_at) ────────
+function _ytScore(v) {
+  return (v.views || 0) + (v.avg_view_pct || 0) * 10 + (v.likes || 0) * 5;
+}
+
+function buildYTTimeAnalysis(videos) {
+  const slots = [
+    {label:'00:00–06:00', min:0,  max:6,  emoji:'🌙'},
+    {label:'06:00–09:00', min:6,  max:9,  emoji:'🌅'},
+    {label:'09:00–12:00', min:9,  max:12, emoji:'☀️'},
+    {label:'12:00–15:00', min:12, max:15, emoji:'🌤'},
+    {label:'15:00–18:00', min:15, max:18, emoji:'🌇'},
+    {label:'18:00–21:00', min:18, max:21, emoji:'🌆'},
+    {label:'21:00–24:00', min:21, max:24, emoji:'🌃'},
+  ];
+  slots.forEach(s => {
+    const sv = videos.filter(v => {
+      if (!v.published_at) return false;
+      const h = new Date(v.published_at).getHours();
+      return h >= s.min && h < s.max;
+    });
+    s.count = sv.length;
+    s.avgViews = s.count ? Math.round(sv.reduce((a,v)=>a+(v.views||0),0)/s.count) : 0;
+    s.avgPct   = s.count ? Math.round(sv.reduce((a,v)=>a+(v.avg_view_pct||0),0)/s.count*10)/10 : 0;
+    s.score    = s.count ? Math.round(sv.reduce((a,v)=>a+_ytScore(v),0)/s.count) : 0;
+  });
+  const active = slots.filter(s => s.count > 0);
+  if (!active.length) return '<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;"><div style="color:#ccc;font-size:13px;font-weight:bold;">⏰ Yayın Saati Analizi</div><div style="color:#555;font-size:12px;margin-top:6px;">Veri yok</div></div>';
+  const maxScore = Math.max(...active.map(s => s.score), 1);
+  const bestScore = Math.max(...active.map(s => s.score));
+  return `<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
+    <div style="color:#facc15;font-size:13px;font-weight:bold;margin-bottom:12px;">⏰ Yayın Saati Analizi <span style="color:#555;font-weight:400;font-size:11px;">(hangi saatte yüklenen videolar daha iyi performans gösteriyor)</span></div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${active.map(s => {
+      const pct = Math.round(s.score / maxScore * 100);
+      const isBest = s.score === bestScore && bestScore > 0;
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:92px;color:#888;font-size:11px;flex-shrink:0;">${s.emoji} ${s.label}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:16px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${isBest?'#7c3aed':'#2a2a5a'};border-radius:4px;"></div>
+        </div>
+        <div style="width:22px;color:#666;font-size:10px;text-align:right;">${s.count}x</div>
+        <div style="width:64px;text-align:right;font-size:11px;${isBest?'color:#7c3aed;font-weight:700;':'color:#444;'}">👁 ${formatNum(s.avgViews)}</div>
+        <div style="width:56px;text-align:right;font-size:11px;${isBest?'color:#a78bfa;font-weight:700;':'color:#555;'}">%${s.avgPct}</div>
+      </div>`;
+    }).join('')}
+    </div>
+    <div style="color:#444;font-size:10px;margin-top:8px;">x = video sayısı · 👁 ort. izlenme · % ort. izlenme oranı</div>
+  </div>`;
+}
+
+function buildYTTagAnalysis(videos) {
+  const tagMap = {};
+  videos.forEach(v => {
+    const score = _ytScore(v);
+    const uniq = [...new Set((v.tags||[]).map(t => t.toLowerCase()))];
+    uniq.forEach(tag => {
+      if (!tagMap[tag]) tagMap[tag] = {count:0, totalScore:0, totalViews:0};
+      tagMap[tag].count++;
+      tagMap[tag].totalScore += score;
+      tagMap[tag].totalViews += v.views||0;
+    });
+  });
+  const tags = Object.entries(tagMap)
+    .map(([tag, x]) => ({tag, count:x.count, avgScore:Math.round(x.totalScore/x.count), avgViews:Math.round(x.totalViews/x.count)}))
+    .filter(t => t.count >= 2)
+    .sort((a,b) => b.avgScore - a.avgScore)
+    .slice(0, 10);
+  if (!tags.length) return '<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;"><div style="color:#ccc;font-size:13px;font-weight:bold;">🏷 Etiket Analizi</div><div style="color:#555;font-size:12px;margin-top:6px;">Yeterli veri yok (en az 2 videoda geçen etiket gerekiyor)</div></div>';
+  const maxScore = Math.max(...tags.map(t => t.avgScore), 1);
+  return `<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
+    <div style="color:#38bdf8;font-size:13px;font-weight:bold;margin-bottom:12px;">🏷 Etiket Analizi <span style="color:#555;font-weight:400;font-size:11px;">(en az 2 videoda geçen)</span></div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${tags.map((t, i) => {
+      const pct = Math.round(t.avgScore / maxScore * 100);
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:110px;color:${i<3?'#a78bfa':'#666'};font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.tag}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:14px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${i===0?'#0369a1':i<3?'#1d4ed8':'#1e3a5f'};border-radius:4px;"></div>
+        </div>
+        <div style="width:22px;color:#555;font-size:10px;text-align:right;">${t.count}x</div>
+        <div style="width:64px;text-align:right;font-size:11px;color:${i<3?'#f97316':'#555'};">👁 ${formatNum(t.avgViews)}</div>
       </div>`;
     }).join('')}
     </div>
