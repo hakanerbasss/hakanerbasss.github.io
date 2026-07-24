@@ -6516,12 +6516,15 @@ async def upload_youtube(
             "hasPaidProductPlacement": False,
         },
     }
+    upload_parts = ["snippet", "status", "paidProductPlacementDetails"]
     if age_restricted == "true":
         body["ageGating"] = {"restricted": True}
+        # ageGating body'de varken "part"a eklenmezse YouTube 400 "unexpectedPart" döner.
+        upload_parts.append("ageGating")
 
     media = MediaFileUpload(str(video_path), mimetype="video/mp4", resumable=True)
     req = youtube.videos().insert(
-        part="snippet,status,paidProductPlacementDetails", body=body, media_body=media
+        part=",".join(upload_parts), body=body, media_body=media
     )
 
     response = None
