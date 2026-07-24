@@ -6509,7 +6509,10 @@ async def upload_youtube(
         "status": {
             "privacyStatus": privacy,
             "selfDeclaredMadeForKids": False,
-            "license": "youtube",
+            # GEÇİCİ TEST: "license" burada devre dışı — 403 hatasının bugünkü
+            # eklemelerden mi yoksa hesap/projeden mi kaynaklandığını netleştirmek
+            # için ana çağrı bugünden önceki hâline birebir eşitlendi.
+            # "license": "youtube",
         },
     }
     upload_parts = ["snippet", "status"]
