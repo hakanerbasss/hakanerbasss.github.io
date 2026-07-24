@@ -2166,11 +2166,16 @@ Rules:
     if png_files and not info_format:
         try:
             first_title = data.get("title", topic or scenes[0]["text"][:60])
+            # AI'nin seçtiği renk şeması/vurgu/rozet SADECE YouTube'a giden içerikte
+            # kullanılıyor — Instagram kitlesi mevcut sabit sarı/kırmızı stile alıştı,
+            # o değişmiyor. YouTube yeni/kitlesiz bir kanal olduğu için hem çeşitlilik
+            # hem de bot-algısı riskini azaltma faydası daha değerli.
+            _use_ai_banner = (platform == "youtube")
             overlay_first_scene_banner(
                 png_files[0], first_title, lang=lang,
-                badge_text=data.get("badge_text"),
-                emphasis_word=data.get("emphasis_word"),
-                color_scheme=data.get("color_scheme"),
+                badge_text=data.get("badge_text") if _use_ai_banner else None,
+                emphasis_word=data.get("emphasis_word") if _use_ai_banner else None,
+                color_scheme=data.get("color_scheme") if _use_ai_banner else None,
             )
         except Exception:
             pass
@@ -3259,6 +3264,22 @@ _BANNER_COLOR_SCHEMES = {
 }
 _DEFAULT_BANNER_SCHEME = "sari_kirmizi"
 
+# Instagram için eski (sabit) davranış korunuyor — o kitle bu stile alıştı, bot algısı
+# riski de düşük çünkü uzun süredir aynı hesap. color_scheme verilmediğinde (yani
+# platform != youtube) bu anahtar kelime tespiti devreye girer, aynı eski mantık.
+_LEGACY_BANNER_CATS = [
+    (["ekonomi", "borsa", "döviz", "faiz", "enflasyon", "dolar", "euro", "piyasa", "merkez ban", "bütçe", "liret"],
+     (30, 130, 220), "EKONOMİ"),
+    (["deprem", "sel", "yangın", "afet", "fırtına", "kasırga", "tsunami", "volkan", "heyelan"],
+     (230, 105, 0), "AFET"),
+    (["futbol", "basketbol", "spor", "şampiyona", "lig", "maç", "gol", "transfer", "milli takım", "teniz", "formula"],
+     (0, 170, 55), "SPOR"),
+    (["dünya", "nato", "avrupa", "ukrayna", "rusya", "gazze", "suriye", "savaş", "uluslararası", "filistin", "İsrail"],
+     (140, 50, 215), "DÜNYA"),
+    (["teknoloji", "yapay zeka", "nasa", "uzay", "bilim", "robot", "chatgpt", "iphone", "android", "yapay", "ai"],
+     (0, 175, 195), "TEKNOLOJİ"),
+]
+
 
 def overlay_first_scene_banner(
     photo_path: Path, title: str, lang: str = "tr",
@@ -3335,10 +3356,28 @@ def overlay_first_scene_banner(
             sz -= 10
         return lf(sz), sz
 
-    scheme = _BANNER_COLOR_SCHEMES.get(
-        (color_scheme or "").strip().lower().replace(" ", "_"),
-        _BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME],
-    )
+    cat_text = "GÜNDEM" if lang == "tr" else "BREAKING"
+
+    if color_scheme:
+        # YouTube yolu — AI'nin seçtiği hazır palet.
+        scheme = dict(_BANNER_COLOR_SCHEMES.get(
+            color_scheme.strip().lower().replace(" ", "_"),
+            _BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME],
+        ))
+    else:
+        # Instagram/varsayılan yol — eski sabit davranış birebir korunuyor:
+        # sarı/kırmızı taban, sadece bant rengi anahtar kelimeyle değişir.
+        scheme = dict(_BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME])
+        _tl = title.lower()
+        _band_txt_dark = True
+        for _kws, _color, _label in _LEGACY_BANNER_CATS:
+            if any(k in _tl for k in _kws):
+                scheme["band"] = _color
+                cat_text = _label
+                _band_txt_dark = False
+                break
+        scheme["band_txt"] = (17, 17, 17) if _band_txt_dark else (255, 255, 255)
+
     BAND_COLOR = scheme["band"]
     BAND_TXT   = scheme["band_txt"]
     HEADLINE   = scheme["headline"]
@@ -3349,7 +3388,6 @@ def overlay_first_scene_banner(
     GLOW       = scheme["glow"]
     BLACK      = (17, 17, 17)
     CX = W // 2
-    cat_text = "GÜNDEM" if lang == "tr" else "BREAKING"
 
     # Rozet metni AI'den serbestçe geliyor — sabit "SON DAKİKA" değil, boşsa/aşırı
     # uzunsa güvenli varsayılana düşer.
