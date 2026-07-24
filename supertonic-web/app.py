@@ -6452,18 +6452,19 @@ async def upload_youtube(
     if not video_path.exists():
         raise HTTPException(404, "Video bulunamadı")
 
-    # Sosyal medya footer — tüm videolara eklenir
+    # Sosyal medya footer — tüm videolara eklenir. Jenerik hashtag satırı
+    # BİLEREK yok — videoya özgü hashtag'ler zaten aşağıda (hashtag_str)
+    # description'a ekleniyor; ikisi üst üste binerse YouTube'un "15'ten
+    # fazla hashtag = hepsini yok say" kuralına takılma riski oluşuyordu.
     if channel == "en":
         social_footer = (
             "\n\n📺 Subscribe for daily documentaries!\n"
-            "📸 Instagram: https://www.instagram.com/hakanerbasss/\n"
-            "\n#documentary #education #history #science #shorts"
+            "📸 Instagram: https://www.instagram.com/hakanerbasss/"
         )
     else:
         social_footer = (
             "\n\n📺 Abone olmayı unutma!\n"
-            "📸 Instagram: https://www.instagram.com/hakanerbasss/\n"
-            "\n#gündem #haber #shorts #keşfet #viral"
+            "📸 Instagram: https://www.instagram.com/hakanerbasss/"
         )
     description = (description or "").strip() + social_footer
 
@@ -6480,16 +6481,16 @@ async def upload_youtube(
             raise HTTPException(401, str(ref_err))
     youtube = build("youtube", "v3", credentials=creds)
 
-    # Tag listesi — virgül veya boşluk ayırıcı kabul et
+    # Tag listesi (Etiketler alanı) — virgül veya boşluk ayırıcı kabul eder,
+    # YouTube burada # İSTEMEZ, düz kelime/öbek olarak gönderilir.
     tag_list = [t.lstrip("#").strip() for t in re.split(r"[\s,]+", tags) if t.strip().lstrip("#")]
     if "Shorts" not in tag_list:
         tag_list.insert(0, "Shorts")
 
-    # Hashtagleri description'a ekle (YouTube'da tıklanabilir gösterir)
-    hashtag_str = " ".join(
-        f"#{t}" if not t.startswith("#") else t
-        for t in tag_list
-    )
+    # Açıklamaya eklenen hashtag'ler (# İLE) — en fazla 5 tane, en güçlü/spesifik
+    # olanlar. Tüm tag_list'i (5-15 arası) hashtag olarak basmıyoruz; YouTube 15'i
+    # aşan hashtag listelerinin TAMAMINI yok sayıyor, az ve öz daha güvenli.
+    hashtag_str = " ".join(f"#{t}" for t in tag_list[:5])
     full_description = f"{description}\n\n{hashtag_str}".strip() if description else hashtag_str
 
     yt_title = title
