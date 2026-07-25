@@ -2110,10 +2110,11 @@ Rules:
                 photo_saved, visual_err = fetch_scene_visual("social media news channel", "portrait", pexels_key, png_path)
         else:
             keyword = scene.get("keyword", topic)
-            if i == 0 and cover_image_path and Path(cover_image_path).exists():
+            _scene0_cover = cover_image_path or intro_cover_path
+            if i == 0 and _scene0_cover and Path(_scene0_cover).exists():
                 try:
                     import shutil as _sh
-                    _sh.copy2(str(cover_image_path), str(png_path))
+                    _sh.copy2(str(_scene0_cover), str(png_path))
                     photo_saved, visual_err = True, ""
                 except Exception:
                     photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
@@ -2265,8 +2266,11 @@ Rules:
                 fb_keyword = scene.get("keyword", topic)
                 fetch_scene_visual(fb_keyword, "portrait", pexels_key, png)
 
-        # Ken Burns efekti dene — başarısız olursa statik fallback
-        kb_ok = await _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
+        # Ken Burns efekti dene — başarısız olursa statik fallback.
+        # Özel açılış kapağı kullanılıyorsa ilk sahnede zoom uygulanmaz —
+        # kullanıcı kendi tasarladığı kapaktaki metni rahat okusun diye statik kalır.
+        skip_kb = bool(i == 0 and intro_cover_path)
+        kb_ok = False if skip_kb else await _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
         if not kb_ok:
             try:
                 result = await asyncio.to_thread(subprocess.run,
@@ -2290,41 +2294,10 @@ Rules:
                 raise RuntimeError(f"ffmpeg scene {i} failed: {fe}")
         clip_files.append(clip_path)
 
-    # Özel açılış kapağı — kullanıcının kendi yüklediği (ör. ChatGPT'de tasarlanan)
-    # görsel, sahne 1'in ÖNÜNE zoom'suz/sessiz statik bir klip olarak eklenir;
-    # mevcut sahnelere (seslendirme, zoom, banner) dokunulmaz.
-    INTRO_COVER_DURATION = 2.0
-    intro_clip_path = None
-    intro_silence_path = None
-    if intro_cover_path and Path(intro_cover_path).exists():
-        try:
-            intro_clip_path = scene_dir / "intro_cover_clip.mp4"
-            await asyncio.to_thread(subprocess.run,
-                ["ffmpeg", "-y",
-                 "-loop", "1", "-i", str(intro_cover_path),
-                 "-t", str(INTRO_COVER_DURATION),
-                 "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-                 "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(intro_clip_path)],
-                check=True, capture_output=True, timeout=90,
-            )
-            intro_silence_path = scene_dir / "intro_cover_silence.wav"
-            await asyncio.to_thread(subprocess.run,
-                ["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
-                 "-t", str(INTRO_COVER_DURATION),
-                 "-c:a", "pcm_s16le", str(intro_silence_path)],
-                check=True, capture_output=True, timeout=30,
-            )
-        except Exception as _intro_e:
-            print(f"[INTRO-COVER] Kapak klibi oluşturulamadı: {_intro_e}", flush=True)
-            intro_clip_path = None
-            intro_silence_path = None
-
     # Ses dosyalarını birleştir
     audio_list_file = scene_dir / "audio_list.txt"
     combined_audio = scene_dir / "combined.wav"
     with open(audio_list_file, "w") as f:
-        if intro_silence_path:
-            f.write(f"file '{intro_silence_path.absolute()}'\n")
         for af in audio_files:
             f.write(f"file '{af.absolute()}'\n")
     # -c copy yerine yeniden encode: sahnelerin TTS çıktısı farklı örnekleme
@@ -2339,8 +2312,6 @@ Rules:
     # Video kliplerini birleştir
     clip_list_file = scene_dir / "clip_list.txt"
     with open(clip_list_file, "w") as f:
-        if intro_clip_path:
-            f.write(f"file '{intro_clip_path.absolute()}'\n")
         for cp in clip_files:
             f.write(f"file '{cp.absolute()}'\n")
 
@@ -2367,10 +2338,6 @@ Rules:
     )
     if font_path:
         disclaimer_filter += f":fontfile={font_path}"
-    if intro_clip_path:
-        # Özel kapak süresince disclaimer metni gösterilmesin — kullanıcının
-        # kendi tasarımının üzerine binmesin.
-        disclaimer_filter += f":enable='gte(t,{INTRO_COVER_DURATION})'"
     await arun_ffmpeg([
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
@@ -2399,13 +2366,12 @@ Rules:
             title_tags = [w.lower() for w in generated_title.split()[:3] if len(w) > 3]
             video_tags = _format_hashtags(["Shorts"] + title_tags + trend_data["hashtags"][1:6], limit=5)
 
-    # Thumbnail — özel açılış kapağı varsa onu kullan (video da onunla açılıyor),
-    # yoksa overlay'li ilk sahneyi kopyala
+    # Thumbnail — overlay'li ilk sahneyi kopyala (özel kapak kullanılıyorsa
+    # scene 0 zaten o kapak, ayrıca create_thumbnail gerekmez)
     thumb_path = None
     try:
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-        thumb_src = intro_cover_path if (intro_cover_path and Path(intro_cover_path).exists()) else png_files[0]
-        shutil.copy2(str(thumb_src), str(thumb_out))
+        shutil.copy2(str(png_files[0]), str(thumb_out))
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
