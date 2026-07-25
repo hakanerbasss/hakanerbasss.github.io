@@ -2432,6 +2432,7 @@ Kurallar:
 - Merak uyandıran, sade ve akıcı bir dil kullan
 - Emoji yok, hashtag yok, başlık tekrarlama
 - Son cümle: "Beğenin ve abone olun, her hafta yeni bilgiler paylaşıyorum!"
+- ÖNEMLİ BİÇİM KURALI: Her paragraf arasına gerçek bir BOŞ SATIR (iki alt satır karakteri, \\n\\n) koy — tek bir uzun blok halinde YAZMA, mutlaka paragraflar görsel olarak ayrı satırlarda dursun
 - Sadece açıklama paragraflarını döndür
 """
             )
@@ -2452,6 +2453,7 @@ Kurallar:
 - Kişi adlarını, yerleri ve rakamları değiştirme
 - "..." ile KESME — her cümle tam bitişin
 - Emoji yok, hashtag yok, başlık tekrarlama
+- ÖNEMLİ BİÇİM KURALI: Her paragraf arasına gerçek bir BOŞ SATIR (iki alt satır karakteri, \\n\\n) koy — tek bir uzun blok halinde YAZMA, mutlaka paragraflar görsel olarak ayrı satırlarda dursun
 - Sadece açıklama paragraflarını döndür
 """
             )
@@ -4703,18 +4705,16 @@ async def send_telegram_video(video_path: Path, title: str, description: str, ta
         lines = [ln for ln in description.splitlines() if not ln.strip().startswith("#")]
         full_desc = " ".join(lines).strip()
 
-    # Tagleri parse et: virgül/boşluk ayır, YouTube olanlari at, Instagram ekle
+    # Tagleri parse et — platforma özel ekleme yapılmıyor, YouTube ve Instagram
+    # için ortak/paylaşılan etiket seti olarak kalsın (reels/keşfet/instareels
+    # gibi Instagram'a özel tag'ler burada zorla eklenmiyor).
     yt_remove = {"shorts", "youtubeshorts", "youtube", "ytshorts", "youtubevideos", "youtubetr", "yttr"}
-    ig_base   = ["#reels", "#keşfet", "#instareels"]
     filtered  = []
     for t in tags.replace(",", " ").split():
         clean = t.lstrip("#").lower().strip()
         if clean and clean not in yt_remove:
             filtered.append(f"#{clean}" if not t.startswith("#") else f"#{t.lstrip('#')}")
-    for ig in ig_base:
-        if ig not in filtered:
-            filtered.append(ig)
-    ig_tags_str = " ".join(filtered[:30])  # Instagram max 30 hashtag
+    common_tags_str = " ".join(filtered[:30])
 
     try:
         print(f"[TELEGRAM] Gönderiliyor: {video_path.name} ({video_path.stat().st_size // 1024}KB)", flush=True)
@@ -4735,8 +4735,8 @@ async def send_telegram_video(video_path: Path, title: str, description: str, ta
             await send_telegram_plain(title[:4096])
         if full_desc:
             await send_telegram_plain(full_desc[:4096])
-        if ig_tags_str:
-            await send_telegram_plain(ig_tags_str[:4096])
+        if common_tags_str:
+            await send_telegram_plain(common_tags_str[:4096])
     except Exception as e:
         print(f"[TELEGRAM] Exception: {e}", flush=True)
 
