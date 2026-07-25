@@ -2025,21 +2025,37 @@ Gurbetçi haberlerini sadece hak/ödeme/askerlik/araç/sınır/emeklilik/e-Devle
 al. Siyaset/adli olay/magazin SADECE ülke çapında güçlü etkili ve tam doğrulanmış büyük bir
 gelişmeyse kabul edilebilir — sıradan kulis/sansasyon haberi elensin.
 
+DOĞRULUK SEVİYESİ (her aday için belirlemen ZORUNLU — taslak/teklif/beklenti haberi doğru
+biçimde "henüz resmileşmedi" diyerek aktarmak sahte haber DEĞİLDİR; sahte haber riski bunu
+kesinleşmiş karar gibi sunmaktan doğar):
+- A — RESMİLEŞMİŞ: kanun kabul edilmiş, Resmi Gazete'de yayımlanmış veya uygulama fiilen
+  başlamış/ödeme yatmış.
+- B — RESMİ DUYURU/HAZIRLIK: bakanlık, SGK, TBMM, belediye, şirket veya yetkili bir kişi
+  doğrudan taslak/teklif/çalışma/pilot uygulamayı duyurmuş. Haber yapılabilir.
+- C — ERKEN SİNYAL/HENÜZ RESMİ DEĞİL: en az iki bağımsız güvenilir kaynak aynı somut gelişmeyi
+  tutarlı biçimde aktarıyor (OLAY_KUMESI'nde aynı numaralı başka adaylar varsa bu bir sinyaldir),
+  konu ülke çapında önemli. FAKAT emeklilik/SGK/maaş/ödeme günü/trafik cezası/vergi/sağlık
+  tedavisi/hukuki haklar gibi parayı veya hakkı doğrudan etkileyen konularda C YETERSİZDİR —
+  bu kategorilerde en az B seviyesi (resmi kaynaklı duyuru) gerekir.
+- D — SÖYLENTİ: tek anonim kaynak, sosyal medya iddiası, kaynağı belirsiz ekran görüntüsü veya
+  birbirini kopyalayan siteler — birincil kaynak yok.
+
 DEĞERLENDİRME KURALLARI:
 - Sadece ilgi çekici olduğu için haber seçme.
-- Yeni bir olay, karar, tarih, tutar, resmi açıklama veya doğrulanabilir değişiklik yoksa ele.
+- Yeni bir olay, karar, tarih, tutar, resmi açıklama, taslak/teklif veya doğrulanabilir gelişme yoksa ele.
 - "Çıkacak mı?", "gelecek mi?", "belli oldu mu?", "zam var mı?" gibi sadece soru soran ve cevap vermeyen başlıkları ele.
-- Başlık kesin konuşup içerik belirsizse clickbait puanını yükselt.
+- Başlık kesin konuşup (örn. "yatırıldı", "kesinleşti") içerik aslında B/C seviyesindeyse (taslak/teklif/iddia) clickbait puanını yükselt — asıl sorun taslak/beklenti haberi işlemek değil, onu kesinleşmiş gibi sunmaktır.
 - "Kritik uyarı", "son dakika", "milyonları ilgilendiriyor" gibi kalıplar tek başına haber değeri sayılmasın.
 - Aynı olayın yeniden yazılmış sürümlerinden yalnızca en güvenilir ve somut olanı bırak (OLAY_KUMESI numarası aynı olanlar muhtemelen aynı olaydır). Eski bir karar/çalışma yeniden haberleştirilmişse ve gerçekten yeni bir gelişme yoksa duplicate_or_rehash_score'u yüksek ver.
-- KAYNAK GÜCÜ (verifiability_score): Resmi Gazete, SGK, bakanlık, AFAD, Meteoroloji, valilik, belediye, TBMM, üniversite veya doğrudan kurum/şirket duyurusu gibi birincil/resmi kaynağa dayanmıyorsa düşük puan ver. Sadece taslak/teklif/beklenti/kulis/tahmin varsa (kesinleşmiş karar değilse) bunu KESİNLEŞMİŞ gibi sunan başlıkların clickbait puanını yükselt.
+- KAYNAK GÜCÜ (verifiability_score): certainty_level A/B ise ve resmi kaynağa dayanıyorsa yüksek puan; C ise ve birden fazla bağımsız kaynak/OLAY_KUMESI eşleşmesi varsa orta puan; D ise çok düşük puan.
 - SOMUTLUK (concrete_development_score): Aday şu sorulardan en az birine kaynaklı, somut cevap veriyor mu? "Ne kadar? Kimler? Ne zaman yatacak? Hangi iller? Ne değişti? Ne zaman başlayacak?" — cevap vermiyorsa düşük puan ver.
 - Resmi kurum duyurusu olsa bile vatandaş üzerindeki etkisi açıklanmıyorsa audience_relevance_score düşük olsun.
 - PERFORMANS SİNYALİ (urgency_score'a yansıt): deprem/hava uyarıları paylaşım ve takipçi kazandırma potansiyeli yüksek olduğu için; emekli/ödeme haberleri yüksek görüntülenme potansiyeli olduğu için avantajlıdır — ikisi de öncelikli değerlendirilsin.
-- Spekülasyon, köşe yazısı, beklenti haberi ve yalnızca SEO trafiği hedefleyen içerikler elensin.
+- Köşe yazısı, yalnızca SEO trafiği hedefleyen içerikler ve D seviyesi (söylenti) her zaman elensin.
+- ZORUNLU RET: certainty_level D olan HER adayı decision="REJECT" yap. certainty_level C olup emeklilik/SGK/maaş/ödeme günü/trafik cezası/vergi/sağlık tedavisi/hukuki haklar kategorisinde olan adayları da decision="REJECT" yap (bu kategorilerde en az B gerekir).
 
 Her aday için TAM OLARAK bu alanları içeren bir JSON nesnesi üret:
-{"index": <numara>, "clickbait_score": 0-100, "concrete_development_score": 0-100, "verifiability_score": 0-100, "audience_relevance_score": 0-100, "wallet_or_rights_impact_score": 0-100, "urgency_score": 0-100, "duplicate_or_rehash_score": 0-100, "decision": "KEEP" veya "REJECT", "reason": "en fazla 8 kelimelik kısa Türkçe gerekçe"}
+{"index": <numara>, "certainty_level": "A veya B veya C veya D", "clickbait_score": 0-100, "concrete_development_score": 0-100, "verifiability_score": 0-100, "audience_relevance_score": 0-100, "wallet_or_rights_impact_score": 0-100, "urgency_score": 0-100, "duplicate_or_rehash_score": 0-100, "decision": "KEEP" veya "REJECT", "reason": "en fazla 8 kelimelik kısa Türkçe gerekçe"}
 
 SADECE bu nesnelerin bir JSON DİZİSİ olarak yanıt ver. Başka hiçbir açıklama, markdown veya metin ekleme."""
 
@@ -2243,6 +2259,10 @@ def _ai_hard_reject(evaluation: dict) -> bool:
     if evaluation.get("clickbait_score", 0) >= _AI_CLICKBAIT_HARD_LIMIT:
         return True
     if evaluation.get("concrete_development_score", 100) <= _AI_CONCRETE_HARD_FLOOR:
+        return True
+    # Söylenti seviyesi (D) — AI "decision" alanını doğru set etmeyi unutsa bile
+    # kod seviyesinde ek güvenlik: hiçbir söylenti haberi üretime geçmesin.
+    if (evaluation.get("certainty_level") or "").strip().upper()[:1] == "D":
         return True
     return False
 

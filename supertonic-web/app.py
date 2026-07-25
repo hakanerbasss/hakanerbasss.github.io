@@ -1961,6 +1961,7 @@ Return ONLY valid JSON, no markdown, no explanation:
   "badge_text": "short punchy attention phrase in {lang_name} for the opening banner, genuinely varied per story",
   "emphasis_word": "the single word or short phrase from the title that is the core subject",
   "color_scheme": "one of: sari_kirmizi, mavi_beyaz, yesil_siyah, mor_altin, turuncu_lacivert, kirmizi_siyah, turkuaz_beyaz",
+  "certainty_level": "A, B, or C — see CERTAINTY LEVEL rules below, be honest",
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
@@ -1970,6 +1971,13 @@ Return ONLY valid JSON, no markdown, no explanation:
 }}
 
 Rules:
+CERTAINTY LEVEL (mandatory — determine this honestly from the source content before writing anything else):
+- A — OFFICIALIZED: a law has passed, a decision was published in the Official Gazette (Resmi Gazete), or the change has already taken effect / payments are already going out. ONLY at this level may you use definite, done-deal language ("ödendi", "yürürlüğe girdi", "yatırıldı", "kesinleşti").
+- B — OFFICIAL ANNOUNCEMENT / IN PREPARATION: a ministry, SGK, TBMM, municipality, company, or a named authorized official directly stated a draft, proposal, study, or pilot is underway. Reportable — but the TITLE and the FIRST scene must use stage-appropriate language: "hazırlanıyor", "çalışma sürüyor", "teklif edildi", "taslakta yer aldı", "pilot uygulama planlanıyor". Never phrase it as if already in effect.
+- C — EARLY SIGNAL / NOT YET OFFICIAL: at least two independent, credible outlets consistently report the same concrete development (multiple matching sources in the material given to you is your signal), and it's nationally significant. The TITLE and the FIRST scene must explicitly say "henüz resmi açıklama yok", "iddia edildi", or "kaynaklara göre" — never bury this in a small disclaimer at the end. FORBIDDEN for topics that directly affect someone's money or legal standing: emeklilik, SGK, maaş, ödeme günü, trafik cezası, vergi, sağlık tedavisi, hukuki haklar — these categories need AT LEAST level B; if your only sourcing on one of these topics is C-level, do not produce it.
+- D — RUMOR: single anonymous source, social media claim, unverifiable screenshot, or outlets copying each other with no primary source. Never write this — if the material given to you is this weak, that means this topic should not have reached you; do not invent certainty to compensate.
+Put your honest determination in "certainty_level" (A, B, or C — if the material only really supports D, still pick the most defensible framing available and hedge hard, do not present it as more certain than it is).
+
 - 5 to 7 scenes
 - In scene text: NEVER use abbreviations (e.g. YKS, ÖSYM, TBMM, ABD, AKP, CHP). Always write the full name so text-to-speech reads correctly. Example: write "Yükseköğretim Kurumları Sınavı" not "YKS", "Amerika Birleşik Devletleri" not "ABD".
 - Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
@@ -1983,7 +1991,7 @@ Rules:
 - TELL THE STORY DIRECTLY: narrate the facts matter-of-factly — do not frame the video as debunking/refuting rumors or other claims unless the source itself is an official correction. Never imply fear, certainty, or a promise/outcome that isn't explicitly stated in the source.
 - LAST scene text: just end the story naturally with its final concrete fact — a varied closing call-to-action line is appended automatically after generation, do not write your own "beğen/abone ol/takip et" sentence here.
 - comment_hook: ONE short question in {lang_name}, tailored to what actually happened in THIS story, meant to provoke viewers to comment their opinion/reaction (e.g. "Sence doğru bir karar mı?", "Sen olsan ne yapardın?", "Katılıyor musun?"). Must be specific to this news — never a generic template, never reused across videos.
-- badge_text: a short (max 3-4 words), punchy phrase in {lang_name} for the opening banner (max 2-5 words for the whole banner text overall — this must stay readable in under 2 seconds for a 45+ audience). GENUINELY VARY this per story — do NOT default to the same phrase every time, and never reuse the exact same phrase across consecutive videos. "SON DAKİKA" is reserved ONLY for a genuinely urgent, just-happened development — for everything else pick whatever authentically fits: a plain category tag when the story is a routine official/bureaucratic update ("Resmi Açıklama", "Yeni Düzenleme", "SGK", "Ekonomi", "Hava Durumu", "Deprem" or similar, matching the actual category), or a more evocative phrase (surprise, gravity, human-interest, curiosity) when the story's tone calls for it — your judgment call, just keep it truthful to the source (no invented urgency/certainty).
+- badge_text: a short (max 3-4 words), punchy phrase in {lang_name} for the opening banner (max 2-5 words for the whole banner text overall — this must stay readable in under 2 seconds for a 45+ audience). MUST match the certainty_level you determined — never let the banner claim more certainty than the story actually has: at level A pick "Resmi Açıklama", "Yeni Düzenleme", "SGK", "Ekonomi", "Hava Durumu", "Deprem" (or "SON DAKİKA" only if it's genuinely urgent and just happened); at level B pick "Hazırlık", "Taslak", "Teklif" (or an equivalent honest stage-marker); at level C pick "Henüz Resmi Değil" or "Kaynaklara Göre". Within whatever level applies, still vary the exact wording — do not default to the same phrase or reuse the identical phrase across consecutive videos.
 - emphasis_word: exactly one word or short phrase (max 2 words) copied VERBATIM from the title, representing the core subject the story is actually about — this word will be visually highlighted in the opening banner.
 - color_scheme: pick whichever of the 7 palettes best fits this story's tone (e.g. turuncu_lacivert for weather/disaster warnings, mavi_beyaz for economy/official announcements, kirmizi_siyah for grave/serious news, yesil_siyah for health, mor_altin for surprising/notable stories, turkuaz_beyaz for tech/science, sari_kirmizi as a versatile default). Vary it — do not pick the same scheme for every video.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
@@ -2472,18 +2480,26 @@ Kurallar:
             )
         else:
             cap_context = gnews_data.get("context_text", "") if gnews_data.get("found") else ""
+            _certainty = (data.get("certainty_level") or "A").strip().upper()[:1]
+            _certainty_note = {
+                "A": "Bu haber RESMİLEŞMİŞ bir gelişme — kesin dil kullanabilirsin.",
+                "B": "Bu haber henüz RESMİ HAZIRLIK/DUYURU aşamasında — 'hazırlanıyor', 'teklif edildi', 'taslakta yer aldı' gibi aşamayı belirten dil kullan, olmuş bitmiş gibi yazma.",
+                "C": "Bu haber HENÜZ RESMİ DEĞİL — 'iddia edildi', 'kaynaklara göre', 'henüz resmi açıklama yok' ifadelerini AÇIKÇA kullan, kesinleşmiş gibi sunma.",
+            }.get(_certainty, "")
             cap_prompt = (
                 f"Aşağıdaki haber için Instagram açıklama metni yaz.\n"
                 f"Dil: {cap_lang_note}\n"
                 f"Başlık: {generated_title}\n"
+                f"Doğruluk seviyesi: {_certainty} — {_certainty_note}\n"
                 f"\nVideo senaryosu (kısa özet):\n{full_script}\n"
                 + (f"\nGüncel haber kaynakları:\n{cap_context}\n" if cap_context else "")
                 + """
 Kurallar:
 - Hedef kitle: 45 yaş üstü ağırlıklı, çoğunluğu kadın bir Türkiye kitlesi. Sade, doğrudan, güven veren bir dil kullan — argo, internet jargonu ve gereksiz teknik/bürokratik terim yok; kaçınılmazsa terimi sade sözcüklerle açıkla.
+- Yukarıdaki doğruluk seviyesine SIKI UY — B/C seviyesinde olmuş bitmiş gibi kesin dil kullanma, seviyeye uygun aşama ifadesini ilk paragrafta açıkça belirt.
 - 3-4 paragraf, toplamda 900-1400 karakter
 - Haberin tüm önemli detaylarını ver: kim, ne, nerede, ne zaman, neden
-- Sadece doğrulanmış bilgileri kullan; spekülasyon yapma
+- Sadece doğrulanmış bilgileri kullan; taslak/teklif/beklenti varsa bunu açıkça öyle sun, spekülasyonu olmuş bitmiş gibi yazma
 - Haber dili: net, akıcı, merak uyandıran ama sensasyonel değil
 - Kişi adlarını, yerleri ve rakamları değiştirme
 - "..." ile KESME — her cümle tam bitişin
