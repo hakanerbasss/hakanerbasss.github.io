@@ -4697,26 +4697,11 @@ async def send_telegram_video(video_path: Path, title: str, description: str, ta
     if not video_path.exists():
         print(f"[TELEGRAM] Video dosyası bulunamadı: {video_path}", flush=True)
         return
-    import html as _html
     # Description'dan hashtag satırlarını temizle (sadece metin kalsın)
     full_desc = ""
     if description:
         lines = [ln for ln in description.splitlines() if not ln.strip().startswith("#")]
         full_desc = " ".join(lines).strip()
-
-    def _trim_at_boundary(text: str, limit: int) -> str:
-        """Kelime ortasından kesmeden, mümkünse cümle sonunda kırpar."""
-        if len(text) <= limit:
-            return text
-        cut = text[:limit]
-        for end_ch in (".", "!", "?"):
-            idx = cut.rfind(end_ch)
-            if idx > limit * 0.5:
-                return cut[:idx + 1]
-        idx = cut.rfind(" ")
-        if idx > 0:
-            cut = cut[:idx]
-        return cut.rstrip() + "…"
 
     # Tagleri parse et: virgül/boşluk ayır, YouTube olanlari at, Instagram ekle
     yt_remove = {"shorts", "youtubeshorts", "youtube", "ytshorts", "youtubevideos", "youtubetr", "yttr"}
@@ -4731,38 +4716,27 @@ async def send_telegram_video(video_path: Path, title: str, description: str, ta
             filtered.append(ig)
     ig_tags_str = " ".join(filtered[:30])  # Instagram max 30 hashtag
 
-    # Telegram video caption sınırı 1024 karakter — başlık + etiketler için pay
-    # bırakıp açıklamayı kelime/cümle sınırında kırpıyoruz, tam metni ayrı mesajla gönderiyoruz.
-    reserved = len(title or "") + len(ig_tags_str) + 10
-    desc_limit = max(0, 1024 - reserved)
-    clean_desc = _trim_at_boundary(full_desc, desc_limit) if full_desc else ""
-    desc_was_trimmed = clean_desc != full_desc
-
-    caption_parts = []
-    if title:
-        caption_parts.append(f"<b>{_html.escape(title)}</b>")
-    if clean_desc:
-        caption_parts.append(_html.escape(clean_desc))
-    if desc_was_trimmed:
-        caption_parts.append("(devamı aşağıdaki mesajda 👇)")
-    if ig_tags_str:
-        caption_parts.append(_html.escape(ig_tags_str))
-    caption = "\n\n".join(caption_parts)[:1024]
     try:
         print(f"[TELEGRAM] Gönderiliyor: {video_path.name} ({video_path.stat().st_size // 1024}KB)", flush=True)
         async with httpx.AsyncClient(timeout=300) as client:
             with open(video_path, "rb") as vf:
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendVideo",
-                    data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML", "supports_streaming": "true"},
+                    data={"chat_id": chat_id, "supports_streaming": "true"},
                     files={"video": (video_path.name, vf, "video/mp4")},
                 )
         if resp.status_code == 200:
             print("[TELEGRAM] Gönderim başarılı", flush=True)
         else:
             print(f"[TELEGRAM] Hata {resp.status_code}: {resp.text[:300]}", flush=True)
-        if desc_was_trimmed:
+        # Başlık, açıklama ve etiketler ayrı mesajlarda — her biri tek dokunuşla
+        # doğrudan kopyalanabilsin diye herhangi bir etiket/format eklenmiyor.
+        if title:
+            await send_telegram_plain(title[:4096])
+        if full_desc:
             await send_telegram_plain(full_desc[:4096])
+        if ig_tags_str:
+            await send_telegram_plain(ig_tags_str[:4096])
     except Exception as e:
         print(f"[TELEGRAM] Exception: {e}", flush=True)
 
