@@ -529,6 +529,23 @@
     </div>
   </div>
 
+  <div style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch" style="margin:0;">
+        <input type="checkbox" id="use-intro-cover" onchange="document.getElementById('intro-cover-wrap').style.display = this.checked ? 'block' : 'none';">
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎨 Özel Açılış Kapağı Kullan (deneysel)</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">Kendi tasarladığın (ör. ChatGPT'de üretilmiş) görsel ilk ~2 saniye zoom'suz/bannersız statik gösterilir, ardından video normal akışına devam eder. Instagram ve YouTube'da aynı şekilde çalışır.</div>
+      </div>
+    </div>
+    <div id="intro-cover-wrap" style="display:none;margin-top:10px;">
+      <input type="file" id="intro-cover-input" accept="image/*" style="font-size:12px;color:#999;">
+      <div style="font-size:11px;color:#555;margin-top:6px;">1080x1920 (dikey) formatına en yakın görsel en iyi sonucu verir.</div>
+    </div>
+  </div>
+
   <div id="spiker-section" style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
     <div style="display:flex;align-items:center;gap:10px;">
       <label class="toggle-switch" style="margin:0;">
@@ -2849,6 +2866,12 @@ async function generateShorts(allowEmpty = false) {
     if (document.getElementById('use-custom-images').checked) {
       const files = document.getElementById('custom-images-input').files;
       for (let i = 0; i < files.length; i++) fd.append('custom_images', files[i]);
+    }
+
+    if (document.getElementById('use-intro-cover').checked) {
+      const introFile = document.getElementById('intro-cover-input').files[0];
+      if (!introFile) return showError('err-shorts', 'Özel açılış kapağı için görsel yükleyin.');
+      fd.append('intro_cover_image', introFile);
     }
 
     const spikerOn = document.getElementById('use-spiker-mode').checked;

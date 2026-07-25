@@ -1651,6 +1651,7 @@ async def _generate_shorts_core(
     info_format: str = None,
     cover_image_path: Path = None,
     skip_closing_cta: bool = False,
+    intro_cover_path: Path = None,
 ):
     import json
     import httpx
@@ -2162,8 +2163,10 @@ Rules:
 
         png_files.append(png_path)
 
-    # İlk sahneye haber overlay ekle — Bilgi Shorts modunda atla
-    if png_files and not info_format:
+    # İlk sahneye haber overlay ekle — Bilgi Shorts modunda ve özel açılış kapağı
+    # kullanılıyorsa atla (kapak zaten kendi tasarımıyla açılış görevini görüyor,
+    # hemen ardından eski kalıp banner'ı tekrar göstermek gereksiz/tutarsız olur).
+    if png_files and not info_format and not intro_cover_path:
         try:
             first_title = data.get("title", topic or scenes[0]["text"][:60])
             # AI'nin seçtiği renk şeması/vurgu/rozet SADECE YouTube'a giden içerikte
@@ -2287,10 +2290,41 @@ Rules:
                 raise RuntimeError(f"ffmpeg scene {i} failed: {fe}")
         clip_files.append(clip_path)
 
+    # Özel açılış kapağı — kullanıcının kendi yüklediği (ör. ChatGPT'de tasarlanan)
+    # görsel, sahne 1'in ÖNÜNE zoom'suz/sessiz statik bir klip olarak eklenir;
+    # mevcut sahnelere (seslendirme, zoom, banner) dokunulmaz.
+    INTRO_COVER_DURATION = 2.0
+    intro_clip_path = None
+    intro_silence_path = None
+    if intro_cover_path and Path(intro_cover_path).exists():
+        try:
+            intro_clip_path = scene_dir / "intro_cover_clip.mp4"
+            await asyncio.to_thread(subprocess.run,
+                ["ffmpeg", "-y",
+                 "-loop", "1", "-i", str(intro_cover_path),
+                 "-t", str(INTRO_COVER_DURATION),
+                 "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+                 "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(intro_clip_path)],
+                check=True, capture_output=True, timeout=90,
+            )
+            intro_silence_path = scene_dir / "intro_cover_silence.wav"
+            await asyncio.to_thread(subprocess.run,
+                ["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
+                 "-t", str(INTRO_COVER_DURATION),
+                 "-c:a", "pcm_s16le", str(intro_silence_path)],
+                check=True, capture_output=True, timeout=30,
+            )
+        except Exception as _intro_e:
+            print(f"[INTRO-COVER] Kapak klibi oluşturulamadı: {_intro_e}", flush=True)
+            intro_clip_path = None
+            intro_silence_path = None
+
     # Ses dosyalarını birleştir
     audio_list_file = scene_dir / "audio_list.txt"
     combined_audio = scene_dir / "combined.wav"
     with open(audio_list_file, "w") as f:
+        if intro_silence_path:
+            f.write(f"file '{intro_silence_path.absolute()}'\n")
         for af in audio_files:
             f.write(f"file '{af.absolute()}'\n")
     # -c copy yerine yeniden encode: sahnelerin TTS çıktısı farklı örnekleme
@@ -2305,6 +2339,8 @@ Rules:
     # Video kliplerini birleştir
     clip_list_file = scene_dir / "clip_list.txt"
     with open(clip_list_file, "w") as f:
+        if intro_clip_path:
+            f.write(f"file '{intro_clip_path.absolute()}'\n")
         for cp in clip_files:
             f.write(f"file '{cp.absolute()}'\n")
 
@@ -2331,6 +2367,10 @@ Rules:
     )
     if font_path:
         disclaimer_filter += f":fontfile={font_path}"
+    if intro_clip_path:
+        # Özel kapak süresince disclaimer metni gösterilmesin — kullanıcının
+        # kendi tasarımının üzerine binmesin.
+        disclaimer_filter += f":enable='gte(t,{INTRO_COVER_DURATION})'"
     await arun_ffmpeg([
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
@@ -2359,11 +2399,13 @@ Rules:
             title_tags = [w.lower() for w in generated_title.split()[:3] if len(w) > 3]
             video_tags = _format_hashtags(["Shorts"] + title_tags + trend_data["hashtags"][1:6], limit=5)
 
-    # Thumbnail — overlay'li ilk sahneyi kopyala (ayrıca create_thumbnail gerekmez)
+    # Thumbnail — özel açılış kapağı varsa onu kullan (video da onunla açılıyor),
+    # yoksa overlay'li ilk sahneyi kopyala
     thumb_path = None
     try:
         thumb_out = THUMB_DIR / f"{uid}_thumb.jpg"
-        shutil.copy2(str(png_files[0]), str(thumb_out))
+        thumb_src = intro_cover_path if (intro_cover_path and Path(intro_cover_path).exists()) else png_files[0]
+        shutil.copy2(str(thumb_src), str(thumb_out))
         thumb_path = f"/api/thumbnail/{thumb_out.name}"
     except Exception:
         pass
@@ -2549,10 +2591,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -2575,6 +2617,11 @@ async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics,
                 Path(cover_image_path).unlink(missing_ok=True)
             except Exception:
                 pass
+        if intro_cover_path:
+            try:
+                Path(intro_cover_path).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 @app.post("/api/generate-shorts-async")
@@ -2591,6 +2638,7 @@ async def generate_shorts_async_endpoint(
     custom_images: list[UploadFile] = File(default=[]),
     spiker_mode: str = Form("false"),
     avatar_image: UploadFile = File(default=None),
+    intro_cover_image: UploadFile = File(default=None),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -2620,10 +2668,17 @@ async def generate_shorts_async_endpoint(
     elif use_spiker and AVATAR_FILE.exists():
         saved_avatar_path = AVATAR_FILE
 
+    saved_intro_cover = None
+    if intro_cover_image and intro_cover_image.filename:
+        ic_data = await intro_cover_image.read()
+        ic_dest = UPLOAD_DIR / f"introcover_{uuid.uuid4().hex}.jpg"
+        if _save_as_jpeg(ic_data, ic_dest):
+            saved_intro_cover = ic_dest
+
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover))
     return {"ok": True}
 
 
