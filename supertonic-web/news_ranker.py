@@ -183,6 +183,12 @@ def _clean(value: str) -> str:
 
 def _normalize(value: str) -> str:
     value = value.casefold()
+    # Türkçe büyük "İ" harfi casefold() ile "i" + görünmez birleşik nokta
+    # karakterine (U+0307) ayrılıyor; bu karakter \w'ye uymadığı için
+    # aşağıdaki regex onu boşluğa çevirip kelimenin ortasını bölüyordu
+    # (ör. "İstifa" -> "i̇stifa" -> "i stifa"), bu da o kelimeyi içeren
+    # terimlerin (örn. "istifa etti") sessizce eşleşmemesine yol açıyordu.
+    value = value.replace("̇", "")
     value = re.sub(r"[^\wçğıöşü\s]", " ", value)
     return re.sub(r"\s+", " ", value).strip()
 
