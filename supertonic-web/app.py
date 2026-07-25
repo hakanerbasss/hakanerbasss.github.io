@@ -1969,7 +1969,6 @@ Return ONLY valid JSON, no markdown, no explanation:
   "comment_hook": "one short question in {lang_name}, specific to this exact story, designed to make viewers comment their opinion",
   "badge_text": "short punchy attention phrase in {lang_name} for the opening banner, genuinely varied per story",
   "emphasis_word": "the single word or short phrase from the title that is the core subject",
-  "color_scheme": "one of: sari_kirmizi, mavi_beyaz, yesil_siyah, mor_altin, turuncu_lacivert, kirmizi_siyah, turkuaz_beyaz",
   "certainty_level": "A, B, or C — see CERTAINTY LEVEL rules below, be honest",
   "scenes": [
     {{
@@ -2002,7 +2001,6 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 - comment_hook: ONE short question in {lang_name}, tailored to what actually happened in THIS story, meant to provoke viewers to comment their opinion/reaction (e.g. "Sence doğru bir karar mı?", "Sen olsan ne yapardın?", "Katılıyor musun?"). Must be specific to this news — never a generic template, never reused across videos.
 - badge_text: a short (max 3-4 words), punchy phrase in {lang_name} for the opening banner (max 2-5 words for the whole banner text overall — this must stay readable in under 2 seconds for a 45+ audience). MUST match the certainty_level you determined — never let the banner claim more certainty than the story actually has: at level A pick "Resmi Açıklama", "Yeni Düzenleme", "SGK", "Ekonomi", "Hava Durumu", "Deprem" (or "SON DAKİKA" only if it's genuinely urgent and just happened); at level B pick "Hazırlık", "Taslak", "Teklif" (or an equivalent honest stage-marker); at level C pick "Henüz Resmi Değil" or "Kaynaklara Göre". Within whatever level applies, still vary the exact wording — do not default to the same phrase or reuse the identical phrase across consecutive videos.
 - emphasis_word: exactly one word or short phrase (max 2 words) copied VERBATIM from the title, representing the core subject the story is actually about — this word will be visually highlighted in the opening banner.
-- color_scheme: pick whichever of the 7 palettes best fits this story's tone (e.g. turuncu_lacivert for weather/disaster warnings, mavi_beyaz for economy/official announcements, kirmizi_siyah for grave/serious news, yesil_siyah for health, mor_altin for surprising/notable stories, turkuaz_beyaz for tech/science, sari_kirmizi as a versatile default). Vary it — do not pick the same scheme for every video.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - Total narration between 45 and 55 seconds — NEVER shorter than 45 seconds. If the facts feel thin, elaborate naturally on the facts you have (implications, who it affects, timing) instead of cutting the video short or inventing new details.
 - hashtags: 10-15 tags — ALL of them must be specific to THIS video's actual topic/people/places/institutions (e.g. if the video is about the Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya", "erişim", "keşfetsayfası"...). Do NOT pad the list with generic filler tags like "sondakika", "gündem", "haberler", "güncel", "viral" — only ONE fixed/generic tag is allowed in the entire list: "Shorts" (always last). Every other tag must be traceable to something specific in this exact story.
@@ -2213,16 +2211,18 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
     if png_files and not info_format and not intro_cover_path:
         try:
             first_title = data.get("title", topic or scenes[0]["text"][:60])
-            # AI'nin seçtiği renk şeması/vurgu/rozet SADECE YouTube'a giden içerikte
-            # kullanılıyor — Instagram kitlesi mevcut sabit sarı/kırmızı stile alıştı,
-            # o değişmiyor. YouTube yeni/kitlesiz bir kanal olduğu için hem çeşitlilik
-            # hem de bot-algısı riskini azaltma faydası daha değerli.
-            _use_ai_banner = (platform == "youtube")
+            # Renk şeması her iki platformda da SABİT (eski sarı/kırmızı) kalıyor —
+            # kullanıcı zaten "Özel Açılış Kapağı" ile kendi görsel çeşitliliğini ve
+            # bot-algısı korumasını sağlıyor (manuel yükleme + yapay zeka etiketi),
+            # bu yüzden otomatik renk rotasyonuna gerek yok. Sadece rozet metni
+            # (badge_text) YouTube'da AI'den serbest/değişken geliyor — Instagram
+            # hâlâ sabit "SON DAKİKA" kullanıyor, o değişmiyor.
+            _use_ai_badge = (platform == "youtube")
             overlay_first_scene_banner(
                 png_files[0], first_title, lang=lang,
-                badge_text=data.get("badge_text") if _use_ai_banner else None,
-                emphasis_word=data.get("emphasis_word") if _use_ai_banner else None,
-                color_scheme=data.get("color_scheme") if _use_ai_banner else None,
+                badge_text=data.get("badge_text") if _use_ai_badge else None,
+                emphasis_word=data.get("emphasis_word") if _use_ai_badge else None,
+                color_scheme=None,
             )
         except Exception:
             pass
@@ -3350,9 +3350,11 @@ _BANNER_COLOR_SCHEMES = {
 }
 _DEFAULT_BANNER_SCHEME = "sari_kirmizi"
 
-# Instagram için eski (sabit) davranış korunuyor — o kitle bu stile alıştı, bot algısı
-# riski de düşük çünkü uzun süredir aynı hesap. color_scheme verilmediğinde (yani
-# platform != youtube) bu anahtar kelime tespiti devreye girer, aynı eski mantık.
+# Her iki platformda da eski (sabit) renk davranışı korunuyor — kitle bu stile
+# alıştı, çeşitlilik/bot-algısı ihtiyacı zaten "Özel Açılış Kapağı" özelliğiyle
+# (manuel yükleme + yapay zeka etiketi) karşılanıyor. color_scheme artık hiç
+# verilmiyor (bkz. çağrı noktası), bu yüzden bu anahtar kelime tespiti her zaman
+# devreye giriyor — sadece bant rengi/kategori etiketi başlığa göre değişir.
 _LEGACY_BANNER_CATS = [
     (["ekonomi", "borsa", "döviz", "faiz", "enflasyon", "dolar", "euro", "piyasa", "merkez ban", "bütçe", "liret"],
      (30, 130, 220), "EKONOMİ"),
@@ -3371,11 +3373,13 @@ def overlay_first_scene_banner(
     photo_path: Path, title: str, lang: str = "tr",
     badge_text: str = None, emphasis_word: str = None, color_scheme: str = None,
 ) -> None:
-    """İlk sahne fotoğrafına haber overlay. Renk şeması, vurgu kelimesi ve rozet
-    metni AI'den geliyor (bkz. _generate_shorts_core prompt'undaki badge_text/
-    emphasis_word/color_scheme alanları) — her video farklı görünsün, hepsi aynı
-    sarı/kırmızı/"SON DAKİKA" kalıbına düşmesin diye. Alanlardan biri boş/geçersiz
-    gelirse güvenli varsayılana düşer, hiçbir zaman görseli bozmaz."""
+    """İlk sahne fotoğrafına haber overlay. Renk şeması her platformda sabit
+    (eski sarı/kırmızı) — çağıran taraf artık color_scheme'i hiç göndermiyor,
+    parametre sadece geriye dönük uyumluluk/manuel test için duruyor. Rozet
+    metni (badge_text) ve vurgu kelimesi (emphasis_word) YouTube'da AI'den
+    serbest/değişken geliyor, Instagram'da boş kalıp sabit "SON DAKİKA"ya
+    düşüyor. Alanlardan biri boş/geçersiz gelirse güvenli varsayılana düşer,
+    hiçbir zaman görseli bozmaz."""
     from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
     W, H = 1080, 1920
