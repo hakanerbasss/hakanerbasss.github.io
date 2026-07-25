@@ -1168,14 +1168,17 @@ def build_ranked_news_pool(
 ) -> list[dict[str, Any]]:
     raw_items: list[dict[str, Any]] = []
 
-    # 1. Hedefli Google News sorguları
-    for query in TARGETED_QUERIES:
-        raw_items.extend(
-            _fetch_query(
-                query=query,
-                max_items=per_query,
-            )
-        )
+    # 1. Hedefli Google News sorguları — paralel çalıştırılıyor. Sıralı halde
+    # 32 sorgu × 12sn timeout ile en kötü durumda 6+ dakika sürebiliyordu ve
+    # "Telegram'a test gönder" çok geç geliyor/hiç gelmiyor şikayetinin asıl
+    # sebebi buydu (DeepSeek değil, bu RSS çekme adımı).
+    with ThreadPoolExecutor(max_workers=min(10, len(TARGETED_QUERIES))) as executor:
+        futures = [
+            executor.submit(_fetch_query, query=query, max_items=per_query)
+            for query in TARGETED_QUERIES
+        ]
+        for future in futures:
+            raw_items.extend(future.result())
 
     # 2. Son 48 saatteki resmî SGK haber ve duyuruları
     official_items = fetch_official_news(

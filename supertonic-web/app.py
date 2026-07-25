@@ -1352,24 +1352,33 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
     ]
     titles = []
     try:
+        async def _fetch_one(client, q):
+            url = f"https://news.google.com/rss/search?q={quote(q)}&hl=tr&gl=TR&ceid=TR:tr"
+            try:
+                r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code != 200:
+                    print(f"[gurbetci-trends] '{q}' → HTTP {r.status_code}", flush=True)
+                    return []
+                root = ET.fromstring(r.text)
+                channel = root.find("channel")
+                if channel is None:
+                    return []
+                return [
+                    (item.findtext("title") or "").strip()
+                    for item in channel.findall("item")[:max_items]
+                ]
+            except Exception as qe:
+                print(f"[gurbetci-trends] '{q}' hata: {qe}", flush=True)
+                return []
+
+        # Sıralı yerine paralel — 7 sorgu × 8sn timeout sıralı halde en kötü
+        # durumda 56sn sürüyordu, bu da Telegram listesinin gecikmesine katkı veriyordu.
         async with httpx.AsyncClient(timeout=8) as client:
-            for q in queries:
-                url = f"https://news.google.com/rss/search?q={quote(q)}&hl=tr&gl=TR&ceid=TR:tr"
-                try:
-                    r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
-                    if r.status_code != 200:
-                        print(f"[gurbetci-trends] '{q}' → HTTP {r.status_code}", flush=True)
-                        continue
-                    root = ET.fromstring(r.text)
-                    channel = root.find("channel")
-                    if channel is None:
-                        continue
-                    for item in channel.findall("item")[:max_items]:
-                        t = (item.findtext("title") or "").strip()
-                        if t and t not in titles:
-                            titles.append(t)
-                except Exception as qe:
-                    print(f"[gurbetci-trends] '{q}' hata: {qe}", flush=True)
+            results = await asyncio.gather(*(_fetch_one(client, q) for q in queries))
+        for result in results:
+            for t in result:
+                if t and t not in titles:
+                    titles.append(t)
 
         # Kişisel ölüm/vefat/cinayet haberleri ele — "gurbetçi" kelimesi geçse bile
         # bunlar ASAYİŞ türü içerik, herkesi ilgilendiren pratik/politika haberi değil.
