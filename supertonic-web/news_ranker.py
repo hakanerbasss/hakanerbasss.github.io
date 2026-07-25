@@ -2010,7 +2010,20 @@ def _ai_jury_assign_clusters(candidates: list[dict]) -> list[int]:
     return cluster_ids
 
 
-_AI_JURY_STAGE2_RULES = """SEN BİR HABER JÜRİSİSİN. Aşağıdaki haber adaylarını değerlendir.
+_AI_JURY_STAGE2_RULES = """SEN BİR HABER JÜRİSİSİN. Hedef kitle: Türkiye'de 45 yaş üstü ağırlıklı,
+kadın çoğunluklu geniş bir Instagram/YouTube Shorts kitlesi. Aşağıdaki haber adaylarını bu kitle
+için değerlendir.
+
+KATEGORİ ÖNCELİĞİ (zorunlu sınır değil, ilk taramada uygun aday yoksa kısıtı kaldır):
+1. Emeklilik/SGK/SSK/Bağ-Kur, maaş, zam farkı, ödeme tarihi, prim, erken/malulen emeklilik,
+   e-Devlet, sosyal destekler
+2. Deprem, diri fay, Meteoroloji/AKOM uyarıları, sel, dolu, fırtına, sıcaklık — geniş bölgeyi
+   etkileyen resmi afet/hava uyarıları
+3. Trafik kuralları/cezaları, akaryakıt, vergi, banka, elektrik-doğalgaz, tüketici hakları,
+   noter, ulaşım — milyonların cebine veya hakkına doğrudan dokunan resmi kararlar
+Gurbetçi haberlerini sadece hak/ödeme/askerlik/araç/sınır/emeklilik/e-Devlet etkisi varsa öne
+al. Siyaset/adli olay/magazin SADECE ülke çapında güçlü etkili ve tam doğrulanmış büyük bir
+gelişmeyse kabul edilebilir — sıradan kulis/sansasyon haberi elensin.
 
 DEĞERLENDİRME KURALLARI:
 - Sadece ilgi çekici olduğu için haber seçme.
@@ -2018,9 +2031,11 @@ DEĞERLENDİRME KURALLARI:
 - "Çıkacak mı?", "gelecek mi?", "belli oldu mu?", "zam var mı?" gibi sadece soru soran ve cevap vermeyen başlıkları ele.
 - Başlık kesin konuşup içerik belirsizse clickbait puanını yükselt.
 - "Kritik uyarı", "son dakika", "milyonları ilgilendiriyor" gibi kalıplar tek başına haber değeri sayılmasın.
-- Aynı olayın yeniden yazılmış sürümlerinden yalnızca en güvenilir ve somut olanı bırak (OLAY_KUMESI numarası aynı olanlar muhtemelen aynı olaydır).
-- Resmi kurum duyurusu olsa bile vatandaş üzerindeki etkisi açıklanmıyorsa düşük puan ver.
-- Emekli, SGK, maaş, ödeme takvimi, vergi, sağlık hakkı, ulaşım zammı, yakıt fiyatı, deprem ve ciddi hava uyarıları hedef kitle açısından değerlendirilsin.
+- Aynı olayın yeniden yazılmış sürümlerinden yalnızca en güvenilir ve somut olanı bırak (OLAY_KUMESI numarası aynı olanlar muhtemelen aynı olaydır). Eski bir karar/çalışma yeniden haberleştirilmişse ve gerçekten yeni bir gelişme yoksa duplicate_or_rehash_score'u yüksek ver.
+- KAYNAK GÜCÜ (verifiability_score): Resmi Gazete, SGK, bakanlık, AFAD, Meteoroloji, valilik, belediye, TBMM, üniversite veya doğrudan kurum/şirket duyurusu gibi birincil/resmi kaynağa dayanmıyorsa düşük puan ver. Sadece taslak/teklif/beklenti/kulis/tahmin varsa (kesinleşmiş karar değilse) bunu KESİNLEŞMİŞ gibi sunan başlıkların clickbait puanını yükselt.
+- SOMUTLUK (concrete_development_score): Aday şu sorulardan en az birine kaynaklı, somut cevap veriyor mu? "Ne kadar? Kimler? Ne zaman yatacak? Hangi iller? Ne değişti? Ne zaman başlayacak?" — cevap vermiyorsa düşük puan ver.
+- Resmi kurum duyurusu olsa bile vatandaş üzerindeki etkisi açıklanmıyorsa audience_relevance_score düşük olsun.
+- PERFORMANS SİNYALİ (urgency_score'a yansıt): deprem/hava uyarıları paylaşım ve takipçi kazandırma potansiyeli yüksek olduğu için; emekli/ödeme haberleri yüksek görüntülenme potansiyeli olduğu için avantajlıdır — ikisi de öncelikli değerlendirilsin.
 - Spekülasyon, köşe yazısı, beklenti haberi ve yalnızca SEO trafiği hedefleyen içerikler elensin.
 
 Her aday için TAM OLARAK bu alanları içeren bir JSON nesnesi üret:

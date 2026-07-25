@@ -1949,6 +1949,7 @@ Rules:
                          "\n".join("  " + ln for ln in _cr.splitlines())) if _cr else ""
         prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
+Target audience: Turkish viewers 45+ (many 60+), majority women, watching on Instagram/YouTube Shorts. Use plain, direct, reassuring language — short sentences, no slang or internet jargon, no unexplained technical/bureaucratic terms (spell them out in plain words if unavoidable), no rushed pacing.
 {topic_instruction}
 {exclude_instruction}{news_context_instruction}Suggested hashtags: {trend_tags}{yt_tag_instruction}
 
@@ -1979,9 +1980,10 @@ Rules:
 - NO SENSATIONALISM BEYOND SOURCE: Do not use words like "şoke eden", "bomba", "skandal", "rezalet", "inanılmaz" unless the source itself uses comparable language. Stick to facts as stated in the source.
 - NO EMPTY PROMISES: NEVER write a sentence that promises information without immediately delivering it in the same or next sentence — e.g. "detaylar açıklandı", "işte merak edilenler", "peki bakalım neler var" followed by ending the video without saying what those details/answers actually are. Every scene must contain a real, concrete piece of information from the facts list. If you don't have enough facts to fill a promised detail, do NOT tease it — cut that sentence entirely instead. Ending a video on an unfulfilled setup reads as clickbait and destroys trust, even if no fact was technically wrong.
 {get_hook_rule()}
-- LAST scene text MUST end with this exact call to action (translated naturally to {lang_name}): "{'Takip etmek ve beğenmek için 2 saniye ver!' if platform == 'instagram' else 'Beğenmek, abone olmak ve yorum yapmak için 2 saniye ver!'}" — make it feel urgent and personal, not generic.
+- TELL THE STORY DIRECTLY: narrate the facts matter-of-factly — do not frame the video as debunking/refuting rumors or other claims unless the source itself is an official correction. Never imply fear, certainty, or a promise/outcome that isn't explicitly stated in the source.
+- LAST scene text: just end the story naturally with its final concrete fact — a varied closing call-to-action line is appended automatically after generation, do not write your own "beğen/abone ol/takip et" sentence here.
 - comment_hook: ONE short question in {lang_name}, tailored to what actually happened in THIS story, meant to provoke viewers to comment their opinion/reaction (e.g. "Sence doğru bir karar mı?", "Sen olsan ne yapardın?", "Katılıyor musun?"). Must be specific to this news — never a generic template, never reused across videos.
-- badge_text: a short (max 3-4 words), punchy, attention-grabbing phrase in {lang_name} for the opening banner. GENUINELY VARY this per story based on its actual tone/urgency/surprise — do NOT default to the same phrase (e.g. "SON DAKİKA") every time. It's fine to use "SON DAKİKA" when a story is truly breaking, but for other stories write whatever authentically fits (surprise, gravity, human-interest, curiosity — your call). Never reuse the exact same phrase across consecutive videos.
+- badge_text: a short (max 3-4 words), punchy phrase in {lang_name} for the opening banner (max 2-5 words for the whole banner text overall — this must stay readable in under 2 seconds for a 45+ audience). GENUINELY VARY this per story — do NOT default to the same phrase every time, and never reuse the exact same phrase across consecutive videos. "SON DAKİKA" is reserved ONLY for a genuinely urgent, just-happened development — for everything else pick whatever authentically fits: a plain category tag when the story is a routine official/bureaucratic update ("Resmi Açıklama", "Yeni Düzenleme", "SGK", "Ekonomi", "Hava Durumu", "Deprem" or similar, matching the actual category), or a more evocative phrase (surprise, gravity, human-interest, curiosity) when the story's tone calls for it — your judgment call, just keep it truthful to the source (no invented urgency/certainty).
 - emphasis_word: exactly one word or short phrase (max 2 words) copied VERBATIM from the title, representing the core subject the story is actually about — this word will be visually highlighted in the opening banner.
 - color_scheme: pick whichever of the 7 palettes best fits this story's tone (e.g. turuncu_lacivert for weather/disaster warnings, mavi_beyaz for economy/official announcements, kirmizi_siyah for grave/serious news, yesil_siyah for health, mor_altin for surprising/notable stories, turkuaz_beyaz for tech/science, sari_kirmizi as a versatile default). Vary it — do not pick the same scheme for every video.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
@@ -2042,18 +2044,42 @@ Rules:
         # sadece son segment gerçek kapanış olsun, 12 kez "takip et" tekrarlanmasın)
         # bu değişiklik atlanır, sahne kendi doğal metnini korur.
         if scenes and not skip_closing_cta:
+            # Her videoda aynı cümleyi tekrarlamamak için birkaç varyasyondan
+            # rastgele seçiliyor — AI'ye bırakmak yerine kod seviyesinde garanti
+            # ediliyor (LLM'in "varyasyon yap" talimatına uyacağına güvenmek yerine).
             _cta = {
                 "tr": {
-                    "youtube": "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
-                    "instagram": "Takip et ve beğen! Her haberi ilk sen gör! İki saniye yeterli!",
+                    "youtube": [
+                        "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
+                        "Beğenmeyi ve abone olmayı unutma, sen de ne düşündüğünü yaz!",
+                        "Bu gelişmeleri kaçırmamak için abone ol, beğenmeyi de unutma!",
+                        "Kanala abone ol, beğen ve yorumlara sen de yaz!",
+                        "Böyle haberleri kaçırma — abone ol, beğen, yorumunu bırak!",
+                    ],
+                    "instagram": [
+                        "Takip et ve beğen! Her haberi ilk sen gör!",
+                        "Beğenmeyi ve takip etmeyi unutma, her gelişmeyi ilk sen öğren!",
+                        "Bu tür gelişmeleri kaçırmamak için takip et, beğenmeyi de unutma!",
+                        "Takipte kal, beğenmeyi unutma — her haber ilk burada!",
+                        "Hesabı takip et, beğen, yeni haberleri kaçırma!",
+                    ],
                 },
                 "en": {
-                    "youtube": "Like, subscribe and drop a comment! Just 2 seconds!",
-                    "instagram": "Follow and like! Be the first to see every update!",
+                    "youtube": [
+                        "Like, subscribe and drop a comment! Just 2 seconds!",
+                        "Don't forget to subscribe and like — let us know what you think!",
+                        "Subscribe so you never miss an update, and hit like!",
+                    ],
+                    "instagram": [
+                        "Follow and like! Be the first to see every update!",
+                        "Don't forget to follow and like so you never miss an update!",
+                        "Follow along and like — stay first on every story!",
+                    ],
                 },
             }
             _lang_cta = _cta.get(lang, _cta["tr"])
-            cta_text = _lang_cta.get(platform, _lang_cta["youtube"])
+            _cta_options = _lang_cta.get(platform, _lang_cta["youtube"])
+            cta_text = _cta_options[secrets.randbelow(len(_cta_options))]
             comment_hook = (data.get("comment_hook") or "").strip()
             # comment_hook DeepSeek'ten gelmezse (eski davranış, alan boşsa) sadece
             # sabit CTA kullanılır — geriye dönük uyumlu, asla boş sahne bırakmaz.
@@ -2454,6 +2480,7 @@ Kurallar:
                 + (f"\nGüncel haber kaynakları:\n{cap_context}\n" if cap_context else "")
                 + """
 Kurallar:
+- Hedef kitle: 45 yaş üstü ağırlıklı, çoğunluğu kadın bir Türkiye kitlesi. Sade, doğrudan, güven veren bir dil kullan — argo, internet jargonu ve gereksiz teknik/bürokratik terim yok; kaçınılmazsa terimi sade sözcüklerle açıkla.
 - 3-4 paragraf, toplamda 900-1400 karakter
 - Haberin tüm önemli detaylarını ver: kim, ne, nerede, ne zaman, neden
 - Sadece doğrulanmış bilgileri kullan; spekülasyon yapma
