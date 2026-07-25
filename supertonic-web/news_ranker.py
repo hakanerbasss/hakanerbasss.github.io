@@ -133,6 +133,13 @@ LOW_VALUE_TERMS = {
     "masada": -7,
     "analiz": -5,
     "yorum": -5,
+    # Parti/politikacı kulis-tarzı haberler gerçek verilerde çok düşük
+    # izlenme alıyor (6-50 görüntüleme) — emeklilik/maaş haberlerinin
+    # (600-1900) çok altında.
+    "partiden istifa": -14,
+    "istifa etti": -10,
+    "yeni parti kurdu": -10,
+    "genel başkan": -6,
 }
 
 BLOCK_TERMS = (
@@ -2027,6 +2034,14 @@ KATEGORİ ÖNCELİĞİ (zorunlu sınır değil, ilk taramada uygun aday yoksa k�
 Gurbetçi haberlerini sadece hak/ödeme/askerlik/araç/sınır/emeklilik/e-Devlet etkisi varsa öne
 al. Siyaset/adli olay/magazin SADECE ülke çapında güçlü etkili ve tam doğrulanmış büyük bir
 gelişmeyse kabul edilebilir — sıradan kulis/sansasyon haberi elensin.
+
+GERÇEK PERFORMANS VERİSİYLE DOĞRULANMIŞ EK KURAL: parti/politikacı haberleri (istifa, kulis,
+açıklama, karşılıklı suçlama) ve salt merak amaçlı bilimsel/akademik haberler (izleyiciye
+doğrudan bir fayda, uygulama veya karar sunmayan) kanalın gerçek verilerinde tutarlı biçimde
+çok düşük izlenme alıyor (6-50 görüntüleme), emeklilik/maaş/gündelik ekonomi haberleri ise
+600-1900 görüntüleme alıyor. Bu yüzden audience_relevance_score'u bu tür haberlerde düşük tut;
+istisna SADECE somut ekonomik/pratik bir etkisi olan (ör. petrol fiyatına yansıyan bir
+jeopolitik gelişme) veya gerçekten ülke gündemini domine eden büyük bir olay ise mümkündür.
 
 DOĞRULUK SEVİYESİ (her aday için belirlemen ZORUNLU — taslak/teklif/beklenti haberi doğru
 biçimde "henüz resmileşmedi" diyerek aktarmak sahte haber DEĞİLDİR; sahte haber riski bunu
