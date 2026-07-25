@@ -322,20 +322,6 @@ def score_candidate(item: dict[str, Any]) -> tuple[int, list[str]]:
         score += 9
         reasons.append("kişisel uygunluk +9")
 
-    if score <= -900:
-        return score, reasons
-
-    penalty, penalty_reasons = _credibility_penalty(item)
-    score += penalty
-    reasons.extend(penalty_reasons)
-
-    if score <= -900:
-        return score, reasons
-
-    penalty, penalty_reasons = _financial_reliability_penalty(item)
-    score += penalty
-    reasons.extend(penalty_reasons)
-
     return score, reasons
 
 def _event_key(title: str) -> set[str]:
@@ -494,6 +480,92 @@ def _deduplicate_exact(
 
     return unique
 
+def build_ranked_news_pool(
+    max_candidates: int = 20,
+    per_query: int = 6,
+) -> list[dict[str, Any]]:
+    raw_items: list[dict[str, Any]] = []
+
+    # İlk keşif katmanı: Google News üzerinde hedefli sorgular.
+    # Sonraki adımda resmî kurum ve haber RSS kaynakları da buraya eklenecek.
+    for query in TARGETED_QUERIES:
+        raw_items.extend(
+            _fetch_query(
+                query=query,
+                max_items=per_query,
+            )
+        )
+
+    unique_items = _deduplicate_exact(raw_items)
+
+    scored_items: list[dict[str, Any]] = []
+
+    for item in unique_items:
+        score, reasons = score_candidate(item)
+
+        item["score"] = score
+        item["reasons"] = reasons
+        item["confirming_sources"] = []
+
+        if item.get("source"):
+            item["confirming_sources"].append(item["source"])
+
+        scored_items.append(item)
+
+    scored_items.sort(
+        key=lambda item: (
+            item.get("score", -999),
+            item.get("published_at")
+            or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+
+    selected: list[dict[str, Any]] = []
+
+    for item in scored_items:
+        if item.get("score", -999) < 12:
+            continue
+
+        matching_event = None
+
+        for existing in selected:
+            if _is_same_event(
+                existing.get("title", ""),
+                item.get("title", ""),
+            ):
+                matching_event = existing
+                break
+
+        if matching_event:
+            source = item.get("source", "")
+
+            if (
+                source
+                and source
+                not in matching_event["confirming_sources"]
+            ):
+                matching_event["confirming_sources"].append(source)
+                matching_event["score"] += 4
+                matching_event["reasons"].append(
+                    "başka kaynakta da yayımlandı +4"
+                )
+
+            continue
+
+        selected.append(item)
+
+        if len(selected) >= max_candidates:
+            break
+
+    selected.sort(
+        key=lambda item: item.get("score", -999),
+        reverse=True,
+    )
+
+    return selected
+
+
 def format_candidates_for_prompt(
     candidates: list[dict[str, Any]],
 ) -> str:
@@ -531,6 +603,160 @@ def format_candidates_for_prompt(
 
     return "\n".join(lines)
 
+OFFICIAL_FEEDS = [
+    {
+        "name": "Sosyal Güvenlik Kurumu",
+        "url": "https://www.sgk.gov.tr/rss",
+        "bonus": 20,
+    },
+]
+
+
+def _find_feed_items(root: ET.Element) -> list[ET.Element]:
+    items = root.findall(".//item")
+
+    if items:
+        return items
+
+    # Atom formatındaki akışlar için yedek yöntem.
+    return root.findall(".//{http://www.w3.org/2005/Atom}entry")
+
+
+def _first_text(
+    node: ET.Element,
+    paths: tuple[str, ...],
+) -> str:
+    for path in paths:
+        value = node.findtext(path)
+
+        if value:
+            return _clean(value)
+
+    return ""
+
+
+def _fetch_rss_feed(
+    feed_name: str,
+    feed_url: str,
+    source_bonus: int = 15,
+    max_items: int = 20,
+) -> list[dict[str, Any]]:
+    try:
+        response = httpx.get(
+            feed_url,
+            timeout=15,
+            follow_redirects=True,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64)"
+                )
+            },
+        )
+
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+
+        results: list[dict[str, Any]] = []
+
+        for node in _find_feed_items(root)[:max_items]:
+            title = _first_text(
+                node,
+                (
+                    "title",
+                    "{http://www.w3.org/2005/Atom}title",
+                ),
+            )
+
+            description = _first_text(
+                node,
+                (
+                    "description",
+                    "summary",
+                    "{http://www.w3.org/2005/Atom}summary",
+                    "{http://www.w3.org/2005/Atom}content",
+                ),
+            )
+
+            published_raw = _first_text(
+                node,
+                (
+                    "pubDate",
+                    "published",
+                    "updated",
+                    "{http://www.w3.org/2005/Atom}published",
+                    "{http://www.w3.org/2005/Atom}updated",
+                ),
+            )
+
+            link = _first_text(node, ("link",))
+
+            # Atom linkleri metin değil href niteliği taşıyabilir.
+            if not link:
+                atom_link = node.find(
+                    "{http://www.w3.org/2005/Atom}link"
+                )
+
+                if atom_link is not None:
+                    link = _clean(atom_link.attrib.get("href", ""))
+
+            if not title:
+                continue
+
+            published_at = _parse_date(published_raw)
+
+            score, reasons = score_candidate({
+                "title": title,
+                "source": feed_name,
+                "published_at": published_at,
+            })
+
+            score += source_bonus
+            reasons.append(
+                f"doğrudan resmî kurum +{source_bonus}"
+            )
+
+            results.append({
+                "title": title,
+                "source": feed_name,
+                "link": link,
+                "description": description[:700],
+                "published_at": published_at,
+                "query": f"official:{feed_name}",
+                "score": score,
+                "reasons": reasons,
+                "confirming_sources": [feed_name],
+                "is_official": True,
+            })
+
+        return results
+
+    except Exception as error:
+        print(
+            f"[news-ranker] resmî kaynak hatası: "
+            f"{feed_name} | {feed_url} | {error}",
+            flush=True,
+        )
+        return []
+
+
+def fetch_official_news(
+    max_items_per_feed: int = 20,
+) -> list[dict[str, Any]]:
+    official_items: list[dict[str, Any]] = []
+
+    for feed in OFFICIAL_FEEDS:
+        official_items.extend(
+            _fetch_rss_feed(
+                feed_name=feed["name"],
+                feed_url=feed["url"],
+                source_bonus=feed.get("bonus", 15),
+                max_items=max_items_per_feed,
+            )
+        )
+
+    return official_items
+
 SGK_OFFICIAL_PAGES = [
     {
         "name": "Sosyal Güvenlik Kurumu Haberler",
@@ -544,6 +770,186 @@ SGK_OFFICIAL_PAGES = [
     },
 ]
 
+
+def _fetch_official_html_page(
+    page_name: str,
+    page_url: str,
+    source_bonus: int = 20,
+    max_items: int = 20,
+) -> list[dict[str, Any]]:
+    from bs4 import BeautifulSoup
+    from urllib.parse import urljoin
+
+    try:
+        response = httpx.get(
+            page_url,
+            timeout=15,
+            follow_redirects=True,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36"
+                )
+            },
+        )
+
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        candidates: list[dict[str, Any]] = []
+        seen_links: set[str] = set()
+        seen_titles: set[str] = set()
+
+        for link_element in soup.find_all("a", href=True):
+            title = _clean(
+                link_element.get_text(" ", strip=True)
+            )
+
+            href = urljoin(
+                page_url,
+                link_element.get("href", ""),
+            )
+
+            if not title or len(title) < 12:
+                continue
+
+            title_low = _normalize(title)
+            href_low = href.casefold()
+
+            # Menü, sosyal medya ve genel sayfa bağlantılarını ele.
+            if any(
+                blocked in href_low
+                for blocked in (
+                    "javascript:",
+                    "facebook.com",
+                    "twitter.com",
+                    "instagram.com",
+                    "youtube.com",
+                    "/iletisim",
+                    "/kurumsal",
+                    "/mevzuat",
+                    "/arama",
+                    "#",
+                )
+            ):
+                continue
+
+            # SGK haber veya duyuru detay bağlantısı olmalı.
+            if (
+                "/haber/" not in href_low
+                and "/duyuru/" not in href_low
+                and "/haber?" not in href_low
+                and "/duyuru?" not in href_low
+            ):
+                continue
+
+            title_key = _normalize(title)
+
+            if title_key in seen_titles:
+                continue
+
+            if href in seen_links:
+                continue
+
+            seen_titles.add(title_key)
+            seen_links.add(href)
+
+            parent_text = ""
+            parent = link_element.parent
+
+            if parent is not None:
+                parent_text = _clean(
+                    parent.get_text(" ", strip=True)
+                )
+
+            date_match = re.search(
+                r"\b([0-3]?\d[./-][01]?\d[./-]20\d{2})\b",
+                parent_text,
+            )
+
+            published_at = None
+
+            if date_match:
+                raw_date = date_match.group(1)
+
+                for date_format in (
+                    "%d.%m.%Y",
+                    "%d/%m/%Y",
+                    "%d-%m-%Y",
+                ):
+                    try:
+                        parsed = datetime.strptime(
+                            raw_date,
+                            date_format,
+                        )
+                        published_at = parsed.replace(
+                            tzinfo=timezone.utc
+                        )
+                        break
+                    except ValueError:
+                        continue
+
+            score, reasons = score_candidate({
+                "title": title,
+                "source": page_name,
+                "published_at": published_at,
+            })
+
+            score += source_bonus
+            reasons.append(
+                f"doğrudan resmî kurum +{source_bonus}"
+            )
+
+            candidates.append({
+                "title": title,
+                "source": page_name,
+                "link": href,
+                "description": parent_text[:700],
+                "published_at": published_at,
+                "query": f"official-html:{page_name}",
+                "score": score,
+                "reasons": reasons,
+                "confirming_sources": [page_name],
+                "is_official": True,
+            })
+
+            if len(candidates) >= max_items:
+                break
+
+        return candidates
+
+    except Exception as error:
+        print(
+            f"[news-ranker] resmî HTML sayfası hatası: "
+            f"{page_name} | {page_url} | {error}",
+            flush=True,
+        )
+        return []
+
+
+# Önceki RSS tabanlı fonksiyonun yerine geçer.
+def fetch_official_news(
+    max_items_per_feed: int = 20,
+) -> list[dict[str, Any]]:
+    official_items: list[dict[str, Any]] = []
+
+    for page in SGK_OFFICIAL_PAGES:
+        official_items.extend(
+            _fetch_official_html_page(
+                page_name=page["name"],
+                page_url=page["url"],
+                source_bonus=page.get("bonus", 20),
+                max_items=max_items_per_feed,
+            )
+        )
+
+    official_items.sort(
+        key=lambda item: item.get("score", -999),
+        reverse=True,
+    )
+
+    return official_items
 
 def _title_and_date_from_sgk_url(url: str) -> tuple[str, datetime | None]:
     """
@@ -871,102 +1277,7 @@ def build_ranked_news_pool(
         reverse=True,
     )
 
-    # Kaynak doğrulama bonusunu sınırla (en fazla 3 ek kaynak × 4 puan) —
-    # yukarıdaki döngü sınırsız +4 ekliyordu.
-    for item in selected:
-        old_bonus_count = sum(
-            1
-            for reason in item.get("reasons", [])
-            if "başka kaynakta da yayımlandı" in reason
-        )
-
-        if old_bonus_count:
-            item["score"] -= old_bonus_count * 4
-
-        _apply_source_confirmation_bonus(item)
-
-    selected.sort(
-        key=lambda item: (
-            item.get("score", -999),
-            item.get("published_at")
-            or datetime.min.replace(tzinfo=timezone.utc),
-        ),
-        reverse=True,
-    )
-    selected = selected[:max_candidates]
-
-    # Son mali güvenilirlik kapısı — bazı adaylar yukarıdaki adımlarda henüz
-    # bu cezayı almamış olabilir.
-    for item in selected:
-        penalty, penalty_reasons = _financial_reliability_penalty(item)
-
-        already_applied = any(
-            reason in item.get("reasons", [])
-            for reason in penalty_reasons
-        )
-
-        if penalty and not already_applied:
-            item["score"] += penalty
-            item["reasons"].extend(penalty_reasons)
-
-    selected = [
-        item
-        for item in selected
-        if item.get("score", -999) >= 12
-    ]
-
-    selected.sort(
-        key=lambda item: (
-            item.get("score", -999),
-            item.get("published_at")
-            or datetime.min.replace(tzinfo=timezone.utc),
-        ),
-        reverse=True,
-    )
-    selected = selected[:max_candidates]
-
-    final_items: list[dict[str, Any]] = []
-
-    for item in selected:
-        penalty, reasons = _final_candidate_penalty(item)
-
-        item["score"] = item.get("score", -999) + penalty
-        item.setdefault("reasons", []).extend(reasons)
-
-        if item["score"] >= 12:
-            final_items.append(item)
-
-    final_items.sort(
-        key=lambda item: (
-            item.get("score", -999),
-            item.get("published_at")
-            or datetime.min.replace(tzinfo=timezone.utc),
-        ),
-        reverse=True,
-    )
-    final_items = final_items[:max_candidates]
-
-    cleaned: list[dict[str, Any]] = []
-
-    for item in final_items:
-        penalty, reasons = _last_quality_gate(item)
-
-        item["score"] = item.get("score", -999) + penalty
-        item.setdefault("reasons", []).extend(reasons)
-
-        if item["score"] >= 12:
-            cleaned.append(item)
-
-    cleaned.sort(
-        key=lambda item: (
-            item.get("score", -999),
-            item.get("published_at")
-            or datetime.min.replace(tzinfo=timezone.utc),
-        ),
-        reverse=True,
-    )
-
-    return cleaned[:max_candidates]
+    return selected
 
 SPECULATIVE_TERMS = (
     "ne zaman çıkacak",
@@ -1049,6 +1360,24 @@ def _credibility_penalty(item: dict[str, Any]) -> tuple[int, list[str]]:
     return penalty, reasons
 
 
+# Önceki score_candidate fonksiyonunun üzerine yazılır.
+_original_score_candidate = score_candidate
+
+
+def score_candidate(
+    item: dict[str, Any],
+) -> tuple[int, list[str]]:
+    score, reasons = _original_score_candidate(item)
+
+    if score <= -900:
+        return score, reasons
+
+    penalty, penalty_reasons = _credibility_penalty(item)
+    score += penalty
+    reasons.extend(penalty_reasons)
+
+    return score, reasons
+
 def _apply_source_confirmation_bonus(
     item: dict[str, Any],
 ) -> None:
@@ -1078,6 +1407,43 @@ def _apply_source_confirmation_bonus(
             f"çoklu kaynak doğrulaması +{bonus}"
         )
 
+
+# Önceki build_ranked_news_pool fonksiyonunun üzerine yazılır.
+_previous_build_ranked_news_pool = build_ranked_news_pool
+
+
+def build_ranked_news_pool(
+    max_candidates: int = 20,
+    per_query: int = 6,
+) -> list[dict[str, Any]]:
+    items = _previous_build_ranked_news_pool(
+        max_candidates=max_candidates,
+        per_query=per_query,
+    )
+
+    for item in items:
+        # Eski fonksiyon her kaynak için +4 eklemiş olabilir.
+        old_bonus_count = sum(
+            1
+            for reason in item.get("reasons", [])
+            if "başka kaynakta da yayımlandı" in reason
+        )
+
+        if old_bonus_count:
+            item["score"] -= old_bonus_count * 4
+
+        _apply_source_confirmation_bonus(item)
+
+    items.sort(
+        key=lambda item: (
+            item.get("score", -999),
+            item.get("published_at")
+            or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+
+    return items[:max_candidates]
 
 REPETITIVE_PAYMENT_TERMS = (
     "ne zaman yatacak",
@@ -1217,6 +1583,68 @@ def _financial_reliability_penalty(
     return penalty, reasons
 
 
+_previous_score_candidate_v2 = score_candidate
+
+
+def score_candidate(
+    item: dict[str, Any],
+) -> tuple[int, list[str]]:
+    score, reasons = _previous_score_candidate_v2(item)
+
+    if score <= -900:
+        return score, reasons
+
+    penalty, penalty_reasons = _financial_reliability_penalty(item)
+
+    score += penalty
+    reasons.extend(penalty_reasons)
+
+    return score, reasons
+
+
+_previous_build_ranked_news_pool_v2 = build_ranked_news_pool
+
+
+def build_ranked_news_pool(
+    max_candidates: int = 20,
+    per_query: int = 6,
+) -> list[dict[str, Any]]:
+    items = _previous_build_ranked_news_pool_v2(
+        max_candidates=max_candidates,
+        per_query=per_query,
+    )
+
+    # Önceki fonksiyon bazı adayları eski score_candidate ile
+    # puanlamış olabilir. Son güvenilirlik kapısını burada tekrar uygula.
+    for item in items:
+        penalty, penalty_reasons = _financial_reliability_penalty(item)
+
+        already_applied = any(
+            reason in item.get("reasons", [])
+            for reason in penalty_reasons
+        )
+
+        if penalty and not already_applied:
+            item["score"] += penalty
+            item["reasons"].extend(penalty_reasons)
+
+    items = [
+        item
+        for item in items
+        if item.get("score", -999) >= 12
+    ]
+
+    items.sort(
+        key=lambda item: (
+            item.get("score", -999),
+            item.get("published_at")
+            or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+
+    return items[:max_candidates]
+
 PROTOCOL_TERMS = (
     "ziyaret etti",
     "ziyarette bulundu",
@@ -1328,6 +1756,40 @@ def _final_candidate_penalty(
     return penalty, reasons
 
 
+_previous_build_ranked_news_pool_v3 = build_ranked_news_pool
+
+
+def build_ranked_news_pool(
+    max_candidates: int = 20,
+    per_query: int = 6,
+) -> list[dict[str, Any]]:
+    items = _previous_build_ranked_news_pool_v3(
+        max_candidates=max_candidates,
+        per_query=per_query,
+    )
+
+    final_items: list[dict[str, Any]] = []
+
+    for item in items:
+        penalty, reasons = _final_candidate_penalty(item)
+
+        item["score"] = item.get("score", -999) + penalty
+        item.setdefault("reasons", []).extend(reasons)
+
+        if item["score"] >= 12:
+            final_items.append(item)
+
+    final_items.sort(
+        key=lambda item: (
+            item.get("score", -999),
+            item.get("published_at")
+            or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+
+    return final_items[:max_candidates]
+
 CLICKBAIT_PAYMENT_TERMS = (
     "çifte değil üçlü ödeme",
     "üçlü ödeme",
@@ -1403,6 +1865,41 @@ def _last_quality_gate(
         reasons.append("yerel ve doğrulanmamış ödeme haberi -20")
 
     return penalty, reasons
+
+
+_previous_build_ranked_news_pool_v4 = build_ranked_news_pool
+
+
+def build_ranked_news_pool(
+    max_candidates: int = 20,
+    per_query: int = 6,
+) -> list[dict[str, Any]]:
+    items = _previous_build_ranked_news_pool_v4(
+        max_candidates=max_candidates,
+        per_query=per_query,
+    )
+
+    cleaned: list[dict[str, Any]] = []
+
+    for item in items:
+        penalty, reasons = _last_quality_gate(item)
+
+        item["score"] = item.get("score", -999) + penalty
+        item.setdefault("reasons", []).extend(reasons)
+
+        if item["score"] >= 12:
+            cleaned.append(item)
+
+    cleaned.sort(
+        key=lambda item: (
+            item.get("score", -999),
+            item.get("published_at")
+            or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+
+    return cleaned[:max_candidates]
 
 
 # ═══════════════════════════════════════════════════════════════════════
