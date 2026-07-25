@@ -18,6 +18,7 @@
     background: #0f0f0f;
     color: #e0e0e0;
     min-height: 100vh;
+    padding-bottom: 70px;
   }
 
   header {
@@ -31,24 +32,70 @@
   header h1 { font-size: 20px; font-weight: 600; color: #fff; }
   header span { font-size: 12px; color: #666; }
 
-  .tabs {
+  /* Alt navigasyon (mobil uygulama tarzı) */
+  .bottom-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
     display: flex;
-    gap: 0;
-    border-bottom: 1px solid #222;
-    padding: 0 32px;
+    background: #141414;
+    border-top: 1px solid #242424;
+    z-index: 80;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .tab {
-    padding: 14px 24px;
+  .bnav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 9px 4px 8px;
     cursor: pointer;
-    font-size: 14px;
     color: #666;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
+    transition: color 0.15s;
+    user-select: none;
   }
 
-  .tab.active { color: #fff; border-bottom-color: #7c3aed; }
-  .tab:hover { color: #ccc; }
+  .bnav-item:hover { color: #ccc; }
+  .bnav-item.active { color: #a78bfa; }
+  .bnav-icon { font-size: 20px; line-height: 1; }
+  .bnav-label { font-size: 10.5px; font-weight: 500; white-space: nowrap; }
+
+  .more-backdrop {
+    position: fixed; inset: 0;
+    background: transparent;
+    z-index: 84;
+    display: none;
+  }
+  .more-backdrop.open { display: block; }
+
+  .more-menu {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 62px;
+    background: #161616;
+    border-top: 1px solid #262626;
+    border-radius: 14px 14px 0 0;
+    z-index: 85;
+    max-height: 60vh;
+    overflow-y: auto;
+    display: none;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
+  }
+  .more-menu.open { display: block; }
+
+  .more-item {
+    padding: 15px 20px;
+    font-size: 14px;
+    color: #ccc;
+    border-bottom: 1px solid #1e1e1e;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .more-item:last-child { border-bottom: none; }
+  .more-item:hover, .more-item:active { background: #1f1f1f; }
+  .more-item.active { color: #a78bfa; font-weight: 600; }
 
   .panel { display: none; padding: 32px; max-width: 800px; }
   .panel.active { display: block; }
@@ -201,10 +248,6 @@
     header { padding: 16px; }
     header h1 { font-size: 17px; }
 
-    .tabs { padding: 0 8px; overflow-x: auto; scrollbar-width: none; }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab { padding: 12px 14px; font-size: 13px; white-space: nowrap; }
-
     .panel { padding: 16px; }
 
     .controls { grid-template-columns: 1fr 1fr; }
@@ -234,12 +277,6 @@
       overflow-y: auto !important;
     }
     #yt-modal { align-items: flex-end !important; }
-
-    /* Ayarlar butonu */
-    div[style*="position:fixed;top:16px;right:16px"] {
-      top: auto !important;
-      bottom: 16px !important;
-    }
   }
 
   /* Accordion */
@@ -277,22 +314,40 @@
   <span>yerel · hızlı · çok dilli</span>
 </header>
 
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('text')">Metin → Ses</div>
-  <div class="tab" onclick="switchTab('video')">Video Seslendirme</div>
-  <div class="tab" onclick="switchTab('translate')">Çeviri + Seslendir</div>
-  <div class="tab" onclick="switchTab('shorts')">Shorts Üret</div>
-  <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
-  <div class="tab" onclick="switchTab('tnlv')">Trend Haber LV</div>
-  <div class="tab" onclick="switchTab('analytics')">📊 Analitik</div>
-  <div class="tab" onclick="switchTab('iganalytics')">📸 IG Analitik</div>
-  <div class="tab" onclick="switchTab('comedy')">📰 Komik Haber</div>
-  <div class="tab" onclick="switchTab('infoshorts')">💡 Bilgi Shorts</div>
-  <div class="tab" onclick="switchTab('prompt')">🤖 Prompt</div>
+<!-- Daha Fazla menüsü (diğer sekmeler burada toplanır) -->
+<div class="more-backdrop" id="more-backdrop" onclick="closeMoreMenu()"></div>
+<div class="more-menu" id="more-menu">
+  <div class="more-item" id="more-item-text" onclick="selectMoreTab('text')">Metin → Ses</div>
+  <div class="more-item" id="more-item-video" onclick="selectMoreTab('video')">Video Seslendirme</div>
+  <div class="more-item" id="more-item-translate" onclick="selectMoreTab('translate')">Çeviri + Seslendir</div>
+  <div class="more-item" id="more-item-longvideo" onclick="selectMoreTab('longvideo')">Uzun Video</div>
+  <div class="more-item" id="more-item-tnlv" onclick="selectMoreTab('tnlv')">Trend Haber LV</div>
+  <div class="more-item" id="more-item-comedy" onclick="selectMoreTab('comedy')">📰 Komik Haber</div>
+  <div class="more-item" id="more-item-infoshorts" onclick="selectMoreTab('infoshorts')">💡 Bilgi Shorts</div>
+  <div class="more-item" id="more-item-prompt" onclick="selectMoreTab('prompt')">🤖 Prompt</div>
+</div>
+
+<!-- Alt navigasyon -->
+<div class="bottom-nav">
+  <div class="bnav-item active" id="bnav-shorts" onclick="switchTab('shorts')">
+    <span class="bnav-icon">🎬</span><span class="bnav-label">Short Üret</span>
+  </div>
+  <div class="bnav-item" id="bnav-analytics" onclick="switchTab('analytics')">
+    <span class="bnav-icon">📊</span><span class="bnav-label">Analitik YT</span>
+  </div>
+  <div class="bnav-item" id="bnav-iganalytics" onclick="switchTab('iganalytics')">
+    <span class="bnav-icon">📸</span><span class="bnav-label">Analitik IG</span>
+  </div>
+  <div class="bnav-item" id="bnav-settings" onclick="openSettings()">
+    <span class="bnav-icon">⚙️</span><span class="bnav-label">Ayarlar</span>
+  </div>
+  <div class="bnav-item" id="bnav-more" onclick="toggleMoreMenu()">
+    <span class="bnav-icon">☰</span><span class="bnav-label">Daha Fazla</span>
+  </div>
 </div>
 
 <!-- TEXT TO SPEECH -->
-<div class="panel active" id="tab-text">
+<div class="panel" id="tab-text">
   <div class="field">
     <label>Metin</label>
     <textarea id="tts-text" placeholder="Seslendirilecek metni girin...&#10;&#10;&lt;laugh&gt; gülen ses&#10;&lt;breath&gt; nefes&#10;&lt;sigh&gt; iç çekme"></textarea>
@@ -438,7 +493,7 @@
 </div>
 
 <!-- SHORTS -->
-<div class="panel" id="tab-shorts">
+<div class="panel active" id="tab-shorts">
 
   <div class="field">
     <label>DeepSeek API Key</label>
@@ -495,8 +550,10 @@
     <div class="field">
       <label>Hız: <span id="speed-val-4">1.0</span>x</label>
       <div class="speed-row">
-        <input type="range" id="shorts-speed" min="0.5" max="2.0" step="0.05" value="1.0"
-          oninput="document.getElementById('speed-val-4').textContent = parseFloat(this.value).toFixed(2)">
+        <input type="number" id="shorts-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          style="width:110px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:10px 12px;outline:none;"
+          oninput="document.getElementById('speed-val-4').textContent = (parseFloat(this.value) || 1).toFixed(2)"
+          onchange="this.value = Math.max(0.5, Math.min(2.0, parseFloat(this.value) || 1)).toFixed(2); document.getElementById('speed-val-4').textContent = this.value">
       </div>
     </div>
   </div>
@@ -1818,10 +1875,6 @@
   </div>
 </div>
 
-<div style="position:fixed;top:16px;right:16px;">
-  <button onclick="openSettings()" style="background:#222;font-size:12px;padding:8px 14px;">⚙ Ayarlar</button>
-</div>
-
 <script>
 let voices = [], langs = {};
 
@@ -1874,19 +1927,47 @@ async function loadMeta() {
   });
 }
 
+// Alt navigasyonda doğrudan görünen sekmeler; geri kalanı "Daha Fazla" menüsüne toplanır.
+const MORE_TABS = ['text', 'video', 'translate', 'longvideo', 'tnlv', 'comedy', 'infoshorts', 'prompt'];
+const BNAV_DIRECT = { shorts: 'bnav-shorts', analytics: 'bnav-analytics', iganalytics: 'bnav-iganalytics' };
+
 function switchTab(name) {
-  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy','infoshorts','prompt'];
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active', names[i] === name);
-  });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
+  updateNavActiveState(name);
   if (name === 'tnlv') updateTNLVApiKeyStatus();
   if (name === 'longvideo') { updateLVApiKeyStatus(); checkLVStatusOnLoad(); }
   if (name === 'infoshorts') { updateInfoApiKeyStatus(); loadInfoEndcardStatus(); loadOutroTemplateStatus(); }
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
   if (name === 'prompt') loadPromptPreview();
+}
+
+function updateNavActiveState(name) {
+  document.querySelectorAll('.bnav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.more-item').forEach(el => el.classList.remove('active'));
+  if (BNAV_DIRECT[name]) {
+    document.getElementById(BNAV_DIRECT[name]).classList.add('active');
+  } else if (MORE_TABS.includes(name)) {
+    document.getElementById('bnav-more').classList.add('active');
+    const item = document.getElementById('more-item-' + name);
+    if (item) item.classList.add('active');
+  }
+  closeMoreMenu();
+}
+
+function toggleMoreMenu() {
+  document.getElementById('more-menu').classList.toggle('open');
+  document.getElementById('more-backdrop').classList.toggle('open');
+}
+
+function closeMoreMenu() {
+  document.getElementById('more-menu').classList.remove('open');
+  document.getElementById('more-backdrop').classList.remove('open');
+}
+
+function selectMoreTab(name) {
+  switchTab(name);
 }
 
 let _lvPollTimer = null;
