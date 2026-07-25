@@ -6668,7 +6668,7 @@ async def upload_youtube(
         )
     else:
         social_footer = (
-            "\n\nHaberin Merkezi — haberin doğru adresi.\n"
+            "\n\nHaberin Merkezi, içeriğin adresi.\n"
             "📺 Abone olmayı unutma, Haberin Merkezi'ni izlemeye devam edin!\n"
             "📸 Instagram: https://www.instagram.com/hakanerbasss/\n"
             "📰 Haber Arşivi: https://wizaicorp.com/\n"
