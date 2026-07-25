@@ -2819,6 +2819,8 @@ function _showShortsResult(d) {
       _startShortsPolling();
     } else if (j.status === 'error') {
       showError('err-shorts', j.error || 'Üretim hatası — sıfırlayıp tekrar deneyin.');
+    } else if (j.status === 'done' && j.result) {
+      _showShortsResult(j.result);
     }
   } catch(e) {}
 })();
