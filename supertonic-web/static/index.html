@@ -2966,11 +2966,13 @@ function _showShortsResult(d) {
   document.getElementById('shorts-video').src = d.video;
   document.getElementById('dl-shorts').href = d.video;
   currentVideoFilename = d.video.split('/').pop();
-  document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
-  if (d.title) document.getElementById('yt-title').value = d.title;
-  const ytDesc = d.suggested_description_yt || d.suggested_description;
-  if (ytDesc) document.getElementById('yt-desc').value = ytDesc;
-  if (d.suggested_tags) document.getElementById('yt-tags').value = _stripHashtags(d.suggested_tags);
+  // ÖNEMLİ: her alan HER ÜRETİMDE koşulsuz üzerine yazılmalı — "d.xxx varsa
+  // yaz, yoksa dokunma" deseni önceki (alakasız) üretimden kalan veriyi
+  // kutuda bırakıyordu; bu yüzden bir haberin açıklaması boş dönünce başka
+  // bir haberin eski açıklaması YouTube'a yüklenmişti. Boşsa da kutu boşalsın.
+  document.getElementById('yt-title').value = d.title || document.getElementById('shorts-topic').value;
+  document.getElementById('yt-desc').value = d.suggested_description_yt || d.suggested_description || '';
+  document.getElementById('yt-tags').value = d.suggested_tags ? _stripHashtags(d.suggested_tags) : '';
   currentSourceText = d.source_text || '';
   document.getElementById('ig-caption').value = d.instagram_caption || '';
   currentThumbnailFilename = null;

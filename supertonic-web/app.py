@@ -2555,6 +2555,16 @@ Kurallar:
         print(f"[CAPTION-GEN] Açıklama üretilemedi: {_cap_e}", flush=True)
         ig_caption_desc = full_script
 
+    # DeepSeek hata FIRLATMADAN boş/anlamsız bir cevap dönebiliyor (özellikle
+    # "Konu" alanına hazır bir blok/şablon yapıştırılınca) — yukarıdaki except
+    # sadece gerçek exception'ları yakalıyordu, bu durumda ig_caption_desc boş
+    # kalıp hem Instagram açıklamasında haber metni eksik kalıyordu hem de
+    # YouTube açıklaması boş dönüp frontend'in eski üretimden kalan veriyi
+    # koruması sonucu YANLIŞ (alakasız) bir açıklama YouTube'a gitmişti.
+    if not ig_caption_desc.strip():
+        print("[CAPTION-GEN] Açıklama boş döndü, senaryo metnine düşülüyor", flush=True)
+        ig_caption_desc = full_script
+
     # ÖNEMLİ: "suggested_description" alanı hem YouTube yüklemesinde hem
     # OTOMATİK Instagram paylaşımında (_post_to_instagram_bg'ye "description"
     # olarak veriliyor, o da source_text'i KENDİSİ ayrıca ekliyor) kullanılıyor.
