@@ -22,52 +22,84 @@ def _save_cache(data: dict):
     CACHE_FILE.write_text(json.dumps(data, ensure_ascii=False))
 
 
-def fetch_google_news(lang="tr", region="TR", max_items=20):
-    """Google News RSS'den güncel haber başlıklarını çeker."""
+def _clean_rss_desc(raw: str, title: str = "") -> str:
+    """Google News RSS <description> alanı genelde HTML'dir. Top-stories feed'inde
+    çoğunlukla sadece "<a>Başlık</a>&nbsp;&nbsp;<font>Kaynak</font>" formatındadır —
+    yani başlığın + kaynak adının tekrarından ibarettir, gerçek özet DEĞİLDİR.
+    Etiketleri temizledikten sonra başlığı çıkarıp geriye anlamlı bir şey kalıp
+    kalmadığını kontrol ediyoruz; kalmıyorsa (sadece kaynak adı vs.) boş döner."""
+    if not raw:
+        return ""
+    import re
+    text = re.sub(r"<[^>]+>", " ", raw)
+    text = text.replace("&nbsp;", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    if title:
+        remainder = text.replace(title, "").strip()
+        if len(remainder) < 20:
+            return ""
+    return text
+
+
+def fetch_google_news(lang="tr", region="TR", max_items=20, include_desc=False):
+    """Google News RSS'den güncel haber başlıklarını çeker.
+    include_desc=True verilirse (titles, {title: desc}) tuple'ı döner — eski
+    çağıranların davranışı DEĞİŞMEZ, varsayılan hâlâ düz liste."""
     url = f"https://news.google.com/rss?hl={lang}&gl={region}&ceid={region}:{lang}"
     try:
         resp = httpx.get(url, timeout=10, follow_redirects=True,
                          headers={"User-Agent": "Mozilla/5.0"})
         root = ET.fromstring(resp.text)
         titles = []
+        details = {}
         for item in root.findall(".//item"):
             title = item.findtext("title", "")
             if title and " - " in title:
                 title = title.rsplit(" - ", 1)[0].strip()
             if title:
                 titles.append(title)
+                if include_desc and title not in details:
+                    desc = _clean_rss_desc(item.findtext("description", ""), title=title)
+                    if desc and desc != title:
+                        details[title] = desc
             if len(titles) >= max_items:
                 break
-        return titles
+        return (titles, details) if include_desc else titles
     except Exception:
-        return []
+        return ([], {}) if include_desc else []
 
 
 _TOPIC_FEEDS = ["BUSINESS", "WORLD"]  # ekonomi / dünya — spor kesin filtreleniyor (app.py _HARD_EXCLUDE_CATS), boşuna çekilmesin
 
 
-def fetch_google_news_topic(topic_code, lang="tr", region="TR", max_items=15):
+def fetch_google_news_topic(topic_code, lang="tr", region="TR", max_items=15, include_desc=False):
     """Google News'in kategori bazlı (ekonomi/spor/dünya vb.) section RSS'inden başlık çeker.
     Genel top-stories feed'i tek bir günün baskın haberiyle dolup taşabiliyor — kategori
     feed'leri ham havuzu büyütüp _ig_same_topic_posted dedup filtresine eleyecek daha fazla
-    malzeme veriyor, böylece yoğun paylaşım programında (günde 12 slot) havuz erken tükenmiyor."""
+    malzeme veriyor, böylece yoğun paylaşım programında (günde 12 slot) havuz erken tükenmiyor.
+    include_desc=True verilirse (titles, {title: desc}) tuple'ı döner."""
     url = f"https://news.google.com/rss/headlines/section/topic/{topic_code}?hl={lang}&gl={region}&ceid={region}:{lang}"
     try:
         resp = httpx.get(url, timeout=10, follow_redirects=True,
                          headers={"User-Agent": "Mozilla/5.0"})
         root = ET.fromstring(resp.text)
         titles = []
+        details = {}
         for item in root.findall(".//item"):
             title = item.findtext("title", "")
             if title and " - " in title:
                 title = title.rsplit(" - ", 1)[0].strip()
             if title:
                 titles.append(title)
+                if include_desc and title not in details:
+                    desc = _clean_rss_desc(item.findtext("description", ""), title=title)
+                    if desc and desc != title:
+                        details[title] = desc
             if len(titles) >= max_items:
                 break
-        return titles
+        return (titles, details) if include_desc else titles
     except Exception:
-        return []
+        return ([], {}) if include_desc else []
 
 
 def fetch_youtube_trending(youtube_client, region_code="TR", max_results=25):
@@ -115,9 +147,12 @@ def get_trends(youtube_client=None, region_code="TR", lang="tr"):
         return cached
 
     # Google News haberleri — genel top-stories + kategori bazlı (ekonomi/spor/dünya)
-    news_topics = fetch_google_news(lang=lang, region=region_code)
+    news_topics, topic_details = fetch_google_news(lang=lang, region=region_code, include_desc=True)
     for topic_code in _TOPIC_FEEDS:
-        news_topics += fetch_google_news_topic(topic_code, lang=lang, region=region_code)
+        more_titles, more_details = fetch_google_news_topic(topic_code, lang=lang, region=region_code, include_desc=True)
+        news_topics += more_titles
+        for k, v in more_details.items():
+            topic_details.setdefault(k, v)
     news_topics = list(dict.fromkeys(news_topics))  # sırayı koruyarak tekilleştir
 
     # YouTube trending (varsa)
@@ -137,6 +172,10 @@ def get_trends(youtube_client=None, region_code="TR", lang="tr"):
 
     result = {
         "topics": topics[:60],  # kategori feed'leri eklenince ham havuz büyüdü, kapak da büyütüldü
+        # Başlığın altında kısa açıklama göstermek için — sadece Google News haberlerinde var,
+        # YouTube trending başlıklarında yok. Manuel Shorts panelinde kullanıcı "bu haber ne
+        # anlatıyor" diye başlıktan anlayamadığında yardımcı olsun diye eklendi.
+        "topic_details": {t: topic_details[t] for t in topics[:60] if t in topic_details},
         "hashtags": trend_hashtags,          # prompt'a giden liste
         "yt_trending_tags": yt_hashtags,     # sadece YouTube kaynaklılar
         "region": region_code,

@@ -1328,16 +1328,20 @@ def _dedupe_pool_against_recent(titles: list) -> list:
     return fresh
 
 
-async def fetch_gurbetci_topics(max_items: int = 8) -> list:
+async def fetch_gurbetci_topics(max_items: int = 8, include_desc: bool = False):
     """Gurbetçi/diaspora haberlerine özel Google News RSS sorgusu.
 
     pytrends'in Türkiye trend listesi yurt içi arama davranışını yansıtıyor —
     gurbetçi konuları orada nadiren organik çıkıyor. Bu, ayrı bir arz kanalı:
     manuel 'Trend + Gurbetçi' butonuyla kullanıcı havuzu inceleyip karar verir,
     otomatik akışa henüz bağlı değil.
+
+    include_desc=True verilirse (titles, {title: desc}) tuple'ı döner — eski
+    çağıranların davranışı DEĞİŞMEZ, varsayılan hâlâ düz liste.
     """
     import xml.etree.ElementTree as ET
     from urllib.parse import quote
+    from trends import _clean_rss_desc
 
     # Google News RSS boolean OR + tırnaklı ifadeleri güvenilir işlemiyor —
     # basit tekil sorgularla birden fazla istek atıp birleştirmek daha sağlam.
@@ -1351,6 +1355,7 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
         "Fransa'daki Türkler when:2d", "Belçika'daki Türkler when:2d",
     ]
     titles = []
+    details = {}
     try:
         async def _fetch_one(client, q):
             url = f"https://news.google.com/rss/search?q={quote(q)}&hl=tr&gl=TR&ceid=TR:tr"
@@ -1363,10 +1368,12 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
                 channel = root.find("channel")
                 if channel is None:
                     return []
-                return [
-                    (item.findtext("title") or "").strip()
-                    for item in channel.findall("item")[:max_items]
-                ]
+                out = []
+                for item in channel.findall("item")[:max_items]:
+                    t = (item.findtext("title") or "").strip()
+                    d = _clean_rss_desc(item.findtext("description") or "", title=t) if include_desc else ""
+                    out.append((t, d))
+                return out
             except Exception as qe:
                 print(f"[gurbetci-trends] '{q}' hata: {qe}", flush=True)
                 return []
@@ -1376,9 +1383,11 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
         async with httpx.AsyncClient(timeout=8) as client:
             results = await asyncio.gather(*(_fetch_one(client, q) for q in queries))
         for result in results:
-            for t in result:
+            for t, d in result:
                 if t and t not in titles:
                     titles.append(t)
+                    if d:
+                        details[t] = d
 
         # Kişisel ölüm/vefat/cinayet haberleri ele — "gurbetçi" kelimesi geçse bile
         # bunlar ASAYİŞ türü içerik, herkesi ilgilendiren pratik/politika haberi değil.
@@ -1388,10 +1397,13 @@ async def fetch_gurbetci_topics(max_items: int = 8) -> list:
             print(f"[gurbetci-trends] {dropped} kişisel/ölüm haberi elendi", flush=True)
 
         print(f"[gurbetci-trends] toplam {len(filtered)} başlık bulundu", flush=True)
-        return filtered[:max_items]
+        final = filtered[:max_items]
+        if include_desc:
+            return final, {t: details[t] for t in final if t in details}
+        return final
     except Exception as e:
         print(f"[gurbetci-trends] genel hata: {e}", flush=True)
-        return []
+        return ([], {}) if include_desc else []
 
 
 async def get_ai_ranked_news_pool(api_key: str, max_candidates: int = 30, per_query: int = 5) -> list:
@@ -5770,8 +5782,12 @@ async def trends_refresh_with_gurbetci():
     """Manuel inceleme için: normal trend listesi + ayrı gurbetçi RSS havuzu.
     Otomatik akışa bağlı değil — sadece Shorts Manuel panelinde gösterilir."""
     base = await trends_refresh()
-    gurbetci_topics = await fetch_gurbetci_topics()
-    return {**base, "gurbetci_topics": gurbetci_topics}
+    gurbetci_topics, gurbetci_details = await fetch_gurbetci_topics(include_desc=True)
+    return {
+        **base,
+        "gurbetci_topics": gurbetci_topics,
+        "topic_details": {**base.get("topic_details", {}), **gurbetci_details},
+    }
 
 
 @app.post("/api/trends/refresh-combined")
@@ -5784,14 +5800,19 @@ async def trends_refresh_combined():
     (gurbetçi listenin sonuna eklenip [:N] kesmesiyle siliniyordu), artık hepsi
     aynı _interleave_topics() ile adil sıralanıyor."""
     base = await trends_refresh()
-    gurbetci_topics = await fetch_gurbetci_topics()
+    gurbetci_topics, gurbetci_details = await fetch_gurbetci_topics(include_desc=True)
     trend_topics_filtered = _filter_low_value_topics(base.get("topics", []))
     dropped = len(base.get("topics", [])) - len(trend_topics_filtered)
     if dropped:
         print(f"[combined-trends] normal trend havuzundan {dropped} düşük değerli haber elendi", flush=True)
     combined = _interleave_topics(trend_topics_filtered, gurbetci_topics)
     combined = _dedupe_pool_against_recent(combined)
-    return {**base, "gurbetci_topics": gurbetci_topics, "combined_topics": combined}
+    return {
+        **base,
+        "gurbetci_topics": gurbetci_topics,
+        "combined_topics": combined,
+        "topic_details": {**base.get("topic_details", {}), **gurbetci_details},
+    }
 
 
 @app.post("/api/yt/config")
