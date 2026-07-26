@@ -2767,23 +2767,53 @@ function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText,
   const details = topicDetails || {};
   topics.forEach(topic => {
     const desc = details[topic] || '';
-    const btn = document.createElement('button');
-    btn.style.cssText = `display:block;width:100%;text-align:left;background:${colorBg};border:1px solid ${colorBorder};border-radius:10px;padding:9px 14px;cursor:pointer;`;
+    const item = document.createElement('div');
+    item.style.cssText = `display:flex;align-items:flex-start;gap:8px;width:100%;box-sizing:border-box;background:${colorBg};border:1px solid ${colorBorder};border-radius:10px;padding:9px 14px;cursor:pointer;`;
+
+    const textWrap = document.createElement('div');
+    textWrap.style.cssText = 'flex:1;min-width:0;';
     const titleEl = document.createElement('div');
     titleEl.textContent = topic;
     titleEl.style.cssText = `font-size:13px;color:${colorText};font-weight:600;line-height:1.35;`;
-    btn.appendChild(titleEl);
+    textWrap.appendChild(titleEl);
     if (desc) {
       const descEl = document.createElement('div');
       descEl.textContent = desc;
       descEl.style.cssText = 'font-size:11.5px;color:#888;margin-top:4px;line-height:1.4;';
-      btn.appendChild(descEl);
+      textWrap.appendChild(descEl);
     }
-    btn.onclick = () => {
-      document.getElementById('shorts-topic').value = topic;
-      btn.style.background = colorBorder;
+    item.appendChild(textWrap);
+
+    // Görsel üretim aracına (ör. ChatGPT) yapıştırmak için başlık + açıklamayı
+    // tek tıkla kopyala — konu seçiminden bağımsız, ayrı bir buton.
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋';
+    copyBtn.title = 'Başlık + açıklamayı kopyala';
+    // width:auto EKLENMELİ — mobil medya sorgusundaki global "button { width:100% }"
+    // kuralı bunu geçersiz kılıp bu küçük butonu tüm satırı kaplamaya zorluyor,
+    // bu da yanındaki başlık/açıklama metnini neredeyse sıfır genişliğe sıkıştırıyordu.
+    copyBtn.style.cssText = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 9px;font-size:13px;cursor:pointer;color:#ccc;';
+    copyBtn.onclick = (e) => {
+      e.stopPropagation();
+      const text = desc ? `${topic}\n\n${desc}` : topic;
+      const done = () => {
+        const prev = copyBtn.textContent;
+        copyBtn.textContent = '✓';
+        setTimeout(() => { copyBtn.textContent = prev; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(done);
+      } else {
+        done();
+      }
     };
-    el.appendChild(btn);
+    item.appendChild(copyBtn);
+
+    item.onclick = () => {
+      document.getElementById('shorts-topic').value = topic;
+      item.style.background = colorBorder;
+    };
+    el.appendChild(item);
   });
 }
 
