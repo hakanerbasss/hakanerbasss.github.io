@@ -2900,7 +2900,8 @@ function _showShortsResult(d) {
   currentVideoFilename = d.video.split('/').pop();
   document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
   if (d.title) document.getElementById('yt-title').value = d.title;
-  if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
+  const ytDesc = d.suggested_description_yt || d.suggested_description;
+  if (ytDesc) document.getElementById('yt-desc').value = ytDesc;
   if (d.suggested_tags) document.getElementById('yt-tags').value = _stripHashtags(d.suggested_tags);
   currentSourceText = d.source_text || '';
   document.getElementById('ig-caption').value = d.instagram_caption || '';

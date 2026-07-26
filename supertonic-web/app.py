@@ -2475,25 +2475,12 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
     # Kullanılan konuyu kaydet — scheduler aynı haberi tekrar seçmesin
     add_shorts_used_topic(generated_title)
 
-    # Kaynak isimleri + gerçek makale linkleri — isim listesi (eski "Kaynak: X, Y")
-    # yerine artık her kaynağın tıklanabilir URL'si de ekleniyor (YouTube açıklaması
-    # bu linkleri hiç göstermiyordu, sadece isim geçiyordu).
-    _seen_source_names = set()
-    _source_links = []
-    for _art in gnews_data.get("articles", []):
-        _sname = (_art.get("source") or "").strip()
-        _slink = (_art.get("link") or "").strip()
-        if not _sname or not _slink or _sname in _seen_source_names:
-            continue
-        _seen_source_names.add(_sname)
-        _source_links.append((_sname, _slink))
-        if len(_source_links) >= 4:
-            break
-    if _source_links:
-        source_text = "Kaynaklar:\n" + "\n".join(f"{n}: {l}" for n, l in _source_links)
-    else:
-        sources = gnews_data.get("sources", [])
-        source_text = ("Kaynak: " + ", ".join(sources)) if sources else ""
+    # Kaynak isimleri — SADECE isim, link yok. Google News RSS'in "link" alanı
+    # gerçek makale URL'si değil, uzun/okunaksız bir yönlendirme token'ı
+    # (news.google.com/rss/articles/CBMi...) — hem YouTube hem Instagram
+    # açıklamasında çirkin/faydasız duruyordu, kaldırıldı.
+    sources = gnews_data.get("sources", [])
+    source_text = ("Kaynak: " + ", ".join(sources)) if sources else ""
 
     # Açıklama metni — Bilgi Shorts için eğitim odaklı, haber için haber odaklı
     ig_caption_desc = ""
@@ -2568,14 +2555,16 @@ Kurallar:
         print(f"[CAPTION-GEN] Açıklama üretilemedi: {_cap_e}", flush=True)
         ig_caption_desc = full_script
 
-    # YouTube açıklaması (suggested_description) şu ana kadar kaynakları hiç
-    # göstermiyordu — sadece Instagram açıklaması (_build_ig_caption, ayrıca
-    # source_text'i kendi ekliyor) gösteriyordu. ig_caption_desc'i DEĞİŞTİRMEDEN
-    # (Instagram'da çift göstermemek için) sadece YouTube'a giden ayrı bir
-    # değişkene kaynak bloğunu ekliyoruz.
-    yt_description = ig_caption_desc
+    # ÖNEMLİ: "suggested_description" alanı hem YouTube yüklemesinde hem
+    # OTOMATİK Instagram paylaşımında (_post_to_instagram_bg'ye "description"
+    # olarak veriliyor, o da source_text'i KENDİSİ ayrıca ekliyor) kullanılıyor.
+    # Daha önce buraya source_text eklemek, otomatik Instagram paylaşımlarında
+    # kaynak bloğunun İKİ KEZ görünmesine yol açan bir hataydı — bu alan
+    # eskisi gibi SAF (kaynak eklenmemiş) kalıyor. YouTube'a özel, kaynaklı
+    # sürüm ayrı bir alanda (suggested_description_yt) sunuluyor.
+    yt_description_with_source = ig_caption_desc
     if source_text and not info_format:
-        yt_description = f"{ig_caption_desc}\n\n{source_text}"
+        yt_description_with_source = f"{ig_caption_desc}\n\n{source_text}"
 
     return {
         "video": f"/api/video/{output_file.name}",
@@ -2584,7 +2573,8 @@ Kurallar:
         "title": generated_title,
         "scene_count": len(scenes),
         "suggested_tags": video_tags,
-        "suggested_description": yt_description,
+        "suggested_description": ig_caption_desc,
+        "suggested_description_yt": yt_description_with_source,
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
         "source_text": source_text,
         "instagram_caption": _build_ig_caption(generated_title, ig_caption_desc, source_text, video_tags),
