@@ -5805,6 +5805,29 @@ async def trends_refresh_combined():
     }
 
 
+@app.post("/api/trends/ai-ranked-pool")
+async def trends_ai_ranked_pool(api_key: str = Form(...)):
+    """Manuel Shorts panelinde gösterilen 4. liste — Telegram konu seçiminde ve
+    otomatik tekli haberde kullanılan TAM OLARAK AYNI havuzu (get_ai_ranked_news_pool:
+    kural tabanlı puanlama + AI jüri) döndürür. Bu fonksiyon salt-okunur/yan etkisiz
+    (hiçbir "kullanıldı" işareti koymaz), o yüzden istediğin kadar tekrar çağrılabilir.
+    Mevcut trend/gurbetçi/birleşik butonlarına dokunmuyor, tamamen ayrı bir uç nokta."""
+    if not api_key.strip():
+        raise HTTPException(400, "API key eksik")
+    ranked_items = await get_ai_ranked_news_pool(api_key)
+    topics = []
+    topic_details = {}
+    for item in ranked_items:
+        title = (item.get("title") or "").strip()
+        if not title or title in topic_details or title in topics:
+            continue
+        topics.append(title)
+        desc = (item.get("description") or "").strip()
+        if desc:
+            topic_details[title] = desc
+    return {"topics": topics, "topic_details": topic_details}
+
+
 @app.post("/api/yt/config")
 async def save_yt_config(client_id: str = Form(...), client_secret: str = Form(...)):
     CONFIG_FILE.write_text(json.dumps({"client_id": client_id, "client_secret": client_secret}))

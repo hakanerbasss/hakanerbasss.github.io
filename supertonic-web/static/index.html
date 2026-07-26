@@ -523,6 +523,10 @@
       <div class="spinner" id="spin-trends-combined"></div>
       🔗 Birleşik Havuz (Filtreli)
     </button>
+    <button onclick="fetchAIRankedPool()" id="btn-ai-pool" style="background:#1a2a2a;font-size:13px;padding:10px 18px;margin-left:8px;">
+      <div class="spinner" id="spin-ai-pool"></div>
+      🤖 AI Jürili Havuz (Telegram'daki Liste)
+    </button>
     <div id="trends-box" style="display:none;margin-top:12px;background:#111;border:1px solid #222;border-radius:8px;padding:14px;">
       <div style="font-size:12px;color:#666;margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
       <div id="trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
@@ -533,6 +537,10 @@
       <div id="combined-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
         <div style="font-size:12px;color:#c4b5fd;margin-bottom:8px;">🔗 Birleşik + filtreli havuz — trend + gurbetçi, ölüm/vefat/dedikodu ve ASAYİŞ kategorisi elenmiş. Sadece manuel inceleme için.</div>
         <div id="combined-trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+      </div>
+      <div id="ai-pool-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
+        <div style="font-size:12px;color:#5eead4;margin-bottom:8px;">🤖 AI jürili havuz — Telegram'a giden VE otomatik tekli haber seçiminde kullanılan aynı liste (kural puanlama + AI jüri). Sadece manuel inceleme için, DeepSeek API key gerekir.</div>
+        <div id="ai-pool-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
       </div>
       <div style="font-size:11px;color:#444;margin-top:10px;" id="trends-time"></div>
     </div>
@@ -2861,6 +2869,36 @@ async function fetchTrends(mode) {
     alert(e.message);
   } finally {
     setLoading(btnId, spinId, false);
+  }
+}
+
+async function fetchAIRankedPool() {
+  // Telegram'a giden VE otomatik tekli haber seçiminde kullanılan aynı
+  // (kural puanlama + AI jüri) havuzu manuel incelemek için — mevcut
+  // trend/gurbetçi/birleşik listelerine hiç dokunmuyor, ayrı bir liste.
+  const apiKey = document.getElementById('shorts-apikey').value.trim();
+  if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
+  showError('err-shorts', '');
+  setLoading('btn-ai-pool', 'spin-ai-pool', true);
+  try {
+    const fd = new FormData();
+    fd.append('api_key', apiKey);
+    const r = await fetch('/api/trends/ai-ranked-pool', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+    _renderTopicChips('ai-pool-list', d.topics || [], '#0f2a28', '#1a4a45', '#5eead4',
+      'AI jürili havuzda şu an uygun haber bulunamadı.', d.topic_details);
+    document.getElementById('ai-pool-wrap').style.display = 'block';
+    document.getElementById('trends-box').style.display = 'block';
+    document.getElementById('ai-pool-wrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch(e) {
+    alert(e.message);
+  } finally {
+    setLoading('btn-ai-pool', 'spin-ai-pool', false);
   }
 }
 
