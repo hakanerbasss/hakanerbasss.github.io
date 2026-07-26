@@ -14,9 +14,9 @@ jobs:
       - name: Sunucuya deploy et
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.ATIK_SSH_HOST }}
+          username: ${{ secrets.ATIK_SSH_USER }}
+          key: ${{ secrets.ATIK_SSH_KEY }}
           script: |
             cd ~/hakanerbasss.github.io
             git fetch origin main
