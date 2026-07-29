@@ -2885,14 +2885,17 @@ async function fetchTrends(mode) {
   }
 }
 
-async function fetchAIRankedPool() {
+async function fetchAIRankedPool(retryCount) {
   // Telegram'a giden VE otomatik tekli haber seçiminde kullanılan aynı
-  // (kural puanlama + AI jüri) havuzu manuel incelemek için — mevcut
-  // trend/gurbetçi/birleşik listelerine hiç dokunmuyor, ayrı bir liste.
+  // (kural puanlama + AI jüri) havuzu manuel incelemek için. Sonuçlar
+  // backend'de 15 dk önbelleklenir; ilk çağrı "pending" dönebilir,
+  // otomatik olarak 8 saniyede bir yeniden denenir (max 8 deneme).
   const apiKey = document.getElementById('shorts-apikey').value.trim();
   if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
   showError('err-shorts', '');
-  setLoading('btn-ai-pool', 'spin-ai-pool', true);
+  const attempt = retryCount || 0;
+  if (attempt === 0) setLoading('btn-ai-pool', 'spin-ai-pool', true);
+  let isPending = false;
   try {
     const fd = new FormData();
     fd.append('api_key', apiKey);
@@ -2903,6 +2906,21 @@ async function fetchAIRankedPool() {
       throw new Error(err);
     }
     const d = await r.json();
+    if (d.status === 'pending') {
+      isPending = true;
+      const poolEl = document.getElementById('ai-pool-list');
+      poolEl.innerHTML = `<div style="color:#5eead4;font-size:13px;padding:8px 0;">`
+        + `⏳ ${d.message || 'AI jürisi hazırlanıyor…'} (${attempt + 1}/8)</div>`;
+      document.getElementById('ai-pool-wrap').style.display = 'block';
+      document.getElementById('trends-box').style.display = 'block';
+      if (attempt < 7) {
+        setTimeout(() => fetchAIRankedPool(attempt + 1), 8000);
+      } else {
+        setLoading('btn-ai-pool', 'spin-ai-pool', false);
+        alert('AI jürisi 1 dakika içinde yanıt vermedi. Lütfen tekrar deneyin.');
+      }
+      return;
+    }
     _renderTopicChips('ai-pool-list', d.topics || [], '#0f2a28', '#1a4a45', '#5eead4',
       'AI jürili havuzda şu an uygun haber bulunamadı.', d.topic_details, d.topic_links);
     document.getElementById('ai-pool-wrap').style.display = 'block';
@@ -2911,7 +2929,7 @@ async function fetchAIRankedPool() {
   } catch(e) {
     alert(e.message);
   } finally {
-    setLoading('btn-ai-pool', 'spin-ai-pool', false);
+    if (!isPending) setLoading('btn-ai-pool', 'spin-ai-pool', false);
   }
 }
 

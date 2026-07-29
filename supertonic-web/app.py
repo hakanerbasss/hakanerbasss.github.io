@@ -12,7 +12,7 @@ import random
 from pathlib import Path
 import shutil
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 import traceback
@@ -5968,16 +5968,51 @@ async def trends_refresh_combined():
     }
 
 
+_ai_pool_cache: dict = {"items": [], "ts": 0.0, "running": False}
+_AI_POOL_TTL = 900  # 15 dakika
+
+
+async def _refresh_ai_pool_bg(api_key: str):
+    global _ai_pool_cache
+    try:
+        items = await get_ai_ranked_news_pool(api_key)
+        _ai_pool_cache["items"] = items
+        _ai_pool_cache["ts"] = time.time()
+        print(f"[ai-pool] önbellek güncellendi: {len(items)} haber", flush=True)
+    except Exception as e:
+        print(f"[ai-pool] önbellek yenileme hatası: {e}", flush=True)
+    finally:
+        _ai_pool_cache["running"] = False
+
+
 @app.post("/api/trends/ai-ranked-pool")
-async def trends_ai_ranked_pool(api_key: str = Form(...)):
+async def trends_ai_ranked_pool(api_key: str = Form(...), background_tasks: BackgroundTasks = None):
     """Manuel Shorts panelinde gösterilen 4. liste — Telegram konu seçiminde ve
     otomatik tekli haberde kullanılan TAM OLARAK AYNI havuzu (get_ai_ranked_news_pool:
-    kural tabanlı puanlama + AI jüri) döndürür. Bu fonksiyon salt-okunur/yan etkisiz
-    (hiçbir "kullanıldı" işareti koymaz), o yüzden istediğin kadar tekrar çağrılabilir.
-    Mevcut trend/gurbetçi/birleşik butonlarına dokunmuyor, tamamen ayrı bir uç nokta."""
+    kural tabanlı puanlama + AI jüri) döndürür. Sonuçlar 15 dakika önbelleklenir;
+    ilk çağrı veya önbellek bayatlamışsa arka planda yenilenir, frontend polling ile
+    bekler — Cloudflare 524 timeout ortadan kalkar."""
+    global _ai_pool_cache
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
-    ranked_items = await get_ai_ranked_news_pool(api_key)
+
+    now = time.time()
+    is_fresh = bool(_ai_pool_cache["items"]) and (now - _ai_pool_cache["ts"]) < _AI_POOL_TTL
+
+    # Arka planda yenileme başlat (zaten çalışmıyorsa)
+    if not is_fresh and not _ai_pool_cache["running"]:
+        _ai_pool_cache["running"] = True
+        background_tasks.add_task(_refresh_ai_pool_bg, api_key)
+
+    # Önbellekte hiç sonuç yok — ilk çağrı, beklemek gerekiyor
+    if not _ai_pool_cache["items"]:
+        return JSONResponse({
+            "status": "pending",
+            "message": "AI jürisi ilk kez hazırlanıyor (~30 sn), lütfen bekleyin…"
+        })
+
+    # Önbellekte sonuç var (taze veya bayat) — anında dön
+    ranked_items = _ai_pool_cache["items"]
     topics = []
     topic_details = {}
     topic_links = {}
@@ -5992,7 +6027,13 @@ async def trends_ai_ranked_pool(api_key: str = Form(...)):
         link = (item.get("link") or "").strip()
         if link:
             topic_links[title] = link
-    return {"topics": topics, "topic_details": topic_details, "topic_links": topic_links}
+    return {
+        "status": "ok",
+        "topics": topics,
+        "topic_details": topic_details,
+        "topic_links": topic_links,
+        "stale": not is_fresh,
+    }
 
 
 @app.post("/api/yt/config")
