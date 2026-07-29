@@ -1656,6 +1656,112 @@ def _build_ig_caption(title: str, description: str = "", source_text: str = "", 
     return caption
 
 
+def _pick_varied_cta_text(lang: str, platform: str, comment_hook: str = "") -> str:
+    """Platforma/dile göre birkaç varyasyondan rastgele kapanış çağrısı seçer —
+    her videoda aynı cümle tekrarlanmasın diye. comment_hook verilirse başına eklenir.
+    Hem normal haber akışında hem 'ChatGPT çıktısı yapıştır' akışında kullanılıyor —
+    tek yerde tanımlı, ikisi birbirinden sapmasın diye."""
+    _cta = {
+        "tr": {
+            "youtube": [
+                "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
+                "Beğenmeyi ve abone olmayı unutma, sen de ne düşündüğünü yaz!",
+                "Bu gelişmeleri kaçırmamak için abone ol, beğenmeyi de unutma!",
+                "Kanala abone ol, beğen ve yorumlara sen de yaz!",
+                "Böyle haberleri kaçırma — abone ol, beğen, yorumunu bırak!",
+            ],
+            "instagram": [
+                "Takip et ve beğen! Her haberi ilk sen gör!",
+                "Beğenmeyi ve takip etmeyi unutma, her gelişmeyi ilk sen öğren!",
+                "Bu tür gelişmeleri kaçırmamak için takip et, beğenmeyi de unutma!",
+                "Takipte kal, beğenmeyi unutma — her haber ilk burada!",
+                "Hesabı takip et, beğen, yeni haberleri kaçırma!",
+            ],
+        },
+        "en": {
+            "youtube": [
+                "Like, subscribe and drop a comment! Just 2 seconds!",
+                "Don't forget to subscribe and like — let us know what you think!",
+                "Subscribe so you never miss an update, and hit like!",
+            ],
+            "instagram": [
+                "Follow and like! Be the first to see every update!",
+                "Don't forget to follow and like so you never miss an update!",
+                "Follow along and like — stay first on every story!",
+            ],
+        },
+    }
+    _lang_cta = _cta.get(lang, _cta["tr"])
+    _cta_options = _lang_cta.get(platform, _lang_cta["youtube"])
+    cta_text = _cta_options[secrets.randbelow(len(_cta_options))]
+    comment_hook = (comment_hook or "").strip()
+    return f"{comment_hook} {cta_text}".strip() if comment_hook else cta_text
+
+
+def _parse_chatgpt_news_block(raw_text: str) -> dict:
+    """ChatGPT'nin 'VİDEO BAŞLIĞI / SESLENDİRME METNİ / AÇIKLAMA / ETİKETLER' (+ isteğe
+    bağlı 'KAPAK İÇİN HAZIR VERİ') formatındaki yapılandırılmış çıktısını ayrıştırır.
+    Numaralandırma ("1.", "1)", numarasız) ve büyük/küçük harf farkı önemli değil.
+    Bulunamayan bölüm boş string/liste olarak döner — asla hata fırlatmaz."""
+    text = (raw_text or "").replace("\r\n", "\n").strip()
+
+    section_pattern = re.compile(
+        r"^\s*\d*[\.\)]?\s*(VİDEO BAŞLIĞI|VIDEO BASLIGI|SESLENDİRME METNİ|SESLENDIRME METNI|"
+        r"AÇIKLAMA|ACIKLAMA|ETİKETLER|ETIKETLER|KAPAK İÇİN HAZIR VERİ|KAPAK ICIN HAZIR VERI)\s*:?\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+
+    matches = list(section_pattern.finditer(text))
+    sections: dict[str, str] = {}
+    for i, m in enumerate(matches):
+        name = m.group(1).strip().upper()
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        sections[name] = text[start:end].strip()
+
+    def _get(*names: str) -> str:
+        for n in names:
+            for key, val in sections.items():
+                if key.startswith(n):
+                    return val
+        return ""
+
+    title = _get("VİDEO BAŞLIĞI", "VIDEO BASLIGI")
+    script = _get("SESLENDİRME METNİ", "SESLENDIRME METNI")
+    description = _get("AÇIKLAMA", "ACIKLAMA")
+    tags_block = _get("ETİKETLER", "ETIKETLER")
+    kapak_block = _get("KAPAK İÇİN HAZIR VERİ", "KAPAK ICIN HAZIR VERI")
+
+    tags: list[str] = []
+    for line in tags_block.splitlines():
+        for tok in re.split(r"[,\s]+", line.strip()):
+            tok = tok.lstrip("#").strip()
+            if tok and tok not in tags:
+                tags.append(tok)
+
+    # Açıklama içine gömülü "Kaynak(lar): ..." cümlesini çıkar ve metinden temizle —
+    # kendi "Kaynak: ..." formatımızda ayrıca ekleyeceğiz, iki kez görünmesin.
+    source = ""
+    source_match = re.search(r"Kaynak(?:lar)?\s*:\s*(.+?)(?:[.\n]|$)", description, re.IGNORECASE)
+    if source_match:
+        source = source_match.group(1).strip()
+        description = (description[:source_match.start()] + description[source_match.end():]).strip()
+        description = re.sub(r"\n{3,}", "\n\n", description).strip()
+
+    if not source and kapak_block:
+        km = re.search(r"Kaynak kurum[^:]*:\s*(.+)", kapak_block, re.IGNORECASE)
+        if km:
+            source = km.group(1).strip()
+
+    return {
+        "title": title.strip(),
+        "script": script.strip(),
+        "description": description.strip(),
+        "tags": tags,
+        "source": source.strip(),
+    }
+
+
 async def _generate_shorts_core(
     topic: str,
     api_key: str,
@@ -1673,6 +1779,7 @@ async def _generate_shorts_core(
     cover_image_path: Path = None,
     skip_closing_cta: bool = False,
     intro_cover_path: Path = None,
+    pasted_content: dict = None,
 ):
     import json
     import httpx
@@ -2071,46 +2178,7 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
         # sadece son segment gerçek kapanış olsun, 12 kez "takip et" tekrarlanmasın)
         # bu değişiklik atlanır, sahne kendi doğal metnini korur.
         if scenes and not skip_closing_cta:
-            # Her videoda aynı cümleyi tekrarlamamak için birkaç varyasyondan
-            # rastgele seçiliyor — AI'ye bırakmak yerine kod seviyesinde garanti
-            # ediliyor (LLM'in "varyasyon yap" talimatına uyacağına güvenmek yerine).
-            _cta = {
-                "tr": {
-                    "youtube": [
-                        "Bu haberi beğen, kanala abone ol ve bir yorum bırak! İki saniye yeterli!",
-                        "Beğenmeyi ve abone olmayı unutma, sen de ne düşündüğünü yaz!",
-                        "Bu gelişmeleri kaçırmamak için abone ol, beğenmeyi de unutma!",
-                        "Kanala abone ol, beğen ve yorumlara sen de yaz!",
-                        "Böyle haberleri kaçırma — abone ol, beğen, yorumunu bırak!",
-                    ],
-                    "instagram": [
-                        "Takip et ve beğen! Her haberi ilk sen gör!",
-                        "Beğenmeyi ve takip etmeyi unutma, her gelişmeyi ilk sen öğren!",
-                        "Bu tür gelişmeleri kaçırmamak için takip et, beğenmeyi de unutma!",
-                        "Takipte kal, beğenmeyi unutma — her haber ilk burada!",
-                        "Hesabı takip et, beğen, yeni haberleri kaçırma!",
-                    ],
-                },
-                "en": {
-                    "youtube": [
-                        "Like, subscribe and drop a comment! Just 2 seconds!",
-                        "Don't forget to subscribe and like — let us know what you think!",
-                        "Subscribe so you never miss an update, and hit like!",
-                    ],
-                    "instagram": [
-                        "Follow and like! Be the first to see every update!",
-                        "Don't forget to follow and like so you never miss an update!",
-                        "Follow along and like — stay first on every story!",
-                    ],
-                },
-            }
-            _lang_cta = _cta.get(lang, _cta["tr"])
-            _cta_options = _lang_cta.get(platform, _lang_cta["youtube"])
-            cta_text = _cta_options[secrets.randbelow(len(_cta_options))]
-            comment_hook = (data.get("comment_hook") or "").strip()
-            # comment_hook DeepSeek'ten gelmezse (eski davranış, alan boşsa) sadece
-            # sabit CTA kullanılır — geriye dönük uyumlu, asla boş sahne bırakmaz.
-            scenes[-1]["text"] = f"{comment_hook} {cta_text}".strip() if comment_hook else cta_text
+            scenes[-1]["text"] = _pick_varied_cta_text(lang, platform, data.get("comment_hook", ""))
 
     uid = uuid.uuid4().hex
     scene_dir = UPLOAD_DIR / uid
