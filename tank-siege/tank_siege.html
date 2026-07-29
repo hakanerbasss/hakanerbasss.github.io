@@ -2107,25 +2107,11 @@ function tankEffectiveWindRes(tankKey){
 }
 
 // ── PNG TERRAIN SİSTEMİ ──────────────────────────────────────────
-const TERRAIN_PNGS = {
-  // valley teması için test PNG — level 1-10
-  // Format: 'theme_terrain': Image object
-};
-const _terrainPngCache = {};
-
 function loadTerrainPng(theme, terrainType){
-  const key = theme+'_'+terrainType;
-  if(_terrainPngCache[key]) return _terrainPngCache[key];
-  // Şimdilik sadece valley_medium için test
-  if(theme==='valley'){
-    const img = new Image();
-    const src = (typeof Android !== 'undefined')
-      ? 'https://appassets.androidplatform.net/assets/terrain_valley.png'
-      : 'test1_terrain.png';
-    img.src = src;
-    _terrainPngCache[key] = img;
-    return img;
-  }
+  // test1_terrain.png bitmemiş bir test görseliydi (dikey, çoğu kare siyah) —
+  // tüm ekrana yayılınca valley temasının (level 1) görselini bozuyordu.
+  // Gerçek terrain PNG'si hazır olana kadar bu özellik devre dışı;
+  // normal procedural terrain (drawTerrain) her zaman kullanılıyor.
   return null;
 }
 
