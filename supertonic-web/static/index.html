@@ -692,7 +692,7 @@
   <div class="error" id="err-shorts"></div>
 
   <div class="result" id="result-shorts">
-    <p>Script</p>
+    <p style="display:flex;align-items:center;gap:10px;">Script <button type="button" onclick="copyFieldValue('shorts-script',this)" style="background:#2a2a2a;border:1px solid #333;border-radius:6px;font-size:12px;padding:4px 10px;color:#ccc;cursor:pointer;width:auto;">📋 Kopyala</button></p>
     <div class="transcript" id="shorts-script"></div>
     <p style="margin-top:16px">Video</p>
     <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
@@ -716,14 +716,17 @@
         <div class="field">
           <label>Başlık</label>
           <input type="text" id="yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <button type="button" onclick="copyFieldValue('yt-title',this)" style="margin-top:8px;background:#2a2a2a;">📋 Kopyala</button>
         </div>
         <div class="field" style="margin-top:12px;">
           <label>Açıklama</label>
           <textarea id="yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
+          <button type="button" onclick="copyFieldValue('yt-desc',this)" style="margin-top:8px;background:#2a2a2a;">📋 Kopyala</button>
         </div>
         <div class="field" style="margin-top:12px;">
           <label>Etiketler (virgülle ayır, # gerekmez)</label>
           <input type="text" id="yt-tags" placeholder="shorts, yapay zeka, teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <button type="button" onclick="copyFieldValue('yt-tags',this)" style="margin-top:8px;background:#2a2a2a;">📋 Kopyala</button>
         </div>
         <div class="field" style="margin-top:12px;">
           <label>Instagram Açıklaması (hazır format — kaynak, etkileşim CTA'ları, hashtag dahil)</label>
@@ -2749,6 +2752,16 @@ function copyIgCaption() {
   }).catch(() => document.execCommand('copy'));
 }
 
+function copyFieldValue(elId, btn) {
+  const el = document.getElementById(elId);
+  const text = el.tagName === 'DIV' ? el.textContent : el.value;
+  const prev = btn.textContent;
+  const done = () => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = prev; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(done);
+  } else { done(); }
+}
+
 async function sendShortsToInstagram() {
   if (!currentVideoFilename) { alert('Önce video oluştur'); return; }
   const res = document.getElementById('shorts-ig-result');
@@ -2860,6 +2873,20 @@ function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText,
         window.open(link, '_blank', 'noopener');
       };
       item.appendChild(linkBtn);
+
+      const linkCopyBtn = document.createElement('button');
+      linkCopyBtn.textContent = '🔗 Kopyala';
+      linkCopyBtn.title = 'Haber linkini kopyala';
+      linkCopyBtn.style.cssText = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 9px;font-size:11px;cursor:pointer;color:#ccc;';
+      linkCopyBtn.onclick = (e) => {
+        e.stopPropagation();
+        const prev = linkCopyBtn.textContent;
+        const done = () => { linkCopyBtn.textContent = '✓'; setTimeout(() => { linkCopyBtn.textContent = prev; }, 1200); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).then(done).catch(done);
+        } else { done(); }
+      };
+      item.appendChild(linkCopyBtn);
     }
 
     item.onclick = () => {
