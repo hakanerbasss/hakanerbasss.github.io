@@ -499,15 +499,18 @@ def build_ranked_news_pool(
 ) -> list[dict[str, Any]]:
     raw_items: list[dict[str, Any]] = []
 
-    # İlk keşif katmanı: Google News üzerinde hedefli sorgular.
-    # Sonraki adımda resmî kurum ve haber RSS kaynakları da buraya eklenecek.
-    for query in TARGETED_QUERIES:
-        raw_items.extend(
-            _fetch_query(
-                query=query,
-                max_items=per_query,
-            )
-        )
+    # 35 sorguyu paralel çek — sıralı yerine eş zamanlı (10 iş parçacığı).
+    # Sıralı: ~35 × 3sn ≈ 100 sn. Paralel: ~35/10 × 3sn ≈ 10-15 sn.
+    def _fetch_one(query: str) -> list:
+        try:
+            return _fetch_query(query=query, max_items=per_query)
+        except Exception:
+            return []
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(_fetch_one, q): q for q in TARGETED_QUERIES}
+        for future in as_completed(futures):
+            raw_items.extend(future.result())
 
     unique_items = _deduplicate_exact(raw_items)
 
