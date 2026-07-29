@@ -1106,8 +1106,38 @@ def _looks_like_consent_wall(text: str) -> bool:
     return hits >= 2
 
 
-async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
-    """Haber URL'sine gidip tam makale metnini çeker. Başarısız olursa boş string döner."""
+_TR_STOPWORDS = {
+    "veya", "değil", "diye", "olan", "olarak", "üzere", "göre", "sonra", "önce",
+    "arasında", "üzerinde", "altında", "kadar", "daha", "ancak", "fakat", "ile",
+    "gibi", "için", "bunu", "bunun", "şunu", "onun", "olduğu", "olduğunu", "yeni",
+    "eski", "bütün", "tüm", "hangi", "nasıl", "neden", "niçin", "çok", "birçok",
+}
+
+
+def _keyword_set(text: str) -> set:
+    words = re.findall(r"[a-zA-ZçğıöşüÇĞİÖŞÜ]+", text.lower())
+    return {w for w in words if len(w) >= 4 and w not in _TR_STOPWORDS}
+
+
+def _title_matches_content(title: str, content: str, min_overlap: float = 0.2) -> bool:
+    """Seçilen haber başlığındaki anlamlı kelimelerin en az min_overlap oranı çekilen
+    içerikte geçiyor mu kontrol eder. Consent duvarı, 404 sayfası, paywall veya linkin
+    yanlış/alakasız bir sayfaya yönlenmesi gibi durumları yakalar — çekilen metin
+    'gerçek gibi' görünse bile (200 OK, uzun, düzgün cümleler) konuyla hiç ilgisi
+    olmayabilir. Başlık çok kısa/genel ise (2'den az anlamlı kelime) kontrol
+    güvenilmez olur, bu durumda geçerli sayılır."""
+    title_kw = _keyword_set(title)
+    if len(title_kw) < 2:
+        return True
+    content_kw = _keyword_set(content)
+    overlap = title_kw & content_kw
+    return (len(overlap) / len(title_kw)) >= min_overlap
+
+
+async def _fetch_article_text(url: str, max_chars: int = 2000, expected_title: str = "") -> str:
+    """Haber URL'sine gidip tam makale metnini çeker. Başarısız olursa boş string döner.
+    expected_title verilirse, çekilen metnin başlıkla en az bir miktar kelime örtüşmesi
+    olması zorunludur — yoksa yanlış sayfaya düşülmüş demektir, metin reddedilir."""
     if not url:
         return ""
     try:
@@ -1119,6 +1149,16 @@ async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
             r = await client.get(url)
         if r.status_code != 200:
             return ""
+
+        def _valid(candidate: str) -> bool:
+            if not candidate or len(candidate) <= 80:
+                return False
+            if _looks_like_consent_wall(candidate):
+                return False
+            if expected_title and not _title_matches_content(expected_title, candidate):
+                return False
+            return True
+
         try:
             import trafilatura
             text = trafilatura.extract(
@@ -1127,7 +1167,7 @@ async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
                 include_tables=False,
                 favor_recall=True,
             )
-            if text and len(text) > 80 and not _looks_like_consent_wall(text):
+            if _valid(text):
                 return text[:max_chars]
         except Exception:
             pass
@@ -1136,7 +1176,7 @@ async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
         clean = _re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", "", r.text, flags=_re.DOTALL | _re.IGNORECASE)
         clean = _re.sub(r"<[^>]+>", " ", clean)
         clean = _re.sub(r"\s+", " ", clean).strip()
-        if len(clean) > 80 and not _looks_like_consent_wall(clean):
+        if _valid(clean):
             return clean[:max_chars]
         return ""
     except Exception:
@@ -1182,7 +1222,7 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
 
         # Tam makale metinlerini paralel çek
         texts = await asyncio.gather(
-            *[_fetch_article_text(a["link"]) for a in articles],
+            *[_fetch_article_text(a["link"], expected_title=a["title"]) for a in articles],
             return_exceptions=True,
         )
         for i, txt in enumerate(texts):
@@ -1217,7 +1257,7 @@ async def fetch_gnews_article_by_link(link: str, title: str = "", source: str = 
     linki okur."""
     if not link:
         return {}
-    full_text = await _fetch_article_text(link)
+    full_text = await _fetch_article_text(link, expected_title=title)
     if not full_text or len(full_text) < 80:
         return {}
     header = f"KAYNAK: {title}" if title else "KAYNAK"
@@ -1847,6 +1887,8 @@ async def _generate_shorts_core(
     pasted_content: dict = None,
     topic_link: str = "",
     require_verified_source: bool = False,
+    manual_link: str = "",
+    manual_content: str = "",
 ):
     import json
     import httpx
@@ -2064,12 +2106,29 @@ Rules:
                         if trend_data["topics"]
                         else ""
                     )
-        if search_query:
+        if manual_content.strip():
+            # Kullanıcı haberin metnini elle yapıştırdı (link çekilemediğinde/yanlış
+            # habere düştüğünde kullanılan yedek yol) — hiçbir arama/fetch yapılmaz,
+            # yanlış habere düşme riski tamamen ortadan kalkar.
+            _mc = manual_content.strip()[:6000]
+            _header = f"KAYNAK: {search_query}" if search_query else "KAYNAK: Manuel giriş"
+            gnews_data = {
+                "found": True,
+                "articles": [{
+                    "title": search_query, "desc": _mc[:300], "source": "Manuel giriş",
+                    "link": manual_link.strip(), "full_text": _mc,
+                }],
+                "sources": ["Manuel giriş"],
+                "context_text": f"{_header}\n{_mc}",
+                "has_full_text": True,
+            }
+            print("[gnews] manuel yapıştırılan içerik kullanıldı", flush=True)
+        elif search_query:
             # AI jürisi bu konuyu zaten GERÇEK bir makale linkiyle puanlamıştı — önce
             # o linki doğrudan çekmeyi dene (arama yapıp farklı/yanlış bir habere
             # düşme riskini ortadan kaldırır). Link bulunamazsa/çekilemezse eski
             # arama-tabanlı yönteme düş.
-            selected_link = (topic_link or "").strip()  # Telegram/manuel akıştan zaten biliniyorsa direkt kullan
+            selected_link = (manual_link or topic_link or "").strip()  # kullanıcı elle link girdiyse önce o denenir
             selected_source = ""
             if not selected_link:
                 for _c in ranked_candidates:
@@ -2820,10 +2879,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link=""):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content=""):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -2869,6 +2928,8 @@ async def generate_shorts_async_endpoint(
     avatar_image: UploadFile = File(default=None),
     intro_cover_image: UploadFile = File(default=None),
     topic_link: str = Form(""),
+    manual_link: str = Form(""),
+    manual_content: str = Form(""),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -2908,7 +2969,7 @@ async def generate_shorts_async_endpoint(
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content))
     return {"ok": True}
 
 

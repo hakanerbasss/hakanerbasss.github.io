@@ -510,6 +510,29 @@
     <textarea id="shorts-topic" placeholder="Örn: Yapay zekanın geleceği, Mars'a yolculuk, Kuantum fiziği nedir..." style="min-height:90px;"></textarea>
   </div>
 
+  <div style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch" style="margin:0;">
+        <input type="checkbox" id="use-manual-source" onchange="document.getElementById('manual-source-wrap').style.display = this.checked ? 'flex' : 'none';">
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🔗 Kaynak Linki / Metni Elle Gir (opsiyonel)</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">Sistem otomatik link bulamazsa veya yanlış habere gidiyorsa, buraya haberin linkini ya da metnini yapıştır — video SADECE bu kaynağa dayanarak üretilir.</div>
+      </div>
+    </div>
+    <div id="manual-source-wrap" style="display:none;margin-top:10px;flex-direction:column;gap:8px;">
+      <div>
+        <label style="font-size:12px;color:#888;">Haber Linki (opsiyonel)</label>
+        <input type="url" id="manual-source-link" placeholder="https://..." style="font-size:13px;">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#888;">veya Haber Metnini Buraya Yapıştır (linkten önceliklidir)</label>
+        <textarea id="manual-source-content" placeholder="Haberin tam metnini buraya yapıştırabilirsin. Bu doluysa link hiç çekilmez, video doğrudan bu metne dayanır." style="min-height:100px;font-size:13px;"></textarea>
+      </div>
+    </div>
+  </div>
+
   <div style="margin-bottom:20px;">
     <button onclick="fetchTrends()" id="btn-trends" style="background:#1a3a1a;font-size:13px;padding:10px 18px;">
       <div class="spinner" id="spin-trends"></div>
@@ -3066,6 +3089,12 @@ async function generateShorts(allowEmpty = false) {
     // Chip'ten seçilen konu elle değiştirilmediyse, o habere ait bilinen gerçek
     // makale linkini de gönder — üretim yeniden arama yapmadan doğrudan o linke gider.
     fd.append('topic_link', _shortsTopicLink || '');
+    // Elle girilen kaynak (link ve/veya yapıştırılan metin) — otomatik bulma
+    // yanlış/eksik olduğunda kullanıcı doğrudan kaynağı verebilir.
+    if (document.getElementById('use-manual-source').checked) {
+      fd.append('manual_link', document.getElementById('manual-source-link').value.trim());
+      fd.append('manual_content', document.getElementById('manual-source-content').value.trim());
+    }
     fd.append('api_key', apiKey);
     fd.append('lang', document.getElementById('shorts-lang').value);
     fd.append('voice', document.getElementById('shorts-voice').value);
