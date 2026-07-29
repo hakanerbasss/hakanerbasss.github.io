@@ -2765,7 +2765,13 @@ async function sendShortsToInstagram() {
   }
 }
 
-function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText, emptyMsg, topicDetails) {
+// Bir konu chip'i tıklanınca, o haberin AI jürisinin zaten bildiği GERÇEK makale
+// linki varsa burada tutulur — üretim bu linke doğrudan gider, tekrar arama
+// yapıp farklı bir habere düşme riski olmaz. Kullanıcı konuyu elle değiştirirse
+// (artık o link o metne karşılık gelmeyebileceği için) sıfırlanır.
+let _shortsTopicLink = '';
+
+function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText, emptyMsg, topicDetails, topicLinks) {
   const el = document.getElementById(containerId);
   el.innerHTML = '';
   if (!topics.length) {
@@ -2773,6 +2779,7 @@ function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText,
     return;
   }
   const details = topicDetails || {};
+  const links = topicLinks || {};
   topics.forEach(topic => {
     const desc = details[topic] || '';
     const item = document.createElement('div');
@@ -2819,11 +2826,17 @@ function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText,
 
     item.onclick = () => {
       document.getElementById('shorts-topic').value = topic;
+      _shortsTopicLink = links[topic] || '';
       item.style.background = colorBorder;
     };
     el.appendChild(item);
   });
 }
+
+// Kullanıcı konuyu elle değiştirirse (chip'ten seçilen metinle artık birebir
+// aynı olmayabileceği için) o habere ait bilinen linki sıfırla — eski/yanlış
+// bir habere gidilmesin.
+document.getElementById('shorts-topic')?.addEventListener('input', () => { _shortsTopicLink = ''; });
 
 async function fetchTrends(mode) {
   // mode: undefined (normal) | true/'gurbetci' | 'combined'
@@ -2891,7 +2904,7 @@ async function fetchAIRankedPool() {
     }
     const d = await r.json();
     _renderTopicChips('ai-pool-list', d.topics || [], '#0f2a28', '#1a4a45', '#5eead4',
-      'AI jürili havuzda şu an uygun haber bulunamadı.', d.topic_details);
+      'AI jürili havuzda şu an uygun haber bulunamadı.', d.topic_details, d.topic_links);
     document.getElementById('ai-pool-wrap').style.display = 'block';
     document.getElementById('trends-box').style.display = 'block';
     document.getElementById('ai-pool-wrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3016,6 +3029,9 @@ async function generateShorts(allowEmpty = false) {
   try {
     const fd = new FormData();
     fd.append('topic', topic);
+    // Chip'ten seçilen konu elle değiştirilmediyse, o habere ait bilinen gerçek
+    // makale linkini de gönder — üretim yeniden arama yapmadan doğrudan o linke gider.
+    fd.append('topic_link', _shortsTopicLink || '');
     fd.append('api_key', apiKey);
     fd.append('lang', document.getElementById('shorts-lang').value);
     fd.append('voice', document.getElementById('shorts-voice').value);

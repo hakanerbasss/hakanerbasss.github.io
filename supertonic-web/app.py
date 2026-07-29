@@ -1189,6 +1189,34 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
         return {}
 
 
+async def fetch_gnews_article_by_link(link: str, title: str = "", source: str = "") -> dict:
+    """Aday seçilirken zaten bilinen GERÇEK makale linkine doğrudan gider — yeniden arama
+    yapıp AI jürisinin puanladığı haberden farklı/yanlış bir sonuca düşme riski olmadan
+    tam makale metnini çeker. fetch_gnews_summary() gibi arama yapmaz, sadece verilen
+    linki okur."""
+    if not link:
+        return {}
+    full_text = await _fetch_article_text(link)
+    if not full_text or len(full_text) < 80:
+        return {}
+    header = f"KAYNAK: {title}" if title else "KAYNAK"
+    if source:
+        header += f" [{source}]"
+    return {
+        "found": True,
+        "articles": [{
+            "title": title,
+            "desc": full_text[:300],
+            "source": source,
+            "link": link,
+            "full_text": full_text,
+        }],
+        "sources": [source] if source else [],
+        "context_text": f"{header}\n{full_text}",
+        "has_full_text": True,
+    }
+
+
 async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -> dict:
     """Ham makale metninden SADECE kaynakta yazan olguları çıkarır (ayrı ajan — yorum/tahmin katmaz).
 
@@ -1796,6 +1824,7 @@ async def _generate_shorts_core(
     skip_closing_cta: bool = False,
     intro_cover_path: Path = None,
     pasted_content: dict = None,
+    topic_link: str = "",
 ):
     import json
     import httpx
@@ -2014,7 +2043,24 @@ Rules:
                         else ""
                     )
         if search_query:
-            gnews_data = await fetch_gnews_summary(search_query, lang)
+            # AI jürisi bu konuyu zaten GERÇEK bir makale linkiyle puanlamıştı — önce
+            # o linki doğrudan çekmeyi dene (arama yapıp farklı/yanlış bir habere
+            # düşme riskini ortadan kaldırır). Link bulunamazsa/çekilemezse eski
+            # arama-tabanlı yönteme düş.
+            selected_link = (topic_link or "").strip()  # Telegram/manuel akıştan zaten biliniyorsa direkt kullan
+            selected_source = ""
+            if not selected_link:
+                for _c in ranked_candidates:
+                    if (_c.get("title") or "").strip() == search_query.strip():
+                        selected_link = (_c.get("link") or "").strip()
+                        selected_source = (_c.get("source") or "").strip()
+                        break
+            if selected_link:
+                gnews_data = await fetch_gnews_article_by_link(selected_link, search_query, selected_source)
+                if gnews_data.get("found"):
+                    print(f"[gnews] gerçek link üzerinden çekildi: {selected_link}", flush=True)
+            if not gnews_data.get("found"):
+                gnews_data = await fetch_gnews_summary(search_query, lang)
 
         # ── Olgu çıkarma: ayrı bir ajan, sadece "kaynakta ne yazıyor" işiyle uğraşır ──
         # (Senaryo yazan ajandan bilerek ayrı — aynı model hem yorumlayıp hem yaratıcı
@@ -2687,8 +2733,9 @@ async def generate_shorts(
     region: str = Form("TR"),
     use_video: str = Form("false"),
     platform: str = Form("youtube"),
+    topic_link: str = Form(""),
 ):
-    return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform)
+    return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, topic_link=topic_link)
 
 
 MANUAL_SHORTS_LOG = Path("manual_shorts_log.json")
@@ -2732,10 +2779,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link=""):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -2780,6 +2827,7 @@ async def generate_shorts_async_endpoint(
     spiker_mode: str = Form("false"),
     avatar_image: UploadFile = File(default=None),
     intro_cover_image: UploadFile = File(default=None),
+    topic_link: str = Form(""),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -2819,7 +2867,7 @@ async def generate_shorts_async_endpoint(
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link))
     return {"ok": True}
 
 
@@ -5912,6 +5960,7 @@ async def trends_ai_ranked_pool(api_key: str = Form(...)):
     ranked_items = await get_ai_ranked_news_pool(api_key)
     topics = []
     topic_details = {}
+    topic_links = {}
     for item in ranked_items:
         title = (item.get("title") or "").strip()
         if not title or title in topic_details or title in topics:
@@ -5920,7 +5969,10 @@ async def trends_ai_ranked_pool(api_key: str = Form(...)):
         desc = (item.get("description") or "").strip()
         if desc:
             topic_details[title] = desc
-    return {"topics": topics, "topic_details": topic_details}
+        link = (item.get("link") or "").strip()
+        if link:
+            topic_links[title] = link
+    return {"topics": topics, "topic_details": topic_details, "topic_links": topic_links}
 
 
 @app.post("/api/yt/config")
@@ -7887,6 +7939,8 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
         # Kullanıcı 5 dakika içinde numarayla cevap verirse o haberi zorla, vermezse
         # eskisi gibi DeepSeek otomatik seçsin.
         forced_topic = ""
+        forced_topic_link = ""
+        ranked_title_to_link = {}
         if cfg.get("telegram_topic_pick") or force_telegram_pick:
             try:
                 trend_data = get_trends(region_code="TR", lang="tr")
@@ -7909,6 +7963,14 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                     for item in ranked_items
                     if item.get("title", "").strip()
                 ]
+                # Başlık -> gerçek makale linki eşlemesi. Kullanıcı Telegram'dan bir
+                # başlık seçtiğinde, üretim tekrar arama yapmak yerine doğrudan bu
+                # linke gitsin diye (bkz. fetch_gnews_article_by_link).
+                ranked_title_to_link = {
+                    item.get("title", "").strip(): (item.get("link") or "").strip()
+                    for item in ranked_items
+                    if item.get("title", "").strip() and item.get("link")
+                }
 
                 # Telegram listesinde yalnızca puanlama motorunun
                 # uygun bulduğu haberleri kullan. Kaliteli aday sayısı
@@ -8256,6 +8318,7 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                             return
                         elif choice:
                             forced_topic = pool[choice - 1]
+                            forced_topic_link = ranked_title_to_link.get(forced_topic, "")
                             await send_telegram_plain(f"✅ Seçildi: {forced_topic}\nÜretiliyor…")
                             save_ig_only_tr_log("running", f"Telegram'dan seçildi: {forced_topic[:80]}")
                         else:
@@ -8286,7 +8349,8 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                         "http://localhost:8001/api/generate-shorts",
                         data={"topic": forced_topic, "api_key": api_key, "lang": "tr", "voice": s_voice,
                               "speed": "1.0", "exclude_topics": exclude_str, "region": "TR",
-                              "platform": "instagram", "use_video": use_video_val},
+                              "platform": "instagram", "use_video": use_video_val,
+                              "topic_link": forced_topic_link},
                     )
                     if r.status_code != 200:
                         save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
