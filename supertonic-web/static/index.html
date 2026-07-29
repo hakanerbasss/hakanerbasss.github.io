@@ -2813,16 +2813,63 @@ function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText,
   }
   const details = topicDetails || {};
   const links = topicLinks || {};
+  const btnBase = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:#ccc;';
   topics.forEach(topic => {
     const desc = details[topic] || '';
-    const item = document.createElement('div');
-    item.style.cssText = `display:flex;align-items:flex-start;gap:8px;width:100%;box-sizing:border-box;background:${colorBg};border:1px solid ${colorBorder};border-radius:10px;padding:9px 14px;cursor:pointer;`;
+    const link = links[topic] || '';
 
+    const item = document.createElement('div');
+    item.style.cssText = `display:flex;flex-direction:column;gap:8px;width:100%;box-sizing:border-box;background:${colorBg};border:1px solid ${colorBorder};border-radius:10px;padding:9px 14px;cursor:pointer;`;
+
+    // ── Buton satırı (üstte) ──────────────────────────────────────────
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 Kopyala';
+    copyBtn.title = 'Başlık + açıklamayı kopyala';
+    copyBtn.style.cssText = btnBase;
+    copyBtn.onclick = (e) => {
+      e.stopPropagation();
+      const text = desc ? `${topic}\n\n${desc}` : topic;
+      const prev = copyBtn.textContent;
+      const done = () => { copyBtn.textContent = '✓'; setTimeout(() => { copyBtn.textContent = prev; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(done);
+      } else { done(); }
+    };
+    btnRow.appendChild(copyBtn);
+
+    if (link) {
+      const linkBtn = document.createElement('button');
+      linkBtn.textContent = '🔗 Habere Git';
+      linkBtn.title = 'Habere git (kaynağı doğrula)';
+      linkBtn.style.cssText = btnBase;
+      linkBtn.onclick = (e) => { e.stopPropagation(); window.open(link, '_blank', 'noopener'); };
+      btnRow.appendChild(linkBtn);
+
+      const linkCopyBtn = document.createElement('button');
+      linkCopyBtn.textContent = '🔗 Link Kopyala';
+      linkCopyBtn.title = 'Haber linkini kopyala';
+      linkCopyBtn.style.cssText = btnBase;
+      linkCopyBtn.onclick = (e) => {
+        e.stopPropagation();
+        const prev = linkCopyBtn.textContent;
+        const done = () => { linkCopyBtn.textContent = '✓'; setTimeout(() => { linkCopyBtn.textContent = prev; }, 1200); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).then(done).catch(done);
+        } else { done(); }
+      };
+      btnRow.appendChild(linkCopyBtn);
+    }
+
+    item.appendChild(btnRow);
+
+    // ── Metin (altta, tam genişlik) ───────────────────────────────────
     const textWrap = document.createElement('div');
-    textWrap.style.cssText = 'flex:1;min-width:0;';
     const titleEl = document.createElement('div');
     titleEl.textContent = topic;
-    titleEl.style.cssText = `font-size:13px;color:${colorText};font-weight:600;line-height:1.35;`;
+    titleEl.style.cssText = `font-size:13px;color:${colorText};font-weight:600;line-height:1.4;`;
     textWrap.appendChild(titleEl);
     if (desc) {
       const descEl = document.createElement('div');
@@ -2832,63 +2879,9 @@ function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText,
     }
     item.appendChild(textWrap);
 
-    // Görsel üretim aracına (ör. ChatGPT) yapıştırmak için başlık + açıklamayı
-    // tek tıkla kopyala — konu seçiminden bağımsız, ayrı bir buton.
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = '📋';
-    copyBtn.title = 'Başlık + açıklamayı kopyala';
-    // width:auto EKLENMELİ — mobil medya sorgusundaki global "button { width:100% }"
-    // kuralı bunu geçersiz kılıp bu küçük butonu tüm satırı kaplamaya zorluyor,
-    // bu da yanındaki başlık/açıklama metnini neredeyse sıfır genişliğe sıkıştırıyordu.
-    copyBtn.style.cssText = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 9px;font-size:13px;cursor:pointer;color:#ccc;';
-    copyBtn.onclick = (e) => {
-      e.stopPropagation();
-      const text = desc ? `${topic}\n\n${desc}` : topic;
-      const done = () => {
-        const prev = copyBtn.textContent;
-        copyBtn.textContent = '✓';
-        setTimeout(() => { copyBtn.textContent = prev; }, 1200);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done).catch(done);
-      } else {
-        done();
-      }
-    };
-    item.appendChild(copyBtn);
-
-    // Haberin gerçek kaynağını doğrulamak için doğrudan habere giden buton —
-    // link biliniyorsa (chip AI jürili/Telegram havuzundan geldiyse) gösterilir.
-    const link = links[topic] || '';
-    if (link) {
-      const linkBtn = document.createElement('button');
-      linkBtn.textContent = '🔗';
-      linkBtn.title = 'Habere git (kaynağı doğrula)';
-      linkBtn.style.cssText = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 9px;font-size:13px;cursor:pointer;color:#ccc;';
-      linkBtn.onclick = (e) => {
-        e.stopPropagation();
-        window.open(link, '_blank', 'noopener');
-      };
-      item.appendChild(linkBtn);
-
-      const linkCopyBtn = document.createElement('button');
-      linkCopyBtn.textContent = '🔗 Kopyala';
-      linkCopyBtn.title = 'Haber linkini kopyala';
-      linkCopyBtn.style.cssText = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 9px;font-size:11px;cursor:pointer;color:#ccc;';
-      linkCopyBtn.onclick = (e) => {
-        e.stopPropagation();
-        const prev = linkCopyBtn.textContent;
-        const done = () => { linkCopyBtn.textContent = '✓'; setTimeout(() => { linkCopyBtn.textContent = prev; }, 1200); };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(link).then(done).catch(done);
-        } else { done(); }
-      };
-      item.appendChild(linkCopyBtn);
-    }
-
     item.onclick = () => {
       document.getElementById('shorts-topic').value = topic;
-      _shortsTopicLink = links[topic] || '';
+      _shortsTopicLink = link;
       item.style.background = colorBorder;
     };
     el.appendChild(item);
