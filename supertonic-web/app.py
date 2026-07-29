@@ -5458,7 +5458,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
                 )
                 if rp.status_code == 200:
                     permalink = rp.json().get("permalink", "")
-            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink, source=source_text)
+            news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink, source=source_text, body=body)
         except Exception:
             pass
         return
@@ -7336,6 +7336,7 @@ async def auto_shorts_job():
                     thumbnail=thumbnail,
                     source="TR-Shorts",
                     source_text=d.get("source_text", ""),
+                    body=d.get("script", ""),
                 ))
 
     except Exception as e:
@@ -7344,7 +7345,7 @@ async def auto_shorts_job():
         lock.release()
 
 
-async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "", video_mode: str = "") -> tuple[bool, str]:
+async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, ig_cfg: dict, source: str = "", description: str = "", thumbnail: str = "", source_text: str = "", video_mode: str = "", body: str = "") -> tuple[bool, str]:
     """Instagram gönderisi. (ok, err) döner — True/ok sadece upload başlatıldığında."""
     ig_user_id = ig_cfg["ig_user_id"]
     ig_token = ig_cfg["access_token"]
@@ -7797,6 +7798,9 @@ async def auto_en_shorts_job():
                         suggested_tags=d.get("suggested_tags", "#Shorts #news"),
                         ig_cfg=ig_cfg,
                         source="EN-Shorts",
+                        description=d.get("suggested_description", ""),
+                        source_text=d.get("source_text", ""),
+                        body=d.get("script", ""),
                     ))
 
     except Exception as e:
@@ -8473,6 +8477,7 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                 source="IG-Only-TR",
                 source_text=d.get("source_text", ""),
                 video_mode=use_video_val,
+                body=d.get("script", ""),
             )
             if ig_ok:
                 save_ig_only_tr_log("success", log_title)
