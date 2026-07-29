@@ -2909,15 +2909,16 @@ async function fetchAIRankedPool(retryCount) {
     if (d.status === 'pending') {
       isPending = true;
       const poolEl = document.getElementById('ai-pool-list');
+      const remaining = Math.max(0, (19 - attempt) * 8);
       poolEl.innerHTML = `<div style="color:#5eead4;font-size:13px;padding:8px 0;">`
-        + `⏳ ${d.message || 'AI jürisi hazırlanıyor…'} (${attempt + 1}/8)</div>`;
+        + `⏳ ${d.message || 'AI jürisi hazırlanıyor…'} (~${remaining} sn kaldı)</div>`;
       document.getElementById('ai-pool-wrap').style.display = 'block';
       document.getElementById('trends-box').style.display = 'block';
-      if (attempt < 7) {
+      if (attempt < 19) {
         setTimeout(() => fetchAIRankedPool(attempt + 1), 8000);
       } else {
         setLoading('btn-ai-pool', 'spin-ai-pool', false);
-        alert('AI jürisi 1 dakika içinde yanıt vermedi. Lütfen tekrar deneyin.');
+        alert('AI jürisi 3 dakika içinde yanıt vermedi. Lütfen tekrar deneyin.');
       }
       return;
     }

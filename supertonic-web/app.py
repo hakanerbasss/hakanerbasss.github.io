@@ -8807,6 +8807,14 @@ async def startup_event():
 
     asyncio.create_task(_rescue_interrupted_jobs_task())
 
+    async def _warmup_ai_pool():
+        await asyncio.sleep(60)  # Scheduler ve diğer servisler hazırlanırken bekle
+        api_key = get_deepseek_key()
+        if api_key and not _ai_pool_cache["items"]:
+            print("[ai-pool] startup: önbellek ısıtılıyor…", flush=True)
+            await _refresh_ai_pool_bg(api_key)
+    asyncio.create_task(_warmup_ai_pool())
+
     # Restart öncesi "Uzun Video Üret" işlemi yarıda kalmışsa (dosyaya "running"
     # yazılmış ama işlemin kendisi restart ile ölmüş), buton kilitli görünmesin.
     if LIVE_STATE_FILE.exists():
