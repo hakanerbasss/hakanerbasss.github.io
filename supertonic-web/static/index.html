@@ -2824,6 +2824,21 @@ function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText,
     };
     item.appendChild(copyBtn);
 
+    // Haberin gerçek kaynağını doğrulamak için doğrudan habere giden buton —
+    // link biliniyorsa (chip AI jürili/Telegram havuzundan geldiyse) gösterilir.
+    const link = links[topic] || '';
+    if (link) {
+      const linkBtn = document.createElement('button');
+      linkBtn.textContent = '🔗';
+      linkBtn.title = 'Habere git (kaynağı doğrula)';
+      linkBtn.style.cssText = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 9px;font-size:13px;cursor:pointer;color:#ccc;';
+      linkBtn.onclick = (e) => {
+        e.stopPropagation();
+        window.open(link, '_blank', 'noopener');
+      };
+      item.appendChild(linkBtn);
+    }
+
     item.onclick = () => {
       document.getElementById('shorts-topic').value = topic;
       _shortsTopicLink = links[topic] || '';
