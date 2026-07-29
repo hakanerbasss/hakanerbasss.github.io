@@ -1207,6 +1207,7 @@ async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -
         "{\n"
         '  "facts": ["short atomic fact 1 (in ' + ("Turkish" if lang == "tr" else "English") + ')", "fact 2", "..."],\n'
         '  "names_with_titles": {"Full Name": "exact title/role as stated in the article, or empty string if none given"},\n'
+        '  "institutions": {"exact institution/organization name as stated (e.g. SGK, Merkez Bankası, Emniyet Genel Müdürlüğü, Meteoroloji Genel Müdürlüğü, X Bankası)": "the exact action/authority/statement the article attributes to THIS institution — do not merge two different institutions actions together"},\n'
         '  "numbers": ["exact number/percentage/count exactly as written in the article"],\n'
         '  "dates": ["exact date/time reference exactly as written in the article"],\n'
         '  "sufficient": true\n'
@@ -1216,6 +1217,11 @@ async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -
         "- Do NOT add context from general/training knowledge, even obvious-seeming facts.\n"
         "- If the article implies someone's role/title has changed from what you'd expect, trust "
         "ONLY the article — never your training data.\n"
+        "- INSTITUTIONS ARE HIGH RISK — extract EVERY organization/institution named in the article "
+        "(government body, company, bank, agency) together with EXACTLY what the article says that "
+        "institution did/decided. Do NOT substitute a similar-sounding or 'more familiar' institution "
+        "(e.g. if the article says SGK collects a debt, do NOT record it under 'bankalar' just because "
+        "banks are commonly involved in similar stories — extract the institution EXACTLY as named).\n"
         "- If unsure whether something counts as a stated fact, leave it out.\n"
         '- Set "sufficient": true only if there are at least 4 solid, distinct facts — enough '
         "material for a natural ~45-55 second news narration without padding."
@@ -1246,6 +1252,8 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
     names = ", ".join(facts_data.get("names_with_titles", {}).keys())
     numbers = ", ".join(facts_data.get("numbers", []))
     dates = ", ".join(facts_data.get("dates", []))
+    institutions = facts_data.get("institutions", {}) or {}
+    institutions_block = "\n".join(f"- {k}: {v}" for k, v in institutions.items()) or "(none)"
     verify_prompt = (
         "You are a strict fact-checker. Compare the NARRATION below against the VERIFIED FACTS list. "
         "Find any specific claim in the narration — a name, number, date, title, or specific detail — "
@@ -1253,8 +1261,16 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
         f"VERIFIED FACTS:\n{facts_list}\n"
         f"Known names: {names or '(none)'}\n"
         f"Known numbers: {numbers or '(none)'}\n"
-        f"Known dates: {dates or '(none)'}\n\n"
+        f"Known dates: {dates or '(none)'}\n"
+        f"Known institutions and their EXACT stated actions:\n{institutions_block}\n\n"
         f"NARRATION TO CHECK:\n{narration}\n\n"
+        "SPECIAL FOCUS — INSTITUTION SWAPS (this is the most common and most dangerous error): "
+        "if the narration attributes an action/authority/decision to an institution (bank, government "
+        "agency, company) that is EITHER not in the known institutions list, OR is a DIFFERENT "
+        "institution than the one the facts say did that specific action (e.g. facts say 'SGK collects "
+        "a debt' but narration says 'banks collect the debt' — this is an unsupported claim EVEN THOUGH "
+        "banks are a plausible-sounding institution for this kind of story), you MUST flag it. Never "
+        "assume institutions are interchangeable just because they're topically related.\n\n"
         "Return ONLY valid JSON, no markdown:\n"
         '{"unsupported_claims": ["claim text not backed by the facts above", "..."]}\n\n'
         "If every specific claim in the narration is backed by the facts list (generic storytelling "
@@ -2111,6 +2127,7 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 - NEVER use phrases that imply real footage or real photos exist (e.g. "İşte görüntüler", "İşte o anlar", "kameralar görüntüledi", "işte o fotoğraflar", "görüntüler ortaya çıktı", "here is the footage"). Visuals are illustrative stock photos — narration must describe events in storytelling form, never reference visuals.
 - POLITICAL TITLES: Your training data is outdated. NEVER assume someone still holds a position from your training. Use ONLY the title given in the news context above. If no title is given, use only the person's name. Known outdated facts to avoid: Assad is no longer Syria's president (fled Dec 2024), Biden is no longer US president.
 - NO FABRICATED NUMBERS OR SCOPE: NEVER write "milyonlarca", "binlerce", "yüz binlerce", or any specific number/count/percentage UNLESS it appears word-for-word in the news source provided above. If the source does not mention a number, do NOT invent one. Use the exact scope from the source (e.g. if source says "bazı çalışanlar", write "bazı çalışanlar" — never upgrade it to "milyonlarca çalışan"). Inventing numbers is disinformation and causes legal risk.
+- NO FABRICATED OR SUBSTITUTED INSTITUTIONS — THIS IS THE MOST DANGEROUS ERROR, CHECK IT TWICE: NEVER name a bank, government agency, ministry, or company as doing/deciding something unless THAT EXACT institution is named in the source doing THAT EXACT thing. Never substitute a "more familiar" or "more clickbaity" institution for the real one, even if it's topically similar — this has caused real incidents (e.g. a source about SGK collecting its own premium debt got rewritten as "bankalar kesinti yapıyor", falsely implying private banks can seize pension payments over personal loans — this is exactly what NOT to do). If the source doesn't name a specific institution, describe the action generically without inventing who's responsible.
 - TITLE SCOPE MUST MATCH THE SOURCE TOO — this is NOT just a narration rule: the "title" field gets the SAME scrutiny as scene text. If the source says only SOME workers/positions/groups are affected (e.g. "bazı memur kadroları", "bazı unvanlar"), the title must NOT generalize to the whole group (e.g. do NOT write "MEMURLARA Ek Tazminat" if it's only a subset — write "Bazı Memurlara..." or name the specific group). A catchy title is fine; an overclaimed scope is not — viewers who don't qualify will call it a lie in the comments.
 - NO SENSATIONALISM BEYOND SOURCE: Do not use words like "şoke eden", "bomba", "skandal", "rezalet", "inanılmaz" unless the source itself uses comparable language. Stick to facts as stated in the source.
 - NO EMPTY PROMISES: NEVER write a sentence that promises information without immediately delivering it in the same or next sentence — e.g. "detaylar açıklandı", "işte merak edilenler", "peki bakalım neler var" followed by ending the video without saying what those details/answers actually are. Every scene must contain a real, concrete piece of information from the facts list. If you don't have enough facts to fill a promised detail, do NOT tease it — cut that sentence entirely instead. Ending a video on an unfulfilled setup reads as clickbait and destroys trust, even if no fact was technically wrong.
