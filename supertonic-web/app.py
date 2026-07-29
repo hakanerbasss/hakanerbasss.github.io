@@ -1825,6 +1825,7 @@ async def _generate_shorts_core(
     intro_cover_path: Path = None,
     pasted_content: dict = None,
     topic_link: str = "",
+    require_verified_source: bool = False,
 ):
     import json
     import httpx
@@ -2068,6 +2069,21 @@ Rules:
         facts_data = {}
         if gnews_data.get("found") and gnews_data.get("context_text"):
             facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
+
+        # GÜVENLİK KİLİDİ: doğrudan link + arama, ikisi de gerçek kaynak metni veremediyse
+        # facts_data boş kalır. Otomatik (insan denetimsiz) akışlarda bu durumda ASLA
+        # senaryo üretimine devam edilmez — model "topic" metninden kafasına göre haber
+        # UYDURABİLİR, bu gerçek bir yanlış bilgi olayına yol açmıştı (SGK/Bankalar).
+        # Manuel "Short Üret" akışında (genel bilgi konuları için de kullanılıyor) bu
+        # kilit devre dışı — require_verified_source sadece insan denetimsiz otomatik
+        # işler (/api/generate-shorts) tarafından True gönderilir.
+        if require_verified_source and not facts_data.get("facts"):
+            raise HTTPException(
+                422,
+                f"'{search_query}' için gerçek/doğrulanabilir kaynak metni bulunamadı — "
+                f"yanlış habere ('kafasına göre uydurma') karşı bu haber OTOMATİK olarak "
+                f"ÜRETİLMEDİ. Bu saat dilimi atlanacak.",
+            )
 
         news_context_instruction = ""
         if facts_data.get("facts"):
@@ -2735,7 +2751,11 @@ async def generate_shorts(
     platform: str = Form("youtube"),
     topic_link: str = Form(""),
 ):
-    return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, topic_link=topic_link)
+    # Bu uç nokta yalnızca insan denetimsiz otomatik işler tarafından çağrılıyor
+    # (auto_shorts_job / auto_en_shorts_job / auto_ig_only_tr_job — frontend hiç
+    # kullanmıyor, o /api/generate-shorts-async kullanıyor). O yüzden gerçek kaynak
+    # doğrulaması burada ZORUNLU: doğrulanamayan haber otomatik paylaşılmaz.
+    return await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, topic_link=topic_link, require_verified_source=True)
 
 
 MANUAL_SHORTS_LOG = Path("manual_shorts_log.json")
