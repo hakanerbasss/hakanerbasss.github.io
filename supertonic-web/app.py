@@ -1087,6 +1087,25 @@ def get_diversity_instruction() -> str:
     return ""
 
 
+_CONSENT_WALL_MARKERS = (
+    "çerezleri kullanır", "çerez politikası", "çerezleri ve verileri", "tümünü kabul et",
+    "tümünü reddet", "cookie policy", "we use cookies", "accept all cookies", "reject all",
+    "consent.google.com", "gdpr", "kvkk onay", "privacy policy and terms",
+)
+
+
+def _looks_like_consent_wall(text: str) -> bool:
+    """Google News RSS linkleri bazen (özellikle AB bölgesindeki sunuculardan) gerçek
+    makale yerine Google'ın kendi çerez onay/consent sayfasına yönlendiriyor. Bu sayfa
+    normal bir makale gibi 200 OK + >80 karakter metin döndürdüğü için fark edilmeden
+    'kaynak metin' sanılıp DeepSeek'e geçiyordu — model de o metne sadık kalıp tamamen
+    alakasız bir konuda ('Google çerez politikası') video üretiyordu. En az 2 belirteç
+    eşleşirse bu makale metni değil bir consent duvarıdır, reddedilmeli."""
+    lowered = text.lower()
+    hits = sum(1 for marker in _CONSENT_WALL_MARKERS if marker in lowered)
+    return hits >= 2
+
+
 async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
     """Haber URL'sine gidip tam makale metnini çeker. Başarısız olursa boş string döner."""
     if not url:
@@ -1108,7 +1127,7 @@ async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
                 include_tables=False,
                 favor_recall=True,
             )
-            if text and len(text) > 80:
+            if text and len(text) > 80 and not _looks_like_consent_wall(text):
                 return text[:max_chars]
         except Exception:
             pass
@@ -1117,7 +1136,9 @@ async def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
         clean = _re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", "", r.text, flags=_re.DOTALL | _re.IGNORECASE)
         clean = _re.sub(r"<[^>]+>", " ", clean)
         clean = _re.sub(r"\s+", " ", clean).strip()
-        return clean[:max_chars] if len(clean) > 80 else ""
+        if len(clean) > 80 and not _looks_like_consent_wall(clean):
+            return clean[:max_chars]
+        return ""
     except Exception:
         return ""
 
