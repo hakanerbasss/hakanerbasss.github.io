@@ -2299,32 +2299,8 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 
         scenes = data["scenes"]
 
-        # ── Üçüncü ajan: senaryodaki iddiaları olgu listesiyle karşılaştırır ──
-        # Desteklenmeyen bir iddia bulunursa, o iddiayı göstererek yeniden yazdırır (maks 2 deneme).
-        if facts_data.get("facts"):
-            for _verify_attempt in range(2):
-                full_narration = " ".join(s.get("text", "") for s in scenes)
-                unsupported = await _verify_narration_facts(client, full_narration, facts_data)
-                if not unsupported:
-                    break
-                print(f"[verify] desteklenmeyen iddialar bulundu, yeniden yazdırılıyor: {unsupported}", flush=True)
-                correction_prompt = prompt + (
-                    "\n\nDÜZELTME GEREKLİ — bir önceki taslağında şu iddialar olgu listesinde YOKTU. "
-                    "Bunları TAMAMEN KALDIR veya olgu listesindeki karşılığıyla değiştir. Başka hiçbir "
-                    "yeni detay ekleme:\n" + "\n".join(f"- {c}" for c in unsupported)
-                )
-                try:
-                    _fix_resp = client.chat.completions.create(
-                        model="deepseek-v4-pro",
-                        messages=[{"role": "user", "content": correction_prompt}],
-                        temperature=0.5,
-                    )
-                    _fixed = _parse_llm_json(_fix_resp.choices[0].message.content)
-                    data = _fixed
-                    scenes = data["scenes"]
-                except Exception as _fix_e:
-                    print(f"[verify] düzeltme denemesi başarısız: {_fix_e}", flush=True)
-                    break
+        # Verify adımı kaldırıldı: sıralı 3. AI çağrısı üretim süresini 10+ dk'ya çıkarıyordu.
+        # Olgu çıkarma (_extract_verified_facts) zaten doğruluğu garanti ediyor.
 
         if lang == "tr":
             try:
