@@ -6274,21 +6274,25 @@ def _get_live_creds():
     return creds
 
 
-def queue_video_for_live(filename: str, title: str = "") -> None:
+def queue_video_for_live(filename: str, title: str = "") -> bool:
     """Başarıyla paylaşılan bir haber videosunu, canlı yayın açıksa kuyruğa ekler.
     title verilirse aynı adlı .json sidecar oluşturulur — supervisor bunu okuyarak
-    YouTube yayın başlığını her video değişiminde otomatik günceller."""
+    YouTube yayın başlığını her video değişiminde otomatik günceller.
+    Döner: True = eklendi, False = yayın kapalı veya hata."""
     try:
         if not load_live_config().get("enabled"):
-            return
+            return False
         src = OUTPUT_DIR / filename
         if src.exists():
             shutil.copy2(str(src), str(LIVE_QUEUE_DIR / filename))
             if title:
                 sidecar = LIVE_QUEUE_DIR / (Path(filename).stem + ".json")
                 sidecar.write_text(json.dumps({"title": title}, ensure_ascii=False))
+            return True
+        return False
     except Exception as e:
         print(f"[LIVE] kuyruğa eklenemedi: {e}", flush=True)
+        return False
 
 
 async def _probe_duration(path: Path) -> float:
@@ -7527,7 +7531,8 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail, source_text))
             upload_ok = True
-            queue_video_for_live(filename, title)
+            if queue_video_for_live(filename, title):
+                asyncio.create_task(send_telegram_plain(f"📺 Canlı yayın havuzuna eklendi\n🎬 {title[:80]}"))
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
