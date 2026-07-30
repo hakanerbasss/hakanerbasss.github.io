@@ -6273,16 +6273,19 @@ def _get_live_creds():
     return creds
 
 
-def queue_video_for_live(filename: str) -> None:
+def queue_video_for_live(filename: str, title: str = "") -> None:
     """Başarıyla paylaşılan bir haber videosunu, canlı yayın açıksa kuyruğa ekler.
-    Yayın kapalıysa disk boşuna dolmasın diye hiçbir şey yapmaz. Ekstra üretim YOK —
-    havuz sadece zaten çalışan üretimlerden (şu an TR Instagram-Only) doğal olarak dolar."""
+    title verilirse aynı adlı .json sidecar oluşturulur — supervisor bunu okuyarak
+    YouTube yayın başlığını her video değişiminde otomatik günceller."""
     try:
         if not load_live_config().get("enabled"):
             return
         src = OUTPUT_DIR / filename
         if src.exists():
             shutil.copy2(str(src), str(LIVE_QUEUE_DIR / filename))
+            if title:
+                sidecar = LIVE_QUEUE_DIR / (Path(filename).stem + ".json")
+                sidecar.write_text(json.dumps({"title": title}, ensure_ascii=False))
     except Exception as e:
         print(f"[LIVE] kuyruğa eklenemedi: {e}", flush=True)
 
@@ -6358,7 +6361,9 @@ async def _live_stream_supervisor():
         return
 
     rtmp_url = f"{info['ingestion_address']}/{info['stream_name']}"
-    save_live_state(status="starting", broadcast_id=info["broadcast_id"], watch_url=info["watch_url"],
+    broadcast_id = info["broadcast_id"]
+    scheduled_start = info["scheduled_start"]
+    save_live_state(status="starting", broadcast_id=broadcast_id, watch_url=info["watch_url"],
                      started_at=time.time(), error="")
 
     try:
@@ -6374,8 +6379,26 @@ async def _live_stream_supervisor():
                     "-f", "flv", rtmp_url,
                 ]
                 stats = await _live_pool_stats()
+                # Sidecar'dan haber başlığını oku, YouTube yayın başlığını güncelle
+                sidecar = LIVE_QUEUE_DIR / (current.stem + ".json")
+                video_title = ""
+                if sidecar.exists():
+                    try:
+                        video_title = json.loads(sidecar.read_text()).get("title", "")
+                    except Exception:
+                        pass
+                if video_title:
+                    yt_title = f"Son Dakika — {video_title}"
+                    try:
+                        await asyncio.to_thread(
+                            youtube_live.update_broadcast_title,
+                            creds, broadcast_id, yt_title, scheduled_start,
+                        )
+                    except Exception as _ute:
+                        print(f"[LIVE] başlık güncellenemedi: {_ute}", flush=True)
                 save_live_state(status="live", current_file=current.name,
-                                 pool_count=stats["count"], pool_seconds=stats["seconds"], error="")
+                                 pool_count=stats["count"], pool_seconds=stats["seconds"],
+                                 current_title=video_title, error="")
             else:
                 # Teorik olarak buraya gelinmemeli (1 saat dolmadan yayın başlamıyor)
                 # ama güvenlik ağı olarak bir bekleme ekranı — RTMP hiç kesilmesin.
@@ -6405,6 +6428,7 @@ async def _live_stream_supervisor():
                         # Havuz 12 saati aşıyor — en eski (az önce oynayan) video atılır,
                         # havuz sürekli "son 12 saat" olacak şekilde kendini tazeler.
                         current.unlink(missing_ok=True)
+                        (LIVE_QUEUE_DIR / (current.stem + ".json")).unlink(missing_ok=True)
                         _live_duration_cache.pop(current.name, None)
                     else:
                         # Havuz henüz 12 saatin altında — sona koy (döngü), silme.
@@ -6421,6 +6445,9 @@ async def _live_stream_supervisor():
                         # 3 ardışık hatada dosyayı bozuk say → hatali/ klasörüne taşı
                         print(f"[LIVE] {current.name} {fails}. hatada hatali/ klasörüne taşındı: {err_tail}", flush=True)
                         current.rename(LIVE_FAILED_DIR / current.name)
+                        _sc = LIVE_QUEUE_DIR / (current.stem + ".json")
+                        if _sc.exists():
+                            _sc.rename(LIVE_FAILED_DIR / _sc.name)
                         _live_duration_cache.pop(current.name, None)
                         _live_fail_count.pop(current.name, None)
                     else:
@@ -7477,6 +7504,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
             asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail, source_text))
             upload_ok = True
+            queue_video_for_live(filename, title)
 
     if ig_cfg.get("post_story", False):  # varsayılan False — REELS+is_stories grid'e de düşer
         video_file2 = OUTPUT_DIR / filename
@@ -8567,7 +8595,6 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
             )
             if ig_ok:
                 save_ig_only_tr_log("success", log_title)
-                queue_video_for_live(filename)
             else:
                 save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
         finally:

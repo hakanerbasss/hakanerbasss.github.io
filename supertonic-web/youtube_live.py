@@ -59,7 +59,24 @@ def create_broadcast(creds, title: str, description: str = "") -> dict:
         "ingestion_address": ingestion["ingestionAddress"],
         "stream_name": ingestion["streamName"],
         "watch_url": f"https://www.youtube.com/watch?v={broadcast['id']}",
+        "scheduled_start": scheduled_start,
     }
+
+
+def update_broadcast_title(creds, broadcast_id: str, title: str, scheduled_start: str) -> None:
+    """Yayın devam ederken başlığı günceller. scheduledStartTime update çağrısında
+    da zorunlu — create_broadcast'ten dönen değer olduğu gibi iletilmeli."""
+    yt = build("youtube", "v3", credentials=creds)
+    yt.liveBroadcasts().update(
+        part="snippet",
+        body={
+            "id": broadcast_id,
+            "snippet": {
+                "title": title[:100],
+                "scheduledStartTime": scheduled_start,
+            },
+        },
+    ).execute()
 
 
 def end_broadcast(creds, broadcast_id: str) -> dict:
