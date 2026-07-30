@@ -2112,17 +2112,31 @@ Rules:
             # yanlış habere düşme riski tamamen ortadan kalkar.
             _mc = manual_content.strip()[:6000]
             _header = f"KAYNAK: {search_query}" if search_query else "KAYNAK: Manuel giriş"
+            # "Kaynak kurum veya yayın adları: X, Y, Z" veya "Kaynaklar: X ve Y" satırını oku
+            import re as _re
+            _kaynak_m = _re.search(
+                r'Kaynak(?:\s+kurum[^:\n]*)?\s*:\s*([^\n]+)', _mc, _re.IGNORECASE
+            )
+            if _kaynak_m:
+                _src_raw = _kaynak_m.group(1)
+                _parsed_sources = [
+                    s.strip().rstrip(".")
+                    for s in _re.split(r'[,،]\s*|\s+ve\s+', _src_raw)
+                    if s.strip() and len(s.strip()) > 2
+                ]
+            else:
+                _parsed_sources = ["Manuel giriş"]
             gnews_data = {
                 "found": True,
                 "articles": [{
-                    "title": search_query, "desc": _mc[:300], "source": "Manuel giriş",
+                    "title": search_query, "desc": _mc[:300], "source": ", ".join(_parsed_sources),
                     "link": manual_link.strip(), "full_text": _mc,
                 }],
-                "sources": ["Manuel giriş"],
+                "sources": _parsed_sources,
                 "context_text": f"{_header}\n{_mc}",
                 "has_full_text": True,
             }
-            print("[gnews] manuel yapıştırılan içerik kullanıldı", flush=True)
+            print(f"[gnews] manuel içerik kullanıldı, kaynaklar: {_parsed_sources}", flush=True)
         elif search_query:
             # AI jürisi bu konuyu zaten GERÇEK bir makale linkiyle puanlamıştı — önce
             # o linki doğrudan çekmeyi dene (arama yapıp farklı/yanlış bir habere
