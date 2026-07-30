@@ -6222,7 +6222,7 @@ LIVE_FAILED_DIR.mkdir(exist_ok=True)
 LIVE_CONFIG_FILE = Path("live_stream_config.json")
 LIVE_STATE_FILE = Path("live_stream_state.json")
 
-_LIVE_MIN_SECONDS = 1800    # 30 dakika — havuz bu kadar dolmadan yayın hiç başlamaz
+_LIVE_MIN_SECONDS = 300     # 5 dakika — havuz bu kadar dolmadan yayın başlamaz (pruning sonrası düşüşe karşı)
 _LIVE_MAX_SECONDS = 1800    # 30 dakika — havuz tavanı; aşılınca en eskiden silinir
 
 _live_stream_task: asyncio.Task | None = None
