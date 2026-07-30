@@ -4,6 +4,7 @@ Video/ses aktarımı burada YOK — Data API v3 sadece yayının "kabuğunu" (br
 stream nesnesi + RTMP giriş adresi) oluşturur. Gerçek video/ses akışı ffmpeg ile
 RTMP üzerinden ayrıca yapılır (bkz. app.py: _live_stream_supervisor).
 """
+import datetime
 from googleapiclient.discovery import build
 
 
@@ -16,12 +17,17 @@ def create_broadcast(creds, title: str, description: str = "") -> dict:
     kendiliğinden sonlanmamasını sağlar."""
     yt = build("youtube", "v3", credentials=creds)
 
+    scheduled_start = (
+        datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+    ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
     broadcast = yt.liveBroadcasts().insert(
         part="snippet,status,contentDetails",
         body={
             "snippet": {
                 "title": (title or "Canlı Yayın")[:100],
                 "description": (description or "")[:5000],
+                "scheduledStartTime": scheduled_start,
             },
             "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False},
             "contentDetails": {
