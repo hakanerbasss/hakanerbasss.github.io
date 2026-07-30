@@ -6229,6 +6229,7 @@ _live_stream_task: asyncio.Task | None = None
 _live_stream_proc = None
 _live_stream_stop_flag = False
 _live_duration_cache: dict[str, float] = {}  # dosya adı -> saniye (dosyalar değişmez, güvenle önbelleklenir)
+_live_fail_count: dict[str, int] = {}  # dosya adı -> ardışık hata sayısı (3'te hatali/ klasörüne taşınır)
 
 
 def load_live_config() -> dict:
@@ -6398,14 +6399,15 @@ async def _live_stream_supervisor():
 
             if current is not None:
                 if _live_stream_proc.returncode == 0:
+                    _live_fail_count.pop(current.name, None)
                     stats = await _live_pool_stats()
                     if stats["seconds"] > _LIVE_MAX_SECONDS:
-                        # Havuz 24 saati aşıyor — en eski (az önce oynayan) video atılır,
-                        # havuz sürekli "son 24 saat" olacak şekilde kendini tazeler.
+                        # Havuz 12 saati aşıyor — en eski (az önce oynayan) video atılır,
+                        # havuz sürekli "son 12 saat" olacak şekilde kendini tazeler.
                         current.unlink(missing_ok=True)
                         _live_duration_cache.pop(current.name, None)
                     else:
-                        # Havuz henüz 24 saatin altında — sona koy (döngü), silme.
+                        # Havuz henüz 12 saatin altında — sona koy (döngü), silme.
                         current.touch()
                 elif _live_stream_stop_flag:
                     # Kasıtlı durdurma (Durdur butonu) ffmpeg'i kesiyor, bu bir hata
@@ -6413,11 +6415,23 @@ async def _live_stream_supervisor():
                     pass
                 else:
                     err_tail = (stderr or b"").decode(errors="ignore")[-500:]
-                    print(f"[LIVE] ffmpeg hatası ({current.name}): {err_tail}", flush=True)
-                    # Bozuk dosya kuyruğu tıkamasın — alt klasöre taşı (glob "*.mp4" alt
-                    # klasörlere inmiyor, bir daha seçilmez), tekrar denenmesin
-                    current.rename(LIVE_FAILED_DIR / current.name)
-                    _live_duration_cache.pop(current.name, None)
+                    fails = _live_fail_count.get(current.name, 0) + 1
+                    _live_fail_count[current.name] = fails
+                    if fails >= 3:
+                        # 3 ardışık hatada dosyayı bozuk say → hatali/ klasörüne taşı
+                        print(f"[LIVE] {current.name} {fails}. hatada hatali/ klasörüne taşındı: {err_tail}", flush=True)
+                        current.rename(LIVE_FAILED_DIR / current.name)
+                        _live_duration_cache.pop(current.name, None)
+                        _live_fail_count.pop(current.name, None)
+                    else:
+                        # Muhtemelen ağ/RTMP geçici kopması — kısa bekle, aynı dosyayı tekrar dene
+                        wait = fails * 5
+                        print(f"[LIVE] ffmpeg hatası ({current.name}, deneme {fails}/3) — {wait}s sonra tekrar: {err_tail[-300:]}", flush=True)
+                        save_live_state(status="reconnecting", error=f"Bağlantı hatası, {wait}s sonra tekrar deneniyor (deneme {fails}/3)")
+                        for _ in range(wait):
+                            if _live_stream_stop_flag:
+                                break
+                            await asyncio.sleep(1)
     finally:
         try:
             await asyncio.to_thread(youtube_live.end_broadcast, creds, info["broadcast_id"])
@@ -8878,6 +8892,14 @@ async def startup_event():
     start_namaz_scheduler(scheduler)
 
     asyncio.create_task(_rescue_interrupted_jobs_task())
+
+    # Canlı yayın etkinse servis başlarken otomatik olarak yeniden başlat
+    _live_cfg = load_live_config()
+    if _live_cfg.get("enabled"):
+        global _live_stream_task, _live_stream_stop_flag
+        _live_stream_stop_flag = False
+        _live_stream_task = asyncio.create_task(_live_stream_supervisor())
+        print("[LIVE] startup: canlı yayın etkin, süpervizör otomatik başlatıldı", flush=True)
 
     async def _warmup_ai_pool():
         await asyncio.sleep(60)  # Scheduler ve diğer servisler hazırlanırken bekle
