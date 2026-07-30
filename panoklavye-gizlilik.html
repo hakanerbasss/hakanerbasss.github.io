@@ -1,0 +1,225 @@
+<title>Panoklavye — Gizlilik Politikası</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f6f7fb;
+    --border: #e2e5f0;
+    --text: #1a1a1a;
+    --text-muted: #5a5f72;
+    --accent: #2b3a67;
+    --accent-light: #eaedf6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1220;
+      --surface: #171b2e;
+      --border: #262c47;
+      --text: #e8eaf5;
+      --text-muted: #9aa0bd;
+      --accent: #7d92e0;
+      --accent-light: #191f38;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --surface: #f6f7fb; --border: #e2e5f0;
+    --text: #1a1a1a; --text-muted: #5a5f72; --accent: #2b3a67; --accent-light: #eaedf6;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1220; --surface: #171b2e; --border: #262c47;
+    --text: #e8eaf5; --text-muted: #9aa0bd; --accent: #7d92e0; --accent-light: #191f38;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    padding: 0 16px;
+  }
+
+  .wrapper {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 48px 0 80px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 40px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-icon {
+    width: 52px;
+    height: 52px;
+    background: var(--accent);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+
+  header p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .summary-box {
+    background: var(--accent-light);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 36px;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  .summary-box strong {
+    color: var(--accent);
+    display: block;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 10px;
+    letter-spacing: -0.1px;
+  }
+
+  p {
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  ul {
+    padding-left: 20px;
+    margin-bottom: 10px;
+  }
+
+  li {
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 5px;
+  }
+
+  .tag {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+
+  footer {
+    font-size: 13px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+
+<div class="wrapper">
+  <header>
+    <div class="app-icon">⌨️</div>
+    <div>
+      <h1>Panoklavye</h1>
+      <p>Gizlilik Politikası · Son güncelleme: Temmuz 2026</p>
+    </div>
+  </header>
+
+  <div class="summary-box">
+    <strong>Özet</strong>
+    Panoklavye bir Android klavye uygulamasıdır. Yazdığınız hiçbir metin, pano (kopyala/yapıştır) geçmişiniz veya kelime önerileri internete gönderilmez — hepsi yalnızca cihazınızda, yerel olarak işlenir ve saklanır. Uygulamanın şu an internet erişim izni bile yoktur.
+  </div>
+
+  <section>
+    <h2>Toplanan Bilgiler</h2>
+    <p>Panoklavye, klavye olarak çalışabilmesi için Android tarafından her klavyeye verilen standart erişime sahiptir. Bu erişimi şöyle kullanır:</p>
+    <ul>
+      <li>
+        <span class="tag">Yazdıklarınız</span>
+        Kelime önerileri (otomatik tamamlama/düzeltme) tamamen cihaz üzerinde, internete bağlı olmayan yerel bir sözlükle hesaplanır. Yazdığınız hiçbir metin kaydedilmez, analiz edilmez veya herhangi bir sunucuya gönderilmez.
+      </li>
+      <li>
+        <span class="tag">Pano geçmişi</span>
+        Kopyaladığınız metin, resim ve dosyalar, siz silene kadar yalnızca cihazınızdaki uygulama veritabanında saklanır. Bu veriler hiçbir zaman cihazınızın dışına çıkmaz.
+      </li>
+      <li>
+        <span class="tag">Titreşim / Bildirim izni</span>
+        Uygulama, tuş basımlarında titreşim geri bildirimi ve (varsa) sistem bildirimleri göstermek için bu izinleri kullanır. Bu izinler veri toplama amaçlı değildir.
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Üçüncü Taraf Hizmetler</h2>
+    <p>Panoklavye şu anda hiçbir üçüncü taraf analitik, reklam veya izleme hizmeti kullanmamaktadır ve <strong>internet erişim izni bulunmamaktadır</strong> — yani uygulama teknik olarak ağ üzerinden veri gönderemez.</p>
+    <p>İleride reklam (örn. Google AdMob) eklenmesi durumunda bu politika güncellenecek ve hangi verilerin (örn. reklam kimliği / GAID) hangi amaçla kullanılacağı burada açıkça belirtilecektir.</p>
+  </section>
+
+  <section>
+    <h2>Veri Saklama</h2>
+    <p>Uygulama şu verileri yalnızca cihazınızda (yerel depolama) saklar:</p>
+    <ul>
+      <li>Pano (kopyala/yapıştır) geçmişi ve sabitlediğiniz/isim verdiğiniz ögeler</li>
+      <li>Klavye dili, düzeni ve diğer tercihleriniz</li>
+    </ul>
+    <p>Bu veriler uygulama silindiğinde veya pano geçmişinden manuel olarak silindiğinde kaldırılır. Sunucularımıza herhangi bir kullanıcı verisi aktarılmaz — çünkü şu an böyle bir sunucu bağlantısı yoktur.</p>
+  </section>
+
+  <section>
+    <h2>Çocukların Gizliliği</h2>
+    <p>Uygulama 13 yaşın altındaki çocuklardan bilerek kişisel veri toplamaz.</p>
+  </section>
+
+  <section>
+    <h2>Değişiklikler</h2>
+    <p>Bu politika gerektiğinde güncellenebilir (örn. reklam eklenmesi durumunda). Önemli değişiklikler bu sayfada duyurulur.</p>
+  </section>
+
+  <hr class="divider">
+
+  <footer>
+    <p>Sorularınız için: <a href="mailto:belmolysoft@gmail.com">belmolysoft@gmail.com</a></p>
+  </footer>
+</div>
