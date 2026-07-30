@@ -2875,7 +2875,6 @@ async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics,
         result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
-        queue_video_for_live(video_file.name, result.get("title", ""))
         await send_telegram_video(
             video_file,
             result.get("title", topic or "Manuel Shorts"),
@@ -6480,6 +6479,16 @@ async def _live_stream_supervisor():
             print(f"[LIVE] yayın sonlandırma hatası: {ee}", flush=True)
         save_live_state(status="stopped", current_file=None)
         _live_stream_proc = None
+
+
+@app.post("/api/live/queue-manual")
+async def live_queue_manual(filename: str = Form(...), title: str = Form("")):
+    """Manuel olarak üretilen bir videoyu canlı yayın havuzuna ekler."""
+    src = OUTPUT_DIR / filename
+    if not src.exists():
+        raise HTTPException(status_code=404, detail="Video dosyası bulunamadı")
+    queue_video_for_live(filename, title)
+    return {"ok": True, "queued": filename}
 
 
 @app.get("/api/live/config")

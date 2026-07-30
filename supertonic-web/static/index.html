@@ -774,7 +774,12 @@
             <div class="spinner" id="spin-shorts-ig"></div>
             Instagram'da Paylaş
           </button>
+          <button onclick="addToLiveQueue(this)" id="btn-live-queue" style="background:#1a3a5a;border:1px solid #2a5a8a;">
+            <div class="spinner" id="spin-live-queue"></div>
+            📺 Canlı Yayın Havuzuna Ekle
+          </button>
         </div>
+        <div id="live-queue-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
         <div class="error" id="err-yt"></div>
         <div id="yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
           Yüklendi! → <a id="yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
@@ -2757,6 +2762,42 @@ function copyFieldValue(elId, btn) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(done).catch(done);
   } else { done(); }
+}
+
+async function addToLiveQueue(btn) {
+  if (!currentVideoFilename) { alert('Önce video oluştur'); return; }
+  const res = document.getElementById('live-queue-result');
+  const spin = document.getElementById('spin-live-queue');
+  res.style.display = 'none';
+  spin.style.display = 'inline-block';
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentVideoFilename);
+    fd.append('title', document.getElementById('yt-title').value || '');
+    const r = await fetch('/api/live/queue-manual', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (r.ok && j.ok) {
+      res.style.display = 'block';
+      res.style.background = '#0a1f0a';
+      res.style.border = '1px solid #1a5a1a';
+      res.style.color = '#4ade80';
+      res.textContent = '✓ Canlı yayın havuzuna eklendi';
+      btn.textContent = '✓ Eklendi';
+      setTimeout(() => { btn.textContent = '📺 Canlı Yayın Havuzuna Ekle'; btn.disabled = false; }, 3000);
+    } else {
+      throw new Error(j.detail || 'Hata');
+    }
+  } catch(e) {
+    res.style.display = 'block';
+    res.style.background = '#1f0a0a';
+    res.style.border = '1px solid #5a1a1a';
+    res.style.color = '#f87171';
+    res.textContent = 'Hata: ' + e.message;
+    btn.disabled = false;
+  } finally {
+    spin.style.display = 'none';
+  }
 }
 
 async function sendShortsToInstagram() {
