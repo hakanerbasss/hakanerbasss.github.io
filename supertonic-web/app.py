@@ -6222,14 +6222,15 @@ LIVE_FAILED_DIR.mkdir(exist_ok=True)
 LIVE_CONFIG_FILE = Path("live_stream_config.json")
 LIVE_STATE_FILE = Path("live_stream_state.json")
 
-_LIVE_MIN_SECONDS = 3600    # 1 saat — havuz bu kadar dolmadan yayın hiç başlamaz
-_LIVE_MAX_SECONDS = 43200   # 12 saat — havuz tavanı, üstü en eskiden silinir
+_LIVE_MIN_SECONDS = 1800    # 30 dakika — havuz bu kadar dolmadan yayın hiç başlamaz
+_LIVE_MAX_SECONDS = 1800    # 30 dakika — havuz tavanı; aşılınca en eskiden silinir
 
 _live_stream_task: asyncio.Task | None = None
 _live_stream_proc = None
 _live_stream_stop_flag = False
 _live_duration_cache: dict[str, float] = {}  # dosya adı -> saniye (dosyalar değişmez, güvenle önbelleklenir)
-_live_fail_count: dict[str, int] = {}  # dosya adı -> ardışık hata sayısı (3'te hatali/ klasörüne taşınır)
+_live_fail_count: dict[str, int] = {}        # dosya adı -> ardışık hata sayısı (3'te hatali/ klasörüne taşınır)
+_live_played_in_cycle: set = set()           # bu turda çalınan dosya adları; tür tamamlanınca sıfırlanır
 
 
 def load_live_config() -> dict:
@@ -6325,7 +6326,8 @@ async def _live_stream_supervisor():
     3) Bir video bitince: havuz 24 saati (_LIVE_MAX_SECONDS) aşmıyorsa sona koyulur
     (döngü — "bittikçe başa sarar"), aşıyorsa silinir (en eski önce atılır, havuz
     sürekli "son 24 saat" olacak şekilde kendini tazeler)."""
-    global _live_stream_proc
+    global _live_stream_proc, _live_played_in_cycle
+    _live_played_in_cycle = set()  # her yayın başlangıcında sıfırla
     cfg = load_live_config()
 
     # ── 1. aşama: havuz 1 saate ulaşana kadar bekle, YouTube'a hiç dokunma ──────
@@ -6368,9 +6370,16 @@ async def _live_stream_supervisor():
 
     try:
         while not _live_stream_stop_flag:
-            files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
-            if files:
-                current = files[0]
+            # En yeniden en eskiye sırala; bu turda çalınanlar atlanır.
+            # Tüm dosyalar çalınca tur sıfırlanır (döngü).
+            files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+            unplayed = [f for f in files if f.name not in _live_played_in_cycle]
+            if not unplayed:
+                # Tüm dosyalar bu turda çalındı — döngüyü sıfırla
+                _live_played_in_cycle.clear()
+                unplayed = files
+            if unplayed:
+                current = unplayed[0]
                 cmd = [
                     "ffmpeg", "-re", "-i", str(current),
                     "-c:v", "libx264", "-preset", "veryfast", "-b:v", "2500k",
@@ -6423,16 +6432,19 @@ async def _live_stream_supervisor():
             if current is not None:
                 if _live_stream_proc.returncode == 0:
                     _live_fail_count.pop(current.name, None)
+                    _live_played_in_cycle.add(current.name)
+                    # Havuz 30 dk'yı aşıyorsa en eskiden başlayarak sil
                     stats = await _live_pool_stats()
-                    if stats["seconds"] > _LIVE_MAX_SECONDS:
-                        # Havuz 12 saati aşıyor — en eski (az önce oynayan) video atılır,
-                        # havuz sürekli "son 12 saat" olacak şekilde kendini tazeler.
-                        current.unlink(missing_ok=True)
-                        (LIVE_QUEUE_DIR / (current.stem + ".json")).unlink(missing_ok=True)
-                        _live_duration_cache.pop(current.name, None)
-                    else:
-                        # Havuz henüz 12 saatin altında — sona koy (döngü), silme.
-                        current.touch()
+                    while stats["seconds"] > _LIVE_MAX_SECONDS:
+                        oldest_files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+                        if not oldest_files:
+                            break
+                        victim = oldest_files[0]
+                        victim.unlink(missing_ok=True)
+                        (LIVE_QUEUE_DIR / (victim.stem + ".json")).unlink(missing_ok=True)
+                        _live_duration_cache.pop(victim.name, None)
+                        _live_played_in_cycle.discard(victim.name)
+                        stats = await _live_pool_stats()
                 elif _live_stream_stop_flag:
                     # Kasıtlı durdurma (Durdur butonu) ffmpeg'i kesiyor, bu bir hata
                     # değil — dosyaya dokunma, bir sonraki başlatmada baştan denensin.
