@@ -6839,8 +6839,16 @@ async def get_live_pool_files():
         if dur is None:
             dur = await _probe_duration(f)
             _live_duration_cache[f.name] = dur
+        sidecar = LIVE_QUEUE_DIR / (f.stem + ".json")
+        title = ""
+        if sidecar.exists():
+            try:
+                title = json.loads(sidecar.read_text()).get("title", "")
+            except Exception:
+                pass
         result.append({
             "filename": f.name,
+            "title": title,
             "size_mb": round(f.stat().st_size / 1024 / 1024, 1),
             "duration_seconds": dur,
         })

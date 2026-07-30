@@ -2601,7 +2601,10 @@ async function loadLivePoolFiles() {
     el.innerHTML = files.map((f, i) => `
       <div style="background:#111;border:1px solid #222;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-          <span style="color:#ccc;word-break:break-all;">${f.filename} <span style="color:#666;">(${_fmtMinSec(f.duration_seconds)}, ${f.size_mb} MB)</span></span>
+          <div style="min-width:0;">
+            ${f.title ? `<div style="color:#e0e0e0;font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.title}</div>` : ''}
+            <span style="color:#555;">${_fmtMinSec(f.duration_seconds)} · ${f.size_mb} MB</span>
+          </div>
           <div style="display:flex;gap:10px;flex-shrink:0;">
             <a href="#" onclick="togglePoolPreview(${i}, '${f.filename.replace(/'/g, "\\'")}'); return false;" style="color:#4ade80;">▶ İzle</a>
             <a href="/api/live/pool-video/${encodeURIComponent(f.filename)}" download style="color:#7c3aed;">⬇ İndir</a>
