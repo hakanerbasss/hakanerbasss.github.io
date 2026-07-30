@@ -3010,6 +3010,7 @@ let _shortsPollInterval = null;
 let _shortsTimerInterval = null;
 
 function _startShortsPolling() {
+  if (_shortsPollInterval) return; // zaten çalışıyorsa tekrar başlatma
   const timerEl = document.getElementById('shorts-elapsed');
   const progressEl = document.getElementById('shorts-progress');
   progressEl.style.display = 'block';
@@ -3147,13 +3148,31 @@ async function generateShorts(allowEmpty = false) {
     const startR = await fetch('/api/generate-shorts-async', { method: 'POST', body: fd });
     if (!startR.ok) {
       const ct = startR.headers.get('content-type') || '';
-      throw new Error(ct.includes('json') ? (await startR.json()).detail : await startR.text());
+      const msg = ct.includes('json') ? (await startR.json()).detail : await startR.text();
+      // 409 = zaten çalışıyor, direkt poll'a bağlan
+      if (startR.status === 409) {
+        _startShortsPolling();
+        return;
+      }
+      throw new Error(msg);
     }
 
     document.getElementById('shorts-elapsed').textContent = '0';
     _startShortsPolling();
   } catch(e) {
-    showError('err-shorts', e.message);
+    // 524 / ağ hatası — istek yine de sunucuya ulaşmış olabilir; durumu kontrol et
+    try {
+      const s = await fetch('/api/manual-shorts/status').then(r => r.json());
+      if (s.status === 'running') {
+        showError('err-shorts', '');
+        document.getElementById('shorts-elapsed').textContent = _fmtElapsed(s.elapsed ?? 0);
+        _startShortsPolling();
+        return;
+      }
+    } catch(_) {}
+    // Gerçekten hata varsa göster (Cloudflare HTML yerine temiz mesaj)
+    const msg = e.message && e.message.length < 300 ? e.message : 'Sunucu yanıt vermedi (524). Lütfen bekleyin ve sayfayı yenileyin.';
+    showError('err-shorts', msg);
   }
 }
 
