@@ -79,6 +79,35 @@ def update_broadcast_title(creds, broadcast_id: str, title: str, scheduled_start
     ).execute()
 
 
+def get_broadcast_if_reusable(creds, broadcast_id: str, stream_id: str) -> dict | None:
+    """Mevcut broadcast hâlâ ready/live/testStarting durumundaysa RTMP bilgisini döner,
+    aksi hâlde None — supervisor yeni broadcast oluşturmak yerine bu sonucu kullanır."""
+    try:
+        yt = build("youtube", "v3", credentials=creds)
+        br = yt.liveBroadcasts().list(id=broadcast_id, part="id,status,snippet").execute()
+        items = br.get("items", [])
+        if not items:
+            return None
+        status = items[0]["status"]["lifeCycleStatus"]
+        if status not in ("ready", "testStarting", "live"):
+            return None
+        st = yt.liveStreams().list(id=stream_id, part="id,cdn").execute()
+        st_items = st.get("items", [])
+        if not st_items:
+            return None
+        ingestion = st_items[0]["cdn"]["ingestionInfo"]
+        return {
+            "broadcast_id": broadcast_id,
+            "stream_id": stream_id,
+            "ingestion_address": ingestion["ingestionAddress"],
+            "stream_name": ingestion["streamName"],
+            "watch_url": f"https://www.youtube.com/watch?v={broadcast_id}",
+            "scheduled_start": items[0]["snippet"].get("scheduledStartTime", ""),
+        }
+    except Exception:
+        return None
+
+
 def end_broadcast(creds, broadcast_id: str) -> dict:
     """Yayını 'complete' durumuna geçirip sonlandırır."""
     yt = build("youtube", "v3", credentials=creds)

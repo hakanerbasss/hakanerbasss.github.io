@@ -6355,22 +6355,36 @@ async def _live_stream_supervisor():
         save_live_state(status="error", error="YouTube hesabı bağlı değil veya yetkisi eksik")
         return
 
+    # Önceki broadcast hâlâ ready/live durumdaysa yeniden kullan — her restart'ta
+    # yeni video oluşmasın, kanal gereksiz yayın videosuyla dolmasın.
+    info = None
     try:
-        info = await asyncio.to_thread(youtube_live.create_broadcast, creds, cfg.get("title", ""), cfg.get("description", ""))
-    except Exception as e:
-        # str(e) bazı Google API hatalarında boş dönebiliyor (örn. çıplak
-        # Exception() veya bazı auth hataları) — tip adı + tam traceback'i
-        # her zaman journalctl'e basıyoruz ki teşhis edilebilsin.
-        detail = str(e).strip() or f"{type(e).__name__} (detay yok)"
-        print(f"[LIVE] Yayın oluşturulamadı: {detail}\n{traceback.format_exc()}", flush=True)
-        save_live_state(status="error", error=f"Yayın oluşturulamadı: {detail}")
-        return
+        prev = json.loads(LIVE_STATE_FILE.read_text()) if LIVE_STATE_FILE.exists() else {}
+        prev_bid = prev.get("broadcast_id", "")
+        prev_sid = prev.get("stream_id", "")
+        if prev_bid and prev_sid:
+            info = await asyncio.to_thread(
+                youtube_live.get_broadcast_if_reusable, creds, prev_bid, prev_sid
+            )
+            if info:
+                print(f"[LIVE] Mevcut yayın yeniden kullanılıyor: {prev_bid}", flush=True)
+    except Exception:
+        info = None
+
+    if info is None:
+        try:
+            info = await asyncio.to_thread(youtube_live.create_broadcast, creds, cfg.get("title", ""), cfg.get("description", ""))
+        except Exception as e:
+            detail = str(e).strip() or f"{type(e).__name__} (detay yok)"
+            print(f"[LIVE] Yayın oluşturulamadı: {detail}\n{traceback.format_exc()}", flush=True)
+            save_live_state(status="error", error=f"Yayın oluşturulamadı: {detail}")
+            return
 
     rtmp_url = f"{info['ingestion_address']}/{info['stream_name']}"
     broadcast_id = info["broadcast_id"]
     scheduled_start = info["scheduled_start"]
-    save_live_state(status="starting", broadcast_id=broadcast_id, watch_url=info["watch_url"],
-                     started_at=time.time(), error="")
+    save_live_state(status="starting", broadcast_id=broadcast_id, stream_id=info["stream_id"],
+                     watch_url=info["watch_url"], started_at=time.time(), error="")
 
     try:
         while not _live_stream_stop_flag:
