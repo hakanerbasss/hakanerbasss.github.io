@@ -6227,7 +6227,7 @@ LIVE_CONFIG_FILE = Path("live_stream_config.json")
 LIVE_STATE_FILE = Path("live_stream_state.json")
 
 _LIVE_MIN_SECONDS = 300     # 5 dakika — havuz bu kadar dolmadan yayın başlamaz (pruning sonrası düşüşe karşı)
-_LIVE_MAX_SECONDS = 1800    # 30 dakika — havuz tavanı; aşılınca en eskiden silinir
+_LIVE_MAX_COUNT   = 50      # video sayısı tavanı — aşılınca en eski video silinir (süre değil sayı bazlı)
 
 _live_stream_task: asyncio.Task | None = None
 _live_stream_proc = None
@@ -6329,11 +6329,11 @@ async def _live_pool_stats() -> dict:
 
 
 async def _live_stream_supervisor():
-    """1) Havuz 1 saati (_LIVE_MIN_SECONDS) doldurana kadar YouTube'a hiç bağlanmaz,
-    sadece bekler. 2) Dolunca yayını açar, havuzdaki videoları sırayla RTMP'ye akıtır.
-    3) Bir video bitince: havuz 24 saati (_LIVE_MAX_SECONDS) aşmıyorsa sona koyulur
-    (döngü — "bittikçe başa sarar"), aşıyorsa silinir (en eski önce atılır, havuz
-    sürekli "son 24 saat" olacak şekilde kendini tazeler)."""
+    """1) Havuz _LIVE_MIN_SECONDS doldurana kadar YouTube'a hiç bağlanmaz, sadece bekler.
+    2) Dolunca yayını açar, havuzdaki videoları sırayla RTMP'ye akıtır.
+    3) Bir video bitince: havuz _LIVE_MAX_COUNT video sınırını aşmıyorsa sona koyulur
+    (döngü — "bittikçe başa sarar"), aşıyorsa en eski silinir (her zaman son 50 video
+    havuzda kalır, süre değil sayı bazlı — kısa/uzun video fark etmez)."""
     global _live_stream_proc, _live_played_in_cycle
     _live_played_in_cycle = set()  # her yayın başlangıcında sıfırla
     cfg = load_live_config()
@@ -6455,19 +6455,17 @@ async def _live_stream_supervisor():
                 if _live_stream_proc.returncode == 0:
                     _live_fail_count.pop(current.name, None)
                     _live_played_in_cycle.add(current.name)
-                    # Havuz 30 dk'yı aşıyorsa en eskiden başlayarak sil;
+                    # Havuz 50 video sınırını aşıyorsa en eskiden başlayarak sil;
                     # en az 3 video yedek olarak her zaman havuzda kalır.
-                    stats = await _live_pool_stats()
-                    while stats["seconds"] > _LIVE_MAX_SECONDS:
-                        oldest_files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+                    oldest_files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+                    while len(oldest_files) > _LIVE_MAX_COUNT:
                         if len(oldest_files) <= 3:  # yedek eşiği — altına inme
                             break
-                        victim = oldest_files[0]
+                        victim = oldest_files.pop(0)
                         victim.unlink(missing_ok=True)
                         (LIVE_QUEUE_DIR / (victim.stem + ".json")).unlink(missing_ok=True)
                         _live_duration_cache.pop(victim.name, None)
                         _live_played_in_cycle.discard(victim.name)
-                        stats = await _live_pool_stats()
                 elif _live_stream_stop_flag:
                     # Kasıtlı durdurma (Durdur butonu) ffmpeg'i kesiyor, bu bir hata
                     # değil — dosyaya dokunma, bir sonraki başlatmada baştan denensin.
@@ -6545,7 +6543,7 @@ async def get_live_status_endpoint():
     state["pool_count"] = stats["count"]
     state["pool_seconds"] = stats["seconds"]
     state["pool_min_seconds"] = _LIVE_MIN_SECONDS
-    state["pool_max_seconds"] = _LIVE_MAX_SECONDS
+    state["pool_max_count"] = _LIVE_MAX_COUNT
     try:
         state["pool_disk_mb"] = round(
             sum(f.stat().st_size for f in LIVE_QUEUE_DIR.glob("*.mp4")) / 1024 / 1024, 1
@@ -6803,6 +6801,9 @@ async def _run_live_roundup_job(api_key: str):
         # zaten /api/live/pool-video/ üzerinden live_queue'dan servis ediliyor.
         shutil.move(str(video_file), str(LIVE_QUEUE_DIR / video_file.name))
         _live_duration_cache.pop(video_file.name, None)
+        # Sidecar: canlı yayın panelinde ve YouTube başlığında görünsün
+        roundup_sidecar = LIVE_QUEUE_DIR / (video_file.stem + ".json")
+        roundup_sidecar.write_text(json.dumps({"title": roundup["title"]}, ensure_ascii=False))
         used_titles = roundup["used_titles"]
         save_live_state(
             roundup_status="done", roundup_error="",

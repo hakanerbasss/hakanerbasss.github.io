@@ -2515,7 +2515,7 @@ async function refreshLiveStatus() {
     if (d.status === 'accumulating') {
       html += ` / ${_fmtMinSec(d.pool_min_seconds)} gerekiyor`;
     } else {
-      html += ` (tavan ${_fmtMinSec(d.pool_max_seconds)})`;
+      html += ` (tavan ${d.pool_max_count ?? 50} video)`;
     }
     html += `</div>`;
     html += `<div style="color:#888;">Disk: ${d.pool_disk_mb ?? 0} MB</div>`;
