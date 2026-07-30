@@ -2875,6 +2875,7 @@ async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics,
         result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
+        queue_video_for_live(video_file.name, result.get("title", ""))
         await send_telegram_video(
             video_file,
             result.get("title", topic or "Manuel Shorts"),
@@ -6433,11 +6434,12 @@ async def _live_stream_supervisor():
                 if _live_stream_proc.returncode == 0:
                     _live_fail_count.pop(current.name, None)
                     _live_played_in_cycle.add(current.name)
-                    # Havuz 30 dk'yı aşıyorsa en eskiden başlayarak sil
+                    # Havuz 30 dk'yı aşıyorsa en eskiden başlayarak sil;
+                    # en az 3 video yedek olarak her zaman havuzda kalır.
                     stats = await _live_pool_stats()
                     while stats["seconds"] > _LIVE_MAX_SECONDS:
                         oldest_files = sorted(LIVE_QUEUE_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
-                        if not oldest_files:
+                        if len(oldest_files) <= 3:  # yedek eşiği — altına inme
                             break
                         victim = oldest_files[0]
                         victim.unlink(missing_ok=True)
