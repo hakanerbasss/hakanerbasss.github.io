@@ -17,6 +17,7 @@ import httpx
 
 
 TARGETED_QUERIES = [
+    # ── Emekli / SGK / Maaş ──────────────────────────────────────────────────
     '"emekli" ödeme when:1d',
     '"emekli maaşı" when:1d',
     '"maaş farkı" when:1d',
@@ -30,28 +31,48 @@ TARGETED_QUERIES = [
     '"ödeme başladı" when:1d',
     '"son ödeme tarihi" when:1d',
     '"vergi" son tarih when:1d',
+    # ── Enerji / Fiyat ───────────────────────────────────────────────────────
     '"doğalgaz" zam when:1d',
     '"elektrik" zam when:1d',
     '"akaryakıt" zam when:1d',
+    '"su faturası" when:2d',
+    # ── Hava / Afet ──────────────────────────────────────────────────────────
     '"Meteoroloji" uyarı when:1d',
     '"AKOM" uyarı when:1d',
     '"deprem" uyarısı when:1d',
     '"fay haritası" when:1d',
-    '"dövizle askerlik" when:2d',
-    '"yurt dışı borçlanması" when:2d',
-    '"Türkiye’ye araçla giriş" when:2d',
-    # Emekli/SGK/maaş dışındaki genel kategoriler — havuz sadece cüzdan/emeklilik
-    # haberleriyle sınırlı kalmasın, ÖSYM, ehliyet, eğitim, genel gündem gibi
-    # geniş kitleyi ilgilendiren başka güncel konular da havuza girsin.
+    '"sel" uyarı when:1d',
+    '"yangın" when:1d',
+    # ── Sağlık ───────────────────────────────────────────────────────────────
+    '"Sağlık Bakanlığı" açıklama when:1d',
+    '"ilaç" fiyat when:2d',
+    '"hastane" when:1d',
+    '"aşı" when:2d',
+    # ── Eğitim / Sınav ───────────────────────────────────────────────────────
     '"ehliyet" when:1d',
     '"YKS" when:1d',
     '"ÖSYM" when:1d',
     '"üniversite tercih" when:1d',
     '"MEB" açıklama when:1d',
+    # ── Gündem / Resmi ───────────────────────────────────────────────────────
     '"trafik cezası" when:1d',
     '"Resmi Gazete" when:1d',
     '"TBMM" kabul when:1d',
     '"Bakanlık" açıklama when:1d',
+    '"Cumhurbaşkanı" when:1d',
+    '"Hazine" when:1d',
+    '"EPDK" when:2d',
+    # ── Ulaşım / Günlük Hayat ────────────────────────────────────────────────
+    '"uçak bileti" when:2d',
+    '"otobüs" zam when:2d',
+    '"dövizle askerlik" when:2d',
+    '"yurt dışı borçlanması" when:2d',
+    '"pasaport" when:2d',
+    '"ehliyet" yenileme when:3d',
+    # ── Geniş havuz yedekleri (havuz boşalınca devreye girer) ────────────────
+    'Türkiye gündem when:1d',
+    'Anadolu Ajansı son dakika when:1d',
+    'site:aa.com.tr when:1d',
 ]
 
 WALLET_TERMS = {
@@ -1082,7 +1103,7 @@ def _fetch_official_html_page(
             else:
                 title = visible_title
 
-            # URL’den çıkan başlık daha açıklayıcıysa onu tercih et.
+            # URL'den çıkan başlık daha açıklayıcıysa onu tercih et.
             if len(url_title) > len(title) + 8:
                 title = url_title
 

@@ -1183,7 +1183,7 @@ async def _fetch_article_text(url: str, max_chars: int = 2000, expected_title: s
         return ""
 
 
-async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) -> dict:
+async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5) -> dict:
     """Google News RSS'ten haber başlıkları + tam makale metinlerini çeker. Hata olursa {} döner."""
     import xml.etree.ElementTree as ET
     import re
@@ -1214,7 +1214,7 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 3) 
                 if dc is not None:
                     src_name = (dc.text or "").strip()
             if title:
-                articles.append({"title": title, "desc": desc[:300], "source": src_name, "link": link})
+                articles.append({"title": title, "desc": desc[:600], "source": src_name, "link": link})
                 if src_name and src_name not in sources:
                     sources.append(src_name)
         if not articles:
@@ -2039,6 +2039,10 @@ Rules:
         # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
         gnews_data = {}
         search_query = topic.strip()
+        # Malformed topic guard: JSON hata yanıtı veya çok kısa string topic olarak
+        # gelirse Google News araması anlamsız sonuç verir → temizle.
+        if search_query.startswith("{") or search_query.startswith("[") or len(search_query) < 5:
+            search_query = ""
         if not search_query:
             try:
                 if ranked_candidates_prompt:
