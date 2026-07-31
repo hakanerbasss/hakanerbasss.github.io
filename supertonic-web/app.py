@@ -1970,56 +1970,14 @@ Rules:
         # HABER SHORTS — mevcut trend/haber akışı
         trend_data = get_trends(region_code=region.upper(), lang=lang)
 
-        # Instagram hedef kitlesine göre puanlanmış güncel haber havuzu.
-        ranked_candidates = []
-        ranked_candidates_prompt = ""
-
-        if lang == "tr" and not topic.strip():
-            try:
-                from news_ranker import format_candidates_for_prompt
-
-                # Telegram aday listesiyle BİREBİR aynı fonksiyon — aynı sorgular,
-                # aynı puanlama, aynı AI jüri. İki taraf arasında fark olmasın diye.
-                ranked_candidates = await get_ai_ranked_news_pool(api_key)
-                ranked_candidates_prompt = format_candidates_for_prompt(
-                    ranked_candidates[:12]
-                )
-            except Exception as rank_error:
-                print(
-                    f"[news-ranker] puanlı havuz hatası: {rank_error}",
-                    flush=True,
-                )
-
-        # TR için: normal trend + gurbetçi havuzunu birleştirip aynı filtreden geçir
-        # (ölüm/vefat/dedikodu + ASAYİŞ kategorisi elenir) — Telegram seçim listesiyle
-        # aynı havuz, artık otomatik seçimde de kullanılıyor. Konu zaten belirtilmişse
-        # (manuel/Telegram'dan zorunlu konu) bu havuz kullanılmayacağı için atlanır.
+        # TR için: Google Trends + gurbetçi havuzunu spor/asayiş filtresiyle temizle.
+        # Puanlama/AI jüri yok — Google Trends sıralaması doğrudan kullanılır.
         if lang == "tr" and not topic.strip():
             try:
                 gurbetci_topics = await fetch_gurbetci_topics()
-                merged = _filter_low_value_topics(
-                    trend_data.get("topics", [])
-                )
-                merged = _interleave_topics(
-                    merged,
-                    gurbetci_topics,
-                )
-
-                # Puanlama motorunun seçtiği güçlü haberleri
-                # mevcut Google News sırasının önüne al.
-                ranked_titles = [
-                    item.get("title", "")
-                    for item in ranked_candidates
-                    if item.get("title")
-                ]
-                ranked_titles = _filter_low_value_topics(ranked_titles)
-
-                merged = list(
-                    dict.fromkeys(ranked_titles + merged)
-                )
-
+                merged = _filter_low_value_topics(trend_data.get("topics", []))
+                merged = _interleave_topics(merged, gurbetci_topics)
                 merged = _dedupe_pool_against_recent(merged)
-
                 if merged:
                     trend_data["topics"] = merged
             except Exception as _ge:
@@ -2033,14 +1991,6 @@ Rules:
         if exclude_topics.strip():
             exclude_instruction = f"\nIMPORTANT - Do NOT cover these topics (already posted today):\n{exclude_topics}\nPick a DIFFERENT topic from the trending list.\n"
 
-        # ── Hesap performans verisi: kategori skorları + tekrar kısıtları ────────
-        perf_instruction = ""
-        if lang == "tr" and not topic.strip():
-            try:
-                perf_instruction = ig_perf.build_instruction(get_ig_only_tr_used_topics())
-            except Exception as _pe:
-                print(f"[ig_perf] yönlendirme üretilemedi: {_pe}", flush=True)
-
         # ── Google News doğrulama: gerçek haber detaylarını çek ──────────────────
         gnews_data = {}
         search_query = topic.strip()
@@ -2049,73 +1999,19 @@ Rules:
         if search_query.startswith("{") or search_query.startswith("[") or len(search_query) < 5:
             search_query = ""
         if not search_query:
+            # Puanlama yok — trend listesinde dışlanmamış ilk konuyu al.
             try:
-                if ranked_candidates_prompt:
-                    sel_prompt = (
-                        "Aşağıdaki haber adayları, kullanıcının gerçek Instagram "
-                        "hedef kitlesine göre puanlandı. Yalnızca bir haber seç.\n\n"
-                        "HEDEF KİTLE:\n"
-                        "- Türkiye ağırlıklı\n"
-                        "- Kadın oranı yüksek\n"
-                        "- İzleyicilerin büyük kısmı 55 yaş üstü\n"
-                        "- En güçlü konular: emekli, SGK, maaş, ödeme, zam, "
-                        "vatandaşın hakkı, deprem, hava ve acil uyarılar\n\n"
-                        "SEÇİM KURALLARI:\n"
-                        "1. Yüksek puanlı ve bugün yayımlanmış haberi tercih et.\n"
-                        "2. İnsanların cebine, güvenliğine veya günlük hayatına "
-                        "doğrudan dokunan haberi seç.\n"
-                        "3. Net ödeme, tarih, başvuru, son gün veya kimlerin "
-                        "etkileneceği bilgisi bulunan haberleri öne al.\n"
-                        "4. Resmî veya birden fazla güvenilir kaynağı olan haberi tercih et.\n"
-                        "5. Kulis, soru başlığı, eski SEO haberi veya protokol haberi seçme.\n"
-                        "6. Genel dünya haberi yerine Türkiye kitlesini doğrudan "
-                        "etkileyen güçlü bir haber varsa onu seç.\n"
-                        "7. Yalnızca seçtiğin başlığı aynen döndür. Başka hiçbir şey yazma.\n\n"
-                        f"PUANLANMIŞ ADAYLAR:\n{ranked_candidates_prompt}"
-                        + (
-                            f"\n\nBUGÜN DAHA ÖNCE PAYLAŞILANLAR — SEÇME:\n"
-                            f"{exclude_topics}"
-                            if exclude_topics.strip()
-                            else ""
-                        )
-                        + perf_instruction
-                    )
-                else:
-                    sel_prompt = (
-                        "From this list of current news topics, choose ONE strong "
-                        "breaking-news topic. Prioritize wallet, rights, payments, "
-                        "retirement, SGK, safety and urgent weather. "
-                        "Return ONLY the topic name.\n\n"
-                        f"Topics: {trend_topics}"
-                        + (
-                            f"\n\nAvoid already posted topics: {exclude_topics}"
-                            if exclude_topics.strip()
-                            else ""
-                        )
-                        + perf_instruction
-                    )
-                sel_resp = await asyncio.to_thread(
-                    client.chat.completions.create,
-                    model="deepseek-v4-pro",
-                    messages=[{"role": "user", "content": sel_prompt}],
-                    temperature=0.3,
-                    max_tokens=60,
-                )
-                search_query = sel_resp.choices[0].message.content.strip().split("\n")[0]
+                excluded_set = {e.strip().lower() for e in exclude_topics.split("|") if e.strip()} if exclude_topics.strip() else set()
+                for _candidate in trend_data.get("topics", [])[:30]:
+                    if _candidate.strip().lower() not in excluded_set:
+                        search_query = _candidate.strip()
+                        break
+                if not search_query and trend_data.get("topics"):
+                    search_query = trend_data["topics"][0]
             except Exception as selection_error:
-                print(
-                    f"[news-ranker] DeepSeek seçim hatası: {selection_error}",
-                    flush=True,
-                )
-
-                if ranked_candidates:
-                    search_query = ranked_candidates[0].get("title", "")
-                else:
-                    search_query = (
-                        trend_data["topics"][0]
-                        if trend_data["topics"]
-                        else ""
-                    )
+                print(f"[topic-select] hata: {selection_error}", flush=True)
+                if trend_data.get("topics"):
+                    search_query = trend_data["topics"][0]
         if manual_content.strip():
             # Kullanıcı haberin metnini elle yapıştırdı (link çekilemediğinde/yanlış
             # habere düştüğünde kullanılan yedek yol) — hiçbir arama/fetch yapılmaz,
@@ -8191,43 +8087,9 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
             try:
                 trend_data = get_trends(region_code="TR", lang="tr")
                 gurbetci_topics = await fetch_gurbetci_topics()
-
-                legacy_pool = _filter_low_value_topics(
-                    trend_data.get("topics", [])
-                )
-                legacy_pool = _interleave_topics(
-                    legacy_pool,
-                    gurbetci_topics,
-                )
-
-                # Otomatik tekli haber seçimiyle BİREBİR aynı fonksiyon — aynı
-                # sorgular, aynı puanlama, aynı AI jüri. İki taraf arasında fark
-                # olmasın diye (kendi içinde hata yutar, hiçbir zaman fırlatmaz).
-                ranked_items = await get_ai_ranked_news_pool(api_key)
-                ranked_pool = [
-                    item.get("title", "").strip()
-                    for item in ranked_items
-                    if item.get("title", "").strip()
-                ]
-                # Başlık -> gerçek makale linki eşlemesi. Kullanıcı Telegram'dan bir
-                # başlık seçtiğinde, üretim tekrar arama yapmak yerine doğrudan bu
-                # linke gitsin diye (bkz. fetch_gnews_article_by_link).
-                ranked_title_to_link = {
-                    item.get("title", "").strip(): (item.get("link") or "").strip()
-                    for item in ranked_items
-                    if item.get("title", "").strip() and item.get("link")
-                }
-
-                # Telegram listesinde yalnızca puanlama motorunun
-                # uygun bulduğu haberleri kullan. Kaliteli aday sayısı
-                # azsa listeyi vasat eski başlıklarla doldurma.
-                if ranked_pool:
-                    ranked_pool = _filter_low_value_topics(ranked_pool)
-                    raw_pool = list(dict.fromkeys(ranked_pool))
-                else:
-                    # Sıralama motoru teknik olarak çalışamazsa
-                    # eski havuz yalnızca güvenli yedek olarak kullanılır.
-                    raw_pool = list(dict.fromkeys(legacy_pool))
+                raw_pool = _filter_low_value_topics(trend_data.get("topics", []))
+                raw_pool = _interleave_topics(raw_pool, gurbetci_topics)
+                raw_pool = list(dict.fromkeys(raw_pool))
 
                 def _telegram_topic_normalize(title: str) -> str:
                     value = title.casefold()
