@@ -2165,36 +2165,14 @@ Rules:
                 if not gnews_data.get("found"):
                     gnews_data = await fetch_gnews_summary(search_query, lang)
 
-        # ── Olgu çıkarma: sadece manuel akışta çalışır ──────────────────────────────
-        # Otomatik akışta makale çekilmiyor → olgu çıkarma atlanır, RSS özeti bağlam olarak kullanılır.
+        # ── Olgu çıkarma: her iki akışta da çalışır ─────────────────────────────────
+        # Otomatik akışta RSS özeti üzerinde (2-3 cümle bile olsa gerçek olgular çıkar).
+        # Manuel akışta tam makale metni üzerinde çalışır.
         facts_data = {}
-        if not require_verified_source and gnews_data.get("found") and gnews_data.get("context_text"):
+        if gnews_data.get("found") and gnews_data.get("context_text"):
             facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
 
         news_context_instruction = ""
-        # RSS özeti bağlamı — otomatik akışta (facts_data boş) devreye girer
-        if not facts_data.get("facts") and gnews_data.get("articles"):
-            rss_parts = []
-            for _a in gnews_data["articles"][:3]:
-                _desc = _a.get("desc") or ""
-                if _desc:
-                    _src = _a.get("source", "")
-                    rss_parts.append(
-                        f"BAŞLIK: {_a['title']}" + (f" [{_src}]" if _src else "") + f"\nÖZET: {_desc}"
-                    )
-            if rss_parts:
-                news_context_instruction = (
-                    "\n\nHABER KAYNAĞI (Google News RSS özeti — tam makale değil):\n"
-                    + "\n\n".join(rss_parts)
-                    + "\n\nKESİN KURALLAR (ihlal edilemez):\n"
-                    "- Bu özetin DIŞINDA HİÇBİR rakam, yüzde, tarih, kişi adı, kurum adı KULLANMA.\n"
-                    "- Özette '3 bin TL' yazmıyorsa sen '3 bin TL' diyemezsin. Yazmıyorsa atla.\n"
-                    "- Özette isim yoksa 'yetkili kaynaklar' de, isim uydurma.\n"
-                    "- certainty_level ZORUNLU olarak 'B' veya 'C' — asla 'A' seçme "
-                    "(RSS özeti tam haber metni değil, kesinleşmiş bilgi sayılmaz).\n"
-                    "- 'kesinleşti', 'yatırıldı', 'öğrendik' gibi kesin ifadeler yasak — "
-                    "'açıklandı', 'haberler geliyor', 'bekleniyor' kullan.\n"
-                )
         if facts_data.get("facts"):
             facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
             names_map = facts_data.get("names_with_titles") or {}
@@ -2205,10 +2183,9 @@ Rules:
             numbers_block = ", ".join(facts_data.get("numbers", [])) or "yok"
             dates_block = ", ".join(facts_data.get("dates", [])) or "yok"
             thin_note = (
-                "\nNOT: Olgu sayısı az. YİNE DE video en az 45 saniye olmalı — yeni bilgi "
-                "UYDURMADAN, elindeki olguları derinleştirerek doldur (örn. bu olgu kimi nasıl "
-                "etkiler, ne zaman geçerli olur, neden önemli — olgunun kendisinden çıkan doğal "
-                "açılımlar, yeni iddia değil). Kısa kesip atlamak yerine var olan olguyu iyi anlat.\n"
+                "\nNOT: Kaynak metni kısa, az olgu var. Video 30-40 saniye olabilir — "
+                "listede olmayan HİÇBİR bilgi, rakam, kurum adı ekleme. "
+                "Eksik bilgiyi doldurmaya çalışma; var olan olgularla kısa ve net bir anlatı yap.\n"
                 if not facts_data.get("sufficient") else ""
             )
             news_context_instruction = (
@@ -2328,8 +2305,20 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 
         scenes = data["scenes"]
 
-        # Verify adımı kaldırıldı: sıralı 3. AI çağrısı üretim süresini 10+ dk'ya çıkarıyordu.
-        # Olgu çıkarma (_extract_verified_facts) zaten doğruluğu garanti ediyor.
+        # ── Olgu doğrulama: üretilen senaryo, çıkarılan olgularla karşılaştırılır ──
+        # Desteklenmeyen iddia (örn. "bankalar da kesebilir" — kaynakta yoksa) yakalanır.
+        # require_verified_source=True = otomatik akış; RSS kısa olunca facts_data az ama
+        # yine de varsa doğrulama çalıştır. Hata → 422 → dış döngü farklı konu dener.
+        if require_verified_source and facts_data.get("facts"):
+            _narration_text = " ".join(s.get("text", "") for s in scenes)
+            _unsupported = await _verify_narration_facts(client, _narration_text, facts_data)
+            if _unsupported:
+                _claims_str = " | ".join(_unsupported[:3])
+                print(f"[verify] DESTEKLENMEYEN İDDİA ({len(_unsupported)} adet): {_claims_str}", flush=True)
+                raise HTTPException(
+                    422,
+                    f"Senaryo kaynakta olmayan iddia içeriyor: {_claims_str[:300]} — farklı konu denenecek.",
+                )
 
         if lang == "tr":
             try:
@@ -8597,6 +8586,14 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                               "platform": "instagram", "use_video": use_video_val,
                               "topic_link": forced_topic_link},
                     )
+                    if r.status_code == 422:
+                        # Üretim/doğrulama hatası (örn. kaynakta olmayan iddia) — farklı konu dene
+                        _err422 = r.text[:300]
+                        print(f"[IG-ONLY-TR] 422 üretim hatası (deneme {_attempt+1}/{_MAX_DEDUP_RETRY}): {_err422}", flush=True)
+                        if _attempt < _MAX_DEDUP_RETRY - 1:
+                            continue
+                        save_ig_only_tr_log("error", f"Video üretilemedi ({_MAX_DEDUP_RETRY} denemede): {_err422}")
+                        return
                     if r.status_code != 200:
                         save_ig_only_tr_log("error", f"Video üretilemedi: {r.text[:800]}")
                         return
