@@ -1974,9 +1974,7 @@ Rules:
         # Puanlama/AI jüri yok — Google Trends sıralaması doğrudan kullanılır.
         if lang == "tr" and not topic.strip():
             try:
-                gurbetci_topics = await fetch_gurbetci_topics()
                 merged = _filter_low_value_topics(trend_data.get("topics", []))
-                merged = _interleave_topics(merged, gurbetci_topics)
                 merged = _dedupe_pool_against_recent(merged)
                 if merged:
                     trend_data["topics"] = merged
@@ -8086,9 +8084,7 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
         if cfg.get("telegram_topic_pick") or force_telegram_pick:
             try:
                 trend_data = get_trends(region_code="TR", lang="tr")
-                gurbetci_topics = await fetch_gurbetci_topics()
                 raw_pool = _filter_low_value_topics(trend_data.get("topics", []))
-                raw_pool = _interleave_topics(raw_pool, gurbetci_topics)
                 raw_pool = list(dict.fromkeys(raw_pool))
 
                 def _telegram_topic_normalize(title: str) -> str:
