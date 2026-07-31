@@ -2051,12 +2051,7 @@ Rules:
                 # Manuel akış: tam makale çekme eski yöntemle devam eder.
                 selected_link = (manual_link or topic_link or "").strip()
                 selected_source = ""
-                if not selected_link:
-                    for _c in ranked_candidates:
-                        if (_c.get("title") or "").strip() == search_query.strip():
-                            selected_link = (_c.get("link") or "").strip()
-                            selected_source = (_c.get("source") or "").strip()
-                            break
+                # ranked_candidates kaldırıldı — link doğrudan topic_link'ten gelir
                 if selected_link:
                     gnews_data = await fetch_gnews_article_by_link(selected_link, search_query, selected_source)
                     if gnews_data.get("found"):
