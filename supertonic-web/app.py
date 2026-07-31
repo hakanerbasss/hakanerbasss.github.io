@@ -2145,9 +2145,10 @@ Rules:
             print(f"[gnews] manuel içerik kullanıldı, kaynaklar: {_parsed_sources}", flush=True)
         elif search_query:
             if require_verified_source:
-                # Otomatik akış: makale içeriği çekilmez (paywall engeli yok).
-                # Sadece RSS başlık + açıklama kullanılır — kaynak linki RSS'ten gelir.
-                gnews_data = await fetch_gnews_summary(search_query, lang, fetch_full_text=False)
+                # Otomatik akış: önce makaleyi açmayı dene, açılamazsa RSS özetiyle devam et.
+                # fetch_full_text=True: _fetch_article_text başarısız olursa sessizce RSS'e düşer,
+                # üretim hiç durmaz — paywall/bot engeli olan siteler otomatik olarak RSS moduna geçer.
+                gnews_data = await fetch_gnews_summary(search_query, lang, fetch_full_text=True)
             else:
                 # Manuel akış: tam makale çekme eski yöntemle devam eder.
                 selected_link = (manual_link or topic_link or "").strip()
