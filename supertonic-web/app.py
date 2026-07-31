@@ -2132,7 +2132,7 @@ Rules:
                 f"Pick whichever topic is most compelling and timely. Prefer topics that directly affect "
                 f"people's daily lives (safety, wallet, health, rights) — but do not force a category; "
                 f"a genuinely viral story beats a forced angle every time.\n"
-                f"{get_diversity_instruction()}{perf_instruction}"
+                f"{get_diversity_instruction()}"
             )
         yt_tag_instruction = f"\nYouTube TR trending hashtags RIGHT NOW (include relevant ones): {yt_tags}" if yt_tags else ""
         _cr = get_custom_prompt_rules()
