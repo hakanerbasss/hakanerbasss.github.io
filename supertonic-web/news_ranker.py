@@ -15,6 +15,8 @@ from urllib.parse import quote
 
 import httpx
 
+from trends import get_trends
+
 
 TARGETED_QUERIES = [
     # ── Emekli / SGK / Maaş ──────────────────────────────────────────────────
@@ -164,14 +166,39 @@ LOW_VALUE_TERMS = {
 }
 
 BLOCK_TERMS = (
+    # ── Spor (kesinlikle yasak) ─────────────────────────────────────────────
     "maç sonucu",
-    "transfer",
-    "futbolcu",
+    "maç özeti",
     "gol attı",
+    "golünü",
+    "penaltı",
+    "hakem kararı",
+    "süper lig",
+    "şampiyonlar ligi",
+    "avrupa ligi",
+    "konferans ligi",
+    "fenerbahçe",
+    "galatasaray",
+    "beşiktaş",
+    "trabzonspor",
+    "başakşehir",
+    "fikstür",
+    "puan tablosu",
+    "deplasman",
+    "taraftar",
+    "bonservis",
+    "teknik direktör atandı",
+    "basketbol maçı",
+    "voleybol maçı",
+    "olimpiyat oyunları",
+    "milli maç",
+    # ── Magazin / dedikodu ──────────────────────────────────────────────────
     "magazin",
     "boşandı",
     "aşk yaşıyor",
     "evlilik teklifi",
+    "ünlü çift",
+    # ── Hassas / suç haberleri ──────────────────────────────────────────────
     "hayatını kaybetti",
     "ölü bulundu",
     "cinayet",
@@ -514,14 +541,39 @@ def _deduplicate_exact(
 
     return unique
 
+def _get_trend_queries(max_topics: int = 30) -> list[str]:
+    """Google Trends TR güncel haberlerini Google News sorgusu formatına çevirir.
+    TARGETED_QUERIES'in yerini alır — sabit sorgular yerine o anki trendler kullanılır.
+    Hata durumunda TARGETED_QUERIES'e yedek olarak döner."""
+    try:
+        data = get_trends(region_code="TR", lang="tr")
+        topics = data.get("topics", [])[:max_topics]
+        if not topics:
+            return TARGETED_QUERIES
+        # Tam haber başlığı → Google News'te aramak için tırnak içine alıp zaman sınırı ekle.
+        # Uzun başlıklar tırnak içinde çok dar sorgu olur — ilk 6 kelime yeterli.
+        queries = []
+        for t in topics:
+            words = t.split()[:6]
+            short = " ".join(words)
+            if len(short) > 4:
+                queries.append(f'"{short}" when:1d')
+        return queries if queries else TARGETED_QUERIES
+    except Exception as e:
+        print(f"[news-ranker] trend sorgu hatası: {e}, TARGETED_QUERIES kullanılıyor", flush=True)
+        return TARGETED_QUERIES
+
+
 def build_ranked_news_pool(
     max_candidates: int = 20,
     per_query: int = 6,
 ) -> list[dict[str, Any]]:
     raw_items: list[dict[str, Any]] = []
 
-    # 35 sorguyu paralel çek — sıralı yerine eş zamanlı (10 iş parçacığı).
-    # Sıralı: ~35 × 3sn ≈ 100 sn. Paralel: ~35/10 × 3sn ≈ 10-15 sn.
+    # Sabit TARGETED_QUERIES yerine güncel trend konuları üzerinden arama.
+    # Paralel çekme: ~30 sorgu × 10 iş parçacığı ≈ 10-15 sn.
+    queries = _get_trend_queries()
+
     def _fetch_one(query: str) -> list:
         try:
             return _fetch_query(query=query, max_items=per_query)
@@ -529,7 +581,7 @@ def build_ranked_news_pool(
             return []
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(_fetch_one, q): q for q in TARGETED_QUERIES}
+        futures = {executor.submit(_fetch_one, q): q for q in queries}
         for future in as_completed(futures):
             raw_items.extend(future.result())
 

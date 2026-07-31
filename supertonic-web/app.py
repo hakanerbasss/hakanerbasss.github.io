@@ -1183,8 +1183,9 @@ async def _fetch_article_text(url: str, max_chars: int = 2000, expected_title: s
         return ""
 
 
-async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5) -> dict:
-    """Google News RSS'ten haber başlıkları + tam makale metinlerini çeker. Hata olursa {} döner."""
+async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, fetch_full_text: bool = True) -> dict:
+    """Google News RSS'ten haber başlıkları çeker. fetch_full_text=False olunca makale içeriği
+    çekilmez (sadece RSS başlık + açıklama) — paywall siteleri tıkamaz. Hata olursa {} döner."""
     import xml.etree.ElementTree as ET
     import re
     from urllib.parse import quote
@@ -1220,16 +1221,17 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5) 
         if not articles:
             return {}
 
-        # Tam makale metinlerini paralel çek
-        texts = await asyncio.gather(
-            *[_fetch_article_text(a["link"], expected_title=a["title"]) for a in articles],
-            return_exceptions=True,
-        )
-        for i, txt in enumerate(texts):
-            if isinstance(txt, str) and len(txt) > 80:
-                articles[i]["full_text"] = txt
-
-        has_full = any(a.get("full_text") for a in articles)
+        # Tam makale metinleri — sadece fetch_full_text=True ise çekilir
+        has_full = False
+        if fetch_full_text:
+            texts = await asyncio.gather(
+                *[_fetch_article_text(a["link"], expected_title=a["title"]) for a in articles],
+                return_exceptions=True,
+            )
+            for i, txt in enumerate(texts):
+                if isinstance(txt, str) and len(txt) > 80:
+                    articles[i]["full_text"] = txt
+            has_full = any(a.get("full_text") for a in articles)
 
         context_lines = []
         for a in articles:
@@ -2142,48 +2144,50 @@ Rules:
             }
             print(f"[gnews] manuel içerik kullanıldı, kaynaklar: {_parsed_sources}", flush=True)
         elif search_query:
-            # AI jürisi bu konuyu zaten GERÇEK bir makale linkiyle puanlamıştı — önce
-            # o linki doğrudan çekmeyi dene (arama yapıp farklı/yanlış bir habere
-            # düşme riskini ortadan kaldırır). Link bulunamazsa/çekilemezse eski
-            # arama-tabanlı yönteme düş.
-            selected_link = (manual_link or topic_link or "").strip()  # kullanıcı elle link girdiyse önce o denenir
-            selected_source = ""
-            if not selected_link:
-                for _c in ranked_candidates:
-                    if (_c.get("title") or "").strip() == search_query.strip():
-                        selected_link = (_c.get("link") or "").strip()
-                        selected_source = (_c.get("source") or "").strip()
-                        break
-            if selected_link:
-                gnews_data = await fetch_gnews_article_by_link(selected_link, search_query, selected_source)
-                if gnews_data.get("found"):
-                    print(f"[gnews] gerçek link üzerinden çekildi: {selected_link}", flush=True)
-            if not gnews_data.get("found"):
-                gnews_data = await fetch_gnews_summary(search_query, lang)
+            if require_verified_source:
+                # Otomatik akış: makale içeriği çekilmez (paywall engeli yok).
+                # Sadece RSS başlık + açıklama kullanılır — kaynak linki RSS'ten gelir.
+                gnews_data = await fetch_gnews_summary(search_query, lang, fetch_full_text=False)
+            else:
+                # Manuel akış: tam makale çekme eski yöntemle devam eder.
+                selected_link = (manual_link or topic_link or "").strip()
+                selected_source = ""
+                if not selected_link:
+                    for _c in ranked_candidates:
+                        if (_c.get("title") or "").strip() == search_query.strip():
+                            selected_link = (_c.get("link") or "").strip()
+                            selected_source = (_c.get("source") or "").strip()
+                            break
+                if selected_link:
+                    gnews_data = await fetch_gnews_article_by_link(selected_link, search_query, selected_source)
+                    if gnews_data.get("found"):
+                        print(f"[gnews] gerçek link üzerinden çekildi: {selected_link}", flush=True)
+                if not gnews_data.get("found"):
+                    gnews_data = await fetch_gnews_summary(search_query, lang)
 
-        # ── Olgu çıkarma: ayrı bir ajan, sadece "kaynakta ne yazıyor" işiyle uğraşır ──
-        # (Senaryo yazan ajandan bilerek ayrı — aynı model hem yorumlayıp hem yaratıcı
-        #  yazınca dikkat dağılıyor, eğitim verisinden detay sızdırıyor.)
+        # ── Olgu çıkarma: sadece manuel akışta çalışır ──────────────────────────────
+        # Otomatik akışta makale çekilmiyor → olgu çıkarma atlanır, RSS özeti bağlam olarak kullanılır.
         facts_data = {}
-        if gnews_data.get("found") and gnews_data.get("context_text"):
+        if not require_verified_source and gnews_data.get("found") and gnews_data.get("context_text"):
             facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
 
-        # GÜVENLİK KİLİDİ: doğrudan link + arama, ikisi de gerçek kaynak metni veremediyse
-        # facts_data boş kalır. Otomatik (insan denetimsiz) akışlarda bu durumda ASLA
-        # senaryo üretimine devam edilmez — model "topic" metninden kafasına göre haber
-        # UYDURABİLİR, bu gerçek bir yanlış bilgi olayına yol açmıştı (SGK/Bankalar).
-        # Manuel "Short Üret" akışında (genel bilgi konuları için de kullanılıyor) bu
-        # kilit devre dışı — require_verified_source sadece insan denetimsiz otomatik
-        # işler (/api/generate-shorts) tarafından True gönderilir.
-        if require_verified_source and not facts_data.get("facts"):
-            raise HTTPException(
-                422,
-                f"'{search_query}' için gerçek/doğrulanabilir kaynak metni bulunamadı — "
-                f"yanlış habere ('kafasına göre uydurma') karşı bu haber OTOMATİK olarak "
-                f"ÜRETİLMEDİ. Bu saat dilimi atlanacak.",
-            )
-
         news_context_instruction = ""
+        # RSS özeti bağlamı — otomatik akışta (facts_data boş) devreye girer
+        if not facts_data.get("facts") and gnews_data.get("articles"):
+            rss_parts = []
+            for _a in gnews_data["articles"][:3]:
+                _desc = _a.get("desc") or ""
+                if _desc:
+                    _src = _a.get("source", "")
+                    rss_parts.append(
+                        f"BAŞLIK: {_a['title']}" + (f" [{_src}]" if _src else "") + f"\nÖZET: {_desc}"
+                    )
+            if rss_parts:
+                news_context_instruction = (
+                    "\n\nHABER KAYNAĞI (Google News RSS özeti):\n"
+                    + "\n\n".join(rss_parts)
+                    + "\nBu özetin ötesine geçme — listede olmayan rakam, tarih, kişi adı uydurma.\n"
+                )
         if facts_data.get("facts"):
             facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
             names_map = facts_data.get("names_with_titles") or {}
