@@ -2184,9 +2184,16 @@ Rules:
                     )
             if rss_parts:
                 news_context_instruction = (
-                    "\n\nHABER KAYNAĞI (Google News RSS özeti):\n"
+                    "\n\nHABER KAYNAĞI (Google News RSS özeti — tam makale değil):\n"
                     + "\n\n".join(rss_parts)
-                    + "\nBu özetin ötesine geçme — listede olmayan rakam, tarih, kişi adı uydurma.\n"
+                    + "\n\nKESİN KURALLAR (ihlal edilemez):\n"
+                    "- Bu özetin DIŞINDA HİÇBİR rakam, yüzde, tarih, kişi adı, kurum adı KULLANMA.\n"
+                    "- Özette '3 bin TL' yazmıyorsa sen '3 bin TL' diyemezsin. Yazmıyorsa atla.\n"
+                    "- Özette isim yoksa 'yetkili kaynaklar' de, isim uydurma.\n"
+                    "- certainty_level ZORUNLU olarak 'B' veya 'C' — asla 'A' seçme "
+                    "(RSS özeti tam haber metni değil, kesinleşmiş bilgi sayılmaz).\n"
+                    "- 'kesinleşti', 'yatırıldı', 'öğrendik' gibi kesin ifadeler yasak — "
+                    "'açıklandı', 'haberler geliyor', 'bekleniyor' kullan.\n"
                 )
         if facts_data.get("facts"):
             facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
