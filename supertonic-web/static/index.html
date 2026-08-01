@@ -2698,6 +2698,10 @@ async function _pollRoundupProgress() {
 
     if (p.active) {
       box.style.display = 'block';
+      // Settings yeniden açılınca interval yoksa otomatik yeniden başlat
+      if (!_roundupProgressTimer) {
+        _roundupProgressTimer = setInterval(_pollRoundupProgress, 5000);
+      }
       const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0;
       document.getElementById('lrp-bar').style.width = pct + '%';
       document.getElementById('lrp-label').textContent =
