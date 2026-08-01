@@ -6610,7 +6610,10 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     segment_starts = []
     total = len(topics)
     cursor = 0.0
+    _roundup_started_at = time.time()
+    _write_roundup_progress(0, total, "", _roundup_started_at)
     for i, topic in enumerate(topics, start=1):
+        _write_roundup_progress(i - 1, total, topic, _roundup_started_at)
         try:
             # "Takip et/beğen" kapanışı SADECE gerçekten son segmentte olsun — her
             # segment kendi başına tam bir Instagram Reels gibi üretildiği için,
@@ -6638,7 +6641,10 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
             print(f"[LV-ROUNDUP] '{topic[:50]}' üretilemedi: {e}", flush=True)
 
     if not clip_paths:
+        _write_roundup_progress(total, total, "", _roundup_started_at, done=True)
         raise RuntimeError("Hiçbir segment üretilemedi")
+
+    _write_roundup_progress(len(clip_paths), total, "Segmentler birleştiriliyor…", _roundup_started_at)
 
     uid = uuid.uuid4().hex
     concat_list = UPLOAD_DIR / f"{uid}_concat.txt"
@@ -6659,7 +6665,11 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
         p.unlink(missing_ok=True)
 
     if proc.returncode != 0 or not output_file.exists():
+        _write_roundup_progress(total, total, "", _roundup_started_at, done=True)
         raise RuntimeError(f"Birleştirme başarısız: {(stderr or b'').decode(errors='ignore')[-300:]}")
+
+    _record_roundup_history(time.time() - _roundup_started_at, len(clip_paths))
+    _write_roundup_progress(total, total, "Tamamlandı", _roundup_started_at, done=True)
 
     # Elle YouTube'a yüklemek isteyenler için hazır başlık/açıklama/etiket —
     # otomatik yükleme yapmıyoruz, sadece indirip elle eklenebilsin diye üretiyoruz.
@@ -6733,6 +6743,24 @@ async def generate_live_roundup_endpoint():
     _lv_roundup_busy = True
     asyncio.create_task(_run_live_roundup_job(api_key))
     return {"ok": True}
+
+
+@app.get("/api/live/roundup-progress")
+async def get_roundup_progress():
+    progress = {}
+    if LIVE_ROUNDUP_PROGRESS.exists():
+        try:
+            progress = json.loads(LIVE_ROUNDUP_PROGRESS.read_text())
+        except Exception:
+            pass
+    history = []
+    if LIVE_ROUNDUP_HISTORY.exists():
+        try:
+            history = json.loads(LIVE_ROUNDUP_HISTORY.read_text())
+        except Exception:
+            pass
+    avg_sec = round(sum(h["duration_sec"] for h in history) / len(history)) if history else None
+    return {"progress": progress, "avg_duration_sec": avg_sec, "run_count": len(history)}
 
 
 @app.get("/api/live/pool-files")
@@ -8094,6 +8122,8 @@ def _rebuild_tnlv_scheduler():
 LIVE_ROUNDUP_SCHED_CONFIG  = Path("live_roundup_sched_config.json")
 LIVE_ROUNDUP_SCHED_LOG     = Path("live_roundup_sched_log.json")
 LIVE_ROUNDUP_UPLOAD_HOURS  = Path("live_roundup_upload_hours.json")
+LIVE_ROUNDUP_PROGRESS      = Path("live_roundup_progress.json")
+LIVE_ROUNDUP_HISTORY       = Path("live_roundup_history.json")
 
 
 def load_live_roundup_sched_config():
@@ -8110,6 +8140,31 @@ def save_live_roundup_sched_log(status: str, message: str, url: str = "", planne
     ))
     if status == "error":
         _fire_telegram("Live Roundup", message)
+
+
+def _write_roundup_progress(current: int, total: int, topic: str, started_at: float, done: bool = False):
+    elapsed = round(time.time() - started_at)
+    est_remaining = None
+    if current > 0 and not done:
+        avg = elapsed / current
+        est_remaining = round(avg * (total - current))
+    LIVE_ROUNDUP_PROGRESS.write_text(json.dumps({
+        "active": not done, "current": current, "total": total,
+        "topic": topic[:60], "elapsed_sec": elapsed,
+        "estimated_remaining_sec": est_remaining,
+        "started_at": started_at, "ts": time.time(),
+    }, ensure_ascii=False))
+
+
+def _record_roundup_history(duration_sec: float, segments: int):
+    history = []
+    if LIVE_ROUNDUP_HISTORY.exists():
+        try:
+            history = json.loads(LIVE_ROUNDUP_HISTORY.read_text())
+        except Exception:
+            pass
+    history.append({"duration_sec": round(duration_sec), "segments": segments, "ts": time.time()})
+    LIVE_ROUNDUP_HISTORY.write_text(json.dumps(history[-20:]))
 
 
 def _get_recent_upload_hours() -> list:

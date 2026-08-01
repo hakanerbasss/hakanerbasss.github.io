@@ -1712,6 +1712,19 @@
           </button>
           <div id="live-roundup-status" style="font-size:12px;color:#888;margin-top:8px;"></div>
 
+          <!-- Progress çubuğu -->
+          <div id="live-roundup-progress-box" style="display:none;margin-top:12px;background:#0d1117;border:1px solid #1a2a3a;border-radius:8px;padding:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span id="lrp-label" style="font-size:12px;color:#ccc;">Segment 1/12</span>
+              <span id="lrp-time" style="font-size:11px;color:#555;"></span>
+            </div>
+            <div style="background:#1a1a2a;border-radius:4px;height:8px;overflow:hidden;">
+              <div id="lrp-bar" style="background:#7c3aed;height:8px;border-radius:4px;transition:width .5s;width:0%;"></div>
+            </div>
+            <div id="lrp-topic" style="font-size:11px;color:#666;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+            <div id="lrp-avg" style="font-size:10px;color:#444;margin-top:4px;"></div>
+          </div>
+
           <!-- Otomatik Roundup Cron -->
           <div style="margin-top:16px;border-top:1px solid #1a1a2a;padding-top:14px;">
             <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:10px;">⏰ Otomatik Gece Roundup (01:00–06:59 rastgele)</div>
@@ -2477,6 +2490,7 @@ async function openSettings() {
   loadENShortsSchedulerStatus();
   loadIGOnlyTRStatus();
   loadLiveRoundupSched();
+  _pollRoundupProgress();
   loadIGFailedUploads();
   loadTelegramConfig();
   checkOpenAIStatus();
@@ -2656,6 +2670,57 @@ async function saveLiveRoundupSched() {
   } catch(e) {}
 }
 
+let _roundupProgressTimer = null;
+
+function _fmtSec(s) {
+  if (!s && s !== 0) return '';
+  const m = Math.floor(s / 60), sec = s % 60;
+  return m > 0 ? `${m} dk ${sec} sn` : `${sec} sn`;
+}
+
+async function _pollRoundupProgress() {
+  try {
+    const r = await fetch('/api/live/roundup-progress');
+    if (!r.ok) return;
+    const d = await r.json();
+    const p = d.progress || {};
+    const box = document.getElementById('live-roundup-progress-box');
+    if (!box) return;
+
+    if (p.active) {
+      box.style.display = 'block';
+      const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0;
+      document.getElementById('lrp-bar').style.width = pct + '%';
+      document.getElementById('lrp-label').textContent =
+        `Segment ${p.current}/${p.total}  ·  ${pct}%`;
+      const elapsed = _fmtSec(p.elapsed_sec);
+      const remaining = p.estimated_remaining_sec != null ? '~' + _fmtSec(p.estimated_remaining_sec) + ' kaldı' : '';
+      document.getElementById('lrp-time').textContent = [elapsed && elapsed + ' geçti', remaining].filter(Boolean).join('  ·  ');
+      document.getElementById('lrp-topic').textContent = p.topic ? `📰 ${p.topic}` : '';
+      if (d.avg_duration_sec) {
+        document.getElementById('lrp-avg').textContent =
+          `Ortalama üretim süresi (son ${d.run_count} üretim): ${_fmtSec(d.avg_duration_sec)}`;
+      }
+    } else {
+      // Tamamlandı — progress kutusu gizle
+      box.style.display = 'none';
+      if (_roundupProgressTimer) { clearInterval(_roundupProgressTimer); _roundupProgressTimer = null; }
+      if (p.topic === 'Tamamlandı') {
+        document.getElementById('lrp-avg') &&
+          (document.getElementById('live-roundup-status').textContent +=
+            d.avg_duration_sec ? `  (bu üretim: ${_fmtSec(p.elapsed_sec)}, ortalama: ${_fmtSec(d.avg_duration_sec)})` : '');
+      }
+    }
+  } catch(e) {}
+}
+
+function _startRoundupProgressPolling() {
+  if (_roundupProgressTimer) clearInterval(_roundupProgressTimer);
+  document.getElementById('live-roundup-progress-box').style.display = 'block';
+  _pollRoundupProgress();
+  _roundupProgressTimer = setInterval(_pollRoundupProgress, 5000);
+}
+
 async function generateLiveRoundup() {
   const rEl = document.getElementById('live-roundup-status');
   showError('err-live', '');
@@ -2665,9 +2730,10 @@ async function generateLiveRoundup() {
       const ct = r.headers.get('content-type') || '';
       throw new Error(ct.includes('json') ? (await r.json()).detail : await r.text());
     }
-    if (rEl) rEl.textContent = 'Başlatıldı, üretim sürebilir…';
+    if (rEl) rEl.textContent = 'Başlatıldı, 12 segment sırayla üretiliyor…';
     setLoading('btn-live-roundup', 'spin-live-roundup', true);
     refreshLiveStatus();
+    setTimeout(_startRoundupProgressPolling, 2000);
   } catch(e) {
     showError('err-live', e.message);
   }
