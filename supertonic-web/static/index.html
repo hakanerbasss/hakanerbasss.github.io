@@ -1714,20 +1714,20 @@
 
           <!-- Otomatik Roundup Cron -->
           <div style="margin-top:16px;border-top:1px solid #1a1a2a;padding-top:14px;">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:10px;">⏰ Otomatik Üretim (Gece Roundup)</div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:10px;">⏰ Otomatik Gece Roundup (01:00–06:59 rastgele)</div>
+            <div style="font-size:11px;color:#555;margin-bottom:10px;">Her gece farklı bir saatte üretir. Son 7 günde kullanılan saatlere girmez. Saati sen seçemezsin — bu kasıtlı.</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ccc;">
                 <input type="checkbox" id="lrs-enabled" onchange="saveLiveRoundupSched()" style="accent-color:#7c3aed;">
                 Aktif
               </label>
-              <input type="text" id="lrs-times" placeholder="04:00" onblur="saveLiveRoundupSched()"
-                style="width:90px;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:13px;padding:6px 8px;outline:none;">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#aaa;">
                 <input type="checkbox" id="lrs-upload" onchange="saveLiveRoundupSched()" style="accent-color:#4ade80;" checked>
                 YouTube'a da yükle
               </label>
             </div>
             <div id="lrs-log" style="font-size:11px;color:#555;"></div>
+            <div id="lrs-hours" style="font-size:10px;color:#444;margin-top:6px;"></div>
           </div>
 
           <div id="live-roundup-result" style="display:none;margin-top:14px;">
@@ -2624,26 +2624,32 @@ async function loadLiveRoundupSched() {
     const d = await r.json();
     const cfg = d.config || {};
     document.getElementById('lrs-enabled').checked = !!cfg.enabled;
-    document.getElementById('lrs-times').value = (cfg.times || ['04:00']).join(', ');
     document.getElementById('lrs-upload').checked = cfg.upload_to_youtube !== false;
     const log = d.log || {};
     const lrsEl = document.getElementById('lrs-log');
     if (lrsEl && log.status) {
       const dt = log.ts ? new Date(log.ts * 1000).toLocaleString('tr-TR') : '';
-      const col = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#888';
-      lrsEl.innerHTML = `<span style="color:${col};">${log.status === 'success' ? '✓' : log.status === 'error' ? '✗' : '…'} ${log.message || ''}</span>${log.url ? ` <a href="${log.url}" target="_blank" style="color:#7c3aed;">↗</a>` : ''} <span style="color:#444;">${dt}</span>`;
+      const icons = {success:'✓', error:'✗', scheduled:'📅', running:'⏳'};
+      const cols  = {success:'#4ade80', error:'#f87171', scheduled:'#facc15', running:'#888'};
+      const icon = icons[log.status] || '…';
+      const col  = cols[log.status]  || '#888';
+      lrsEl.innerHTML = `<span style="color:${col};">${icon} ${log.message || ''}</span>`
+        + (log.url ? ` <a href="${log.url}" target="_blank" style="color:#7c3aed;">↗</a>` : '')
+        + ` <span style="color:#444;">${dt}</span>`;
+    }
+    const hoursEl = document.getElementById('lrs-hours');
+    if (hoursEl && d.recent_hours && d.recent_hours.length) {
+      hoursEl.textContent = `Son 7 gün kullanılan saatler: ${d.recent_hours.map(h => h+':xx').join(', ')}`;
     }
   } catch(e) {}
 }
 
 async function saveLiveRoundupSched() {
   const enabled = document.getElementById('lrs-enabled').checked;
-  const times = document.getElementById('lrs-times').value.trim() || '04:00';
   const upload = document.getElementById('lrs-upload').checked;
   try {
     const fd = new FormData();
     fd.append('enabled', enabled ? 'true' : 'false');
-    fd.append('times', times);
     fd.append('upload_to_youtube', upload ? 'true' : 'false');
     await fetch('/api/live/roundup-sched', { method: 'POST', body: fd });
     await loadLiveRoundupSched();

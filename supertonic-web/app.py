@@ -21,6 +21,7 @@ import httpx
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 
 from supertonic import TTS
 from deep_translator import GoogleTranslator
@@ -8087,27 +8088,100 @@ def _rebuild_tnlv_scheduler():
 
 
 # ── Otomatik Live Roundup (havuz + YouTube yükleme) ─────────────────────────
-LIVE_ROUNDUP_SCHED_CONFIG = Path("live_roundup_sched_config.json")
-LIVE_ROUNDUP_SCHED_LOG    = Path("live_roundup_sched_log.json")
+# Her gece 00:30'da _plan_live_roundup_upload() çalışır, 01:00-06:59 arasında
+# son 7 günde kullanılmayan rastgele bir saat seçer ve o saate DateTrigger ekler.
+# Böylece her gece farklı bir saatte yükleme yapılır, pattern oluşmaz.
+LIVE_ROUNDUP_SCHED_CONFIG  = Path("live_roundup_sched_config.json")
+LIVE_ROUNDUP_SCHED_LOG     = Path("live_roundup_sched_log.json")
+LIVE_ROUNDUP_UPLOAD_HOURS  = Path("live_roundup_upload_hours.json")
 
 
 def load_live_roundup_sched_config():
     if LIVE_ROUNDUP_SCHED_CONFIG.exists():
         return json.loads(LIVE_ROUNDUP_SCHED_CONFIG.read_text())
-    return {"enabled": False, "times": ["04:00"], "upload_to_youtube": True}
+    return {"enabled": False, "upload_to_youtube": True}
 
 
-def save_live_roundup_sched_log(status: str, message: str, url: str = ""):
+def save_live_roundup_sched_log(status: str, message: str, url: str = "", planned_time: str = ""):
     LIVE_ROUNDUP_SCHED_LOG.write_text(json.dumps(
-        {"status": status, "message": message, "url": url, "ts": time.time()},
+        {"status": status, "message": message, "url": url,
+         "planned_time": planned_time, "ts": time.time()},
         ensure_ascii=False,
     ))
     if status == "error":
         _fire_telegram("Live Roundup", message)
 
 
+def _get_recent_upload_hours() -> list:
+    """Son 7 günde yükleme yapılan saatleri döner (tekrar seçilmesin diye)."""
+    if not LIVE_ROUNDUP_UPLOAD_HOURS.exists():
+        return []
+    try:
+        entries = json.loads(LIVE_ROUNDUP_UPLOAD_HOURS.read_text())
+        cutoff = time.time() - 7 * 86400
+        return [e["hour"] for e in entries if e.get("ts", 0) > cutoff]
+    except Exception:
+        return []
+
+
+def _record_upload_hour(hour: int):
+    entries = []
+    if LIVE_ROUNDUP_UPLOAD_HOURS.exists():
+        try:
+            entries = json.loads(LIVE_ROUNDUP_UPLOAD_HOURS.read_text())
+        except Exception:
+            pass
+    entries.append({"hour": hour, "ts": time.time()})
+    cutoff = time.time() - 30 * 86400
+    entries = [e for e in entries if e.get("ts", 0) > cutoff]
+    LIVE_ROUNDUP_UPLOAD_HOURS.write_text(json.dumps(entries))
+
+
+def _plan_live_roundup_upload():
+    """Her gece 00:30'da çalışır: 01-06 saatleri arasında rastgele bir saat seçer,
+    son 7 günde kullanılmamış olanı tercih eder, DateTrigger ile planlar."""
+    import random
+    import datetime as _dt
+
+    cfg = load_live_roundup_sched_config()
+    if not cfg.get("enabled"):
+        return
+
+    recent = _get_recent_upload_hours()
+    available = [h for h in range(1, 7) if h not in recent]
+    if not available:
+        available = list(range(1, 7))  # Tümü dolmuşsa en eski geçerli
+
+    chosen_hour   = random.choice(available)
+    chosen_minute = random.randint(0, 59)
+
+    now = _dt.datetime.now()
+    run_dt = now.replace(hour=chosen_hour, minute=chosen_minute, second=0, microsecond=0)
+    if run_dt <= now:
+        run_dt += _dt.timedelta(days=1)
+
+    for job in scheduler.get_jobs():
+        if job.id == "live_roundup_today":
+            job.remove()
+
+    scheduler.add_job(
+        auto_live_roundup_job,
+        DateTrigger(run_date=run_dt),
+        id="live_roundup_today",
+        replace_existing=True,
+        max_instances=1,
+    )
+    planned_str = run_dt.strftime("%d.%m.%Y %H:%M")
+    save_live_roundup_sched_log("scheduled", f"Planlanan yükleme: {planned_str}", planned_time=planned_str)
+    print(f"[LIVE-ROUNDUP] {planned_str}'de upload planlandı (son 7 gün: {recent})", flush=True)
+
+
 async def auto_live_roundup_job():
-    """Gece üretim: roundup → live_queue + (isteğe bağlı) YouTube yükleme."""
+    """Planlanan saatte: roundup → live_queue + (isteğe bağlı) YouTube yükleme."""
+    import datetime as _dt
+    upload_hour = _dt.datetime.now().hour
+    _record_upload_hour(upload_hour)
+
     api_key = get_deepseek_key()
     if not api_key:
         save_live_roundup_sched_log("error", "DeepSeek API key sunucuda kayıtlı değil")
@@ -8122,7 +8196,6 @@ async def auto_live_roundup_job():
     _lv_roundup_busy = True
     await _run_live_roundup_job(api_key)
 
-    # Üretim sonucunu oku
     try:
         state = json.loads(LIVE_STATE_FILE.read_text()) if LIVE_STATE_FILE.exists() else {}
     except Exception:
@@ -8147,7 +8220,6 @@ async def auto_live_roundup_job():
         save_live_roundup_sched_log("error", f"Video dosyası bulunamadı: {vfn}")
         return
 
-    # YouTube upload endpoint'i OUTPUT_DIR'den okur — geçici kopya oluştur
     dst = OUTPUT_DIR / vfn
     try:
         shutil.copy2(str(src), str(dst))
@@ -8177,23 +8249,21 @@ async def auto_live_roundup_job():
 
 def _rebuild_live_roundup_scheduler():
     for job in scheduler.get_jobs():
-        if job.id.startswith("live_roundup_"):
+        if job.id in ("live_roundup_planner", "live_roundup_today"):
             job.remove()
     cfg = load_live_roundup_sched_config()
     if not cfg.get("enabled"):
         return
-    for t in cfg.get("times", ["04:00"]):
-        try:
-            hour, minute = t.strip().split(":")
-            scheduler.add_job(
-                auto_live_roundup_job,
-                CronTrigger(hour=int(hour), minute=int(minute), timezone="Europe/Istanbul"),
-                id=f"live_roundup_{t.replace(':', '')}",
-                replace_existing=True,
-                max_instances=1,
-            )
-        except Exception:
-            pass
+    # Her gece 00:30'da planlayıcı çalışır
+    scheduler.add_job(
+        _plan_live_roundup_upload,
+        CronTrigger(hour=0, minute=30, timezone="Europe/Istanbul"),
+        id="live_roundup_planner",
+        replace_existing=True,
+        max_instances=1,
+    )
+    # Startup'ta da hemen bir plan oluştur (sunucu gündüz restart'larında)
+    _plan_live_roundup_upload()
 
 
 @app.get("/api/live/roundup-sched")
@@ -8205,19 +8275,17 @@ async def get_live_roundup_sched():
             log = json.loads(LIVE_ROUNDUP_SCHED_LOG.read_text())
         except Exception:
             pass
-    return {"config": cfg, "log": log}
+    recent_hours = _get_recent_upload_hours()
+    return {"config": cfg, "log": log, "recent_hours": recent_hours}
 
 
 @app.post("/api/live/roundup-sched")
 async def save_live_roundup_sched(
     enabled: str = Form(...),
-    times: str = Form("04:00"),
     upload_to_youtube: str = Form("true"),
 ):
-    time_list = [t.strip() for t in times.replace(",", " ").split() if t.strip()]
     cfg = {
         "enabled": enabled == "true",
-        "times": time_list or ["04:00"],
         "upload_to_youtube": upload_to_youtube == "true",
     }
     LIVE_ROUNDUP_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
