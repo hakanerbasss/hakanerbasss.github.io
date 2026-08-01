@@ -1128,11 +1128,20 @@
 
     <!-- Canlı Yayın İstatistikleri -->
     <div style="background:#0d1117;border:1px solid #1a3a2e;border-radius:12px;padding:14px 18px;margin-bottom:18px;">
-      <div style="color:#4ade80;font-size:13px;font-weight:700;margin-bottom:12px;">📡 Canlı Yayın İstatistikleri</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="color:#4ade80;font-size:13px;font-weight:700;">📡 Canlı Yayın İstatistikleri</div>
+        <div id="an-live-active-badge" style="display:none;background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.3px;">🔴 CANLI</div>
+      </div>
+      <!-- Aktif yayın bilgisi -->
+      <div id="an-live-active-box" style="display:none;background:#1a0a0a;border:1px solid #7f1d1d;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+        <div style="font-size:12px;color:#f87171;font-weight:600;margin-bottom:4px;" id="an-live-active-title">-</div>
+        <div style="font-size:11px;color:#888;" id="an-live-active-duration">-</div>
+        <div style="font-size:11px;color:#555;margin-top:3px;">Yayın kapandığında YouTube otomatik video kaydeder (İçerikler sekmesinde görünür). Analytics verisi kapandıktan 1–2 gün sonra tam yansır.</div>
+      </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
         <div style="background:#0a1f14;border:1px solid #1a3a2e;border-radius:8px;padding:12px;text-align:center;">
           <div style="font-size:22px;font-weight:bold;color:#4ade80;" id="an-live-count">-</div>
-          <div style="color:#888;font-size:11px;margin-top:3px;">Toplam Yayın</div>
+          <div style="color:#888;font-size:11px;margin-top:3px;">Biten Yayın</div>
         </div>
         <div style="background:#0a1f14;border:1px solid #1a3a2e;border-radius:8px;padding:12px;text-align:center;">
           <div style="font-size:22px;font-weight:bold;color:#34d399;" id="an-live-hours-all">-</div>
@@ -4695,12 +4704,32 @@ async function loadAnalytics() {
 
     // Canlı yayın istatistikleri
     const lv = d.live || {};
+
+    // Aktif yayın varsa göster
+    const activeB = lv.active;
+    if (activeB) {
+      document.getElementById('an-live-active-badge').style.display = 'inline-block';
+      document.getElementById('an-live-active-box').style.display = 'block';
+      document.getElementById('an-live-active-title').textContent = activeB.title || activeB.id;
+      let durationStr = 'Başlangıç: ' + (activeB.start ? new Date(activeB.start).toLocaleString('tr-TR') : '-');
+      if (activeB.start) {
+        const diffMs = Date.now() - new Date(activeB.start).getTime();
+        const diffH = Math.floor(diffMs / 3600000);
+        const diffM = Math.floor((diffMs % 3600000) / 60000);
+        durationStr += ` · ${diffH} saat ${diffM} dakikadır canlı`;
+      }
+      document.getElementById('an-live-active-duration').textContent = durationStr;
+    } else {
+      document.getElementById('an-live-active-badge').style.display = 'none';
+      document.getElementById('an-live-active-box').style.display = 'none';
+    }
+
     document.getElementById('an-live-count').textContent = lv.total_sessions ?? 0;
     document.getElementById('an-live-hours-all').textContent = (lv.alltime_watch_hours ?? 0) + 's';
     document.getElementById('an-live-hours-period').textContent = (lv.period_watch_hours ?? 0) + 's';
     const lvRecent = lv.recent_broadcasts || [];
     document.getElementById('an-live-recent').innerHTML = lvRecent.length
-      ? '<div style="font-size:12px;color:#666;margin-bottom:6px;">Son Tamamlanan Yayınlar</div>'
+      ? '<div style="font-size:12px;color:#666;margin-bottom:6px;">Son Biten Yayınlar (kapanınca YouTube\'da video olarak kaydedilir)</div>'
         + lvRecent.map(b => {
             const dt = b.start ? new Date(b.start).toLocaleDateString('tr-TR', {day:'2-digit', month:'short', year:'numeric'}) : '-';
             return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#aaa;padding:5px 0;border-bottom:1px solid #1a2a1a;">
@@ -4708,7 +4737,7 @@ async function loadAnalytics() {
               <span style="color:#555;white-space:nowrap;margin-left:12px;">${dt}</span>
             </div>`;
           }).join('')
-      : '<div style="color:#555;font-size:12px;">Tamamlanmış yayın bulunamadı</div>';
+      : '<div style="color:#555;font-size:12px;">Henüz biten yayın yok (şu an aktif olan kapandığında burada görünür)</div>';
 
     // Yayın saati + etiket analizi (top_videos üzerinden — instagram tarafındaki
     // buildTimeAnalysis/buildTopicAnalysis ile aynı görsel dil, YouTube veri

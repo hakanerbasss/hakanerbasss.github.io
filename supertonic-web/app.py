@@ -6845,6 +6845,27 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
             metrics="views,estimatedMinutesWatched", dimensions="country", sort="-views", maxResults=10,
         )
 
+        # ── Canlı yayın: şu an aktif yayın var mı?
+        active_broadcast = None
+        try:
+            ab_resp = yt.liveBroadcasts().list(
+                part="id,snippet,status,contentDetails",
+                broadcastType="all",
+                broadcastStatus="active",
+                maxResults=5,
+            ).execute()
+            for it in ab_resp.get("items", []):
+                start_str = it["snippet"].get("actualStartTime", "")
+                active_broadcast = {
+                    "id": it["id"],
+                    "title": it["snippet"].get("title", ""),
+                    "start": start_str,
+                    "concurrent_viewers": it.get("statistics", {}).get("concurrentViewers", None),
+                }
+                break
+        except Exception as ab_err:
+            print(f"[YT-ANALYTICS] aktif broadcast sorgusu başarısız: {ab_err}", flush=True)
+
         # ── Canlı yayın: tamamlanmış yayın sayısı (liveBroadcasts API)
         live_count = 0
         live_recent = []
@@ -6990,6 +7011,7 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
                 for r in countries.get("rows", [])
             ],
             "live": {
+                "active": active_broadcast,
                 "total_sessions": live_count,
                 "recent_broadcasts": live_recent[:10],
                 "alltime_watch_hours": round(live_watch_min_all / 60, 1),
