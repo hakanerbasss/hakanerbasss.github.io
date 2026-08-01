@@ -251,6 +251,17 @@ def _is_banned_topic(title: str) -> bool:
 
 tts_model = None
 whisper_model = None
+# ONNX TTS modeli thread-safe DEĞİL — aynı anda birden fazla sentez çağrısı
+# model durumunu bozar. Semaforda değil burada seri hale getiriyoruz ki
+# _generate_shorts_core içindeki DeepSeek/Pexels çağrıları paralel çalışabilsin.
+_tts_synthesize_lock: asyncio.Lock | None = None
+
+
+def _get_tts_lock() -> asyncio.Lock:
+    global _tts_synthesize_lock
+    if _tts_synthesize_lock is None:
+        _tts_synthesize_lock = asyncio.Lock()
+    return _tts_synthesize_lock
 
 LANG_MAP = {
     "tr": "Turkish",
@@ -279,10 +290,11 @@ async def _synth_audio(text: str, lang: str, voice: str, speed: float, out_path:
         )
     tts_obj = get_tts()
     style = tts_obj.get_voice_style(voice_name=voice)
-    wav, dur = await asyncio.to_thread(tts_obj.synthesize,
-        _clean_tts_text(text, lang), lang=lang, voice_style=style, total_steps=8, speed=speed)
-    dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
-    tts_obj.save_audio(wav, str(out_path))
+    async with _get_tts_lock():
+        wav, dur = await asyncio.to_thread(tts_obj.synthesize,
+            _clean_tts_text(text, lang), lang=lang, voice_style=style, total_steps=8, speed=speed)
+        dur_val = float(dur[0]) if hasattr(dur, '__getitem__') else float(dur)
+        tts_obj.save_audio(wav, str(out_path))
     return dur_val
 
 
@@ -6616,9 +6628,14 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
                 # "Takip et/beğen" kapanışı SADECE son segmentte (idx==total) —
                 # her segment kendi başına tam Reels gibi üretildiği için bu
                 # koruma olmadan 12 haberde 12 kez "takip et" tekrarlanırdı.
-                result = await _generate_shorts_core(
-                    topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
-                    platform="instagram", skip_closing_cta=(idx < total),
+                # 5 dakika timeout: TTS/FFmpeg'in kilitlenmesi durumunda sonsuz
+                # beklemeye karşı güvence.
+                result = await asyncio.wait_for(
+                    _generate_shorts_core(
+                        topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
+                        platform="instagram", skip_closing_cta=(idx < total),
+                    ),
+                    timeout=300.0,
                 )
                 clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
                 if clip_file.exists():
