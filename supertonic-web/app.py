@@ -1378,6 +1378,14 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
         "assume institutions are interchangeable just because they're topically related.\n\n"
         "Return ONLY valid JSON, no markdown:\n"
         '{"unsupported_claims": ["claim text not backed by the facts above", "..."]}\n\n'
+        "IMPORTANT EXCEPTIONS — do NOT flag these even if absent from the facts list:\n"
+        "- Widely known geographic facts (e.g. which city/district something is in, which side of a city, "
+        "country capitals, population ranges, names of rivers/mountains)\n"
+        "- General descriptive context about places or organizations that any informed adult would know\n"
+        "- Background sentences that set the scene without making a new factual claim about the news event\n"
+        "- Standard journalistic framing ('experts say', 'according to reports')\n"
+        "Only flag invented or misattributed SPECIFIC claims about the news event itself (wrong numbers, "
+        "wrong names, wrong institutions doing the action described in this article).\n"
         "If every specific claim in the narration is backed by the facts list (generic storytelling "
         "phrasing with no new factual claims is fine), return an empty list."
     )
