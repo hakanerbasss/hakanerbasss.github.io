@@ -6845,6 +6845,57 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
             metrics="views,estimatedMinutesWatched", dimensions="country", sort="-views", maxResults=10,
         )
 
+        # ── Canlı yayın: tamamlanmış yayın sayısı (liveBroadcasts API)
+        live_count = 0
+        live_recent = []
+        try:
+            lb_resp = yt.liveBroadcasts().list(
+                part="id,snippet,status",
+                broadcastType="all",
+                broadcastStatus="completed",
+                maxResults=50,
+            ).execute()
+            for it in lb_resp.get("items", []):
+                live_count += 1
+                live_recent.append({
+                    "id": it["id"],
+                    "title": it["snippet"].get("title", ""),
+                    "start": it["snippet"].get("actualStartTime", it["snippet"].get("scheduledStartTime", "")),
+                })
+            page_token = lb_resp.get("nextPageToken")
+            extra_pages = 0
+            while page_token and extra_pages < 2:
+                lb_resp2 = yt.liveBroadcasts().list(
+                    part="id,snippet,status",
+                    broadcastType="all",
+                    broadcastStatus="completed",
+                    maxResults=50,
+                    pageToken=page_token,
+                ).execute()
+                live_count += len(lb_resp2.get("items", []))
+                page_token = lb_resp2.get("nextPageToken")
+                extra_pages += 1
+        except Exception as lb_err:
+            print(f"[YT-ANALYTICS] liveBroadcasts hatası: {lb_err}", flush=True)
+
+        # ── Canlı yayın analitik (tüm zamanlar)
+        live_alltime = safe_query(
+            ids="channel==MINE", startDate="2020-01-01", endDate=ed,
+            metrics="estimatedMinutesWatched,views",
+            filters="liveOrOnDemand==LIVE",
+        )
+        live_watch_min_all = int(live_alltime["rows"][0][0]) if live_alltime.get("rows") else 0
+        live_views_all = int(live_alltime["rows"][0][1]) if live_alltime.get("rows") else 0
+
+        # ── Canlı yayın analitik (seçili dönem)
+        live_period_q = safe_query(
+            ids="channel==MINE", startDate=sd, endDate=ed,
+            metrics="estimatedMinutesWatched,views",
+            filters="liveOrOnDemand==LIVE",
+        )
+        live_watch_min_period = int(live_period_q["rows"][0][0]) if live_period_q.get("rows") else 0
+        live_views_period = int(live_period_q["rows"][0][1]) if live_period_q.get("rows") else 0
+
         # ── Kanal abone sayısı
         ch_resp = yt.channels().list(part="statistics", mine=True).execute()
         ch_stats = {}
@@ -6938,6 +6989,14 @@ async def get_yt_analytics(days: int = 28, channel: str = "tr"):
                 {"country": r[0], "views": int(r[1]), "watch_min": int(r[2])}
                 for r in countries.get("rows", [])
             ],
+            "live": {
+                "total_sessions": live_count,
+                "recent_broadcasts": live_recent[:10],
+                "alltime_watch_hours": round(live_watch_min_all / 60, 1),
+                "alltime_views": live_views_all,
+                "period_watch_hours": round(live_watch_min_period / 60, 1),
+                "period_views": live_views_period,
+            },
         }
     except Exception as e:
         raise HTTPException(500, str(e))
