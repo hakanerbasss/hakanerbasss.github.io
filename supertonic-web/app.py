@@ -8086,6 +8086,145 @@ def _rebuild_tnlv_scheduler():
             pass
 
 
+# ── Otomatik Live Roundup (havuz + YouTube yükleme) ─────────────────────────
+LIVE_ROUNDUP_SCHED_CONFIG = Path("live_roundup_sched_config.json")
+LIVE_ROUNDUP_SCHED_LOG    = Path("live_roundup_sched_log.json")
+
+
+def load_live_roundup_sched_config():
+    if LIVE_ROUNDUP_SCHED_CONFIG.exists():
+        return json.loads(LIVE_ROUNDUP_SCHED_CONFIG.read_text())
+    return {"enabled": False, "times": ["04:00"], "upload_to_youtube": True}
+
+
+def save_live_roundup_sched_log(status: str, message: str, url: str = ""):
+    LIVE_ROUNDUP_SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "url": url, "ts": time.time()},
+        ensure_ascii=False,
+    ))
+    if status == "error":
+        _fire_telegram("Live Roundup", message)
+
+
+async def auto_live_roundup_job():
+    """Gece üretim: roundup → live_queue + (isteğe bağlı) YouTube yükleme."""
+    api_key = get_deepseek_key()
+    if not api_key:
+        save_live_roundup_sched_log("error", "DeepSeek API key sunucuda kayıtlı değil")
+        return
+    if not TOKEN_FILE.exists():
+        save_live_roundup_sched_log("error", "YouTube hesabı bağlı değil")
+        return
+
+    save_live_roundup_sched_log("running", "Roundup üretimi başlıyor…")
+
+    global _lv_roundup_busy
+    _lv_roundup_busy = True
+    await _run_live_roundup_job(api_key)
+
+    # Üretim sonucunu oku
+    try:
+        state = json.loads(LIVE_STATE_FILE.read_text()) if LIVE_STATE_FILE.exists() else {}
+    except Exception:
+        state = {}
+
+    if state.get("roundup_status") == "error":
+        save_live_roundup_sched_log("error", state.get("roundup_error", "Bilinmeyen hata"))
+        return
+
+    vfn   = state.get("roundup_video_filename", "")
+    title = state.get("roundup_title", "Günün Haberleri")
+    desc  = state.get("roundup_description", "")
+    tags  = state.get("roundup_tags", "")
+
+    cfg = load_live_roundup_sched_config()
+    if not cfg.get("upload_to_youtube", True) or not vfn:
+        save_live_roundup_sched_log("success", f"Havuza eklendi: {title}")
+        return
+
+    src = LIVE_QUEUE_DIR / vfn
+    if not src.exists():
+        save_live_roundup_sched_log("error", f"Video dosyası bulunamadı: {vfn}")
+        return
+
+    # YouTube upload endpoint'i OUTPUT_DIR'den okur — geçici kopya oluştur
+    dst = OUTPUT_DIR / vfn
+    try:
+        shutil.copy2(str(src), str(dst))
+        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=30, read=600, write=60, pool=30)) as hc:
+            r = await hc.post(
+                "http://localhost:8001/api/yt/upload",
+                data={
+                    "filename": vfn,
+                    "title": title,
+                    "description": desc,
+                    "tags": tags,
+                    "privacy": "public",
+                    "category_id": "25",
+                    "channel": "tr",
+                },
+            )
+        if r.status_code == 200:
+            url = r.json().get("url", "")
+            save_live_roundup_sched_log("success", title, url)
+        else:
+            save_live_roundup_sched_log("error", f"YouTube yüklenemedi: {r.text[:300]}")
+    except Exception as yt_err:
+        save_live_roundup_sched_log("error", f"YouTube yükleme hatası: {yt_err}")
+    finally:
+        dst.unlink(missing_ok=True)
+
+
+def _rebuild_live_roundup_scheduler():
+    for job in scheduler.get_jobs():
+        if job.id.startswith("live_roundup_"):
+            job.remove()
+    cfg = load_live_roundup_sched_config()
+    if not cfg.get("enabled"):
+        return
+    for t in cfg.get("times", ["04:00"]):
+        try:
+            hour, minute = t.strip().split(":")
+            scheduler.add_job(
+                auto_live_roundup_job,
+                CronTrigger(hour=int(hour), minute=int(minute), timezone="Europe/Istanbul"),
+                id=f"live_roundup_{t.replace(':', '')}",
+                replace_existing=True,
+                max_instances=1,
+            )
+        except Exception:
+            pass
+
+
+@app.get("/api/live/roundup-sched")
+async def get_live_roundup_sched():
+    cfg = load_live_roundup_sched_config()
+    log = {}
+    if LIVE_ROUNDUP_SCHED_LOG.exists():
+        try:
+            log = json.loads(LIVE_ROUNDUP_SCHED_LOG.read_text())
+        except Exception:
+            pass
+    return {"config": cfg, "log": log}
+
+
+@app.post("/api/live/roundup-sched")
+async def save_live_roundup_sched(
+    enabled: str = Form(...),
+    times: str = Form("04:00"),
+    upload_to_youtube: str = Form("true"),
+):
+    time_list = [t.strip() for t in times.replace(",", " ").split() if t.strip()]
+    cfg = {
+        "enabled": enabled == "true",
+        "times": time_list or ["04:00"],
+        "upload_to_youtube": upload_to_youtube == "true",
+    }
+    LIVE_ROUNDUP_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
+    _rebuild_live_roundup_scheduler()
+    return cfg
+
+
 # ── TR Instagram-Only Scheduler ─────────────────────────────────────────────
 IG_ONLY_TR_SCHED_CONFIG = Path("ig_only_tr_sched_config.json")
 IG_ONLY_TR_SCHED_LOG    = Path("ig_only_tr_sched_log.json")
@@ -8759,6 +8898,7 @@ async def startup_event():
     _rebuild_lv_en_scheduler()
     _rebuild_en_shorts_scheduler()
     _rebuild_tnlv_scheduler()
+    _rebuild_live_roundup_scheduler()
     _rebuild_ig_only_tr_scheduler()
     scheduler.add_job(
         _cleanup_old_media, CronTrigger(hour=4, minute=30, timezone="Europe/Istanbul"),

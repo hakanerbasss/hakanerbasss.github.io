@@ -1712,6 +1712,24 @@
           </button>
           <div id="live-roundup-status" style="font-size:12px;color:#888;margin-top:8px;"></div>
 
+          <!-- Otomatik Roundup Cron -->
+          <div style="margin-top:16px;border-top:1px solid #1a1a2a;padding-top:14px;">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:10px;">⏰ Otomatik Üretim (Gece Roundup)</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ccc;">
+                <input type="checkbox" id="lrs-enabled" onchange="saveLiveRoundupSched()" style="accent-color:#7c3aed;">
+                Aktif
+              </label>
+              <input type="text" id="lrs-times" placeholder="04:00" onblur="saveLiveRoundupSched()"
+                style="width:90px;background:#111;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-size:13px;padding:6px 8px;outline:none;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#aaa;">
+                <input type="checkbox" id="lrs-upload" onchange="saveLiveRoundupSched()" style="accent-color:#4ade80;" checked>
+                YouTube'a da yükle
+              </label>
+            </div>
+            <div id="lrs-log" style="font-size:11px;color:#555;"></div>
+          </div>
+
           <div id="live-roundup-result" style="display:none;margin-top:14px;">
             <p style="color:#666;font-size:12px;margin-bottom:8px;">
               Elle YouTube'a yüklemek için hazır — videoyu indir, aşağıdaki başlık/açıklama/etiketleri kopyala.
@@ -2458,6 +2476,7 @@ async function openSettings() {
   loadLVENSchedulerStatus();
   loadENShortsSchedulerStatus();
   loadIGOnlyTRStatus();
+  loadLiveRoundupSched();
   loadIGFailedUploads();
   loadTelegramConfig();
   checkOpenAIStatus();
@@ -2596,6 +2615,39 @@ async function copyRoundupField(fieldId, btn) {
   const orig = btn.textContent;
   btn.textContent = '✓ Kopyalandı';
   setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+async function loadLiveRoundupSched() {
+  try {
+    const r = await fetch('/api/live/roundup-sched');
+    if (!r.ok) return;
+    const d = await r.json();
+    const cfg = d.config || {};
+    document.getElementById('lrs-enabled').checked = !!cfg.enabled;
+    document.getElementById('lrs-times').value = (cfg.times || ['04:00']).join(', ');
+    document.getElementById('lrs-upload').checked = cfg.upload_to_youtube !== false;
+    const log = d.log || {};
+    const lrsEl = document.getElementById('lrs-log');
+    if (lrsEl && log.status) {
+      const dt = log.ts ? new Date(log.ts * 1000).toLocaleString('tr-TR') : '';
+      const col = log.status === 'success' ? '#4ade80' : log.status === 'error' ? '#f87171' : '#888';
+      lrsEl.innerHTML = `<span style="color:${col};">${log.status === 'success' ? '✓' : log.status === 'error' ? '✗' : '…'} ${log.message || ''}</span>${log.url ? ` <a href="${log.url}" target="_blank" style="color:#7c3aed;">↗</a>` : ''} <span style="color:#444;">${dt}</span>`;
+    }
+  } catch(e) {}
+}
+
+async function saveLiveRoundupSched() {
+  const enabled = document.getElementById('lrs-enabled').checked;
+  const times = document.getElementById('lrs-times').value.trim() || '04:00';
+  const upload = document.getElementById('lrs-upload').checked;
+  try {
+    const fd = new FormData();
+    fd.append('enabled', enabled ? 'true' : 'false');
+    fd.append('times', times);
+    fd.append('upload_to_youtube', upload ? 'true' : 'false');
+    await fetch('/api/live/roundup-sched', { method: 'POST', body: fd });
+    await loadLiveRoundupSched();
+  } catch(e) {}
 }
 
 async function generateLiveRoundup() {
