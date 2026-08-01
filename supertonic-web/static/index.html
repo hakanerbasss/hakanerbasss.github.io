@@ -1738,6 +1738,12 @@
                 <input type="checkbox" id="lrs-upload" onchange="saveLiveRoundupSched()" style="accent-color:#4ade80;" checked>
                 YouTube'a da yükle
               </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aaa;">
+                <span>Segment sayısı:</span>
+                <input type="number" id="lrs-segcount" min="3" max="20" value="10"
+                  onchange="saveLiveRoundupSched()"
+                  style="width:52px;background:#0e0e1a;border:1px solid #2a2a3a;border-radius:4px;color:#ccc;padding:2px 6px;font-size:12px;text-align:center;">
+              </label>
             </div>
             <div id="lrs-log" style="font-size:11px;color:#555;"></div>
             <div id="lrs-hours" style="font-size:10px;color:#444;margin-top:6px;"></div>
@@ -2639,6 +2645,7 @@ async function loadLiveRoundupSched() {
     const cfg = d.config || {};
     document.getElementById('lrs-enabled').checked = !!cfg.enabled;
     document.getElementById('lrs-upload').checked = cfg.upload_to_youtube !== false;
+    document.getElementById('lrs-segcount').value = cfg.segment_count ?? 10;
     const log = d.log || {};
     const lrsEl = document.getElementById('lrs-log');
     if (lrsEl && log.status) {
@@ -2661,10 +2668,12 @@ async function loadLiveRoundupSched() {
 async function saveLiveRoundupSched() {
   const enabled = document.getElementById('lrs-enabled').checked;
   const upload = document.getElementById('lrs-upload').checked;
+  const segCount = document.getElementById('lrs-segcount').value || '10';
   try {
     const fd = new FormData();
     fd.append('enabled', enabled ? 'true' : 'false');
     fd.append('upload_to_youtube', upload ? 'true' : 'false');
+    fd.append('segment_count', segCount);
     await fetch('/api/live/roundup-sched', { method: 'POST', body: fd });
     await loadLiveRoundupSched();
   } catch(e) {}

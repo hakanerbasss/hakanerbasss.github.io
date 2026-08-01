@@ -6720,7 +6720,8 @@ async def _run_live_roundup_job(api_key: str):
     await lock.acquire()
     try:
         pool = await fetch_long_video_topic_pool()
-        topics = _select_distinct_topics(pool, 12)
+        seg_count = int(load_live_roundup_sched_config().get("segment_count", 10))
+        topics = _select_distinct_topics(pool, max(3, min(seg_count, 20)))
         if len(topics) < 3:
             save_live_state(roundup_status="error", roundup_error="Yeterli sayıda farklı konu bulunamadı, havuz yetersiz")
             return
@@ -8150,8 +8151,10 @@ LIVE_ROUNDUP_HISTORY       = Path("live_roundup_history.json")
 
 def load_live_roundup_sched_config():
     if LIVE_ROUNDUP_SCHED_CONFIG.exists():
-        return json.loads(LIVE_ROUNDUP_SCHED_CONFIG.read_text())
-    return {"enabled": False, "upload_to_youtube": True}
+        cfg = json.loads(LIVE_ROUNDUP_SCHED_CONFIG.read_text())
+        cfg.setdefault("segment_count", 10)
+        return cfg
+    return {"enabled": False, "upload_to_youtube": True, "segment_count": 10}
 
 
 def save_live_roundup_sched_log(status: str, message: str, url: str = "", planned_time: str = ""):
@@ -8360,10 +8363,16 @@ async def get_live_roundup_sched():
 async def save_live_roundup_sched(
     enabled: str = Form(...),
     upload_to_youtube: str = Form("true"),
+    segment_count: str = Form("10"),
 ):
+    try:
+        sc = max(3, min(int(segment_count), 20))
+    except (ValueError, TypeError):
+        sc = 10
     cfg = {
         "enabled": enabled == "true",
         "upload_to_youtube": upload_to_youtube == "true",
+        "segment_count": sc,
     }
     LIVE_ROUNDUP_SCHED_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
     _rebuild_live_roundup_scheduler()
