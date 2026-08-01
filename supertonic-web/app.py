@@ -6732,6 +6732,9 @@ async def _run_live_roundup_job(api_key: str):
     global _lv_roundup_busy
     lock = _get_gen_lock()
     save_live_state(roundup_status="running", roundup_error="")
+    # Lock almadan ÖNCE progress dosyasını active yap — sayfa kapatılıp
+    # açılınca lock bekleme süresi dahil bar hemen görünsün.
+    _write_roundup_progress(0, 0, "Başlatılıyor…", time.time())
     if lock.locked():
         save_live_state(roundup_status="running", roundup_error="", roundup_note="⏳ Kuyruğa alındı, başka bir üretim bitince başlayacak")
     await lock.acquire()
@@ -6800,7 +6803,12 @@ async def get_roundup_progress():
         except Exception:
             pass
     avg_sec = round(sum(h["duration_sec"] for h in history) / len(history)) if history else None
-    return {"progress": progress, "avg_duration_sec": avg_sec, "run_count": len(history)}
+    return {
+        "progress": progress,
+        "avg_duration_sec": avg_sec,
+        "run_count": len(history),
+        "busy": _lv_roundup_busy,  # sayfa yeniden açılınca anında "çalışıyor" tespiti
+    }
 
 
 @app.get("/api/live/pool-files")

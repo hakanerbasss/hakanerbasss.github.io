@@ -2696,9 +2696,10 @@ async function _pollRoundupProgress() {
     const box = document.getElementById('live-roundup-progress-box');
     if (!box) return;
 
-    if (p.active) {
+    if (p.active || d.busy) {
       box.style.display = 'block';
-      // Settings yeniden açılınca interval yoksa otomatik yeniden başlat
+      // Settings yeniden açılınca (veya busy=true ama dosya henüz yazılmadıysa)
+      // interval yoksa otomatik yeniden başlat
       if (!_roundupProgressTimer) {
         _roundupProgressTimer = setInterval(_pollRoundupProgress, 5000);
       }
