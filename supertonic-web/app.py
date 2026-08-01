@@ -6604,41 +6604,63 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
     today_str = now.strftime("%d.%m.%Y")
     date_label = f"{now.day} {_TR_MONTH_ABBR[now.month]} '{now.strftime('%y')}"
 
-    clip_paths = []
-    used_titles = []
-    segment_sources = []
-    segment_starts = []
     total = len(topics)
-    cursor = 0.0
     _roundup_started_at = time.time()
-    _write_roundup_progress(0, total, "", _roundup_started_at)
-    for i, topic in enumerate(topics, start=1):
-        _write_roundup_progress(i - 1, total, topic, _roundup_started_at)
-        try:
-            # "Takip et/beğen" kapanışı SADECE gerçekten son segmentte olsun — her
-            # segment kendi başına tam bir Instagram Reels gibi üretildiği için,
-            # bu koruma olmadan 12 haberde 12 kez "takip et" tekrarlanırdı.
-            result = await _generate_shorts_core(
-                topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
-                platform="instagram", skip_closing_cta=(i < total),
-            )
-            clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
-            if clip_file.exists():
-                # Haber geçişinde sade başlık + tarih/kaynak bandı — büyük dramatik
-                # banttaki parçalı başlığın yanında düz okunabilir bir özet + kaynak
-                # bilgisi (videoda başka hiçbir yerde yok). _generate_shorts_core'un
-                # kendisine dokunmuyor, ayrı bir son işleme adımı.
-                clip_file = await _label_roundup_segment(
-                    clip_file, result.get("title", topic), today_str, result.get("source_text", "")
+    _write_roundup_progress(0, total, "Paralel üretim başlıyor…", _roundup_started_at)
+    _completed_count = [0]
+    _sem = asyncio.Semaphore(3)  # max 3 segment aynı anda; DeepSeek flash rate-limit dostu
+
+    async def _produce_one(idx: int, topic: str):
+        async with _sem:
+            try:
+                # "Takip et/beğen" kapanışı SADECE son segmentte (idx==total) —
+                # her segment kendi başına tam Reels gibi üretildiği için bu
+                # koruma olmadan 12 haberde 12 kez "takip et" tekrarlanırdı.
+                result = await _generate_shorts_core(
+                    topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
+                    platform="instagram", skip_closing_cta=(idx < total),
                 )
-                dur = await _probe_duration(clip_file)
-                clip_paths.append(clip_file)
-                used_titles.append(result.get("title", topic))
-                segment_sources.append((result.get("source_text") or "").replace("Kaynak: ", "").strip() or "çeşitli kaynaklar")
-                segment_starts.append(cursor)
-                cursor += dur or 0.0
-        except Exception as e:
-            print(f"[LV-ROUNDUP] '{topic[:50]}' üretilemedi: {e}", flush=True)
+                clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
+                if clip_file.exists():
+                    # Haber geçişinde sade başlık + tarih/kaynak bandı — büyük dramatik
+                    # banttaki parçalı başlığın yanında düz okunabilir bir özet + kaynak
+                    # bilgisi (videoda başka hiçbir yerde yok). _generate_shorts_core'un
+                    # kendisine dokunmuyor, ayrı bir son işleme adımı.
+                    clip_file = await _label_roundup_segment(
+                        clip_file, result.get("title", topic), today_str, result.get("source_text", "")
+                    )
+                    dur = await _probe_duration(clip_file)
+                    _completed_count[0] += 1
+                    _write_roundup_progress(_completed_count[0], total, topic, _roundup_started_at)
+                    return {
+                        "idx": idx,
+                        "clip_file": clip_file,
+                        "title": result.get("title", topic),
+                        "source_text": (result.get("source_text") or "").replace("Kaynak: ", "").strip() or "çeşitli kaynaklar",
+                        "dur": dur or 0.0,
+                    }
+            except Exception as e:
+                print(f"[LV-ROUNDUP] '{topic[:50]}' üretilemedi: {e}", flush=True)
+            _completed_count[0] += 1
+            _write_roundup_progress(_completed_count[0], total, topic, _roundup_started_at)
+            return None
+
+    _raw = await asyncio.gather(
+        *[_produce_one(i, t) for i, t in enumerate(topics, start=1)],
+        return_exceptions=True,
+    )
+    # Başarısız (None/exception) segmentleri at, orijinal konu sırasını koru
+    _ordered = sorted(
+        [r for r in _raw if isinstance(r, dict)],
+        key=lambda r: r["idx"],
+    )
+    clip_paths = [r["clip_file"] for r in _ordered]
+    used_titles = [r["title"] for r in _ordered]
+    segment_sources = [r["source_text"] for r in _ordered]
+    segment_starts, cursor = [], 0.0
+    for r in _ordered:
+        segment_starts.append(cursor)
+        cursor += r["dur"]
 
     if not clip_paths:
         _write_roundup_progress(total, total, "", _roundup_started_at, done=True)
