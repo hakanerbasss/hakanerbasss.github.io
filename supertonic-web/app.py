@@ -6618,24 +6618,24 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
 
     total = len(topics)
     _roundup_started_at = time.time()
-    _write_roundup_progress(0, total, "Paralel üretim başlıyor…", _roundup_started_at)
+    _write_roundup_progress(0, total, "Üretim başlıyor…", _roundup_started_at)
     _completed_count = [0]
-    _sem = asyncio.Semaphore(3)  # max 3 segment aynı anda; DeepSeek flash rate-limit dostu
+    _fail_reasons: list = []
+    # Semaphore(1) — sıralı çalışır. Pexels/DeepSeek eşzamanlı rate-limit ve
+    # TTS lock çakışması yaşanmıyor. TTS lock zaten seriyi sağlıyor, 3 slot
+    # açmak API hatalarına yol açıyordu (8/10 fail gözlemlendi).
+    _sem = asyncio.Semaphore(1)
 
     async def _produce_one(idx: int, topic: str):
         async with _sem:
+            _write_roundup_progress(_completed_count[0], total, topic, _roundup_started_at)
             try:
                 # "Takip et/beğen" kapanışı SADECE son segmentte (idx==total) —
                 # her segment kendi başına tam Reels gibi üretildiği için bu
                 # koruma olmadan 12 haberde 12 kez "takip et" tekrarlanırdı.
-                # 5 dakika timeout: TTS/FFmpeg'in kilitlenmesi durumunda sonsuz
-                # beklemeye karşı güvence.
-                result = await asyncio.wait_for(
-                    _generate_shorts_core(
-                        topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
-                        platform="instagram", skip_closing_cta=(idx < total),
-                    ),
-                    timeout=300.0,
+                result = await _generate_shorts_core(
+                    topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
+                    platform="instagram", skip_closing_cta=(idx < total),
                 )
                 clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
                 if clip_file.exists():
@@ -6656,8 +6656,14 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
                         "source_text": (result.get("source_text") or "").replace("Kaynak: ", "").strip() or "çeşitli kaynaklar",
                         "dur": dur or 0.0,
                     }
+                else:
+                    reason = f"'{topic[:40]}': dosya oluşmadı"
+                    _fail_reasons.append(reason)
+                    print(f"[LV-ROUNDUP] {reason}", flush=True)
             except Exception as e:
-                print(f"[LV-ROUNDUP] '{topic[:50]}' üretilemedi: {e}", flush=True)
+                reason = f"'{topic[:40]}': {type(e).__name__}: {str(e)[:120]}"
+                _fail_reasons.append(reason)
+                print(f"[LV-ROUNDUP] üretilemedi — {reason}", flush=True)
             _completed_count[0] += 1
             _write_roundup_progress(_completed_count[0], total, topic, _roundup_started_at)
             return None
@@ -6679,9 +6685,15 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
         segment_starts.append(cursor)
         cursor += r["dur"]
 
+    if _fail_reasons:
+        fail_note = f"{len(_fail_reasons)} segment başarısız: " + " | ".join(_fail_reasons[:3])
+        save_live_state(roundup_note=fail_note)
+        print(f"[LV-ROUNDUP] {fail_note}", flush=True)
+
     if not clip_paths:
         _write_roundup_progress(total, total, "", _roundup_started_at, done=True)
-        raise RuntimeError("Hiçbir segment üretilemedi")
+        all_reasons = " | ".join(_fail_reasons[:5]) if _fail_reasons else "bilinmiyor"
+        raise RuntimeError(f"Hiçbir segment üretilemedi. Nedenler: {all_reasons}")
 
     _write_roundup_progress(len(clip_paths), total, "Segmentler birleştiriliyor…", _roundup_started_at)
 
