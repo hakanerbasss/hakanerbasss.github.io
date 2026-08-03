@@ -9,7 +9,7 @@ Ana proje: `supertonic-web/` klasörü.
 - **Deploy:** `cd /root/hakanerbasss.github.io && git pull && systemctl restart tts`
 - **Ana dosya:** `supertonic-web/app.py` — FastAPI uygulaması, tüm bot mantığı burada
 - **Haber sitesi:** `supertonic-web/news_site.py` — `hakanerbas.wizaicorp.com` subdomaininde yayınlanır
-- **Geliştirme branch:** `claude/arduino-smart-home-uj82ef`
+- **Geliştirme branch:** `main` — tüm değişiklikler doğrudan main'e push edilir
 
 ## Mimarisi
 
