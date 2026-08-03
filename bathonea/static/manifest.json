@@ -1,0 +1,16 @@
+{
+  "name": "Bathonea Toplu İş Sözleşmesi Asistanı",
+  "short_name": "Bathonea TİS",
+  "description": "Bathonea Yapı A.Ş. toplu iş sözleşmesi okuma ve yapay zeka soru-cevap asistanı",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "orientation": "portrait",
+  "lang": "tr",
+  "icons": [
+    { "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

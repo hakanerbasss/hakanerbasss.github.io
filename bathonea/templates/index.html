@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Bathonea — Toplu İş Sözleşmesi Asistanı</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bathonea TİS">
+<meta name="theme-color" content="#0b1220">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <div class="brand">📄 Bathonea <span class="sub">Toplu İş Sözleşmesi</span></div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-logo">📋</div>
+    <h1>Toplu İş Sözleşmesi Asistanı</h1>
+    <p>Bathonea Yapı A.Ş. ile Belediye-İş Sendikası arasındaki toplu iş sözleşmesini okuyun
+       ya da merak ettiğiniz maddeyi yapay zekaya sorun.</p>
+  </div>
+
+  <div class="action-grid">
+    <a class="action-card" href="/sohbet">
+      <div class="icon">💬</div>
+      <div>
+        <div class="label">Soru Sor</div>
+        <div class="desc">Yazarak veya sesli olarak sözleşme hakkında soru sorun</div>
+      </div>
+    </a>
+    <a class="action-card" href="/sozlesme">
+      <div class="icon">📖</div>
+      <div>
+        <div class="label">Sözleşmeyi Oku</div>
+        <div class="desc">Tüm maddeleri sayfa sayfa görüntüleyin</div>
+      </div>
+    </a>
+  </div>
+
+  <a class="footer-link" href="/admin/login">Yönetim Girişi</a>
+</div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js', {scope: '/'}).catch(() => {});
+}
+</script>
+</body>
+</html>
