@@ -18,6 +18,7 @@
     background: #0f0f0f;
     color: #e0e0e0;
     min-height: 100vh;
+    padding-bottom: 70px;
   }
 
   header {
@@ -31,24 +32,70 @@
   header h1 { font-size: 20px; font-weight: 600; color: #fff; }
   header span { font-size: 12px; color: #666; }
 
-  .tabs {
+  /* Alt navigasyon (mobil uygulama tarzı) */
+  .bottom-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
     display: flex;
-    gap: 0;
-    border-bottom: 1px solid #222;
-    padding: 0 32px;
+    background: #141414;
+    border-top: 1px solid #242424;
+    z-index: 80;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .tab {
-    padding: 14px 24px;
+  .bnav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 9px 4px 8px;
     cursor: pointer;
-    font-size: 14px;
     color: #666;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
+    transition: color 0.15s;
+    user-select: none;
   }
 
-  .tab.active { color: #fff; border-bottom-color: #7c3aed; }
-  .tab:hover { color: #ccc; }
+  .bnav-item:hover { color: #ccc; }
+  .bnav-item.active { color: #a78bfa; }
+  .bnav-icon { font-size: 20px; line-height: 1; }
+  .bnav-label { font-size: 10.5px; font-weight: 500; white-space: nowrap; }
+
+  .more-backdrop {
+    position: fixed; inset: 0;
+    background: transparent;
+    z-index: 84;
+    display: none;
+  }
+  .more-backdrop.open { display: block; }
+
+  .more-menu {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 62px;
+    background: #161616;
+    border-top: 1px solid #262626;
+    border-radius: 14px 14px 0 0;
+    z-index: 85;
+    max-height: 60vh;
+    overflow-y: auto;
+    display: none;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
+  }
+  .more-menu.open { display: block; }
+
+  .more-item {
+    padding: 15px 20px;
+    font-size: 14px;
+    color: #ccc;
+    border-bottom: 1px solid #1e1e1e;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .more-item:last-child { border-bottom: none; }
+  .more-item:hover, .more-item:active { background: #1f1f1f; }
+  .more-item.active { color: #a78bfa; font-weight: 600; }
 
   .panel { display: none; padding: 32px; max-width: 800px; }
   .panel.active { display: block; }
@@ -201,10 +248,6 @@
     header { padding: 16px; }
     header h1 { font-size: 17px; }
 
-    .tabs { padding: 0 8px; overflow-x: auto; scrollbar-width: none; }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab { padding: 12px 14px; font-size: 13px; white-space: nowrap; }
-
     .panel { padding: 16px; }
 
     .controls { grid-template-columns: 1fr 1fr; }
@@ -234,12 +277,6 @@
       overflow-y: auto !important;
     }
     #yt-modal { align-items: flex-end !important; }
-
-    /* Ayarlar butonu */
-    div[style*="position:fixed;top:16px;right:16px"] {
-      top: auto !important;
-      bottom: 16px !important;
-    }
   }
 
   /* Accordion */
@@ -277,22 +314,40 @@
   <span>yerel · hızlı · çok dilli</span>
 </header>
 
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('text')">Metin → Ses</div>
-  <div class="tab" onclick="switchTab('video')">Video Seslendirme</div>
-  <div class="tab" onclick="switchTab('translate')">Çeviri + Seslendir</div>
-  <div class="tab" onclick="switchTab('shorts')">Shorts Üret</div>
-  <div class="tab" onclick="switchTab('longvideo')">Uzun Video</div>
-  <div class="tab" onclick="switchTab('tnlv')">Trend Haber LV</div>
-  <div class="tab" onclick="switchTab('analytics')">📊 Analitik</div>
-  <div class="tab" onclick="switchTab('iganalytics')">📸 IG Analitik</div>
-  <div class="tab" onclick="switchTab('comedy')">📰 Komik Haber</div>
-  <div class="tab" onclick="switchTab('infoshorts')">💡 Bilgi Shorts</div>
-  <div class="tab" onclick="switchTab('prompt')">🤖 Prompt</div>
+<!-- Daha Fazla menüsü (diğer sekmeler burada toplanır) -->
+<div class="more-backdrop" id="more-backdrop" onclick="closeMoreMenu()"></div>
+<div class="more-menu" id="more-menu">
+  <div class="more-item" id="more-item-text" onclick="selectMoreTab('text')">Metin → Ses</div>
+  <div class="more-item" id="more-item-video" onclick="selectMoreTab('video')">Video Seslendirme</div>
+  <div class="more-item" id="more-item-translate" onclick="selectMoreTab('translate')">Çeviri + Seslendir</div>
+  <div class="more-item" id="more-item-longvideo" onclick="selectMoreTab('longvideo')">Uzun Video</div>
+  <div class="more-item" id="more-item-tnlv" onclick="selectMoreTab('tnlv')">Trend Haber LV</div>
+  <div class="more-item" id="more-item-comedy" onclick="selectMoreTab('comedy')">📰 Komik Haber</div>
+  <div class="more-item" id="more-item-infoshorts" onclick="selectMoreTab('infoshorts')">💡 Bilgi Shorts</div>
+  <div class="more-item" id="more-item-prompt" onclick="selectMoreTab('prompt')">🤖 Prompt</div>
+</div>
+
+<!-- Alt navigasyon -->
+<div class="bottom-nav">
+  <div class="bnav-item active" id="bnav-shorts" onclick="switchTab('shorts')">
+    <span class="bnav-icon">🎬</span><span class="bnav-label">Short Üret</span>
+  </div>
+  <div class="bnav-item" id="bnav-analytics" onclick="switchTab('analytics')">
+    <span class="bnav-icon">📊</span><span class="bnav-label">Analitik YT</span>
+  </div>
+  <div class="bnav-item" id="bnav-iganalytics" onclick="switchTab('iganalytics')">
+    <span class="bnav-icon">📸</span><span class="bnav-label">Analitik IG</span>
+  </div>
+  <div class="bnav-item" id="bnav-settings" onclick="openSettings()">
+    <span class="bnav-icon">⚙️</span><span class="bnav-label">Ayarlar</span>
+  </div>
+  <div class="bnav-item" id="bnav-more" onclick="toggleMoreMenu()">
+    <span class="bnav-icon">☰</span><span class="bnav-label">Daha Fazla</span>
+  </div>
 </div>
 
 <!-- TEXT TO SPEECH -->
-<div class="panel active" id="tab-text">
+<div class="panel" id="tab-text">
   <div class="field">
     <label>Metin</label>
     <textarea id="tts-text" placeholder="Seslendirilecek metni girin...&#10;&#10;&lt;laugh&gt; gülen ses&#10;&lt;breath&gt; nefes&#10;&lt;sigh&gt; iç çekme"></textarea>
@@ -438,7 +493,7 @@
 </div>
 
 <!-- SHORTS -->
-<div class="panel" id="tab-shorts">
+<div class="panel active" id="tab-shorts">
 
   <div class="field">
     <label>DeepSeek API Key</label>
@@ -455,6 +510,29 @@
     <textarea id="shorts-topic" placeholder="Örn: Yapay zekanın geleceği, Mars'a yolculuk, Kuantum fiziği nedir..." style="min-height:90px;"></textarea>
   </div>
 
+  <div style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch" style="margin:0;">
+        <input type="checkbox" id="use-manual-source" onchange="document.getElementById('manual-source-wrap').style.display = this.checked ? 'flex' : 'none';">
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🔗 Kaynak Linki / Metni Elle Gir (opsiyonel)</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">Sistem otomatik link bulamazsa veya yanlış habere gidiyorsa, buraya haberin linkini ya da metnini yapıştır — video SADECE bu kaynağa dayanarak üretilir.</div>
+      </div>
+    </div>
+    <div id="manual-source-wrap" style="display:none;margin-top:10px;flex-direction:column;gap:8px;">
+      <div>
+        <label style="font-size:12px;color:#888;">Haber Linki (opsiyonel)</label>
+        <input type="url" id="manual-source-link" placeholder="https://..." style="font-size:13px;">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#888;">veya Haber Metnini Buraya Yapıştır (linkten önceliklidir)</label>
+        <textarea id="manual-source-content" placeholder="Haberin tam metnini buraya yapıştırabilirsin. Bu doluysa link hiç çekilmez, video doğrudan bu metne dayanır." style="min-height:100px;font-size:13px;"></textarea>
+      </div>
+    </div>
+  </div>
+
   <div style="margin-bottom:20px;">
     <button onclick="fetchTrends()" id="btn-trends" style="background:#1a3a1a;font-size:13px;padding:10px 18px;">
       <div class="spinner" id="spin-trends"></div>
@@ -468,16 +546,24 @@
       <div class="spinner" id="spin-trends-combined"></div>
       🔗 Birleşik Havuz (Filtreli)
     </button>
+    <button onclick="fetchAIRankedPool()" id="btn-ai-pool" style="background:#1a2a2a;font-size:13px;padding:10px 18px;margin-left:8px;">
+      <div class="spinner" id="spin-ai-pool"></div>
+      🤖 AI Jürili Havuz (Telegram'daki Liste)
+    </button>
     <div id="trends-box" style="display:none;margin-top:12px;background:#111;border:1px solid #222;border-radius:8px;padding:14px;">
       <div style="font-size:12px;color:#666;margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
-      <div id="trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <div id="trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
       <div id="gurbetci-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
         <div style="font-size:12px;color:#7dd3fc;margin-bottom:8px;">🌍 Gurbetçi haber havuzu — sadece manuel inceleme için, otomatik akışa dahil değil</div>
-        <div id="gurbetci-trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div id="gurbetci-trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
       </div>
       <div id="combined-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
         <div style="font-size:12px;color:#c4b5fd;margin-bottom:8px;">🔗 Birleşik + filtreli havuz — trend + gurbetçi, ölüm/vefat/dedikodu ve ASAYİŞ kategorisi elenmiş. Sadece manuel inceleme için.</div>
-        <div id="combined-trends-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div id="combined-trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+      </div>
+      <div id="ai-pool-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #222;">
+        <div style="font-size:12px;color:#5eead4;margin-bottom:8px;">🤖 AI jürili havuz — Telegram'a giden VE otomatik tekli haber seçiminde kullanılan aynı liste (kural puanlama + AI jüri). Sadece manuel inceleme için, DeepSeek API key gerekir.</div>
+        <div id="ai-pool-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
       </div>
       <div style="font-size:11px;color:#444;margin-top:10px;" id="trends-time"></div>
     </div>
@@ -495,8 +581,10 @@
     <div class="field">
       <label>Hız: <span id="speed-val-4">1.0</span>x</label>
       <div class="speed-row">
-        <input type="range" id="shorts-speed" min="0.5" max="2.0" step="0.05" value="1.0"
-          oninput="document.getElementById('speed-val-4').textContent = parseFloat(this.value).toFixed(2)">
+        <input type="number" id="shorts-speed" min="0.5" max="2.0" step="0.05" value="1.0"
+          style="width:110px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:10px 12px;outline:none;"
+          oninput="document.getElementById('speed-val-4').textContent = (parseFloat(this.value) || 1).toFixed(2)"
+          onchange="this.value = Math.max(0.5, Math.min(2.0, parseFloat(this.value) || 1)).toFixed(2); document.getElementById('speed-val-4').textContent = this.value">
       </div>
     </div>
   </div>
@@ -529,6 +617,23 @@
     </div>
   </div>
 
+  <div style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch" style="margin:0;">
+        <input type="checkbox" id="use-intro-cover" onchange="document.getElementById('intro-cover-wrap').style.display = this.checked ? 'block' : 'none';">
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div style="font-size:13px;color:#d4d4d4;font-weight:600;">🎨 Özel Açılış Kapağı Kullan (deneysel)</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">Kendi tasarladığın (ör. ChatGPT'de üretilmiş) görsel, ilk sahnedeki stok fotoğrafın yerine geçer — zoom efekti ve sarı/kırmızı banner uygulanmaz, statik durur. Seslendirme, süre ve geri kalan her şey aynen çalışır. Instagram ve YouTube'da aynı şekilde işler.</div>
+      </div>
+    </div>
+    <div id="intro-cover-wrap" style="display:none;margin-top:10px;">
+      <input type="file" id="intro-cover-input" accept="image/*" style="font-size:12px;color:#999;">
+      <div style="font-size:11px;color:#555;margin-top:6px;">1080x1920 (dikey) formatına en yakın görsel en iyi sonucu verir.</div>
+    </div>
+  </div>
+
   <div id="spiker-section" style="margin-bottom:14px;padding:10px 14px;background:#111;border:1px solid #222;border-radius:8px;">
     <div style="display:flex;align-items:center;gap:10px;">
       <label class="toggle-switch" style="margin:0;">
@@ -553,6 +658,21 @@
     </div>
   </div>
 
+  <div class="field" style="margin-bottom:14px;">
+    <label>Hangi platform için?</label>
+    <div style="display:flex;gap:8px;">
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#1a1a1a;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;color:#e0e0e0;">
+        <input type="radio" name="shorts-platform" value="instagram" checked style="accent-color:#e1306c;">
+        📸 Instagram için üret
+      </label>
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#1a1a1a;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;color:#e0e0e0;">
+        <input type="radio" name="shorts-platform" value="youtube" style="accent-color:#ff0000;">
+        ▶️ YouTube için üret
+      </label>
+    </div>
+    <div style="font-size:11px;color:#555;margin-top:6px;">Seçtiğine göre kapanış çağrısı (Takip Et vs Abone Ol) ve video sonundaki kapanış görseli değişir.</div>
+  </div>
+
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
     <button onclick="generateShorts()" id="btn-shorts">
       <div class="spinner" id="spin-shorts"></div>
@@ -572,7 +692,7 @@
   <div class="error" id="err-shorts"></div>
 
   <div class="result" id="result-shorts">
-    <p>Script</p>
+    <p style="display:flex;align-items:center;gap:10px;">Script <button type="button" onclick="copyFieldValue('shorts-script',this)" style="background:#2a2a2a;border:1px solid #333;border-radius:6px;font-size:12px;padding:4px 10px;color:#ccc;cursor:pointer;width:auto;">📋 Kopyala</button></p>
     <div class="transcript" id="shorts-script"></div>
     <p style="margin-top:16px">Video</p>
     <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
@@ -594,16 +714,16 @@
 
       <div id="yt-linked" style="display:none;">
         <div class="field">
-          <label>Başlık</label>
+          <label style="display:flex;align-items:center;justify-content:space-between;">Başlık<button type="button" onclick="copyFieldValue('yt-title',this)" style="background:#2a2a2a;border:1px solid #333;border-radius:6px;font-size:12px;padding:3px 9px;color:#ccc;cursor:pointer;width:auto;font-weight:normal;">📋 Kopyala</button></label>
           <input type="text" id="yt-title" placeholder="Video başlığı..." style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Açıklama</label>
+          <label style="display:flex;align-items:center;justify-content:space-between;">Açıklama<button type="button" onclick="copyFieldValue('yt-desc',this)" style="background:#2a2a2a;border:1px solid #333;border-radius:6px;font-size:12px;padding:3px 9px;color:#ccc;cursor:pointer;width:auto;font-weight:normal;">📋 Kopyala</button></label>
           <textarea id="yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Hashtagler (virgülle ayır)</label>
-          <input type="text" id="yt-tags" placeholder="#shorts, #yapay zeka, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <label style="display:flex;align-items:center;justify-content:space-between;">Etiketler (virgülle ayır, # gerekmez)<button type="button" onclick="copyFieldValue('yt-tags',this)" style="background:#2a2a2a;border:1px solid #333;border-radius:6px;font-size:12px;padding:3px 9px;color:#ccc;cursor:pointer;width:auto;font-weight:normal;">📋 Kopyala</button></label>
+          <input type="text" id="yt-tags" placeholder="shorts, yapay zeka, teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
         <div class="field" style="margin-top:12px;">
           <label>Instagram Açıklaması (hazır format — kaynak, etkileşim CTA'ları, hashtag dahil)</label>
@@ -640,6 +760,11 @@
             Yetişkin içerik (18+ yaş kısıtlaması)
           </label>
         </div>
+        <div style="margin-top:10px;font-size:12px;color:#555;background:#111;border:1px solid #222;border-radius:8px;padding:10px 12px;">
+          Her yüklemede otomatik gönderilir: 🤖 Yapay zeka kullanımı: <b style="color:#888;">Evet</b> ·
+          🤝 Ücretli tanıtım/markalı içerik: <b style="color:#888;">Hayır</b> ·
+          📄 Lisans: <b style="color:#888;">Standart YouTube Lisansı</b>
+        </div>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
           <button onclick="uploadToYouTube()" id="btn-yt-upload" style="background:#c00;">
             <div class="spinner" id="spin-yt"></div>
@@ -649,7 +774,12 @@
             <div class="spinner" id="spin-shorts-ig"></div>
             Instagram'da Paylaş
           </button>
+          <button onclick="addToLiveQueue(this)" id="btn-live-queue" style="background:#1a3a5a;border:1px solid #2a5a8a;">
+            <div class="spinner" id="spin-live-queue"></div>
+            📺 Canlı Yayın Havuzuna Ekle
+          </button>
         </div>
+        <div id="live-queue-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
         <div class="error" id="err-yt"></div>
         <div id="yt-success" style="display:none;margin-top:12px;background:#0a1f0a;border:1px solid #1a5a1a;color:#4ade80;padding:12px 16px;border-radius:8px;font-size:13px;">
           Yüklendi! → <a id="yt-link" href="#" target="_blank" style="color:#4ade80;"></a>
@@ -791,8 +921,8 @@
           <textarea id="lv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Hashtagler (virgülle ayır)</label>
-          <input type="text" id="lv-yt-tags" placeholder="#belgesel, #eğitim, #teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <label>Etiketler (virgülle ayır, # gerekmez)</label>
+          <input type="text" id="lv-yt-tags" placeholder="belgesel, eğitim, teknoloji" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
           <div class="field">
@@ -893,8 +1023,8 @@
           <textarea id="tnlv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Hashtagler (virgülle ayır)</label>
-          <input type="text" id="tnlv-yt-tags" placeholder="#gündem, #haberler, #trendler" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
+          <label>Etiketler (virgülle ayır, # gerekmez)</label>
+          <input type="text" id="tnlv-yt-tags" placeholder="gündem, haberler, trendler" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;font-size:14px;padding:12px;outline:none;">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
           <div class="field">
@@ -996,6 +1126,35 @@
       </div>
     </div>
 
+    <!-- Canlı Yayın İstatistikleri -->
+    <div style="background:#0d1117;border:1px solid #1a3a2e;border-radius:12px;padding:14px 18px;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="color:#4ade80;font-size:13px;font-weight:700;">📡 Canlı Yayın İstatistikleri</div>
+        <div id="an-live-active-badge" style="display:none;background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.3px;">🔴 CANLI</div>
+      </div>
+      <!-- Aktif yayın bilgisi -->
+      <div id="an-live-active-box" style="display:none;background:#1a0a0a;border:1px solid #7f1d1d;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+        <div style="font-size:12px;color:#f87171;font-weight:600;margin-bottom:4px;" id="an-live-active-title">-</div>
+        <div style="font-size:11px;color:#888;" id="an-live-active-duration">-</div>
+        <div style="font-size:11px;color:#555;margin-top:3px;">Yayın kapandığında YouTube otomatik video kaydeder (İçerikler sekmesinde görünür). Analytics verisi kapandıktan 1–2 gün sonra tam yansır.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+        <div style="background:#0a1f14;border:1px solid #1a3a2e;border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:22px;font-weight:bold;color:#4ade80;" id="an-live-count">-</div>
+          <div style="color:#888;font-size:11px;margin-top:3px;">Biten Yayın</div>
+        </div>
+        <div style="background:#0a1f14;border:1px solid #1a3a2e;border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:22px;font-weight:bold;color:#34d399;" id="an-live-hours-all">-</div>
+          <div style="color:#888;font-size:11px;margin-top:3px;">Tüm Zamanlar İzlenme (s)</div>
+        </div>
+        <div style="background:#0a1f14;border:1px solid #1a3a2e;border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:22px;font-weight:bold;color:#a7f3d0;" id="an-live-hours-period">-</div>
+          <div style="color:#888;font-size:11px;margin-top:3px;">Bu Dönem İzlenme (s)</div>
+        </div>
+      </div>
+      <div id="an-live-recent"></div>
+    </div>
+
     <!-- Günlük görüntüleme chart -->
     <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:16px;">
       <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center;">
@@ -1027,6 +1186,12 @@
       <div style="color:#ccc;font-size:13px;font-weight:bold;margin-bottom:10px;">Top Ülkeler</div>
       <div id="an-countries"></div>
     </div>
+
+    <!-- Yayın saati analizi -->
+    <div id="an-yt-time" style="margin-bottom:16px;"></div>
+
+    <!-- Etiket/Hashtag analizi -->
+    <div id="an-yt-tags" style="margin-bottom:16px;"></div>
 
     <!-- Top videolar tablosu -->
     <div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
@@ -1497,6 +1662,123 @@
       </div>
     </div>
 
+    <!-- 7b. Canlı Yayın -->
+    <div class="acc-item" id="acc-live-stream">
+      <div class="acc-header" onclick="toggleAcc('live-stream')">
+        <span class="acc-title">📡 Canlı Yayın (YouTube)</span>
+        <span class="acc-right"><span class="acc-badge" id="acc-badge-live-stream"></span><span class="acc-chevron" id="acc-chev-live-stream">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-live-stream">
+        <p style="color:#666;font-size:12px;margin-bottom:12px;">
+          Kısa video yerine 7/24 açık kalan bir yayın — izleyici sekmeyi arka planda bıraksa bile
+          izlenme saati birikiyor. TR Instagram-Only'nin ürettiği her video, başarıyla
+          paylaşıldıktan sonra otomatik olarak havuza eklenir — ekstra üretim yapılmaz.
+          Havuzda <b>1 saatlik</b> video birikmeden yayın hiç açılmaz (aşağıda ilerlemeyi
+          görebilirsin). Yayın açılınca videolar sırayla oynar, bitince başa sarar; havuz
+          <b>24 saati</b> geçince en eski video havuzdan düşer — yayın her zaman "son 24 saat"i
+          gösterir.
+        </p>
+        <div class="field">
+          <label>Yayın Başlığı</label>
+          <input type="text" id="live-title" placeholder="Son Dakika — Canlı Haber Akışı" style="background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <div class="field">
+          <label>Açıklama</label>
+          <textarea id="live-description" placeholder="Güncel haberler yapay zeka destekli olarak otomatik üretilip burada akıyor." style="min-height:60px;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;width:100%;"></textarea>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#ccc;font-size:13px;margin:10px 0 14px;">
+          <input type="checkbox" id="live-enabled" style="width:16px;height:16px;accent-color:#7c3aed;">
+          Yeni videoları otomatik kuyruğa ekle
+        </label>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveLiveConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="startLiveStream()" id="btn-live-start" style="background:#1a3a1a;font-size:12px;padding:8px 16px;">▶ Yayını Başlat</button>
+          <button onclick="stopLiveStream()" id="btn-live-stop" style="background:#3a1a1a;font-size:12px;padding:8px 16px;">■ Yayını Durdur</button>
+        </div>
+        <div id="live-status" style="font-size:12px;background:#111;border:1px solid #222;border-radius:8px;padding:12px;line-height:1.8;">
+          Kontrol ediliyor...
+        </div>
+        <div class="error" id="err-live" style="margin-top:8px;"></div>
+
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid #222;">
+          <p style="color:#666;font-size:12px;margin-bottom:10px;">
+            Havuzu hızlandırmak istersen: 12 farklı haberi tek uzun videoda birleştirip
+            (aynı Instagram görsel/ses formatında) havuza ekler. Instagram'a göndermez,
+            haber sitesine eklemez — sadece canlı yayın havuzu için. Otomasyon yok,
+            sadece bastığında bir kere çalışır.
+          </p>
+          <button onclick="generateLiveRoundup()" id="btn-live-roundup" style="background:#2a1a3a;font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-live-roundup"></div>🎬 Uzun Video Üret
+          </button>
+          <div id="live-roundup-status" style="font-size:12px;color:#888;margin-top:8px;"></div>
+
+          <!-- Progress çubuğu -->
+          <div id="live-roundup-progress-box" style="display:none;margin-top:12px;background:#0d1117;border:1px solid #1a2a3a;border-radius:8px;padding:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span id="lrp-label" style="font-size:12px;color:#ccc;">Segment 1/12</span>
+              <span id="lrp-time" style="font-size:11px;color:#555;"></span>
+            </div>
+            <div style="background:#1a1a2a;border-radius:4px;height:8px;overflow:hidden;">
+              <div id="lrp-bar" style="background:#7c3aed;height:8px;border-radius:4px;transition:width .5s;width:0%;"></div>
+            </div>
+            <div id="lrp-topic" style="font-size:11px;color:#666;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+            <div id="lrp-avg" style="font-size:10px;color:#444;margin-top:4px;"></div>
+          </div>
+
+          <!-- Otomatik Roundup Cron -->
+          <div style="margin-top:16px;border-top:1px solid #1a1a2a;padding-top:14px;">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:10px;">⏰ Otomatik Gece Roundup (01:00–06:59 rastgele)</div>
+            <div style="font-size:11px;color:#555;margin-bottom:10px;">Her gece farklı bir saatte üretir. Son 7 günde kullanılan saatlere girmez. Saati sen seçemezsin — bu kasıtlı.</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ccc;">
+                <input type="checkbox" id="lrs-enabled" onchange="saveLiveRoundupSched()" style="accent-color:#7c3aed;">
+                Aktif
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#aaa;">
+                <input type="checkbox" id="lrs-upload" onchange="saveLiveRoundupSched()" style="accent-color:#4ade80;" checked>
+                YouTube'a da yükle
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#aaa;">
+                <span>Segment sayısı:</span>
+                <input type="number" id="lrs-segcount" min="3" max="20" value="10"
+                  onchange="saveLiveRoundupSched()"
+                  style="width:52px;background:#0e0e1a;border:1px solid #2a2a3a;border-radius:4px;color:#ccc;padding:2px 6px;font-size:12px;text-align:center;">
+              </label>
+            </div>
+            <div id="lrs-log" style="font-size:11px;color:#555;"></div>
+            <div id="lrs-hours" style="font-size:10px;color:#444;margin-top:6px;"></div>
+          </div>
+
+          <div id="live-roundup-result" style="display:none;margin-top:14px;">
+            <p style="color:#666;font-size:12px;margin-bottom:8px;">
+              Elle YouTube'a yüklemek için hazır — videoyu indir, aşağıdaki başlık/açıklama/etiketleri kopyala.
+            </p>
+            <div class="field">
+              <label>Başlık</label>
+              <input type="text" id="live-roundup-title" readonly onclick="this.select()" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+              <button onclick="copyRoundupField('live-roundup-title', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:#1a1a2a;">📋 Başlığı Kopyala</button>
+            </div>
+            <div class="field" style="margin-top:8px;">
+              <label>Açıklama</label>
+              <textarea id="live-roundup-desc" readonly onclick="this.select()" style="min-height:180px;width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;"></textarea>
+              <button onclick="copyRoundupField('live-roundup-desc', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:#1a1a2a;">📋 Açıklamayı Kopyala</button>
+            </div>
+            <div class="field" style="margin-top:8px;">
+              <label>Etiketler</label>
+              <input type="text" id="live-roundup-tags" readonly onclick="this.select()" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:13px;padding:10px;outline:none;">
+              <button onclick="copyRoundupField('live-roundup-tags', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:#1a1a2a;">🏷️ Etiket Öner (Kopyala)</button>
+            </div>
+            <a id="live-roundup-download" href="#" download class="dl-btn" style="margin-top:10px;">⬇ Videoyu İndir</a>
+          </div>
+
+          <div style="margin-top:14px;">
+            <button onclick="loadLivePoolFiles()" style="font-size:12px;padding:7px 14px;background:#1a1a2a;">📂 Havuzdaki Videoları Göster</button>
+            <div id="live-pool-files" style="margin-top:10px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 8. API Bağlantıları -->
     <div class="acc-item" id="acc-api-keys">
       <div class="acc-header" onclick="toggleAcc('api-keys')">
@@ -1695,12 +1977,16 @@
   </div>
 </div>
 
-<div style="position:fixed;top:16px;right:16px;">
-  <button onclick="openSettings()" style="background:#222;font-size:12px;padding:8px 14px;">⚙ Ayarlar</button>
-</div>
-
 <script>
 let voices = [], langs = {};
+
+// YouTube "Etiketler" alanı # kabul etmiyor — sunucu yükleme anında zaten
+// temizliyor ama kutuda #'li gösterilmesi kafa karıştırıyordu (gerçekte
+// gönderilecek değerle ekranda görünen birebir eşleşsin diye burada da temizliyoruz).
+// Instagram açıklamasındaki hashtag'lere (ig-caption) dokunmuyor, onlar # istiyor.
+function _stripHashtags(str) {
+  return (str || '').split(/\s+/).map(t => t.replace(/^#+/, '')).join(' ').trim();
+}
 
 async function loadMeta() {
   const r = await fetch('/api/voices');
@@ -1743,19 +2029,47 @@ async function loadMeta() {
   });
 }
 
+// Alt navigasyonda doğrudan görünen sekmeler; geri kalanı "Daha Fazla" menüsüne toplanır.
+const MORE_TABS = ['text', 'video', 'translate', 'longvideo', 'tnlv', 'comedy', 'infoshorts', 'prompt'];
+const BNAV_DIRECT = { shorts: 'bnav-shorts', analytics: 'bnav-analytics', iganalytics: 'bnav-iganalytics' };
+
 function switchTab(name) {
-  const names = ['text','video','translate','shorts','longvideo','tnlv','analytics','iganalytics','comedy','infoshorts','prompt'];
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active', names[i] === name);
-  });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
+  updateNavActiveState(name);
   if (name === 'tnlv') updateTNLVApiKeyStatus();
   if (name === 'longvideo') { updateLVApiKeyStatus(); checkLVStatusOnLoad(); }
   if (name === 'infoshorts') { updateInfoApiKeyStatus(); loadInfoEndcardStatus(); loadOutroTemplateStatus(); }
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
   if (name === 'prompt') loadPromptPreview();
+}
+
+function updateNavActiveState(name) {
+  document.querySelectorAll('.bnav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.more-item').forEach(el => el.classList.remove('active'));
+  if (BNAV_DIRECT[name]) {
+    document.getElementById(BNAV_DIRECT[name]).classList.add('active');
+  } else if (MORE_TABS.includes(name)) {
+    document.getElementById('bnav-more').classList.add('active');
+    const item = document.getElementById('more-item-' + name);
+    if (item) item.classList.add('active');
+  }
+  closeMoreMenu();
+}
+
+function toggleMoreMenu() {
+  document.getElementById('more-menu').classList.toggle('open');
+  document.getElementById('more-backdrop').classList.toggle('open');
+}
+
+function closeMoreMenu() {
+  document.getElementById('more-menu').classList.remove('open');
+  document.getElementById('more-backdrop').classList.remove('open');
+}
+
+function selectMoreTab(name) {
+  switchTab(name);
 }
 
 let _lvPollTimer = null;
@@ -1817,7 +2131,7 @@ function _displayLVResult(d) {
   }
   document.getElementById('lv-yt-title').value = d.title || '';
   document.getElementById('lv-yt-desc').value = d.description || '';
-  document.getElementById('lv-yt-tags').value = d.suggested_tags || '';
+  document.getElementById('lv-yt-tags').value = _stripHashtags(d.suggested_tags);
   document.getElementById('lv-yt-upload-section').style.display = 'block';
   document.getElementById('result-lv').classList.add('show');
   checkYTStatus();
@@ -2123,7 +2437,7 @@ async function checkYTStatus() {
   } catch(e) {}
 }
 
-const _ACC_IDS = ['tr-short','tr-lv','tr-tnlv','en-belgesel','en-short','tr-ig-only','ig-api','api-keys','sistem'];
+const _ACC_IDS = ['tr-short','tr-lv','tr-tnlv','en-belgesel','en-short','tr-ig-only','ig-api','live-stream','api-keys','sistem'];
 
 function toggleAcc(id) {
   const body = document.getElementById('acc-body-' + id);
@@ -2181,6 +2495,8 @@ async function openSettings() {
   loadLVENSchedulerStatus();
   loadENShortsSchedulerStatus();
   loadIGOnlyTRStatus();
+  loadLiveRoundupSched();
+  _pollRoundupProgress();
   loadIGFailedUploads();
   loadTelegramConfig();
   checkOpenAIStatus();
@@ -2188,6 +2504,297 @@ async function openSettings() {
   loadInstagramLog();
   loadBannedTopics();
   loadCloneStatus();
+  loadLiveConfig();
+  refreshLiveStatus();
+}
+
+// ── Canlı Yayın (YouTube) ─────────────────────────────────────────────────
+let _liveStatusPoll = null;
+
+async function loadLiveConfig() {
+  try {
+    const r = await fetch('/api/live/config');
+    const d = await r.json();
+    document.getElementById('live-title').value = d.title || '';
+    document.getElementById('live-description').value = d.description || '';
+    document.getElementById('live-enabled').checked = !!d.enabled;
+  } catch(e) {}
+}
+
+async function saveLiveConfig() {
+  showError('err-live', '');
+  try {
+    const fd = new FormData();
+    fd.append('enabled', document.getElementById('live-enabled').checked ? 'true' : 'false');
+    fd.append('title', document.getElementById('live-title').value || '');
+    fd.append('description', document.getElementById('live-description').value || '');
+    const r = await fetch('/api/live/config', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error(await r.text());
+  } catch(e) {
+    showError('err-live', e.message);
+  }
+}
+
+async function startLiveStream() {
+  showError('err-live', '');
+  try {
+    const r = await fetch('/api/live/start', { method: 'POST' });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      throw new Error(ct.includes('json') ? (await r.json()).detail : await r.text());
+    }
+    refreshLiveStatus();
+  } catch(e) {
+    showError('err-live', e.message);
+  }
+}
+
+async function stopLiveStream() {
+  showError('err-live', '');
+  try {
+    await fetch('/api/live/stop', { method: 'POST' });
+    setTimeout(refreshLiveStatus, 2000);
+  } catch(e) {
+    showError('err-live', e.message);
+  }
+}
+
+function _fmtMinSec(totalSeconds) {
+  const s = Math.round(totalSeconds || 0);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h} sa ${m} dk`;
+  return `${m} dk`;
+}
+
+async function refreshLiveStatus() {
+  const el = document.getElementById('live-status');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/live/status');
+    const d = await r.json();
+    const statusLabel = {
+      accumulating: '🟠 Biriktiriliyor (henüz yayında değil)',
+      live: '🔴 Yayında', idle: '🟡 Yayında (bekleme ekranı)', starting: '⏳ Başlatılıyor',
+      stopped: '⚪ Durduruldu', error: '❌ Hata',
+    }[d.status] || d.status;
+    let html = `<div><b>${statusLabel}</b></div>`;
+    html += `<div style="color:#888;">Havuz: ${d.pool_count ?? 0} video, ${_fmtMinSec(d.pool_seconds)}`;
+    if (d.status === 'accumulating') {
+      html += ` / ${_fmtMinSec(d.pool_min_seconds)} gerekiyor`;
+    } else {
+      html += ` (tavan ${d.pool_max_count ?? 50} video)`;
+    }
+    html += `</div>`;
+    html += `<div style="color:#888;">Disk: ${d.pool_disk_mb ?? 0} MB</div>`;
+    if (d.current_file) html += `<div style="color:#888;">Şu an: ${d.current_file}</div>`;
+    if (d.watch_url) html += `<div><a href="${d.watch_url}" target="_blank" style="color:#7c3aed;">İzleme linki ↗</a></div>`;
+    if (d.error) html += `<div style="color:#f87171;">${d.error}</div>`;
+    el.innerHTML = html;
+
+    // Uzun video üretim durumu (ayrı, elle tetiklenen özellik)
+    const rEl = document.getElementById('live-roundup-status');
+    if (rEl) {
+      const busy = d.roundup_status === 'running';
+      setLoading('btn-live-roundup', 'spin-live-roundup', busy);
+      let rHtml = '';
+      if (d.roundup_note) rHtml += d.roundup_note;
+      if (d.roundup_status === 'error' && d.roundup_error) rHtml += `<span style="color:#f87171;"> ${d.roundup_error}</span>`;
+      rEl.innerHTML = rHtml;
+
+      const resultEl = document.getElementById('live-roundup-result');
+      if (resultEl) {
+        if (d.roundup_status === 'done' && d.roundup_video_filename) {
+          resultEl.style.display = 'block';
+          document.getElementById('live-roundup-title').value = d.roundup_title || '';
+          document.getElementById('live-roundup-desc').value = d.roundup_description || '';
+          document.getElementById('live-roundup-tags').value = d.roundup_tags || '';
+          document.getElementById('live-roundup-download').href = '/api/live/pool-video/' + d.roundup_video_filename;
+        } else {
+          resultEl.style.display = 'none';
+        }
+      }
+    }
+  } catch(e) {
+    el.textContent = 'Durum alınamadı';
+  }
+  clearInterval(_liveStatusPoll);
+  _liveStatusPoll = setInterval(refreshLiveStatus, 15000);
+}
+
+async function copyRoundupField(fieldId, btn) {
+  const el = document.getElementById(fieldId);
+  const text = el ? el.value : '';
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    el.select();
+    document.execCommand('copy');
+  }
+  const orig = btn.textContent;
+  btn.textContent = '✓ Kopyalandı';
+  setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+async function loadLiveRoundupSched() {
+  try {
+    const r = await fetch('/api/live/roundup-sched');
+    if (!r.ok) return;
+    const d = await r.json();
+    const cfg = d.config || {};
+    document.getElementById('lrs-enabled').checked = !!cfg.enabled;
+    document.getElementById('lrs-upload').checked = cfg.upload_to_youtube !== false;
+    document.getElementById('lrs-segcount').value = cfg.segment_count ?? 10;
+    const log = d.log || {};
+    const lrsEl = document.getElementById('lrs-log');
+    if (lrsEl && log.status) {
+      const dt = log.ts ? new Date(log.ts * 1000).toLocaleString('tr-TR') : '';
+      const icons = {success:'✓', error:'✗', scheduled:'📅', running:'⏳'};
+      const cols  = {success:'#4ade80', error:'#f87171', scheduled:'#facc15', running:'#888'};
+      const icon = icons[log.status] || '…';
+      const col  = cols[log.status]  || '#888';
+      lrsEl.innerHTML = `<span style="color:${col};">${icon} ${log.message || ''}</span>`
+        + (log.url ? ` <a href="${log.url}" target="_blank" style="color:#7c3aed;">↗</a>` : '')
+        + ` <span style="color:#444;">${dt}</span>`;
+    }
+    const hoursEl = document.getElementById('lrs-hours');
+    if (hoursEl && d.recent_hours && d.recent_hours.length) {
+      hoursEl.textContent = `Son 7 gün kullanılan saatler: ${d.recent_hours.map(h => h+':xx').join(', ')}`;
+    }
+  } catch(e) {}
+}
+
+async function saveLiveRoundupSched() {
+  const enabled = document.getElementById('lrs-enabled').checked;
+  const upload = document.getElementById('lrs-upload').checked;
+  const segCount = document.getElementById('lrs-segcount').value || '10';
+  try {
+    const fd = new FormData();
+    fd.append('enabled', enabled ? 'true' : 'false');
+    fd.append('upload_to_youtube', upload ? 'true' : 'false');
+    fd.append('segment_count', segCount);
+    await fetch('/api/live/roundup-sched', { method: 'POST', body: fd });
+    await loadLiveRoundupSched();
+  } catch(e) {}
+}
+
+let _roundupProgressTimer = null;
+
+function _fmtSec(s) {
+  if (!s && s !== 0) return '';
+  const m = Math.floor(s / 60), sec = s % 60;
+  return m > 0 ? `${m} dk ${sec} sn` : `${sec} sn`;
+}
+
+async function _pollRoundupProgress() {
+  try {
+    const r = await fetch('/api/live/roundup-progress');
+    if (!r.ok) return;
+    const d = await r.json();
+    const p = d.progress || {};
+    const box = document.getElementById('live-roundup-progress-box');
+    if (!box) return;
+
+    if (p.active || d.busy) {
+      box.style.display = 'block';
+      // Settings yeniden açılınca (veya busy=true ama dosya henüz yazılmadıysa)
+      // interval yoksa otomatik yeniden başlat
+      if (!_roundupProgressTimer) {
+        _roundupProgressTimer = setInterval(_pollRoundupProgress, 5000);
+      }
+      const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0;
+      document.getElementById('lrp-bar').style.width = pct + '%';
+      document.getElementById('lrp-label').textContent =
+        `Segment ${p.current}/${p.total}  ·  ${pct}%`;
+      const elapsed = _fmtSec(p.elapsed_sec);
+      const remaining = p.estimated_remaining_sec != null ? '~' + _fmtSec(p.estimated_remaining_sec) + ' kaldı' : '';
+      document.getElementById('lrp-time').textContent = [elapsed && elapsed + ' geçti', remaining].filter(Boolean).join('  ·  ');
+      document.getElementById('lrp-topic').textContent = p.topic ? `📰 ${p.topic}` : '';
+      if (d.avg_duration_sec) {
+        document.getElementById('lrp-avg').textContent =
+          `Ortalama üretim süresi (son ${d.run_count} üretim): ${_fmtSec(d.avg_duration_sec)}`;
+      }
+    } else {
+      // Tamamlandı — progress kutusu gizle
+      box.style.display = 'none';
+      if (_roundupProgressTimer) { clearInterval(_roundupProgressTimer); _roundupProgressTimer = null; }
+      if (p.topic === 'Tamamlandı') {
+        document.getElementById('lrp-avg') &&
+          (document.getElementById('live-roundup-status').textContent +=
+            d.avg_duration_sec ? `  (bu üretim: ${_fmtSec(p.elapsed_sec)}, ortalama: ${_fmtSec(d.avg_duration_sec)})` : '');
+      }
+    }
+  } catch(e) {}
+}
+
+function _startRoundupProgressPolling() {
+  if (_roundupProgressTimer) clearInterval(_roundupProgressTimer);
+  document.getElementById('live-roundup-progress-box').style.display = 'block';
+  _pollRoundupProgress();
+  _roundupProgressTimer = setInterval(_pollRoundupProgress, 5000);
+}
+
+async function generateLiveRoundup() {
+  const rEl = document.getElementById('live-roundup-status');
+  showError('err-live', '');
+  try {
+    const r = await fetch('/api/live/generate-roundup', { method: 'POST' });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      throw new Error(ct.includes('json') ? (await r.json()).detail : await r.text());
+    }
+    if (rEl) rEl.textContent = 'Başlatıldı, 12 segment sırayla üretiliyor…';
+    setLoading('btn-live-roundup', 'spin-live-roundup', true);
+    refreshLiveStatus();
+    setTimeout(_startRoundupProgressPolling, 2000);
+  } catch(e) {
+    showError('err-live', e.message);
+  }
+}
+
+async function loadLivePoolFiles() {
+  const el = document.getElementById('live-pool-files');
+  if (!el) return;
+  el.textContent = 'Yükleniyor…';
+  try {
+    const r = await fetch('/api/live/pool-files');
+    const d = await r.json();
+    const files = d.files || [];
+    if (!files.length) {
+      el.innerHTML = '<span style="color:#888;font-size:12px;">Havuz boş</span>';
+      return;
+    }
+    el.innerHTML = files.map((f, i) => `
+      <div style="background:#111;border:1px solid #222;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="min-width:0;">
+            ${f.title ? `<div style="color:#e0e0e0;font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.title}</div>` : ''}
+            <span style="color:#555;">${_fmtMinSec(f.duration_seconds)} · ${f.size_mb} MB</span>
+          </div>
+          <div style="display:flex;gap:10px;flex-shrink:0;">
+            <a href="#" onclick="togglePoolPreview(${i}, '${f.filename.replace(/'/g, "\\'")}'); return false;" style="color:#4ade80;">▶ İzle</a>
+            <a href="/api/live/pool-video/${encodeURIComponent(f.filename)}" download style="color:#7c3aed;">⬇ İndir</a>
+          </div>
+        </div>
+        <div id="pool-preview-${i}" style="display:none;margin-top:8px;"></div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = '<span style="color:#f87171;font-size:12px;">Liste alınamadı</span>';
+  }
+}
+
+function togglePoolPreview(i, filename) {
+  const box = document.getElementById(`pool-preview-${i}`);
+  if (!box) return;
+  if (box.style.display === 'none') {
+    box.innerHTML = `<video controls preload="metadata" style="width:100%;max-height:400px;border-radius:8px;background:#000;" src="/api/live/pool-video/${encodeURIComponent(filename)}"></video>`;
+    box.style.display = 'block';
+  } else {
+    box.innerHTML = '';
+    box.style.display = 'none';
+  }
 }
 
 async function loadBannedTopics() {
@@ -2317,6 +2924,52 @@ function copyIgCaption() {
   }).catch(() => document.execCommand('copy'));
 }
 
+function copyFieldValue(elId, btn) {
+  const el = document.getElementById(elId);
+  const text = el.tagName === 'DIV' ? el.textContent : el.value;
+  const prev = btn.textContent;
+  const done = () => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = prev; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(done);
+  } else { done(); }
+}
+
+async function addToLiveQueue(btn) {
+  if (!currentVideoFilename) { alert('Önce video oluştur'); return; }
+  const res = document.getElementById('live-queue-result');
+  const spin = document.getElementById('spin-live-queue');
+  res.style.display = 'none';
+  spin.style.display = 'inline-block';
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('filename', currentVideoFilename);
+    fd.append('title', document.getElementById('yt-title').value || '');
+    const r = await fetch('/api/live/queue-manual', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (r.ok && j.ok) {
+      res.style.display = 'block';
+      res.style.background = '#0a1f0a';
+      res.style.border = '1px solid #1a5a1a';
+      res.style.color = '#4ade80';
+      res.textContent = '✓ Canlı yayın havuzuna eklendi';
+      btn.textContent = '✓ Eklendi';
+      setTimeout(() => { btn.textContent = '📺 Canlı Yayın Havuzuna Ekle'; btn.disabled = false; }, 3000);
+    } else {
+      throw new Error(j.detail || 'Hata');
+    }
+  } catch(e) {
+    res.style.display = 'block';
+    res.style.background = '#1f0a0a';
+    res.style.border = '1px solid #5a1a1a';
+    res.style.color = '#f87171';
+    res.textContent = 'Hata: ' + e.message;
+    btn.disabled = false;
+  } finally {
+    spin.style.display = 'none';
+  }
+}
+
 async function sendShortsToInstagram() {
   if (!currentVideoFilename) { alert('Önce video oluştur'); return; }
   const res = document.getElementById('shorts-ig-result');
@@ -2356,24 +3009,100 @@ async function sendShortsToInstagram() {
   }
 }
 
-function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText, emptyMsg) {
+// Bir konu chip'i tıklanınca, o haberin AI jürisinin zaten bildiği GERÇEK makale
+// linki varsa burada tutulur — üretim bu linke doğrudan gider, tekrar arama
+// yapıp farklı bir habere düşme riski olmaz. Kullanıcı konuyu elle değiştirirse
+// (artık o link o metne karşılık gelmeyebileceği için) sıfırlanır.
+let _shortsTopicLink = '';
+
+function _renderTopicChips(containerId, topics, colorBg, colorBorder, colorText, emptyMsg, topicDetails, topicLinks) {
   const el = document.getElementById(containerId);
   el.innerHTML = '';
   if (!topics.length) {
     el.innerHTML = `<div style="font-size:12px;color:#888;">${emptyMsg}</div>`;
     return;
   }
+  const details = topicDetails || {};
+  const links = topicLinks || {};
+  const btnBase = 'width:auto;flex-shrink:0;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:#ccc;';
   topics.forEach(topic => {
-    const btn = document.createElement('button');
-    btn.textContent = topic;
-    btn.style.cssText = `background:${colorBg};border:1px solid ${colorBorder};border-radius:20px;padding:6px 14px;font-size:13px;color:${colorText};cursor:pointer;`;
-    btn.onclick = () => {
-      document.getElementById('shorts-topic').value = topic;
-      btn.style.background = colorBorder;
+    const desc = details[topic] || '';
+    const link = links[topic] || '';
+
+    const item = document.createElement('div');
+    item.style.cssText = `display:flex;flex-direction:column;gap:8px;width:100%;box-sizing:border-box;background:${colorBg};border:1px solid ${colorBorder};border-radius:10px;padding:9px 14px;cursor:pointer;`;
+
+    // ── Buton satırı (üstte) ──────────────────────────────────────────
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 Kopyala';
+    copyBtn.title = 'Başlık + açıklamayı kopyala';
+    copyBtn.style.cssText = btnBase;
+    copyBtn.onclick = (e) => {
+      e.stopPropagation();
+      const text = desc ? `${topic}\n\n${desc}` : topic;
+      const prev = copyBtn.textContent;
+      const done = () => { copyBtn.textContent = '✓'; setTimeout(() => { copyBtn.textContent = prev; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(done);
+      } else { done(); }
     };
-    el.appendChild(btn);
+    btnRow.appendChild(copyBtn);
+
+    if (link) {
+      const linkBtn = document.createElement('button');
+      linkBtn.textContent = '🔗 Habere Git';
+      linkBtn.title = 'Habere git (kaynağı doğrula)';
+      linkBtn.style.cssText = btnBase;
+      linkBtn.onclick = (e) => { e.stopPropagation(); window.open(link, '_blank', 'noopener'); };
+      btnRow.appendChild(linkBtn);
+
+      const linkCopyBtn = document.createElement('button');
+      linkCopyBtn.textContent = '🔗 Link Kopyala';
+      linkCopyBtn.title = 'Haber linkini kopyala';
+      linkCopyBtn.style.cssText = btnBase;
+      linkCopyBtn.onclick = (e) => {
+        e.stopPropagation();
+        const prev = linkCopyBtn.textContent;
+        const done = () => { linkCopyBtn.textContent = '✓'; setTimeout(() => { linkCopyBtn.textContent = prev; }, 1200); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).then(done).catch(done);
+        } else { done(); }
+      };
+      btnRow.appendChild(linkCopyBtn);
+    }
+
+    item.appendChild(btnRow);
+
+    // ── Metin (altta, tam genişlik) ───────────────────────────────────
+    const textWrap = document.createElement('div');
+    const titleEl = document.createElement('div');
+    titleEl.textContent = topic;
+    titleEl.style.cssText = `font-size:13px;color:${colorText};font-weight:600;line-height:1.4;`;
+    textWrap.appendChild(titleEl);
+    if (desc) {
+      const descEl = document.createElement('div');
+      descEl.textContent = desc;
+      descEl.style.cssText = 'font-size:11.5px;color:#888;margin-top:4px;line-height:1.4;';
+      textWrap.appendChild(descEl);
+    }
+    item.appendChild(textWrap);
+
+    item.onclick = () => {
+      document.getElementById('shorts-topic').value = topic;
+      _shortsTopicLink = link;
+      item.style.background = colorBorder;
+    };
+    el.appendChild(item);
   });
 }
+
+// Kullanıcı konuyu elle değiştirirse (chip'ten seçilen metinle artık birebir
+// aynı olmayabileceği için) o habere ait bilinen linki sıfırla — eski/yanlış
+// bir habere gidilmesin.
+document.getElementById('shorts-topic')?.addEventListener('input', () => { _shortsTopicLink = ''; });
 
 async function fetchTrends(mode) {
   // mode: undefined (normal) | true/'gurbetci' | 'combined'
@@ -2390,12 +3119,12 @@ async function fetchTrends(mode) {
     if (!r.ok) throw new Error('Trend verisi alınamadı');
     const d = await r.json();
 
-    _renderTopicChips('trends-list', d.topics || [], '#1a2a1a', '#2a4a2a', '#86efac', 'Trend bulunamadı.');
+    _renderTopicChips('trends-list', d.topics || [], '#1a2a1a', '#2a4a2a', '#86efac', 'Trend bulunamadı.', d.topic_details);
 
     const gWrap = document.getElementById('gurbetci-trends-wrap');
     if (withGurbetci || combined) {
       _renderTopicChips('gurbetci-trends-list', d.gurbetci_topics || [], '#1a2530', '#2a4a5a', '#7dd3fc',
-        'Şu an gurbetçi haber havuzunda sonuç bulunamadı — birkaç dakika sonra tekrar dene.');
+        'Şu an gurbetçi haber havuzunda sonuç bulunamadı — birkaç dakika sonra tekrar dene.', d.topic_details);
       gWrap.style.display = 'block';
     } else {
       gWrap.style.display = 'none';
@@ -2404,7 +3133,7 @@ async function fetchTrends(mode) {
     const cWrap = document.getElementById('combined-trends-wrap');
     if (combined) {
       _renderTopicChips('combined-trends-list', d.combined_topics || [], '#241a30', '#4a2a5a', '#c4b5fd',
-        'Birleşik havuzda sonuç bulunamadı.');
+        'Birleşik havuzda sonuç bulunamadı.', d.topic_details);
       cWrap.style.display = 'block';
       cWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
@@ -2419,6 +3148,55 @@ async function fetchTrends(mode) {
     alert(e.message);
   } finally {
     setLoading(btnId, spinId, false);
+  }
+}
+
+async function fetchAIRankedPool(retryCount) {
+  // Telegram'a giden VE otomatik tekli haber seçiminde kullanılan aynı
+  // (kural puanlama + AI jüri) havuzu manuel incelemek için. Sonuçlar
+  // backend'de 15 dk önbelleklenir; ilk çağrı "pending" dönebilir,
+  // otomatik olarak 8 saniyede bir yeniden denenir (max 8 deneme).
+  const apiKey = document.getElementById('shorts-apikey').value.trim();
+  if (!apiKey) return showError('err-shorts', 'DeepSeek API key girin.');
+  showError('err-shorts', '');
+  const attempt = retryCount || 0;
+  if (attempt === 0) setLoading('btn-ai-pool', 'spin-ai-pool', true);
+  let isPending = false;
+  try {
+    const fd = new FormData();
+    fd.append('api_key', apiKey);
+    const r = await fetch('/api/trends/ai-ranked-pool', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const ct = r.headers.get('content-type') || '';
+      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
+      throw new Error(err);
+    }
+    const d = await r.json();
+    if (d.status === 'pending') {
+      isPending = true;
+      const poolEl = document.getElementById('ai-pool-list');
+      const remaining = Math.max(0, (19 - attempt) * 8);
+      poolEl.innerHTML = `<div style="color:#5eead4;font-size:13px;padding:8px 0;">`
+        + `⏳ ${d.message || 'AI jürisi hazırlanıyor…'} (~${remaining} sn kaldı)</div>`;
+      document.getElementById('ai-pool-wrap').style.display = 'block';
+      document.getElementById('trends-box').style.display = 'block';
+      if (attempt < 19) {
+        setTimeout(() => fetchAIRankedPool(attempt + 1), 8000);
+      } else {
+        setLoading('btn-ai-pool', 'spin-ai-pool', false);
+        alert('AI jürisi 3 dakika içinde yanıt vermedi. Lütfen tekrar deneyin.');
+      }
+      return;
+    }
+    _renderTopicChips('ai-pool-list', d.topics || [], '#0f2a28', '#1a4a45', '#5eead4',
+      'AI jürili havuzda şu an uygun haber bulunamadı.', d.topic_details, d.topic_links);
+    document.getElementById('ai-pool-wrap').style.display = 'block';
+    document.getElementById('trends-box').style.display = 'block';
+    document.getElementById('ai-pool-wrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch(e) {
+    alert(e.message);
+  } finally {
+    if (!isPending) setLoading('btn-ai-pool', 'spin-ai-pool', false);
   }
 }
 
@@ -2443,6 +3221,7 @@ let _shortsPollInterval = null;
 let _shortsTimerInterval = null;
 
 function _startShortsPolling() {
+  if (_shortsPollInterval) return; // zaten çalışıyorsa tekrar başlatma
   const timerEl = document.getElementById('shorts-elapsed');
   const progressEl = document.getElementById('shorts-progress');
   progressEl.style.display = 'block';
@@ -2486,10 +3265,13 @@ function _showShortsResult(d) {
   document.getElementById('shorts-video').src = d.video;
   document.getElementById('dl-shorts').href = d.video;
   currentVideoFilename = d.video.split('/').pop();
-  document.getElementById('yt-title').value = document.getElementById('shorts-topic').value;
-  if (d.title) document.getElementById('yt-title').value = d.title;
-  if (d.suggested_description) document.getElementById('yt-desc').value = d.suggested_description;
-  if (d.suggested_tags) document.getElementById('yt-tags').value = d.suggested_tags;
+  // ÖNEMLİ: her alan HER ÜRETİMDE koşulsuz üzerine yazılmalı — "d.xxx varsa
+  // yaz, yoksa dokunma" deseni önceki (alakasız) üretimden kalan veriyi
+  // kutuda bırakıyordu; bu yüzden bir haberin açıklaması boş dönünce başka
+  // bir haberin eski açıklaması YouTube'a yüklenmişti. Boşsa da kutu boşalsın.
+  document.getElementById('yt-title').value = d.title || document.getElementById('shorts-topic').value;
+  document.getElementById('yt-desc').value = d.suggested_description_yt || d.suggested_description || '';
+  document.getElementById('yt-tags').value = d.suggested_tags ? _stripHashtags(d.suggested_tags) : '';
   currentSourceText = d.source_text || '';
   document.getElementById('ig-caption').value = d.instagram_caption || '';
   currentThumbnailFilename = null;
@@ -2516,6 +3298,8 @@ function _showShortsResult(d) {
       _startShortsPolling();
     } else if (j.status === 'error') {
       showError('err-shorts', j.error || 'Üretim hatası — sıfırlayıp tekrar deneyin.');
+    } else if (j.status === 'done' && j.result) {
+      _showShortsResult(j.result);
     }
   } catch(e) {}
 })();
@@ -2531,18 +3315,34 @@ async function generateShorts(allowEmpty = false) {
   try {
     const fd = new FormData();
     fd.append('topic', topic);
+    // Chip'ten seçilen konu elle değiştirilmediyse, o habere ait bilinen gerçek
+    // makale linkini de gönder — üretim yeniden arama yapmadan doğrudan o linke gider.
+    fd.append('topic_link', _shortsTopicLink || '');
+    // Elle girilen kaynak (link ve/veya yapıştırılan metin) — otomatik bulma
+    // yanlış/eksik olduğunda kullanıcı doğrudan kaynağı verebilir.
+    if (document.getElementById('use-manual-source').checked) {
+      fd.append('manual_link', document.getElementById('manual-source-link').value.trim());
+      fd.append('manual_content', document.getElementById('manual-source-content').value.trim());
+    }
     fd.append('api_key', apiKey);
     fd.append('lang', document.getElementById('shorts-lang').value);
     fd.append('voice', document.getElementById('shorts-voice').value);
     fd.append('speed', document.getElementById('shorts-speed').value);
     fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
-    // Bu panel artık Instagram için üretiyor — otomatik IG-Only-TR job'uyla aynı CTA
-    // metni, aynı kapanış bandı ve aynı hazır Instagram açıklaması (ig-caption) üretilsin.
-    fd.append('platform', 'instagram');
+    // Seçilen platforma göre kapanış CTA metni, kapanış görseli (endcard) ve
+    // (Instagram seçiliyse) hazır Instagram açıklaması (ig-caption) değişir.
+    const selectedPlatform = document.querySelector('input[name="shorts-platform"]:checked')?.value || 'instagram';
+    fd.append('platform', selectedPlatform);
 
     if (document.getElementById('use-custom-images').checked) {
       const files = document.getElementById('custom-images-input').files;
       for (let i = 0; i < files.length; i++) fd.append('custom_images', files[i]);
+    }
+
+    if (document.getElementById('use-intro-cover').checked) {
+      const introFile = document.getElementById('intro-cover-input').files[0];
+      if (!introFile) return showError('err-shorts', 'Özel açılış kapağı için görsel yükleyin.');
+      fd.append('intro_cover_image', introFile);
     }
 
     const spikerOn = document.getElementById('use-spiker-mode').checked;
@@ -2559,13 +3359,31 @@ async function generateShorts(allowEmpty = false) {
     const startR = await fetch('/api/generate-shorts-async', { method: 'POST', body: fd });
     if (!startR.ok) {
       const ct = startR.headers.get('content-type') || '';
-      throw new Error(ct.includes('json') ? (await startR.json()).detail : await startR.text());
+      const msg = ct.includes('json') ? (await startR.json()).detail : await startR.text();
+      // 409 = zaten çalışıyor, direkt poll'a bağlan
+      if (startR.status === 409) {
+        _startShortsPolling();
+        return;
+      }
+      throw new Error(msg);
     }
 
     document.getElementById('shorts-elapsed').textContent = '0';
     _startShortsPolling();
   } catch(e) {
-    showError('err-shorts', e.message);
+    // 524 / ağ hatası — istek yine de sunucuya ulaşmış olabilir; durumu kontrol et
+    try {
+      const s = await fetch('/api/manual-shorts/status').then(r => r.json());
+      if (s.status === 'running') {
+        showError('err-shorts', '');
+        document.getElementById('shorts-elapsed').textContent = _fmtElapsed(s.elapsed ?? 0);
+        _startShortsPolling();
+        return;
+      }
+    } catch(_) {}
+    // Gerçekten hata varsa göster (Cloudflare HTML yerine temiz mesaj)
+    const msg = e.message && e.message.length < 300 ? e.message : 'Sunucu yanıt vermedi (524). Lütfen bekleyin ve sayfayı yenileyin.';
+    showError('err-shorts', msg);
   }
 }
 
@@ -3025,7 +3843,7 @@ async function generateTrendLongVideo() {
 
     document.getElementById('tnlv-yt-title').value = d.title;
     document.getElementById('tnlv-yt-desc').value = d.description || '';
-    document.getElementById('tnlv-yt-tags').value = d.suggested_tags || '';
+    document.getElementById('tnlv-yt-tags').value = _stripHashtags(d.suggested_tags);
 
     document.getElementById('tnlv-yt-upload-section').style.display = 'block';
     document.getElementById('tnlv-yt-success').style.display = 'none';
@@ -4022,6 +4840,49 @@ async function loadAnalytics() {
       </div>`;
     }).join('') || '<div style="color:#555;font-size:12px;">Veri yok</div>';
 
+    // Canlı yayın istatistikleri
+    const lv = d.live || {};
+
+    // Aktif yayın varsa göster
+    const activeB = lv.active;
+    if (activeB) {
+      document.getElementById('an-live-active-badge').style.display = 'inline-block';
+      document.getElementById('an-live-active-box').style.display = 'block';
+      document.getElementById('an-live-active-title').textContent = activeB.title || activeB.id;
+      let durationStr = 'Başlangıç: ' + (activeB.start ? new Date(activeB.start).toLocaleString('tr-TR') : '-');
+      if (activeB.start) {
+        const diffMs = Date.now() - new Date(activeB.start).getTime();
+        const diffH = Math.floor(diffMs / 3600000);
+        const diffM = Math.floor((diffMs % 3600000) / 60000);
+        durationStr += ` · ${diffH} saat ${diffM} dakikadır canlı`;
+      }
+      document.getElementById('an-live-active-duration').textContent = durationStr;
+    } else {
+      document.getElementById('an-live-active-badge').style.display = 'none';
+      document.getElementById('an-live-active-box').style.display = 'none';
+    }
+
+    document.getElementById('an-live-count').textContent = lv.total_sessions ?? 0;
+    document.getElementById('an-live-hours-all').textContent = (lv.alltime_watch_hours ?? 0) + 's';
+    document.getElementById('an-live-hours-period').textContent = (lv.period_watch_hours ?? 0) + 's';
+    const lvRecent = lv.recent_broadcasts || [];
+    document.getElementById('an-live-recent').innerHTML = lvRecent.length
+      ? '<div style="font-size:12px;color:#666;margin-bottom:6px;">Son Biten Yayınlar (kapanınca YouTube\'da video olarak kaydedilir)</div>'
+        + lvRecent.map(b => {
+            const dt = b.start ? new Date(b.start).toLocaleDateString('tr-TR', {day:'2-digit', month:'short', year:'numeric'}) : '-';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#aaa;padding:5px 0;border-bottom:1px solid #1a2a1a;">
+              <a href="https://youtu.be/${b.id}" target="_blank" style="color:#4ade80;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${b.title || b.id} ↗</a>
+              <span style="color:#555;white-space:nowrap;margin-left:12px;">${dt}</span>
+            </div>`;
+          }).join('')
+      : '<div style="color:#555;font-size:12px;">Henüz biten yayın yok (şu an aktif olan kapandığında burada görünür)</div>';
+
+    // Yayın saati + etiket analizi (top_videos üzerinden — instagram tarafındaki
+    // buildTimeAnalysis/buildTopicAnalysis ile aynı görsel dil, YouTube veri
+    // şekline uyarlanmış)
+    document.getElementById('an-yt-time').innerHTML = buildYTTimeAnalysis(d.top_videos || []);
+    document.getElementById('an-yt-tags').innerHTML = buildYTTagAnalysis(d.top_videos || []);
+
     // Top videolar tablosu
     document.getElementById('an-top-videos').innerHTML = (d.top_videos||[]).map((v, i) => {
       const mins = Math.floor(v.avg_view_sec / 60);
@@ -4189,6 +5050,95 @@ function buildTopicAnalysis(posts) {
         </div>
         <div style="width:24px;color:#555;font-size:10px;text-align:right;">${t.count}x</div>
         <div style="width:50px;text-align:right;font-size:11px;color:${i<3?'#f97316':'#555'};">❤ ${t.avgLikes}</div>
+      </div>`;
+    }).join('')}
+    </div>
+  </div>`;
+}
+
+// ─── YOUTUBE KANAL ANALİTİK — saat/etiket analizi (Instagram'daki
+// buildTimeAnalysis/buildTopicAnalysis ile aynı görsel dil, top_videos'un
+// veri şekline uyarlanmış: views/avg_view_pct/likes/tags/published_at) ────────
+function _ytScore(v) {
+  return (v.views || 0) + (v.avg_view_pct || 0) * 10 + (v.likes || 0) * 5;
+}
+
+function buildYTTimeAnalysis(videos) {
+  const slots = [
+    {label:'00:00–06:00', min:0,  max:6,  emoji:'🌙'},
+    {label:'06:00–09:00', min:6,  max:9,  emoji:'🌅'},
+    {label:'09:00–12:00', min:9,  max:12, emoji:'☀️'},
+    {label:'12:00–15:00', min:12, max:15, emoji:'🌤'},
+    {label:'15:00–18:00', min:15, max:18, emoji:'🌇'},
+    {label:'18:00–21:00', min:18, max:21, emoji:'🌆'},
+    {label:'21:00–24:00', min:21, max:24, emoji:'🌃'},
+  ];
+  slots.forEach(s => {
+    const sv = videos.filter(v => {
+      if (!v.published_at) return false;
+      const h = new Date(v.published_at).getHours();
+      return h >= s.min && h < s.max;
+    });
+    s.count = sv.length;
+    s.avgViews = s.count ? Math.round(sv.reduce((a,v)=>a+(v.views||0),0)/s.count) : 0;
+    s.avgPct   = s.count ? Math.round(sv.reduce((a,v)=>a+(v.avg_view_pct||0),0)/s.count*10)/10 : 0;
+    s.score    = s.count ? Math.round(sv.reduce((a,v)=>a+_ytScore(v),0)/s.count) : 0;
+  });
+  const active = slots.filter(s => s.count > 0);
+  if (!active.length) return '<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;"><div style="color:#ccc;font-size:13px;font-weight:bold;">⏰ Yayın Saati Analizi</div><div style="color:#555;font-size:12px;margin-top:6px;">Veri yok</div></div>';
+  const maxScore = Math.max(...active.map(s => s.score), 1);
+  const bestScore = Math.max(...active.map(s => s.score));
+  return `<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
+    <div style="color:#facc15;font-size:13px;font-weight:bold;margin-bottom:12px;">⏰ Yayın Saati Analizi <span style="color:#555;font-weight:400;font-size:11px;">(hangi saatte yüklenen videolar daha iyi performans gösteriyor)</span></div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${active.map(s => {
+      const pct = Math.round(s.score / maxScore * 100);
+      const isBest = s.score === bestScore && bestScore > 0;
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:92px;color:#888;font-size:11px;flex-shrink:0;">${s.emoji} ${s.label}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:16px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${isBest?'#7c3aed':'#2a2a5a'};border-radius:4px;"></div>
+        </div>
+        <div style="width:22px;color:#666;font-size:10px;text-align:right;">${s.count}x</div>
+        <div style="width:64px;text-align:right;font-size:11px;${isBest?'color:#7c3aed;font-weight:700;':'color:#444;'}">👁 ${formatNum(s.avgViews)}</div>
+        <div style="width:56px;text-align:right;font-size:11px;${isBest?'color:#a78bfa;font-weight:700;':'color:#555;'}">%${s.avgPct}</div>
+      </div>`;
+    }).join('')}
+    </div>
+    <div style="color:#444;font-size:10px;margin-top:8px;">x = video sayısı · 👁 ort. izlenme · % ort. izlenme oranı</div>
+  </div>`;
+}
+
+function buildYTTagAnalysis(videos) {
+  const tagMap = {};
+  videos.forEach(v => {
+    const score = _ytScore(v);
+    const uniq = [...new Set((v.tags||[]).map(t => t.toLowerCase()))];
+    uniq.forEach(tag => {
+      if (!tagMap[tag]) tagMap[tag] = {count:0, totalScore:0, totalViews:0};
+      tagMap[tag].count++;
+      tagMap[tag].totalScore += score;
+      tagMap[tag].totalViews += v.views||0;
+    });
+  });
+  const tags = Object.entries(tagMap)
+    .map(([tag, x]) => ({tag, count:x.count, avgScore:Math.round(x.totalScore/x.count), avgViews:Math.round(x.totalViews/x.count)}))
+    .sort((a,b) => (b.count - a.count) || (b.avgScore - a.avgScore))
+    .slice(0, 10);
+  if (!tags.length) return '<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;"><div style="color:#ccc;font-size:13px;font-weight:bold;">🏷 Etiket Analizi</div><div style="color:#555;font-size:12px;margin-top:6px;">Henüz etiket verisi yok</div></div>';
+  const maxScore = Math.max(...tags.map(t => t.avgScore), 1);
+  return `<div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;">
+    <div style="color:#38bdf8;font-size:13px;font-weight:bold;margin-bottom:12px;">🏷 Etiket Analizi <span style="color:#555;font-weight:400;font-size:11px;">(x = kaç videoda geçtiği, az videolu etiketler daha az güvenilir)</span></div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+    ${tags.map((t, i) => {
+      const pct = Math.round(t.avgScore / maxScore * 100);
+      return `<div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:110px;color:${i<3?'#a78bfa':'#666'};font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.tag}</div>
+        <div style="flex:1;background:#1a1a2e;border-radius:4px;height:14px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${i===0?'#0369a1':i<3?'#1d4ed8':'#1e3a5f'};border-radius:4px;"></div>
+        </div>
+        <div style="width:22px;color:#555;font-size:10px;text-align:right;">${t.count}x</div>
+        <div style="width:64px;text-align:right;font-size:11px;color:${i<3?'#f97316':'#555'};">👁 ${formatNum(t.avgViews)}</div>
       </div>`;
     }).join('')}
     </div>

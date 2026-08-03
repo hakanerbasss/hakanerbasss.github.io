@@ -117,6 +117,8 @@ def init_db() -> None:
         cols = [r["name"] for r in c.execute("PRAGMA table_info(articles)").fetchall()]
         if "source" not in cols:
             c.execute("ALTER TABLE articles ADD COLUMN source TEXT")
+        if "body" not in cols:
+            c.execute("ALTER TABLE articles ADD COLUMN body TEXT")
         c.execute("""CREATE TABLE IF NOT EXISTS comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             article_id INTEGER NOT NULL,
@@ -148,14 +150,15 @@ def _can_comment(ip: str) -> bool:
     return True
 
 
-def add_article(title: str, description: str, thumbnail: str, ig_permalink: str, source: str = "") -> int:
+def add_article(title: str, description: str, thumbnail: str, ig_permalink: str, source: str = "", body: str = "") -> int:
     label, color = guess_category(title)
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO articles (title, description, category, category_color, thumbnail, ig_permalink, created_at, source) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO articles (title, description, category, category_color, thumbnail, ig_permalink, created_at, source, body) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (title.strip()[:200], (description or "").strip()[:600], label, color,
-             thumbnail or "", ig_permalink or "", time.time(), (source or "").strip()[:120]),
+             thumbnail or "", ig_permalink or "", time.time(), (source or "").strip()[:120],
+             (body or "").strip()[:8000]),
         )
         return cur.lastrowid
 

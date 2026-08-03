@@ -1,1 +1,15 @@
 __pycache__/
+
+# --- supertonic-web: secrets, config, tokenlar, üretilen veri — asla commit etme ---
+supertonic-web/*.json
+supertonic-web/*.txt
+!supertonic-web/requirements.txt
+supertonic-web/*.log
+supertonic-web/*.db
+supertonic-web/*.wav
+supertonic-web/*.bak
+supertonic-web/*.bak-*
+supertonic-web/outputs/
+supertonic-web/uploads/
+supertonic-web/live_queue/
+supertonic-web/thumbnails/

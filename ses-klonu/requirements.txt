@@ -1,0 +1,6 @@
+# coqui-tts: orijinal Coqui TTS'in bakımı yapılan çatalı (idiap) —
+# yeni torch sürümleriyle (weights_only sorunu) uyumlu
+coqui-tts==0.26.2
+torch>=2.3
+torchaudio
+gradio>=4.44

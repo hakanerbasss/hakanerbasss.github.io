@@ -39,6 +39,7 @@
   }
   .hero-nav a.disabled{ opacity:.35; pointer-events:none; }
   .desc{ font-size:15px; line-height:1.7; margin:20px 0; color:#26272c; }
+  .article-body p{ font-size:15px; line-height:1.75; margin:0 0 14px; color:#26272c; }
   .source-note{
     display:inline-block; font-size:12.5px; font-weight:700; color:var(--sub);
     background:var(--bg); border:1px solid var(--line); border-radius:8px;
@@ -116,7 +117,11 @@
     <a href="{{ '/haber/' ~ older_id if older_id else '#' }}" class="{{ '' if older_id else 'disabled' }}">Sonraki haber ›</a>
   </div>
 
-  {% if a['description'] %}<p class="desc">{{ a['description'] }}</p>{% endif %}
+  {% if a['body'] %}
+  <div class="article-body">
+    {% for para in a['body'].split('\n') %}{% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}{% endfor %}
+  </div>
+  {% elif a['description'] %}<p class="desc">{{ a['description'] }}</p>{% endif %}
   {% if a['source'] %}<div class="source-note">{{ a['source'] }}</div>{% endif %}
 
   <div class="actions">
