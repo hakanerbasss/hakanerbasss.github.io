@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Soru Sor — Bathonea</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1220">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <a class="iconbtn" href="/">←</a>
+    <div class="brand">💬 Sözleşme Asistanı</div>
+    <a class="iconbtn" href="/sozlesme">📖</a>
+  </div>
+
+  <div class="chat-hint">Cevaplar yalnızca yüklenen toplu iş sözleşmesi metnine dayanır.</div>
+  <div id="chatBody"></div>
+
+  <div id="chatInputBar">
+    <button id="chatMicBtn" title="Sesli soru">🎤</button>
+    <input type="text" id="chatInput" placeholder="Bir soru yazın… örn. yıllık izin kaç gün?" maxlength="500">
+    <button id="chatSendBtn">➤</button>
+  </div>
+</div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js', {scope: '/'}).catch(() => {});
+}
+
+const SESSION_KEY = 'bathonea_chat_session';
+let sessionId = localStorage.getItem(SESSION_KEY);
+if (!sessionId) {
+  sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+  localStorage.setItem(SESSION_KEY, sessionId);
+}
+
+const body = document.getElementById('chatBody');
+const input = document.getElementById('chatInput');
+const sendBtn = document.getElementById('chatSendBtn');
+const micBtn = document.getElementById('chatMicBtn');
+
+function esc(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function addMsg(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.innerHTML = esc(text);
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+async function send() {
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  addMsg(q, 'user');
+  const typing = addMsg('Yazıyor…', 'typing');
+  sendBtn.disabled = true;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q, session_id: sessionId})
+    });
+    const data = await res.json();
+    typing.remove();
+    if (!res.ok) {
+      addMsg(data.error || 'Bir hata oluştu.', 'error');
+    } else {
+      addMsg(data.answer, 'assistant');
+      if (data.session_id) { sessionId = data.session_id; localStorage.setItem(SESSION_KEY, sessionId); }
+    }
+  } catch (e) {
+    typing.remove();
+    addMsg('Bağlantı hatası — internet bağlantınızı kontrol edin.', 'error');
+  }
+  sendBtn.disabled = false;
+}
+
+sendBtn.addEventListener('click', send);
+input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+// ── Sesli soru ──
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { addMsg('Sesli giriş bu tarayıcıda desteklenmiyor.', 'error'); return; }
+  const recognition = new SR();
+  recognition.lang = 'tr-TR';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  micBtn.classList.add('recording');
+  recognition.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    input.value = text;
+    send();
+  };
+  recognition.onerror = () => {};
+  recognition.onend = () => micBtn.classList.remove('recording');
+  try { recognition.start(); } catch (e) {}
+}
+
+micBtn.addEventListener('click', startVoice);
+
+addMsg('Merhaba! Toplu iş sözleşmesiyle ilgili merak ettiğiniz bir konuyu yazabilir ya da 🎤 ile sesli sorabilirsiniz.', 'assistant');
+</script>
+</body>
+</html>
