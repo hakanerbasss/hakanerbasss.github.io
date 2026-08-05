@@ -1,4 +1,6 @@
 __pycache__/
+.venv/
+venv/
 
 # --- supertonic-web: secrets, config, tokenlar, üretilen veri — asla commit etme ---
 supertonic-web/*.json

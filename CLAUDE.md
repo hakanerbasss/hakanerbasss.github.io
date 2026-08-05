@@ -7,6 +7,7 @@ Ana proje: `supertonic-web/` klasörü.
 - **Sunucu:** Hetzner CX23 — IP: `77.42.45.229` (Helsinki)
 - **Servis:** `systemctl status tts` (systemd servisi olarak çalışır)
 - **Deploy:** `cd /root/hakanerbasss.github.io && git pull && systemctl restart tts`
+- **Python ortamı:** `supertonic-web/.venv` (kendi venv'i). Sistem Python'una **asla** `pip install` yapma — sunucudaki diğer projeleri (firebase-admin vb.) kırar. Yeni paket: `supertonic-web/.venv/bin/pip install <paket>` + `requirements.txt`'e ekle. İlk kurulum/onarım: `bash supertonic-web/setup-venv.sh`
 - **Ana dosya:** `supertonic-web/app.py` — FastAPI uygulaması, tüm bot mantığı burada
 - **Haber sitesi:** `supertonic-web/news_site.py` — `hakanerbas.wizaicorp.com` subdomaininde yayınlanır
 - **Geliştirme branch:** `main` — tüm değişiklikler doğrudan main'e push edilir
