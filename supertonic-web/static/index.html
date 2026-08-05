@@ -2035,11 +2035,15 @@ async function loadMeta() {
   const translateSelect = document.getElementById('vid-translate');
   const sourceSelect = document.getElementById('tr-source');
 
+  const voiceLabels = d.voice_labels || {};
   voiceSelects.forEach(id => {
     const el = document.getElementById(id);
     voices.forEach(v => {
       const o = document.createElement('option');
-      o.value = v; o.textContent = v;
+      o.value = v;
+      o.textContent = voiceLabels[v] || v;
+      // Doğal Edge sesi varsayılan gelsin — Supertonic yedek olarak listede kalır
+      if (v === 'E-Emel') o.selected = true;
       el.appendChild(o);
     });
   });

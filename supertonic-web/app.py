@@ -292,6 +292,17 @@ EDGE_VOICES = {
 }
 _EDGE_DEFAULT = "tr-TR-EmelNeural"
 
+# Panelde gösterilen ses listesi — Edge sesleri önce (varsayılan olsun diye).
+# VOICES yalnızca Supertonic seslerini tutmaya devam ediyor; Edge başarısız
+# olduğunda hangi Supertonic sesine düşüleceği ona göre belirleniyor.
+UI_VOICES = list(EDGE_VOICES.keys()) + VOICES
+VOICE_LABELS = {
+    "E-Emel":  "Emel — doğal (Edge)",
+    "E-Ahmet": "Ahmet — doğal (Edge)",
+    "M1": "M1 (Erkek · Supertonic)", "M2": "M2 (Erkek · Supertonic)", "M3": "M3 (Erkek · Supertonic)",
+    "F1": "F1 (Kadın · Supertonic)", "F2": "F2 (Kadın · Supertonic)", "F3": "F3 (Kadın · Supertonic)",
+}
+
 
 def _edge_voice_for(voice: str) -> str:
     """Panelden seçilen ses adını Edge ses kimliğine çevirir.
@@ -1007,7 +1018,7 @@ async def index(request: Request):
 
 @app.get("/api/voices")
 async def voices():
-    return {"voices": VOICES, "languages": LANG_MAP}
+    return {"voices": UI_VOICES, "voice_labels": VOICE_LABELS, "languages": LANG_MAP}
 
 
 @app.post("/api/synthesize")
@@ -1021,10 +1032,16 @@ async def synthesize(
         raise HTTPException(400, "Metin boş olamaz")
     if lang not in LANG_MAP:
         raise HTTPException(400, "Desteklenmeyen dil")
-    if voice not in VOICES:
+    if voice not in UI_VOICES:
         raise HTTPException(400, "Geçersiz ses")
 
     out_file = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
+
+    # Edge sesi seçildiyse ortak _synth_audio yolunu kullan — Edge hata
+    # verirse orada zaten Supertonic'e düşülüyor.
+    if voice in EDGE_VOICES:
+        dur = await _synth_audio(text, lang, voice, speed, out_file)
+        return {"file": f"/api/audio/{out_file.name}", "duration": round(float(dur), 2)}
 
     tts = get_tts()
     style = tts.get_voice_style(voice_name=voice)
