@@ -1891,6 +1891,19 @@
           </p>
         </div>
 
+        <div style="background:#111;border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:14px;">
+          <p style="color:#888;font-size:12px;font-weight:600;margin:0 0 6px;text-transform:uppercase;">Arka Plan Müziği</p>
+          <div id="bgmusic-status" style="font-size:12px;color:#888;margin-bottom:8px;">Yükleniyor...</div>
+          <input type="file" id="bgmusic-file" accept="audio/*" style="display:none;" onchange="uploadBgMusic()">
+          <button onclick="document.getElementById('bgmusic-file').click()" style="font-size:12px;padding:8px 14px;">🎵 Müzik Yükle</button>
+          <button onclick="deleteBgMusic()" style="font-size:12px;padding:8px 14px;margin-left:6px;background:#2a1a1a;border-color:#5a2a2a;">Kaldır</button>
+          <p style="color:#666;font-size:11px;margin:8px 0 0;">
+            Anlatımın çok altında (%7 seviyede) döngüyle çalar. Telifsiz bir parça seç —
+            telifli müzik Instagram/YouTube'da videonun sesini kapattırabilir.
+            Dosya yoksa müzik adımı atlanır, ses seviyesi eşitleme yine çalışır.
+          </p>
+        </div>
+
         <div id="clone-status-box" style="background:#111;border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;">
           Yükleniyor...
         </div>
@@ -4300,6 +4313,42 @@ async function loadCloneStatus() {
     const et = document.getElementById('edge-tts-toggle');
     if (et) et.checked = !!e.use_edge_tts;
   } catch(e) { console.error('tts engine:', e); }
+  loadBgMusicStatus();
+}
+
+async function loadBgMusicStatus() {
+  const el = document.getElementById('bgmusic-status');
+  if (!el) return;
+  try {
+    const d = await fetch('/api/bg-music/status').then(r => r.json());
+    el.innerHTML = d.has_music
+      ? `<span style="color:#4ade80;">✓ Müzik yüklü (${d.size_kb} KB)</span>`
+      : `<span style="color:#888;">Müzik yok — videolar müziksiz üretilir</span>`;
+  } catch(e) { el.textContent = 'Durum alınamadı'; }
+}
+
+async function uploadBgMusic() {
+  const inp = document.getElementById('bgmusic-file');
+  const el = document.getElementById('bgmusic-status');
+  if (!inp.files.length) return;
+  el.textContent = 'Yükleniyor...';
+  try {
+    const fd = new FormData();
+    fd.append('file', inp.files[0]);
+    const r = await fetch('/api/bg-music/upload', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || 'yükleme hatası');
+    await loadBgMusicStatus();
+  } catch(e) {
+    el.innerHTML = `<span style="color:#f87171;">Hata: ${e.message}</span>`;
+  }
+  inp.value = '';
+}
+
+async function deleteBgMusic() {
+  try {
+    await fetch('/api/bg-music/delete', { method: 'POST' });
+    await loadBgMusicStatus();
+  } catch(e) { console.error('bg music delete:', e); }
 }
 
 async function toggleEdgeTts() {

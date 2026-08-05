@@ -328,6 +328,98 @@ async def _synth_edge(text: str, voice: str, speed: float, out_path: Path) -> fl
     return float(dur)
 
 
+# Sahne süresi alt sınırı ve sahne sonu nefes payı.
+# ESKİDEN: sahne süresi = TTS çıktısının ham süresi. Kısa bir cümle 1.5
+# saniyelik "flaş" sahne üretiyor, cümleler de birbirine yapışık akıyordu —
+# hem robotik hem yorucu. Artık her sahnenin sonuna kısa bir sessizlik
+# ekleniyor (doğal duraklama) ve çok kısa sahneler alt sınıra tamamlanıyor.
+_SCENE_MIN_SEC = 2.2
+_SCENE_TAIL_SEC = 0.28
+
+
+async def _pad_scene_audio(path: Path, dur: float) -> float:
+    """Sahne sesine kuyruk sessizliği ekler, gerekiyorsa alt sınıra tamamlar.
+    Yeni süreyi döner. Başarısız olursa dosyaya dokunmaz, eski süreyi döner.
+
+    Ses uzatıldığı için video klibi de aynı süreye kurulur — senkron bozulmaz."""
+    target = max(dur + _SCENE_TAIL_SEC, _SCENE_MIN_SEC)
+    if target <= dur + 0.01:
+        return dur
+    padded = path.with_name(path.stem + "_pad.wav")
+    try:
+        # arun_ffmpeg hata durumunda istisna fırlatır (False dönmez).
+        await arun_ffmpeg([
+            "ffmpeg", "-y", "-i", str(path.absolute()),
+            "-af", "apad", "-t", f"{target:.3f}",
+            "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1",
+            str(padded.absolute())
+        ], timeout=60, step="sahne sesi dolgusu")
+        if padded.exists() and padded.stat().st_size > 0:
+            padded.replace(path)
+            return target
+    except Exception as e:
+        print(f"[ses] dolgu başarısız ({type(e).__name__}: {e}) — ham süre kullanılıyor", flush=True)
+    padded.unlink(missing_ok=True)
+    return dur
+
+
+# Opsiyonel arka plan müziği. Dosya yoksa müzik adımı sessizce atlanır —
+# telifli bir parça depoya konmadı, kullanıcı panelden kendisi yükler.
+BG_MUSIC_FILE = UPLOAD_DIR / "bg_music.mp3"
+_BG_MUSIC_VOLUME = 0.07   # konuşmanın altında kalacak kadar kısık
+
+
+async def _master_audio(path: Path) -> None:
+    """Birleştirilmiş anlatım sesini yayına hazırlar:
+      - loudnorm ile sahneler arası seviye farkını eşitler (eskiden hiç yoktu,
+        bir sahne fısıltı diğeri bağırma gibi çıkabiliyordu)
+      - bg_music.mp3 varsa çok kısık şekilde altına döşer
+
+    Başarısız olursa dosyaya dokunmaz — üretim ham sesle devam eder."""
+    out = path.with_name(path.stem + "_master.wav")
+    has_music = BG_MUSIC_FILE.exists() and BG_MUSIC_FILE.stat().st_size > 1024
+
+    def _music_cmd():
+        return [
+            "ffmpeg", "-y",
+            "-i", str(path.absolute()),
+            "-stream_loop", "-1", "-i", str(BG_MUSIC_FILE.absolute()),
+            "-filter_complex",
+            f"[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[v];"
+            f"[1:a]volume={_BG_MUSIC_VOLUME},afade=t=in:st=0:d=1.5[m];"
+            # normalize=0 şart: amix varsayılanı her girdiyi 1/n ile çarpar,
+            # yani müzik eklenince konuşma 6 dB kısılırdı.
+            f"[v][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]",
+            "-map", "[a]",
+            "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1",
+            str(out.absolute()),
+        ]
+
+    def _plain_cmd():
+        return [
+            "ffmpeg", "-y", "-i", str(path.absolute()),
+            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+            "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1",
+            str(out.absolute()),
+        ]
+
+    # Müzik miksi başarısız olursa (eski ffmpeg'de normalize seçeneği yok,
+    # bozuk mp3 vb.) sessizce sadece-loudnorm'a düş — seviye eşitleme
+    # müzikten daha önemli, onu kaybetme.
+    attempts = ([( _music_cmd, "loudnorm + müzik")] if has_music else []) + [(_plain_cmd, "loudnorm")]
+    for build, label in attempts:
+        try:
+            await arun_ffmpeg(build(), timeout=180, step=f"ses masterlama ({label})")
+            if out.exists() and out.stat().st_size > 0:
+                out.replace(path)
+                print(f"[ses] masterlandı: {label}", flush=True)
+                return
+        except Exception as e:
+            print(f"[ses] {label} başarısız ({type(e).__name__}: {e})", flush=True)
+        out.unlink(missing_ok=True)
+    print("[ses] masterlama yapılamadı — ham ses kullanılıyor", flush=True)
+
+
 async def _synth_audio(text: str, lang: str, voice: str, speed: float, out_path: Path) -> float:
     """Ses sentezi. Sıra: XTTS klon → Edge TTS (TR, ayar açıksa) → Supertonic.
 
@@ -1934,6 +2026,9 @@ def _build_ig_caption(title: str, description: str = "", source_text: str = "", 
     return caption
 
 
+_CTA_HISTORY_FILE = Path("cta_history.json")
+
+
 def _pick_varied_cta_text(lang: str, platform: str, comment_hook: str = "") -> str:
     """Platforma/dile göre birkaç varyasyondan rastgele kapanış çağrısı seçer —
     her videoda aynı cümle tekrarlanmasın diye. comment_hook verilirse başına eklenir.
@@ -1954,6 +2049,16 @@ def _pick_varied_cta_text(lang: str, platform: str, comment_hook: str = "") -> s
                 "Bu tür gelişmeleri kaçırmamak için takip et, beğenmeyi de unutma!",
                 "Takipte kal, beğenmeyi unutma — her haber ilk burada!",
                 "Hesabı takip et, beğen, yeni haberleri kaçırma!",
+                # Aşağıdakiler farklı EYLEM istiyor (kaydet/paylaş/yorum) —
+                # beş varyantın hepsi "takip et + beğen" olduğu için kapanış
+                # tekdüze kalıyordu.
+                "Bu videoyu kaydet, lazım olduğunda elinin altında olsun!",
+                "Yakınlarına gönder — bunu bilmesi gerekenler var!",
+                "Sen ne düşünüyorsun? Yorumlara yaz, herkes okusun!",
+                "Kaydet, paylaş, takip et — üçü de iki saniye sürüyor!",
+                "Bu haber işine yaradıysa bir beğeni bırak, takipte kal!",
+                "Aklında bulunsun diye kaydet, gelişmeler için takip et!",
+                "Katılıyor musun? Yorumda buluşalım — takip etmeyi de unutma!",
             ],
         },
         "en": {
@@ -1971,7 +2076,28 @@ def _pick_varied_cta_text(lang: str, platform: str, comment_hook: str = "") -> s
     }
     _lang_cta = _cta.get(lang, _cta["tr"])
     _cta_options = _lang_cta.get(platform, _lang_cta["youtube"])
-    cta_text = _cta_options[secrets.randbelow(len(_cta_options))]
+
+    # Son kullanılanları ele — saf rastgele seçim arka arkaya aynı cümleyi
+    # verebiliyordu (günde 3 post atılırken fark ediliyor).
+    recent = []
+    try:
+        if _CTA_HISTORY_FILE.exists():
+            recent = (json.loads(_CTA_HISTORY_FILE.read_text()) or {}).get(f"{lang}:{platform}", [])
+    except Exception:
+        recent = []
+    avoid = max(1, min(len(_cta_options) - 1, 4))
+    pool = [c for c in _cta_options if c not in recent[-avoid:]] or _cta_options
+    cta_text = pool[secrets.randbelow(len(pool))]
+    try:
+        all_hist = {}
+        if _CTA_HISTORY_FILE.exists():
+            all_hist = json.loads(_CTA_HISTORY_FILE.read_text()) or {}
+        key = f"{lang}:{platform}"
+        all_hist[key] = (all_hist.get(key, []) + [cta_text])[-8:]
+        _CTA_HISTORY_FILE.write_text(json.dumps(all_hist, ensure_ascii=False))
+    except Exception:
+        pass
+
     comment_hook = (comment_hook or "").strip()
     return f"{comment_hook} {cta_text}".strip() if comment_hook else cta_text
 
@@ -2362,6 +2488,13 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 - NO EMPTY PROMISES: NEVER write a sentence that promises information without immediately delivering it in the same or next sentence — e.g. "detaylar açıklandı", "işte merak edilenler", "peki bakalım neler var" followed by ending the video without saying what those details/answers actually are. Every scene must contain a real, concrete piece of information from the facts list. If you don't have enough facts to fill a promised detail, do NOT tease it — cut that sentence entirely instead. Ending a video on an unfulfilled setup reads as clickbait and destroys trust, even if no fact was technically wrong.
 {get_hook_rule()}
 - TELL THE STORY DIRECTLY: narrate the facts matter-of-factly — do not frame the video as debunking/refuting rumors or other claims unless the source itself is an official correction. Never imply fear, certainty, or a promise/outcome that isn't explicitly stated in the source.
+- SOUND LIKE A PERSON, NOT A PRESS RELEASE — this matters as much as the accuracy rules above. The rules in this prompt are about WHAT you may say; this one is about HOW it must sound. Viewers have been calling these videos robotic, so:
+  * Write the way a knowledgeable friend explains news out loud — not the way an official statement is written. Prefer active voice and everyday words over bureaucratic ones ("verilecek" over "tahsis edilecek", "başlıyor" over "yürürlüğe konulacaktır").
+  * VARY SENTENCE LENGTH deliberately. A short punchy sentence after a longer one creates rhythm. Never write 6 scenes that all have the same shape and length — that flatness is exactly what reads as machine-written.
+  * Connect scenes so they flow as one story, not as 6 disconnected bullet points read aloud. Each scene should feel like it follows from the previous one.
+  * Address the viewer directly where it fits ("bunu bilmeniz önemli", "sizi de ilgilendiriyor") instead of narrating everything in detached third person.
+  * Do NOT open consecutive scenes with the same word or construction, and do not start every scene with the subject noun.
+  * This is spoken text read by a text-to-speech voice: read your sentences aloud in your head. If a sentence is hard to say in one breath, split it.
 - LAST scene text: just end the story naturally with its final concrete fact — a varied closing call-to-action line is appended automatically after generation, do not write your own "beğen/abone ol/takip et" sentence here.
 - comment_hook: ONE short question in {lang_name}, tailored to what actually happened in THIS story, meant to provoke viewers to comment their opinion/reaction (e.g. "Sence doğru bir karar mı?", "Sen olsan ne yapardın?", "Katılıyor musun?"). Must be specific to this news — never a generic template, never reused across videos.
 - badge_text: a short (max 3-4 words), punchy phrase in {lang_name} for the opening banner (max 2-5 words for the whole banner text overall — this must stay readable in under 2 seconds for a 45+ audience). MUST match the certainty_level you determined — never let the banner claim more certainty than the story actually has: at level A pick "Resmi Açıklama", "Yeni Düzenleme", "SGK", "Ekonomi", "Hava Durumu", "Deprem" (or "SON DAKİKA" only if it's genuinely urgent and just happened); at level B pick "Hazırlık", "Taslak", "Teklif" (or an equivalent honest stage-marker); at level C pick "Henüz Resmi Değil" or "Kaynaklara Göre". Within whatever level applies, still vary the exact wording — do not default to the same phrase or reuse the identical phrase across consecutive videos.
@@ -2450,6 +2583,7 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
     for i, scene in enumerate(scenes):
         audio_path = scene_dir / f"audio_{i}.wav"
         dur_val = await _synth_audio(scene["text"], lang, voice, speed, audio_path)
+        dur_val = await _pad_scene_audio(audio_path, dur_val)
         audio_files.append(audio_path)
         durations.append(dur_val)
 
@@ -2533,18 +2667,17 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
     if png_files and not info_format and not intro_cover_path:
         try:
             first_title = data.get("title", topic or scenes[0]["text"][:60])
-            # Renk şeması her iki platformda da SABİT (eski sarı/kırmızı) kalıyor —
-            # kullanıcı zaten "Özel Açılış Kapağı" ile kendi görsel çeşitliliğini ve
-            # bot-algısı korumasını sağlıyor (manuel yükleme + yapay zeka etiketi),
-            # bu yüzden otomatik renk rotasyonuna gerek yok. Sadece rozet metni
-            # (badge_text) YouTube'da AI'den serbest/değişken geliyor — Instagram
-            # hâlâ sabit "SON DAKİKA" kullanıyor, o değişmiyor.
-            _use_ai_badge = (platform == "youtube")
+            # ESKİDEN: Instagram'da rozet her seferinde sabit "SON DAKİKA",
+            # renk paleti de hep aynı sarı/kırmızıydı. Her post birebir aynı
+            # bantla açılıyordu — "robotik" algısının en görünür sebebi.
+            # ARTIK: rozet metni AI'den (doğruluk seviyesine uygun, habere özel)
+            # her iki platformda da geliyor; renk paleti son kullanılanları
+            # tekrarlamayacak şekilde dönüyor.
             overlay_first_scene_banner(
                 png_files[0], first_title, lang=lang,
-                badge_text=data.get("badge_text") if _use_ai_badge else None,
-                emphasis_word=data.get("emphasis_word") if _use_ai_badge else None,
-                color_scheme=None,
+                badge_text=data.get("badge_text"),
+                emphasis_word=data.get("emphasis_word"),
+                color_scheme=_pick_banner_scheme(),
             )
         except Exception:
             pass
@@ -2635,7 +2768,7 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
         # Özel açılış kapağı kullanılıyorsa ilk sahnede zoom uygulanmaz —
         # kullanıcı kendi tasarladığı kapaktaki metni rahat okusun diye statik kalır.
         skip_kb = bool(i == 0 and intro_cover_path)
-        kb_ok = False if skip_kb else await _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path)
+        kb_ok = False if skip_kb else await _try_ken_burns_clip(png, float(dur), clip_path, text_file, font_path, move_idx=i)
         if not kb_ok:
             try:
                 result = await asyncio.to_thread(subprocess.run,
@@ -2673,6 +2806,9 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
          "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1", str(combined_audio)],
         timeout=120, step="ses birleştirme"
     )
+
+    # Ses seviyesini eşitle (+ arka plan müziği varsa karıştır)
+    await _master_audio(combined_audio)
 
     # Video kliplerini birleştir
     clip_list_file = scene_dir / "clip_list.txt"
@@ -3728,6 +3864,34 @@ _BANNER_COLOR_SCHEMES = {
 }
 _DEFAULT_BANNER_SCHEME = "sari_kirmizi"
 
+# Son kullanılan paletler — arka arkaya aynı rengin çıkmaması için.
+_BANNER_SCHEME_HISTORY_FILE = Path("banner_scheme_history.json")
+_BANNER_SCHEME_AVOID_LAST = 3
+
+
+def _pick_banner_scheme() -> str:
+    """Son N videoda kullanılmayan bir renk paleti seç.
+
+    Eskiden palet sabit sarı/kırmızıydı ve her post aynı görünüyordu.
+    Rastgele seçim de arka arkaya aynı rengi verebildiği için son
+    kullanılanlar dosyada tutulup eleniyor."""
+    names = list(_BANNER_COLOR_SCHEMES.keys())
+    recent = []
+    try:
+        if _BANNER_SCHEME_HISTORY_FILE.exists():
+            recent = json.loads(_BANNER_SCHEME_HISTORY_FILE.read_text()) or []
+    except Exception:
+        recent = []
+    pool = [n for n in names if n not in recent[-_BANNER_SCHEME_AVOID_LAST:]] or names
+    choice = pool[secrets.randbelow(len(pool))]
+    try:
+        recent.append(choice)
+        _BANNER_SCHEME_HISTORY_FILE.write_text(
+            json.dumps(recent[-_BANNER_SCHEME_AVOID_LAST * 2:], ensure_ascii=False))
+    except Exception:
+        pass
+    return choice
+
 # Her iki platformda da eski (sabit) renk davranışı korunuyor — kitle bu stile
 # alıştı, çeşitlilik/bot-algısı ihtiyacı zaten "Özel Açılış Kapağı" özelliğiyle
 # (manuel yükleme + yapay zeka etiketi) karşılanıyor. color_scheme artık hiç
@@ -3824,27 +3988,31 @@ def overlay_first_scene_banner(
             sz -= 10
         return lf(sz), sz
 
+    # Kategori etiketi (EKONOMİ/AFET/SPOR/DÜNYA/TEKNOLOJİ) her zaman başlıktan
+    # tespit edilir — palet döndürülse bile izleyici haberin türünü görsün.
     cat_text = "GÜNDEM" if lang == "tr" else "BREAKING"
+    _cat_color = None
+    _tl = (title or "").lower()
+    for _kws, _color, _label in _LEGACY_BANNER_CATS:
+        if any(k in _tl for k in _kws):
+            cat_text, _cat_color = _label, _color
+            break
 
     if color_scheme:
-        # YouTube yolu — AI'nin seçtiği hazır palet.
+        # Dönen palet — görsel çeşitlilik için. Bant rengi paletten gelir,
+        # kategori etiketi yukarıdan korunur.
         scheme = dict(_BANNER_COLOR_SCHEMES.get(
             color_scheme.strip().lower().replace(" ", "_"),
             _BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME],
         ))
     else:
-        # Instagram/varsayılan yol — eski sabit davranış birebir korunuyor:
-        # sarı/kırmızı taban, sadece bant rengi anahtar kelimeyle değişir.
+        # Eski sabit davranış: sarı/kırmızı taban, bant rengi kategoriden.
         scheme = dict(_BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME])
-        _tl = title.lower()
-        _band_txt_dark = True
-        for _kws, _color, _label in _LEGACY_BANNER_CATS:
-            if any(k in _tl for k in _kws):
-                scheme["band"] = _color
-                cat_text = _label
-                _band_txt_dark = False
-                break
-        scheme["band_txt"] = (17, 17, 17) if _band_txt_dark else (255, 255, 255)
+        if _cat_color:
+            scheme["band"] = _cat_color
+            scheme["band_txt"] = (255, 255, 255)
+        else:
+            scheme["band_txt"] = (17, 17, 17)
 
     BAND_COLOR = scheme["band"]
     BAND_TXT   = scheme["band_txt"]
@@ -5753,17 +5921,41 @@ def _save_as_jpeg(data: bytes, img_path: Path) -> bool:
         return False
 
 
+# Ken Burns hareket çeşitleri. Eskiden her sahne birebir aynıydı (merkeze
+# %12 zoom-in) — bu, videoların "robotik" görünmesinin en büyük sebeplerinden
+# biriydi. Sahne sırasına göre dönüşümlü kullanılır, ardışık iki sahne asla
+# aynı hareketi almaz.
+#   z  : zoom ifadesi   x/y: kaydırma ifadeleri   ({n} = toplam kare sayısı)
+_KB_MOVES = [
+    # yakınlaş, merkez
+    ("min(1+0.12*on/{n},1.12)", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),
+    # uzaklaş, merkez
+    ("max(1.12-0.12*on/{n},1.0)", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),
+    # yakınlaş + soldan sağa
+    ("min(1+0.10*on/{n},1.10)", "(iw-iw/zoom)*on/{n}", "ih/2-(ih/zoom/2)"),
+    # yakınlaş + yukarıdan aşağı
+    ("min(1+0.10*on/{n},1.10)", "iw/2-(iw/zoom/2)", "(ih-ih/zoom)*on/{n}"),
+    # uzaklaş + sağdan sola
+    ("max(1.12-0.10*on/{n},1.0)", "(iw-iw/zoom)*(1-on/{n})", "ih/2-(ih/zoom/2)"),
+    # yakınlaş + aşağıdan yukarı
+    ("min(1+0.10*on/{n},1.10)", "iw/2-(iw/zoom/2)", "(ih-ih/zoom)*(1-on/{n})"),
+]
+
+
 async def _try_ken_burns_clip(
     img_path: Path, dur: float, clip_path: Path,
-    text_file=None, font_path: str = None,
+    text_file=None, font_path: str = None, move_idx: int = 0,
 ) -> bool:
-    """Ken Burns zoom efektiyle klip oluşturmayı dene. Başarısız olursa False döner."""
+    """Ken Burns efektiyle klip oluşturmayı dene. Başarısız olursa False döner.
+
+    move_idx: sahne sırası — hangi hareketin kullanılacağını belirler."""
     frames = max(1, int(dur * 30))
-    zoom_expr = f"'min(1+0.12*on/{frames},1.12)'"
+    z, x, y = _KB_MOVES[move_idx % len(_KB_MOVES)]
     zoompan = (
         f"scale=1296:2304:force_original_aspect_ratio=increase,"
         f"crop=1296:2304,"
-        f"zoompan=z={zoom_expr}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+        f"zoompan=z='{z.format(n=frames)}'"
+        f":x='{x.format(n=frames)}':y='{y.format(n=frames)}'"
         f":d={frames}:s=1080x1920:fps=30"
     )
     if text_file and Path(text_file).exists():
@@ -5780,11 +5972,14 @@ async def _try_ken_burns_clip(
         vf = zoompan
     try:
         result = await asyncio.to_thread(subprocess.run,
+            # crf 28 + ultrafast idi: bu klip sonrasında iki kez daha yeniden
+            # kodlandığı için zincirin en zayıf halkasıydı, görüntü gereksiz
+            # yumuşuyordu. crf 20 + veryfast belirgin daha temiz.
             ["ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
              "-t", str(dur), "-vf", vf,
-             "-r", "30", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
              "-pix_fmt", "yuv420p", str(clip_path)],
-            capture_output=True, timeout=90,
+            capture_output=True, timeout=120,
         )
         return result.returncode == 0 and clip_path.exists() and clip_path.stat().st_size > 0
     except Exception:
@@ -9998,6 +10193,45 @@ async def tts_toggle_clone(enabled: bool = Form(...)):
     cfg["use_clone_voice"] = enabled
     IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
     return {"use_clone": enabled}
+
+
+@app.get("/api/bg-music/status")
+async def bg_music_status():
+    exists = BG_MUSIC_FILE.exists() and BG_MUSIC_FILE.stat().st_size > 1024
+    return {
+        "has_music": exists,
+        "size_kb": round(BG_MUSIC_FILE.stat().st_size / 1024) if exists else 0,
+    }
+
+
+@app.post("/api/bg-music/upload")
+async def bg_music_upload(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(400, "Dosya seçilmedi")
+    if Path(file.filename).suffix.lower() not in (".mp3", ".m4a", ".wav", ".ogg", ".aac"):
+        raise HTTPException(400, "Desteklenen formatlar: mp3, m4a, wav, ogg, aac")
+    tmp = BG_MUSIC_FILE.with_suffix(".tmp")
+    async with aiofiles.open(tmp, "wb") as f:
+        await f.write(await file.read())
+    # Her formatı tek tip mp3'e çevir — miks aşaması sürprizle karşılaşmasın
+    try:
+        await arun_ffmpeg(
+            ["ffmpeg", "-y", "-i", str(tmp.absolute()), "-vn",
+             "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100",
+             str(BG_MUSIC_FILE.absolute())],
+            timeout=120, step="müzik dönüşümü",
+        )
+    except Exception as e:
+        tmp.unlink(missing_ok=True)
+        raise HTTPException(500, f"Ses dönüştürülemedi: {e}")
+    tmp.unlink(missing_ok=True)
+    return {"ok": True, "size_kb": round(BG_MUSIC_FILE.stat().st_size / 1024)}
+
+
+@app.post("/api/bg-music/delete")
+async def bg_music_delete():
+    BG_MUSIC_FILE.unlink(missing_ok=True)
+    return {"ok": True}
 
 
 @app.get("/api/tts/engine")
