@@ -6278,6 +6278,26 @@ async def _live_pool_stats() -> dict:
 
 
 async def _live_stream_supervisor():
+    """_live_stream_supervisor_inner'ı sarar ve HER hatayı duruma yazar.
+
+    Sarmalayıcı olmadan: create_task ile başlatılan süpervizörde bir istisna
+    oluşursa asyncio onu sessizce yutuyor, durum dosyası "accumulating"de
+    donup kalıyordu. Kullanıcı "Yayını Başlat"a bassa da her seferinde yeni
+    task aynı noktada sessizce ölüyor, arayüzde hiçbir hata görünmüyordu.
+    """
+    try:
+        await _live_stream_supervisor_inner()
+    except asyncio.CancelledError:
+        save_live_state(status="stopped", current_file=None)
+        raise
+    except Exception as e:
+        detail = str(e).strip() or f"{type(e).__name__} (detay yok)"
+        print(f"[LIVE] süpervizör çöktü: {detail}\n{traceback.format_exc()}", flush=True)
+        save_live_state(status="error", current_file=None,
+                        error=f"Yayın süpervizörü çöktü: {detail}")
+
+
+async def _live_stream_supervisor_inner():
     """1) Havuz _LIVE_MIN_SECONDS doldurana kadar YouTube'a hiç bağlanmaz, sadece bekler.
     2) Dolunca yayını açar, havuzdaki videoları sırayla RTMP'ye akıtır.
     3) Bir video bitince: havuz _LIVE_MAX_COUNT video sınırını aşmıyorsa sona koyulur
@@ -6303,7 +6323,15 @@ async def _live_stream_supervisor():
         return
 
     # ── 2. aşama: havuz dolu, yayını gerçekten aç ───────────────────────────────
-    creds = _get_live_creds()
+    # Token yenileme hatası (RefreshError vb.) istisna fırlatır — yakalanmazsa
+    # süpervizör burada sessizce ölür ve durum "accumulating"de donar.
+    try:
+        creds = _get_live_creds()
+    except Exception as e:
+        detail = str(e).strip() or f"{type(e).__name__} (detay yok)"
+        print(f"[LIVE] YouTube kimlik bilgisi alınamadı: {detail}\n{traceback.format_exc()}", flush=True)
+        save_live_state(status="error", error=f"YouTube yetkisi alınamadı ({detail}) — /auth/youtube ile yeniden bağlan")
+        return
     if not creds:
         save_live_state(status="error", error="YouTube hesabı bağlı değil veya yetkisi eksik")
         return
