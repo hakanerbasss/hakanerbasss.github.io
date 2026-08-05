@@ -282,14 +282,71 @@ LANG_MAP = {
 
 VOICES = ["M1", "M2", "M3", "F1", "F2", "F3"]
 
+# ── Edge TTS (Microsoft nöral sesler) ──────────────────────────────────────
+# Ücretsiz, API anahtarı gerektirmez, sınırsız. Supertonic'e göre belirgin
+# şekilde daha doğal Türkçe. Supertonic KALDIRILMADI — ayar kapalıysa veya
+# Edge çağrısı hata verirse otomatik olarak Supertonic'e düşülür.
+EDGE_VOICES = {
+    "E-Ahmet":  "tr-TR-AhmetNeural",   # erkek
+    "E-Emel":   "tr-TR-EmelNeural",    # kadın
+}
+_EDGE_DEFAULT = "tr-TR-EmelNeural"
+
+
+def _edge_voice_for(voice: str) -> str:
+    """Panelden seçilen ses adını Edge ses kimliğine çevirir.
+    Eski Supertonic adları (M1/F1...) geldiğinde cinsiyeti korur."""
+    if voice in EDGE_VOICES:
+        return EDGE_VOICES[voice]
+    if voice and voice.upper().startswith("M"):
+        return "tr-TR-AhmetNeural"
+    return _EDGE_DEFAULT
+
+
+async def _synth_edge(text: str, voice: str, speed: float, out_path: Path) -> float:
+    """Edge TTS ile seslendirir, süreyi saniye olarak döner.
+    Hata durumunda istisna fırlatır — çağıran Supertonic'e düşer."""
+    import edge_tts
+    # edge-tts hız formatı: "+0%" / "-10%" / "+15%"
+    pct = int(round((speed - 1.0) * 100))
+    rate = f"{pct:+d}%"
+    mp3_path = out_path.with_suffix(".edge.mp3")
+    communicate = edge_tts.Communicate(_clean_tts_text(text, "tr"),
+                                       _edge_voice_for(voice), rate=rate)
+    await communicate.save(str(mp3_path))
+    if not mp3_path.exists() or mp3_path.stat().st_size < 512:
+        raise RuntimeError("edge-tts boş çıktı üretti")
+    # Hattın geri kalanı 44.1kHz mono WAV bekliyor (concat aşaması PCM birleştiriyor)
+    await arun_ffmpeg([
+        "ffmpeg", "-y", "-i", str(mp3_path),
+        "-ar", "44100", "-ac", "1", "-c:a", "pcm_s16le", str(out_path.absolute())
+    ], timeout=60, step="edge-tts wav dönüşümü")
+    mp3_path.unlink(missing_ok=True)
+    dur = await _probe_duration(out_path)
+    if not dur or dur <= 0:
+        raise RuntimeError("edge-tts süresi ölçülemedi")
+    return float(dur)
+
+
 async def _synth_audio(text: str, lang: str, voice: str, speed: float, out_path: Path) -> float:
-    """Ses sentezi. Türkçe+clone modu aktifse XTTS-v2, değilse Supertonic."""
+    """Ses sentezi. Sıra: XTTS klon → Edge TTS (TR, ayar açıksa) → Supertonic.
+
+    Supertonic her zaman son çare olarak duruyor: Edge internet/servis hatası
+    verirse üretim durmaz, sessizce Supertonic'e düşer."""
     if lang == "tr" and get_ig_config().get("use_clone_voice", False) and xtts_clone.hazir_mi():
         return await xtts_clone.seslendir(
             _clean_tts_text(text, lang), str(out_path), language="tr", speed=speed
         )
+    if lang == "tr" and get_ig_config().get("use_edge_tts", True):
+        try:
+            return await _synth_edge(text, voice, speed, out_path)
+        except Exception as e:
+            print(f"[tts] Edge TTS başarısız ({type(e).__name__}: {e}) — Supertonic'e düşülüyor", flush=True)
     tts_obj = get_tts()
-    style = tts_obj.get_voice_style(voice_name=voice)
+    # Panelde Edge sesi seçiliyken buraya düşülmüş olabilir — Supertonic bu adları
+    # tanımaz, cinsiyeti koruyan bir Supertonic sesine çevir.
+    st_voice = voice if voice in VOICES else ("M1" if _edge_voice_for(voice).endswith("AhmetNeural") else "F1")
+    style = tts_obj.get_voice_style(voice_name=st_voice)
     async with _get_tts_lock():
         wav, dur = await asyncio.to_thread(tts_obj.synthesize,
             _clean_tts_text(text, lang), lang=lang, voice_style=style, total_steps=8, speed=speed)
@@ -1196,9 +1253,48 @@ async def _fetch_article_text(url: str, max_chars: int = 2000, expected_title: s
         return ""
 
 
-async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, fetch_full_text: bool = True) -> dict:
+def _rss_age_hours(pubdate_raw: str) -> float | None:
+    """RSS <pubDate> (RFC 822) → şu andan kaç saat önce yayınlandığı.
+    Ayrıştırılamazsa None döner (çağıran 'bilinmiyor' olarak ele alır)."""
+    if not pubdate_raw:
+        return None
+    try:
+        from email.utils import parsedate_to_datetime
+        from datetime import datetime as _dt, timezone as _tz
+        dt = parsedate_to_datetime(pubdate_raw.strip())
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_tz.utc)
+        return max(0.0, (_dt.now(_tz.utc) - dt).total_seconds() / 3600.0)
+    except Exception:
+        return None
+
+
+def _add_recency_filter(query: str, days: int) -> str:
+    """Google News arama sorgusuna when:Nd ekler.
+
+    Kritik: arama RSS'i varsayılan olarak TARİHE GÖRE DEĞİL, ALAKA DÜZEYİNE göre
+    sıralar — bu filtre olmadan haftalar öncesine ait bir makale "SON DAKİKA"
+    bandıyla paylaşılabiliyordu."""
+    if not query or "when:" in query:
+        return query
+    return f"{query} when:{days}d"
+
+
+# Haberin kabul edilebilir azami yaşı. Bunun üstündeki makale olgu çıkarımına
+# hiç sokulmaz — eski haberi güncel gibi sunmak izleyicide "yalan haber"
+# algısı yaratan en büyük sebepti.
+_NEWS_MAX_AGE_HOURS = 48.0
+
+
+async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, fetch_full_text: bool = True,
+                              max_age_hours: float = _NEWS_MAX_AGE_HOURS) -> dict:
     """Google News RSS'ten haber başlıkları çeker. fetch_full_text=False olunca makale içeriği
-    çekilmez (sadece RSS başlık + açıklama) — paywall siteleri tıkamaz. Hata olursa {} döner."""
+    çekilmez (sadece RSS başlık + açıklama) — paywall siteleri tıkamaz. Hata olursa {} döner.
+
+    max_age_hours: bu yaştan eski makaleler elenir. Hiçbiri kalmazsa
+    {"found": False, "stale": True} döner — çağıran farklı konu denemeli."""
     import xml.etree.ElementTree as ET
     import re
     from urllib.parse import quote
@@ -1206,7 +1302,9 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
     hl = "tr" if lang == "tr" else "en"
     gl = "TR" if lang == "tr" else "US"
     ceid = f"{gl}:{hl}"
-    url = f"https://news.google.com/rss/search?q={quote(query)}&hl={hl}&gl={gl}&ceid={ceid}"
+    # Aramanın kendisini de tazelikle sınırla — filtreye daha az çürük aday gelsin.
+    search_q = _add_recency_filter(query, max(1, int(round(max_age_hours / 24)) or 1))
+    url = f"https://news.google.com/rss/search?q={quote(search_q)}&hl={hl}&gl={gl}&ceid={ceid}"
     try:
         async with httpx.AsyncClient(timeout=8) as client:
             r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -1217,10 +1315,19 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
         if channel is None:
             return {}
         articles, sources = [], []
-        for item in channel.findall("item")[:max_items]:
+        _stale_dropped = 0
+        for item in channel.findall("item"):
+            if len(articles) >= max_items:
+                break
             title = (item.findtext("title") or "").strip()
             desc = re.sub(r"<[^>]+>", "", (item.findtext("description") or "")).strip()
             link = (item.findtext("link") or "").strip()
+            age_h = _rss_age_hours(item.findtext("pubDate") or "")
+            # Yaşı bilinenler eşiğe tabi; ayrıştırılamayanlar geçer (Google bazen
+            # pubDate vermiyor — bu yüzden bilinmeyeni eleyip havuzu kurutmuyoruz).
+            if age_h is not None and age_h > max_age_hours:
+                _stale_dropped += 1
+                continue
             src_el = item.find("source")
             src_name = (src_el.text or "").strip() if src_el is not None else ""
             if not src_name:
@@ -1228,10 +1335,15 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
                 if dc is not None:
                     src_name = (dc.text or "").strip()
             if title:
-                articles.append({"title": title, "desc": desc[:600], "source": src_name, "link": link})
+                articles.append({"title": title, "desc": desc[:600], "source": src_name,
+                                 "link": link, "age_hours": age_h})
                 if src_name and src_name not in sources:
                     sources.append(src_name)
         if not articles:
+            if _stale_dropped:
+                print(f"[haber] '{query[:50]}': {_stale_dropped} makalenin hepsi "
+                      f"{max_age_hours:.0f} saatten eski — konu atlanıyor", flush=True)
+                return {"found": False, "stale": True}
             return {}
 
         # Tam makale metinleri — sadece fetch_full_text=True ise çekilir
@@ -1246,13 +1358,27 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
                     articles[i]["full_text"] = txt
             has_full = any(a.get("full_text") for a in articles)
 
-        context_lines = []
-        for a in articles:
-            header = f"KAYNAK: {a['title']}"
-            if a["source"]:
-                header += f" [{a['source']}]"
-            body = a.get("full_text") or a["desc"]
-            context_lines.append(f"{header}\n{body}")
+        # Olgu havuzuna SADECE gerçek gövde metni olan makaleler girer.
+        # Google News RSS <description>'ı çoğu zaman "Başlık + kaynak adı"
+        # tekrarından ibaret (bkz. trends._clean_rss_desc) — bunun üzerinden
+        # "doğrulanmış olgu" çıkarmak halüsinasyonun ana kaynağıydı.
+        def _hdr(a):
+            return f"KAYNAK: {a['title']}" + (f" [{a['source']}]" if a["source"] else "")
+
+        if fetch_full_text:
+            context_lines = [f"{_hdr(a)}\n{a['full_text']}" for a in articles if a.get("full_text")]
+            thin = [a["source"] or a["title"][:40] for a in articles if not a.get("full_text")]
+            if thin:
+                print(f"[haber] '{query[:50]}': gövde metni açılamayan {len(thin)} kaynak "
+                      f"olgu havuzuna alınmadı ({', '.join(thin[:3])})", flush=True)
+            # Tam metin hiç yoksa RSS özetine düşmek yerine açıkça "zayıf kaynak" bildir.
+            # Çağıran (require_verified_source=True akışı) bunu görüp konuyu atlayacak.
+            if not context_lines:
+                print(f"[haber] '{query[:50]}': hiçbir makalenin gövdesi açılamadı — konu atlanıyor", flush=True)
+                return {"found": False, "no_body": True, "sources": sources}
+        else:
+            # Bilinçli olarak sadece başlık/özet isteyen çağıranlar — eski davranış korunur.
+            context_lines = [f"{_hdr(a)}\n{a['desc']}" for a in articles]
 
         return {
             "found": True,
@@ -1260,6 +1386,8 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
             "sources": sources,
             "context_text": "\n\n---\n\n".join(context_lines),
             "has_full_text": has_full,
+            "freshest_age_hours": min((a["age_hours"] for a in articles
+                                       if a.get("age_hours") is not None), default=None),
         }
     except Exception:
         return {}
@@ -2100,12 +2228,29 @@ Rules:
                 if not gnews_data.get("found"):
                     gnews_data = await fetch_gnews_summary(search_query, lang)
 
+        # ── Kaynak kapısı: doğrulama zorunluysa, kaynaksız üretime izin verilmez ────
+        # Eskiden kaynak bulunamayınca/olgu çıkmayınca üretim sessizce devam ediyor,
+        # model başlığa bakıp eğitim verisinden haber uyduruyordu. Artık durur.
+        _fix_hint = " (Elle üretiyorsan: haberin metnini 'Haber metni' alanına yapıştırıp tekrar dene.)"
+        if require_verified_source:
+            if gnews_data.get("stale"):
+                raise HTTPException(422, "Haber 48 saatten eski — güncel değil, farklı konu denenecek." + _fix_hint)
+            if gnews_data.get("no_body"):
+                raise HTTPException(422, "Hiçbir kaynağın makale metni açılamadı — farklı konu denenecek." + _fix_hint)
+            if not (gnews_data.get("found") and gnews_data.get("context_text")):
+                raise HTTPException(422, "Konu için doğrulanabilir kaynak bulunamadı — farklı konu denenecek." + _fix_hint)
+
         # ── Olgu çıkarma: her iki akışta da çalışır ─────────────────────────────────
-        # Otomatik akışta RSS özeti üzerinde (2-3 cümle bile olsa gerçek olgular çıkar).
-        # Manuel akışta tam makale metni üzerinde çalışır.
+        # Otomatik akışta gerçek makale gövdesi üzerinde çalışır (RSS özeti artık
+        # olgu havuzuna girmiyor). Manuel akışta tam makale metni üzerinde çalışır.
         facts_data = {}
         if gnews_data.get("found") and gnews_data.get("context_text"):
             facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
+
+        # Olgu çıkarılamadıysa senaryo yazacak modele dayanak kalmıyor — dur.
+        if require_verified_source and not facts_data.get("facts"):
+            raise HTTPException(
+                422, "Kaynaktan doğrulanabilir olgu çıkarılamadı — farklı konu denenecek." + _fix_hint)
 
         news_context_instruction = ""
         if facts_data.get("facts"):
@@ -2118,8 +2263,9 @@ Rules:
             numbers_block = ", ".join(facts_data.get("numbers", [])) or "yok"
             dates_block = ", ".join(facts_data.get("dates", [])) or "yok"
             thin_note = (
-                "\nNOT: Kaynak metni kısa, az olgu var. Video 30-40 saniye olabilir — "
-                "listede olmayan HİÇBİR bilgi, rakam, kurum adı ekleme. "
+                "\nNOT: Kaynak metni kısa, az olgu var. BU DURUMDA aşağıdaki "
+                "'45 saniyeden kısa olmasın' kuralı GEÇERSİZDİR — video 30-40 saniye olabilir. "
+                "Listede olmayan HİÇBİR bilgi, rakam, kurum adı ekleme. "
                 "Eksik bilgiyi doldurmaya çalışma; var olan olgularla kısa ve net bir anlatı yap.\n"
                 if not facts_data.get("sufficient") else ""
             )
@@ -2544,19 +2690,37 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 
     # Ses ekle — YouTube + Instagram uyumlu encode
     output_file = OUTPUT_DIR / f"{uid}_shorts.mp4"
+    # ── Temsili görsel uyarısı ────────────────────────────────────────────────
+    # ESKİDEN: 20px, en alt kenarda (y=h-th-16). Telefonda okunmuyordu, üstelik
+    # Instagram'ın kendi arayüzü tam o şeridi kapatıyordu. Sonuç: izleyici stok
+    # fotoğrafı olayın gerçek görüntüsü sanıp "burası Antalya değil, yalan haber"
+    # yorumu yazıyordu.
+    # ŞİMDİ: iki katmanlı — sağ üstte video boyunca duran belirgin bir rozet
+    # (Shorts/Reels arayüzünün kapatmadığı bölge) + altta ayrıntılı satır.
     disclaimer_file = scene_dir / "disclaimer.txt"
     disclaimer_file.write_text(
-        "Gorseller temsilidir. Gercek kisi veya mekanla ilgili degildir.",
+        "Gorseller temsilidir, olayin gercek goruntusu degildir.",
         encoding="utf-8"
     )
-    disclaimer_filter = (
+    badge_file = scene_dir / "temsili_badge.txt"
+    badge_file.write_text("TEMSILI GORSEL", encoding="utf-8")
+
+    _badge_filter = (
+        f"drawtext=textfile={badge_file.absolute()}"
+        f":fontsize=30:fontcolor=white"
+        f":box=1:boxcolor=black@0.72:boxborderw=14"
+        f":x=w-text_w-46:y=190"
+    )
+    _bottom_filter = (
         f"drawtext=textfile={disclaimer_file.absolute()}"
-        f":fontsize=20:fontcolor=white@0.9"
-        f":box=1:boxcolor=black@0.55:boxborderw=6"
-        f":x=(w-text_w)/2:y=h-th-16"
+        f":fontsize=26:fontcolor=white@0.95"
+        f":box=1:boxcolor=black@0.65:boxborderw=8"
+        f":x=(w-text_w)/2:y=h-th-280"
     )
     if font_path:
-        disclaimer_filter += f":fontfile={font_path}"
+        _badge_filter += f":fontfile={font_path}"
+        _bottom_filter += f":fontfile={font_path}"
+    disclaimer_filter = f"{_badge_filter},{_bottom_filter}"
     await arun_ffmpeg([
         "ffmpeg", "-y", "-i", str(slideshow.absolute()), "-i", str(combined_audio.absolute()),
         "-map", "0:v:0", "-map", "1:a:0",
@@ -2820,7 +2984,10 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
 async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content=""):
     global _manual_shorts_lock
     try:
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content)
+        # info_format (Bilgi Shorts) haber değil — kaynak/olgu zorunluluğu uygulanmaz.
+        # Haber shorts'ta doğrulama artık burada da açık: elle üretilen videolarda
+        # halüsinasyon ağı kapalıydı, uydurma kurum/rakam buradan geçiyordu.
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, require_verified_source=not info_format)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -5429,7 +5596,7 @@ async def post_story_to_instagram(video_path: Path, ig_user_id: str, access_toke
         return False, str(e)
 
 
-async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1, description: str = "", thumbnail: str = "", source_text: str = ""):
+async def _verify_reel_published(reel_id: str, title: str, video_path: str, caption: str, ig_cfg: dict, source: str, attempt: int = 1, description: str = "", thumbnail: str = "", source_text: str = "", body: str = ""):
     """Post'tan 5 dk sonra Instagram API ile reel'i doğrular. Bulunamazsa yeniden dener (maks 3)."""
     await asyncio.sleep(300)  # 5 dakika bekle
 
@@ -5484,8 +5651,12 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
                 if rp.status_code == 200:
                     permalink = rp.json().get("permalink", "")
             news_site.add_article(title=title, description=description, thumbnail=thumbnail, ig_permalink=permalink, source=source_text, body=body)
-        except Exception:
-            pass
+            print(f"[haber-sitesi] eklendi: {title[:60]}", flush=True)
+        except Exception as _art_err:
+            # Sessiz yutma yasak: burada 'body' tanımsız olduğu için aylarca
+            # NameError atıp haber sitesine hiçbir makale eklenmemişti, hiçbir
+            # log da düşmemişti. Artık hata görünür.
+            print(f"[haber-sitesi] EKLENEMEDİ ({type(_art_err).__name__}): {_art_err}", flush=True)
         return
 
     # Her iki yöntem de bulamadı — gerçekten yüklenmemiş
@@ -5495,7 +5666,7 @@ async def _verify_reel_published(reel_id: str, title: str, video_path: str, capt
             reel_id2, reel_err = await post_reel_to_instagram(vpath, caption, ig_user_id, ig_token)
             if reel_id2:
                 IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": f"[YENİDEN:{source}] Deneme {attempt + 1}: {title[:60]}"}))
-                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1, description, thumbnail, source_text))
+                asyncio.create_task(_verify_reel_published(reel_id2, title, video_path, caption, ig_cfg, source, attempt + 1, description, thumbnail, source_text, body))
             else:
                 err_msg = reel_err or "Bilinmeyen hata (boş yanıt)"
                 await send_telegram_alert(f"IG Yeniden Deneme [{source}]", f"Deneme {attempt + 1} başarısız: {err_msg}\n{title[:60]}")
@@ -6711,6 +6882,7 @@ async def _generate_ig_roundup(topics: list, api_key: str, lang: str = "tr", voi
                 result = await _generate_shorts_core(
                     topic=topic, api_key=api_key, lang=lang, voice=voice, speed=1.0,
                     platform="instagram", skip_closing_cta=(idx < total),
+                    require_verified_source=True,
                 )
                 clip_file = OUTPUT_DIR / result["video"].split("/")[-1]
                 if clip_file.exists():
@@ -7702,7 +7874,7 @@ async def _post_to_instagram_bg(filename: str, title: str, suggested_tags: str, 
         else:
             ig_log = f"Reels yüklendi, doğrulama bekleniyor: {reel_id}"
             IG_LOG.write_text(json.dumps({"ts": time.time(), "msg": ig_log}))
-            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail, source_text))
+            asyncio.create_task(_verify_reel_published(reel_id, title, str(video_file), caption, ig_cfg, source, 1, description, thumbnail, source_text, body))
             upload_ok = True
             if queue_video_for_live(filename, title):
                 asyncio.create_task(send_telegram_plain(f"📺 Canlı yayın havuzuna eklendi\n🎬 {title[:80]}"))
@@ -9826,6 +9998,22 @@ async def tts_toggle_clone(enabled: bool = Form(...)):
     cfg["use_clone_voice"] = enabled
     IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
     return {"use_clone": enabled}
+
+
+@app.get("/api/tts/engine")
+async def tts_engine_status():
+    """Hangi TTS motoru aktif — Edge (doğal nöral) mi Supertonic mi."""
+    return {"use_edge_tts": get_ig_config().get("use_edge_tts", True)}
+
+
+@app.post("/api/tts/toggle-edge")
+async def tts_toggle_edge(enabled: bool = Form(...)):
+    """Edge TTS'i aç/kapat. Kapatılırsa Supertonic'e döner —
+    Supertonic hiçbir zaman kaldırılmadı, her zaman yedek olarak duruyor."""
+    cfg = get_ig_config()
+    cfg["use_edge_tts"] = enabled
+    IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
+    return {"use_edge_tts": enabled}
 
 
 @app.post("/api/tts/test-clone")
