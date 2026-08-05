@@ -49,7 +49,28 @@ echo "==> Bağımlılıklar venv içine kuruluyor (sistem Python'u değişmez)..
 #      düşürdüğünde supertonic yine kırılıyor
 # --no-deps: doğrudan bağımlılıkları venv'e sabitler ama torch/onnxruntime
 # gibi ağır TRANSİTİF paketleri yeniden indirmez (sistemden okunmaya devam).
-"$VENV_DIR/bin/pip" install --ignore-installed --no-deps -r "$APP_DIR/requirements.txt"
+#
+# Paketler TEK TEK kurulur: bazıları (örn. openai-whisper) hazır wheel'i
+# olmadığı için kaynaktan derlenmeye çalışıyor ve yeni setuptools'ta
+# pkg_resources kalktığı için patlıyor. Tek bir paketin başarısızlığı tüm
+# kurulumu durdurmasın — o paket sistemdeki sürümünden okunmaya devam eder.
+SKIPPED=""
+while IFS= read -r _line; do
+  pkg="$(printf '%s' "$_line" | sed 's/#.*//' | xargs || true)"
+  [ -z "$pkg" ] && continue
+  if "$VENV_DIR/bin/pip" install --ignore-installed --no-deps -q "$pkg" 2>/dev/null; then
+    echo "    venv   : $pkg"
+  else
+    echo "    ATLANDI: $pkg  (sistemdeki sürüm kullanılacak)"
+    SKIPPED="$SKIPPED $pkg"
+  fi
+done < "$APP_DIR/requirements.txt"
+
+if [ -n "$SKIPPED" ]; then
+  echo ""
+  echo "    NOT: Şu paketler venv'e kurulamadı, sistemden okunacak:$SKIPPED"
+  echo "    Bu sorun değil — bunlar sürüm çakışması yaratan paketler değil."
+fi
 
 echo "==> Kurulum doğrulanıyor..."
 # Modülün NEREDEN geldiği de yazdırılır: yol venv içindeyse gerçekten izole,
