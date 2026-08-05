@@ -123,7 +123,10 @@ import re, sys
 path, venv = sys.argv[1], sys.argv[2]
 s = open(path).read()
 
+stripped_any = False
+
 def fix(m):
+    global stripped_any
     line = m.group(0)
     # "ExecStart=" sonrasındaki komutu parçala
     cmd = line.split("=", 1)[1].strip()
@@ -136,11 +139,15 @@ def fix(m):
     while parts:
         p = parts[0]
         if "python" in p or p.endswith("uvicorn"):
-            parts.pop(0)
+            parts.pop(0); stripped_any = True
         elif p == "-m" and len(parts) > 1 and parts[1] == "uvicorn":
-            parts.pop(0); parts.pop(0)
+            parts.pop(0); parts.pop(0); stripped_any = True
         else:
             break
+    if not stripped_any:
+        # Baştaki hiçbir belirteç python/uvicorn değil — bu birim beklediğimiz
+        # biçimde değil. Bozmak yerine olduğu gibi bırak, çağıran hata versin.
+        return line
     # "python -m uvicorn": konsol script'i (.venv/bin/uvicorn) bir sebeple
     # oluşmasa bile çalışır. Doğrudan .venv/bin/uvicorn yazmak 203/EXEC
     # hatasına yol açmıştı.
@@ -148,6 +155,12 @@ def fix(m):
 
 new = re.sub(r"^ExecStart=.*$", fix, s, count=1, flags=re.M)
 if new == s:
+    # İki ihtimal: (a) satır zaten doğru — script daha önce çalışmış veya elle
+    # düzeltilmiş, (b) satır hiç tanınamamış. İkisini ayırt et; (a) hata değil.
+    cur = next((l for l in s.splitlines() if l.startswith("ExecStart=")), "")
+    if f"{venv}/bin/python" in cur and "uvicorn" in cur:
+        print("    zaten güncel — değişiklik gerekmedi")
+        sys.exit(0)
     print("    DEĞİŞMEDİ — ExecStart satırı tanınamadı, elle düzelt", file=sys.stderr)
     sys.exit(1)
 open(path, "w").write(new)
