@@ -1376,18 +1376,26 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
         "a debt' but narration says 'banks collect the debt' — this is an unsupported claim EVEN THOUGH "
         "banks are a plausible-sounding institution for this kind of story), you MUST flag it. Never "
         "assume institutions are interchangeable just because they're topically related.\n\n"
-        "Return ONLY valid JSON, no markdown:\n"
-        '{"unsupported_claims": ["claim text not backed by the facts above", "..."]}\n\n'
-        "IMPORTANT EXCEPTIONS — do NOT flag these even if absent from the facts list:\n"
-        "- Widely known geographic facts (e.g. which city/district something is in, which side of a city, "
-        "country capitals, population ranges, names of rivers/mountains)\n"
-        "- General descriptive context about places or organizations that any informed adult would know\n"
-        "- Background sentences that set the scene without making a new factual claim about the news event\n"
-        "- Standard journalistic framing ('experts say', 'according to reports')\n"
-        "Only flag invented or misattributed SPECIFIC claims about the news event itself (wrong numbers, "
-        "wrong names, wrong institutions doing the action described in this article).\n"
-        "If every specific claim in the narration is backed by the facts list (generic storytelling "
-        "phrasing with no new factual claims is fine), return an empty list."
+        "Return ONLY valid JSON, no markdown. Each flagged claim MUST carry a severity:\n"
+        '{"unsupported_claims": [{"claim": "text", "severity": "high"}, ...]}\n\n'
+        "SEVERITY RULES — this is the most important part of your job:\n\n"
+        '"high" = a FABRICATED or MISATTRIBUTED hard fact about this news event. Only these:\n'
+        "  - a number, amount, percentage or date that contradicts or is absent from the facts\n"
+        "  - a person's name or title that is wrong or invented\n"
+        "  - an institution credited with an action the facts attribute to a DIFFERENT institution\n"
+        "  - a concrete event/outcome that the facts do not state happened at all\n\n"
+        '"low" = everything else. Do NOT let these block the video. Includes:\n'
+        "  - NEGATIVE / ABSENCE statements ('henüz resmi açıklama yapılmadı', 'detaylar paylaşılmadı', "
+        "'soruşturma sürüyor', 'karar bekleniyor') — saying nothing is known yet is never a fabricated fact\n"
+        "  - RESTATEMENTS or summaries of the headline in different words\n"
+        "  - FRAMING and emphasis ('bir ilk', 'tarihi adım', 'dikkat çeken gelişme', 'gündem oldu')\n"
+        "  - widely known geography or common knowledge (which city a district is in, capitals, rivers)\n"
+        "  - background context any informed adult knows, scene-setting with no new claim\n"
+        "  - journalistic framing ('uzmanlara göre', 'iddiaya göre', 'öğrenildi')\n"
+        "  - vague forward-looking language ('önümüzdeki günlerde netleşecek')\n\n"
+        "Be conservative with \"high\". When you are unsure whether something is fabricated or just "
+        "rephrased//generic, choose \"low\". A false \"high\" destroys a correct video; a missed \"low\" "
+        "costs nothing. If nothing is fabricated, return an empty list."
     )
     try:
         resp = await asyncio.to_thread(
@@ -1397,7 +1405,19 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
             temperature=0.0,
         )
         result = _parse_llm_json(resp.choices[0].message.content)
-        return result.get("unsupported_claims", []) or []
+        raw = result.get("unsupported_claims", []) or []
+        # Model bazen düz string listesi dönebiliyor — normalize et.
+        # Seviye belirtilmemişse "low" say: emin olunmayan durum videoyu öldürmesin.
+        out = []
+        for item in raw:
+            if isinstance(item, dict):
+                claim = str(item.get("claim", "")).strip()
+                sev = str(item.get("severity", "low")).strip().lower()
+            else:
+                claim, sev = str(item).strip(), "low"
+            if claim:
+                out.append({"claim": claim, "severity": "high" if sev == "high" else "low"})
+        return out
     except Exception as e:
         print(f"[verify] hata: {e}", flush=True)
         return []
@@ -2228,9 +2248,16 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
         if require_verified_source and facts_data.get("facts"):
             _narration_text = " ".join(s.get("text", "") for s in scenes)
             _unsupported = await _verify_narration_facts(client, _narration_text, facts_data)
-            if _unsupported:
-                _claims_str = " | ".join(_unsupported[:3])
-                print(f"[verify] DESTEKLENMEYEN İDDİA ({len(_unsupported)} adet): {_claims_str}", flush=True)
+            # Sadece "high" seviye (uydurma sayı/isim/kurum/olay) videoyu iptal eder.
+            # "low" (yokluk bildirimi, çerçeveleme, başlığın yeniden ifadesi) sadece loglanır —
+            # bunlar için video iptal edilirse günde 5 haber yerine 1 haber üretilir hale geliyordu.
+            _hard = [c["claim"] for c in _unsupported if c["severity"] == "high"]
+            _soft = [c["claim"] for c in _unsupported if c["severity"] != "high"]
+            if _soft:
+                print(f"[verify] hafif uyarı ({len(_soft)} adet, iptal yok): {' | '.join(_soft[:3])[:200]}", flush=True)
+            if _hard:
+                _claims_str = " | ".join(_hard[:3])
+                print(f"[verify] DESTEKLENMEYEN İDDİA ({len(_hard)} adet): {_claims_str}", flush=True)
                 raise HTTPException(
                     422,
                     f"Senaryo kaynakta olmayan iddia içeriyor: {_claims_str[:300]} — farklı konu denenecek.",
