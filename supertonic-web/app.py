@@ -6077,6 +6077,17 @@ VERIFIER_FILE = Path("yt_verifier.txt")
 VERIFIER_FILE_EN = Path("yt_verifier_en.txt")
 
 
+def _external_redirect_uri(request: Request, path: str) -> str:
+    """redirect_uri'yi her zaman https ile kurar (localhost hariç).
+
+    Nginx arkasında X-Forwarded-Proto iletilmediğinde/uvicorn buna
+    güvenmediğinde request.base_url http:// döner — Google Cloud'da kayıtlı
+    https:// URI ile eşleşmeyip redirect_uri_mismatch'e yol açıyordu."""
+    host = request.headers.get("host") or request.url.hostname or ""
+    scheme = "http" if request.url.hostname in ("localhost", "127.0.0.1") else "https"
+    return f"{scheme}://{host}{path}"
+
+
 def _build_flow(cfg, redirect_uri):
     from google_auth_oauthlib.flow import Flow
     return Flow.from_client_config(
@@ -6095,7 +6106,7 @@ async def youtube_auth(request: Request):
     cfg = load_yt_config()
     if not cfg:
         raise HTTPException(400, "Önce client_id ve client_secret girin")
-    redirect_uri = str(request.base_url) + "auth/youtube/callback"
+    redirect_uri = _external_redirect_uri(request, "/auth/youtube/callback")
     print(f"[LIVE] /auth/youtube redirect_uri = {redirect_uri}", flush=True)
     flow = _build_flow(cfg, redirect_uri)
 
@@ -6117,7 +6128,7 @@ async def youtube_auth(request: Request):
 @app.get("/auth/youtube/callback")
 async def youtube_callback(request: Request, code: str):
     cfg = load_yt_config()
-    redirect_uri = str(request.base_url) + "auth/youtube/callback"
+    redirect_uri = _external_redirect_uri(request, "/auth/youtube/callback")
     flow = _build_flow(cfg, redirect_uri)
     code_verifier = VERIFIER_FILE.read_text() if VERIFIER_FILE.exists() else None
     flow.fetch_token(code=code, code_verifier=code_verifier)
@@ -6131,7 +6142,7 @@ async def youtube_auth_en(request: Request):
     cfg = load_yt_config()
     if not cfg:
         raise HTTPException(400, "Önce client_id ve client_secret girin")
-    redirect_uri = str(request.base_url) + "auth/youtube/en/callback"
+    redirect_uri = _external_redirect_uri(request, "/auth/youtube/en/callback")
     flow = _build_flow(cfg, redirect_uri)
     code_verifier = secrets.token_urlsafe(64)
     code_challenge = base64.urlsafe_b64encode(
@@ -6150,7 +6161,7 @@ async def youtube_auth_en(request: Request):
 @app.get("/auth/youtube/en/callback")
 async def youtube_callback_en(request: Request, code: str):
     cfg = load_yt_config()
-    redirect_uri = str(request.base_url) + "auth/youtube/en/callback"
+    redirect_uri = _external_redirect_uri(request, "/auth/youtube/en/callback")
     flow = _build_flow(cfg, redirect_uri)
     code_verifier = VERIFIER_FILE_EN.read_text() if VERIFIER_FILE_EN.exists() else None
     flow.fetch_token(code=code, code_verifier=code_verifier)
