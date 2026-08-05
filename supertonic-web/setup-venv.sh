@@ -41,21 +41,43 @@ fi
 
 echo "==> Bağımlılıklar venv içine kuruluyor (sistem Python'u değişmez)..."
 "$VENV_DIR/bin/pip" install --upgrade pip -q
-"$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements.txt"
+
+# --ignore-installed: --system-site-packages yüzünden pip, paketi sistemde
+# görünce venv'e HİÇ kurmuyor. Bu iki soruna yol açıyor:
+#   1) Konsol script'i (.venv/bin/uvicorn) oluşmuyor -> systemd 203/EXEC
+#   2) İzolasyon kağıt üzerinde kalıyor; başka bir proje sistemdeki httpx'i
+#      düşürdüğünde supertonic yine kırılıyor
+# --no-deps: doğrudan bağımlılıkları venv'e sabitler ama torch/onnxruntime
+# gibi ağır TRANSİTİF paketleri yeniden indirmez (sistemden okunmaya devam).
+"$VENV_DIR/bin/pip" install --ignore-installed --no-deps -r "$APP_DIR/requirements.txt"
 
 echo "==> Kurulum doğrulanıyor..."
-"$VENV_DIR/bin/python" - <<'PY'
+# Modülün NEREDEN geldiği de yazdırılır: yol venv içindeyse gerçekten izole,
+# /usr/... ise sistemden okunuyor demektir.
+"$VENV_DIR/bin/python" - "$VENV_DIR" <<'PY'
 import sys
+venv = sys.argv[1]
 print(f"    python : {sys.executable}")
 mods = ["fastapi", "uvicorn", "httpx", "openai", "edge_tts", "whisper", "supertonic"]
 for m in mods:
     try:
         mod = __import__(m)
         v = getattr(mod, "__version__", "?")
-        print(f"    ok     : {m} {v}")
+        loc = getattr(mod, "__file__", "") or ""
+        where = "venv" if loc.startswith(venv) else "SİSTEM"
+        print(f"    ok     : {m:12} {v:12} [{where}]")
     except Exception as e:
         print(f"    EKSİK  : {m} -> {type(e).__name__}: {e}")
 PY
+
+# app.py gerçekten yüklenebiliyor mu? Servisi yeniden başlatmadan ÖNCE dene —
+# yoksa systemd sonsuz auto-restart döngüsüne giriyor.
+echo "==> Uygulama import testi..."
+if ! (cd "$APP_DIR" && "$VENV_DIR/bin/python" -c "import uvicorn, app" 2>&1 | tail -20); then
+  echo "HATA: app.py venv içinde import edilemedi — servis güncellenmedi." >&2
+  exit 1
+fi
+echo "    ok"
 
 if [ ! -f "$SERVICE_FILE" ]; then
   echo ""
@@ -98,7 +120,10 @@ def fix(m):
             parts.pop(0); parts.pop(0)
         else:
             break
-    return f"ExecStart={venv}/bin/uvicorn " + " ".join(parts)
+    # "python -m uvicorn": konsol script'i (.venv/bin/uvicorn) bir sebeple
+    # oluşmasa bile çalışır. Doğrudan .venv/bin/uvicorn yazmak 203/EXEC
+    # hatasına yol açmıştı.
+    return f"ExecStart={venv}/bin/python -m uvicorn " + " ".join(parts)
 
 new = re.sub(r"^ExecStart=.*$", fix, s, count=1, flags=re.M)
 if new == s:
