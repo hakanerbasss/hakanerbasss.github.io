@@ -6096,6 +6096,7 @@ async def youtube_auth(request: Request):
     if not cfg:
         raise HTTPException(400, "Önce client_id ve client_secret girin")
     redirect_uri = str(request.base_url) + "auth/youtube/callback"
+    print(f"[LIVE] /auth/youtube redirect_uri = {redirect_uri}", flush=True)
     flow = _build_flow(cfg, redirect_uri)
 
     code_verifier = secrets.token_urlsafe(64)
