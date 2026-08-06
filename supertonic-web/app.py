@@ -1076,13 +1076,20 @@ async def synthesize(
     # Edge hata verirse fark edilmeden Supertonic'e düşülür (doğru davranış,
     # video üretimini durdurmaz), ama bu ayrım test ederken "Ahmet/Emel gerçekten
     # Edge mi yoksa aslında Supertonic mi çalıyor?" sorusunu görünmez kılıyordu.
-    # Burada Edge başarısız olursa gerçek hata mesajıyla 502 dönüyoruz.
+    # Burada Edge başarısız olursa gerçek hata mesajıyla dönüyoruz.
+    #
+    # ÖNEMLİ: 502/503/504 KULLANMA — Cloudflare, origin'den 5xx "gateway" kodu
+    # görünce kendi markalı hata sayfasını devreye sokup bizim gerçek JSON hata
+    # mesajımızı (asıl sebebi) tamamen gizliyor. Bu yüzden "Edge TTS başarısız"
+    # hatası kullanıcıya hep aynı anlamsız Cloudflare HTML sayfası olarak
+    # görünüyordu, gerçek sebep (zaman aşımı/bağlantı reddi/vs.) hiç ulaşmıyordu.
+    # 400 (istemci hatası sınıfı) Cloudflare tarafından olduğu gibi geçiriliyor.
     if voice in EDGE_VOICES:
         try:
             dur = await _synth_edge(text, voice, speed, out_file)
             return {"file": f"/api/audio/{out_file.name}", "duration": round(float(dur), 2), "engine": "edge"}
         except Exception as e:
-            raise HTTPException(502, f"Edge TTS başarısız: {type(e).__name__}: {e}")
+            raise HTTPException(400, f"Edge TTS başarısız: {type(e).__name__}: {e}")
 
     tts = get_tts()
     style = tts.get_voice_style(voice_name=voice)
