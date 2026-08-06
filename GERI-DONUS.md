@@ -29,6 +29,19 @@ systemctl restart tts
 
 ## Noktalar
 
+### `893ff66` — arayüz yeniden düzenlemesi TAMAMLANDI
+**Tarih:** 06.08.2026
+**Durum:** Arayüz 6096 → 4857 satır. 5 adımın hepsi bitti.
+
+- Açık/karanlık tema (header'daki 🌙 düğmesi)
+- Alt nav: Short Üret / Instagram / Canlı Yayın / Analitik YT / Daha Fazla
+- Ayarlar header'daki ⚙ düğmesinde, sadece 4 gerçek ayar bölümü kaldı
+- Silinen sekmeler: Trend Haber LV, Bilgi Shorts, Komik Haber,
+  Çeviri+Seslendir, Video Seslendirme, Uzun Video
+- Kapatılan zamanlayıcılar (app.py startup): `_rebuild_tnlv_scheduler`,
+  `_rebuild_lv_scheduler`, `_rebuild_lv_en_scheduler` — geri istenirse
+  yorum satırlarını açmak yeterli, kodları duruyor.
+
 ### `97e1b7a` — arayüz yeniden düzenlemesi ÖNCESİ son çalışan sürüm
 **Tarih:** 06.08.2026
 **Durum:** Bilinen-çalışan. Arayüz karışık ama tüm özellikler işliyor.
