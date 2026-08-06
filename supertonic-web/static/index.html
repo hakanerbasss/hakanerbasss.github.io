@@ -1038,6 +1038,145 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Otomatik üretim ────────────────────────────────────────────────
+       Eskiden Ayarlar akordiyonundaydı; elle üretimle aynı özelliğin iki
+       parçası olduğu için buraya taşındı. -->
+  <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--c-2a2a2a);">
+    <h3 style="font-size:15px;margin-bottom:4px;">⏰ Otomatik Üretim</h3>
+    <p style="color:var(--c-666666);font-size:12px;margin-bottom:16px;">
+      Belirlediğin saatlerde kendi kendine short üretip yükler.
+    </p>
+
+    <details style="margin-bottom:12px;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:10px;padding:12px 14px;">
+      <summary style="cursor:pointer;font-size:14px;color:var(--c-e0e0e0);font-weight:600;">⚡ TR Otomatik Short</summary>
+      <div style="margin-top:14px;">
+        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">Belirlenen saatlerde trend haberden Short üretip YouTube'a yükler</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
+            <input type="checkbox" id="sched-enabled" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveScheduler()">
+            Otomatik yayını etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:var(--c-555555);font-size:11px;">(virgülle ayır — örn: 09:22,14:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="sched-times-mon" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="sched-times-tue" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="sched-times-wed" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="sched-times-thu" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="sched-times-fri" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="sched-times-sat" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="sched-times-sun" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="field">
+            <label>Seslendirme Dili</label>
+            <select id="sched-lang" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="tr" selected>Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ses</label>
+            <select id="sched-voice" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
+              <option value="E-Emel" selected>Emel — doğal (Edge)</option>
+              <option value="E-Ahmet">Ahmet — doğal (Edge)</option>
+              <option value="F1">F1 (Kadın · Supertonic)</option>
+              <option value="F2">F2 (Kadın · Supertonic)</option>
+              <option value="F3">F3 (Kadın · Supertonic)</option>
+              <option value="M1">M1 (Erkek · Supertonic)</option>
+              <option value="M2">M2 (Erkek · Supertonic)</option>
+              <option value="M3">M3 (Erkek · Supertonic)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runNow()" id="btn-run-now" style="background:var(--c-1a3a1a);font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="sched-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="sched-next" style="color:var(--c-888888);"></div>
+          <div id="sched-last-status"></div>
+          <div id="sched-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
+          <div id="sched-last-url"></div>
+        </div>
+      </div>
+    </details>
+
+    <details style="background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:10px;padding:12px 14px;">
+      <summary style="cursor:pointer;font-size:14px;color:var(--c-e0e0e0);font-weight:600;">⚡ EN Otomatik Short</summary>
+      <div style="margin-top:14px;">
+        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">İngilizce kanalına otomatik trend haberden Short üretip yükler (ABD trendleri)</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
+            <input type="checkbox" id="en-shorts-sched-enabled" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveENShortsScheduler()">
+            EN otomatik shortu etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:var(--c-555555);font-size:11px;">(virgülle ayır — örn: 10:22,15:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="en-shorts-times-mon" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="en-shorts-times-tue" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="en-shorts-times-wed" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="en-shorts-times-thu" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="en-shorts-times-fri" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="en-shorts-times-sat" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="en-shorts-times-sun" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Ses</label>
+          <select id="en-shorts-sched-voice" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
+            <option value="E-Ahmet" selected>Ahmet — doğal (Edge)</option>
+            <option value="E-Emel">Emel — doğal (Edge)</option>
+            <option value="M1">M1 (Erkek · Supertonic)</option>
+            <option value="M2">M2 (Erkek · Supertonic)</option>
+            <option value="M3">M3 (Erkek · Supertonic)</option>
+            <option value="F1">F1 (Kadın · Supertonic)</option>
+            <option value="F2">F2 (Kadın · Supertonic)</option>
+            <option value="F3">F3 (Kadın · Supertonic)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
+            <input type="checkbox" id="en-shorts-ig-enabled" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveENShortsScheduler()">
+            Instagram'a da paylaş
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveENShortsScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runENShortsNow()" id="btn-en-shorts-run-now" style="background:var(--c-1a1a3a);font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-en-shorts-run-now"></div>Şimdi Çalıştır
+          </button>
+        </div>
+        <div id="en-shorts-sched-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="en-shorts-sched-next" style="color:var(--c-888888);"></div>
+          <div id="en-shorts-sched-last-status"></div>
+          <div id="en-shorts-sched-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
+          <div id="en-shorts-sched-last-url"></div>
+        </div>
+    <!-- 6. TR Instagram-Only -->
+    <!-- Ayar fonksiyonlarının ortak hata alanı (savePexelsConfig, saveYTConfig,
+         saveDSConfig, saveScheduler, saveLVScheduler, runNow, runLVNow).
+         Eskiden Instagram akordiyonunun içindeydi; o blok kendi sekmesine
+         taşınınca burada kaldı, yoksa ayar hataları gizli sekmeye yazılıp
+         görünmez oluyordu. -->
+    <div class="error" id="err-cfg" style="margin:10px 16px 0;"></div>
+    <!-- Instagram otomatiği artık kendi sekmesinde (alt menü: 📸 Instagram).
+         Buradaki akordiyon kaldırıldı; kimlik bilgileri aşağıdaki
+         "Instagram API" bölümünde kalmaya devam ediyor. -->
+      </div>
+    </details>
+  </div>
 </div>
 <div class="panel" id="tab-analytics">
   <!-- Başlık + filtreler -->
@@ -1219,143 +1358,8 @@
     </div>
 
     <!-- 1. TR Otomatik Short -->
-    <div class="acc-item" id="acc-tr-short">
-      <div class="acc-header" onclick="toggleAcc('tr-short')">
-        <span class="acc-title">⚡ TR Otomatik Short</span>
-        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-short"></span><span class="acc-chevron" id="acc-chev-tr-short">›</span></span>
-      </div>
-      <div class="acc-body" id="acc-body-tr-short">
-        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">Belirlenen saatlerde trend haberden Short üretip YouTube'a yükler</p>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
-            <input type="checkbox" id="sched-enabled" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveScheduler()">
-            Otomatik yayını etkinleştir
-          </label>
-        </div>
-        <div class="field" style="margin-bottom:12px;">
-          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:var(--c-555555);font-size:11px;">(virgülle ayır — örn: 09:22,14:38)</span></label>
-          <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="sched-times-mon" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="sched-times-tue" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="sched-times-wed" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="sched-times-thu" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="sched-times-fri" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="sched-times-sat" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="sched-times-sun" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-          </table>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-          <div class="field">
-            <label>Seslendirme Dili</label>
-            <select id="sched-lang" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
-              <option value="tr" selected>Türkçe</option>
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-              <option value="fr">Français</option>
-              <option value="es">Español</option>
-              <option value="ar">العربية</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Ses</label>
-            <select id="sched-voice" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
-              <option value="E-Emel" selected>Emel — doğal (Edge)</option>
-              <option value="E-Ahmet">Ahmet — doğal (Edge)</option>
-              <option value="F1">F1 (Kadın · Supertonic)</option>
-              <option value="F2">F2 (Kadın · Supertonic)</option>
-              <option value="F3">F3 (Kadın · Supertonic)</option>
-              <option value="M1">M1 (Erkek · Supertonic)</option>
-              <option value="M2">M2 (Erkek · Supertonic)</option>
-              <option value="M3">M3 (Erkek · Supertonic)</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-          <button onclick="saveScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-          <button onclick="runNow()" id="btn-run-now" style="background:var(--c-1a3a1a);font-size:12px;padding:8px 16px;">
-            <div class="spinner" id="spin-run-now"></div>Şimdi Çalıştır
-          </button>
-        </div>
-        <div id="sched-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
-          <div id="sched-next" style="color:var(--c-888888);"></div>
-          <div id="sched-last-status"></div>
-          <div id="sched-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
-          <div id="sched-last-url"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 5. EN Short -->
-    <div class="acc-item" id="acc-en-short">
-      <div class="acc-header" onclick="toggleAcc('en-short')">
-        <span class="acc-title">⚡ EN Otomatik Short</span>
-        <span class="acc-right"><span class="acc-badge" id="acc-badge-en-short"></span><span class="acc-chevron" id="acc-chev-en-short">›</span></span>
-      </div>
-      <div class="acc-body" id="acc-body-en-short">
-        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">İngilizce kanalına otomatik trend haberden Short üretip yükler (ABD trendleri)</p>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
-            <input type="checkbox" id="en-shorts-sched-enabled" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveENShortsScheduler()">
-            EN otomatik shortu etkinleştir
-          </label>
-        </div>
-        <div class="field" style="margin-bottom:12px;">
-          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:var(--c-555555);font-size:11px;">(virgülle ayır — örn: 10:22,15:38)</span></label>
-          <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="en-shorts-times-mon" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="en-shorts-times-tue" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="en-shorts-times-wed" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="en-shorts-times-thu" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="en-shorts-times-fri" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="en-shorts-times-sat" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="en-shorts-times-sun" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-          </table>
-        </div>
-        <div class="field" style="margin-bottom:14px;">
-          <label>Ses</label>
-          <select id="en-shorts-sched-voice" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
-            <option value="E-Ahmet" selected>Ahmet — doğal (Edge)</option>
-            <option value="E-Emel">Emel — doğal (Edge)</option>
-            <option value="M1">M1 (Erkek · Supertonic)</option>
-            <option value="M2">M2 (Erkek · Supertonic)</option>
-            <option value="M3">M3 (Erkek · Supertonic)</option>
-            <option value="F1">F1 (Kadın · Supertonic)</option>
-            <option value="F2">F2 (Kadın · Supertonic)</option>
-            <option value="F3">F3 (Kadın · Supertonic)</option>
-          </select>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
-            <input type="checkbox" id="en-shorts-ig-enabled" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveENShortsScheduler()">
-            Instagram'a da paylaş
-          </label>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-          <button onclick="saveENShortsScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-          <button onclick="runENShortsNow()" id="btn-en-shorts-run-now" style="background:var(--c-1a1a3a);font-size:12px;padding:8px 16px;">
-            <div class="spinner" id="spin-en-shorts-run-now"></div>Şimdi Çalıştır
-          </button>
-        </div>
-        <div id="en-shorts-sched-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
-          <div id="en-shorts-sched-next" style="color:var(--c-888888);"></div>
-          <div id="en-shorts-sched-last-status"></div>
-          <div id="en-shorts-sched-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
-          <div id="en-shorts-sched-last-url"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 6. TR Instagram-Only -->
-    <!-- Ayar fonksiyonlarının ortak hata alanı (savePexelsConfig, saveYTConfig,
-         saveDSConfig, saveScheduler, saveLVScheduler, runNow, runLVNow).
-         Eskiden Instagram akordiyonunun içindeydi; o blok kendi sekmesine
-         taşınınca burada kaldı, yoksa ayar hataları gizli sekmeye yazılıp
-         görünmez oluyordu. -->
-    <div class="error" id="err-cfg" style="margin:10px 16px 0;"></div>
-
-    <!-- Instagram otomatiği artık kendi sekmesinde (alt menü: 📸 Instagram).
-         Buradaki akordiyon kaldırıldı; kimlik bilgileri aşağıdaki
-         "Instagram API" bölümünde kalmaya devam ediyor. -->
+    <!-- Otomatik Short zamanlayıcıları artık "Short Üret" sekmesinin
+         altında (elle üretimle aynı yerde). -->
 
     <!-- 7. Instagram API -->
     <div class="acc-item" id="acc-ig-api">
@@ -1717,6 +1721,11 @@ const BNAV_DIRECT = { shorts: 'bnav-shorts', instagram: 'bnav-instagram', live: 
 // çağırıyordu. Kendi sekmesine taşındığı için artık sekme açılınca çalışıyor.
 // ── Canlı Yayın sekmesi ─────────────────────────────────────────────────
 // Eskiden Ayarlar akordiyonundaydı; yükleyicileri openSettings() çağırıyordu.
+function loadShortsTab() {
+  loadSchedulerStatus();
+  loadENShortsSchedulerStatus();
+}
+
 function loadLiveTab() {
   loadLiveConfig();
   refreshLiveStatus();
@@ -1737,6 +1746,7 @@ function switchTab(name) {
   if (name === 'iganalytics') loadIGAnalytics();
   if (name === 'instagram') loadInstagramTab();
   if (name === 'live') loadLiveTab();
+  if (name === 'shorts') loadShortsTab();
   if (name === 'prompt') loadPromptPreview();
 }
 
@@ -1885,7 +1895,7 @@ async function checkYTStatus() {
   } catch(e) {}
 }
 
-const _ACC_IDS = ['tr-short','en-short','ig-api','api-keys','sistem'];
+const _ACC_IDS = ['ig-api','api-keys','sistem'];
 
 function toggleAcc(id) {
   const body = document.getElementById('acc-body-' + id);
@@ -1935,8 +1945,6 @@ async function openSettings() {
       document.getElementById('ds-input-state').style.display = 'none';
     }
   } catch(e) {}
-  loadSchedulerStatus();
-  loadENShortsSchedulerStatus();
   loadTelegramConfig();
   checkOpenAIStatus();
   checkInstagramStatus();
@@ -3744,6 +3752,7 @@ async function runNow() {
 
 _syncThemeIcon();
 loadMeta();
+loadShortsTab();
 if (new URLSearchParams(window.location.search).get('yt') === 'ok') {
   switchTab('shorts');
   checkYTStatus();
