@@ -672,12 +672,7 @@
 <div class="more-backdrop" id="more-backdrop" onclick="closeMoreMenu()"></div>
 <div class="more-menu" id="more-menu">
   <div class="more-item" id="more-item-text" onclick="selectMoreTab('text')">Metin → Ses</div>
-  <div class="more-item" id="more-item-video" onclick="selectMoreTab('video')">Video Seslendirme</div>
-  <div class="more-item" id="more-item-translate" onclick="selectMoreTab('translate')">Çeviri + Seslendir</div>
   <div class="more-item" id="more-item-longvideo" onclick="selectMoreTab('longvideo')">Uzun Video</div>
-  <div class="more-item" id="more-item-tnlv" onclick="selectMoreTab('tnlv')">Trend Haber LV</div>
-  <div class="more-item" id="more-item-comedy" onclick="selectMoreTab('comedy')">📰 Komik Haber</div>
-  <div class="more-item" id="more-item-infoshorts" onclick="selectMoreTab('infoshorts')">💡 Bilgi Shorts</div>
   <div class="more-item" id="more-item-iganalytics" onclick="selectMoreTab('iganalytics')">📸 Instagram Analitik</div>
   <div class="more-item" id="more-item-prompt" onclick="selectMoreTab('prompt')">🤖 Prompt</div>
 </div>
@@ -739,115 +734,6 @@
     <a id="dl-synth" class="dl-btn" download="ses.wav">İndir</a>
   </div>
 </div>
-
-<!-- VIDEO VOICING -->
-<div class="panel" id="tab-video">
-  <div class="field">
-    <label>Video Yükle</label>
-    <div class="upload-area" id="drop-zone" onclick="document.getElementById('video-file').click()"
-      ondragover="event.preventDefault();this.classList.add('drag')"
-      ondragleave="this.classList.remove('drag')"
-      ondrop="handleDrop(event)">
-      <strong>Tıkla veya sürükle bırak</strong>
-      <p>MP4, MOV, AVI, MKV, WEBM</p>
-      <div id="file-badge"></div>
-    </div>
-    <input type="file" id="video-file" accept="video/*" style="display:none" onchange="showFilename(this)">
-  </div>
-
-  <div class="controls">
-    <div class="field">
-      <label>Hedef Dil</label>
-      <select id="vid-lang"></select>
-    </div>
-    <div class="field">
-      <label>Ses</label>
-      <select id="vid-voice"></select>
-    </div>
-    <div class="field">
-      <label>Hız: <span id="speed-val-2">1.0</span>x</label>
-      <div class="speed-row">
-        <input type="range" id="vid-speed" min="0.5" max="2.0" step="0.05" value="1.0"
-          oninput="document.getElementById('speed-val-2').textContent = parseFloat(this.value).toFixed(2)">
-      </div>
-    </div>
-  </div>
-
-  <div class="field">
-    <label>Çeviri (opsiyonel — boş bırakırsan orijinal dilde seslendirir)</label>
-    <select id="vid-translate">
-      <option value="">Çeviri yapma</option>
-    </select>
-  </div>
-
-  <button onclick="voiceVideo()" id="btn-video">
-    <div class="spinner" id="spin-video"></div>
-    Seslendir
-  </button>
-
-  <div class="error" id="err-video"></div>
-
-  <div class="result" id="result-video">
-    <p>Transkript</p>
-    <div class="transcript" id="video-transcript"></div>
-    <p style="margin-top:16px">Seslendirilmiş Video</p>
-    <video id="video-out" controls></video>
-    <a id="dl-video" class="dl-btn" download="video.mp4">İndir</a>
-  </div>
-</div>
-
-<!-- TRANSLATE + TTS -->
-<div class="panel" id="tab-translate">
-  <div class="field">
-    <label>Kaynak Metin</label>
-    <textarea id="tr-text" placeholder="Çevrilecek metni girin..."></textarea>
-  </div>
-
-  <div class="translate-row">
-    <div class="field">
-      <label>Kaynak Dil</label>
-      <select id="tr-source">
-        <option value="auto">Otomatik Algıla</option>
-      </select>
-    </div>
-    <div class="arrow">→</div>
-    <div class="field">
-      <label>Hedef Dil</label>
-      <select id="tr-target"></select>
-    </div>
-  </div>
-
-  <div class="controls">
-    <div class="field">
-      <label>Ses</label>
-      <select id="tr-voice"></select>
-    </div>
-    <div class="field" style="grid-column: span 2">
-      <label>Hız: <span id="speed-val-3">1.0</span>x</label>
-      <div class="speed-row">
-        <input type="range" id="tr-speed" min="0.5" max="2.0" step="0.05" value="1.0"
-          oninput="document.getElementById('speed-val-3').textContent = parseFloat(this.value).toFixed(2)">
-      </div>
-    </div>
-  </div>
-
-  <button onclick="translateAndSynth()" id="btn-tr">
-    <div class="spinner" id="spin-tr"></div>
-    Çevir ve Seslendir
-  </button>
-
-  <div class="error" id="err-tr"></div>
-
-  <div class="result" id="result-tr">
-    <p>Çeviri</p>
-    <div class="transcript" id="tr-translated"></div>
-    <p style="margin-top:16px">Oluşturulan ses</p>
-    <audio id="audio-tr" controls></audio>
-    <a id="dl-tr" class="dl-btn" download="ceviri.wav">İndir</a>
-  </div>
-</div>
-
-<!-- SHORTS -->
 <div class="panel active" id="tab-shorts">
 
   <div class="field">
@@ -1312,107 +1198,6 @@
     </div>
   </div>
 </div>
-
-<div class="panel" id="tab-tnlv">
-
-  <p style="color:var(--c-888888);font-size:13px;margin-bottom:20px;">Günün trend haberlerini otomatik olarak çekip tüm konuları kapsayan bir uzun video üretir.</p>
-
-  <div class="controls">
-    <div class="field">
-      <label>Dil</label>
-      <select id="tnlv-lang"></select>
-    </div>
-    <div class="field">
-      <label>Ses</label>
-      <select id="tnlv-voice"></select>
-    </div>
-    <div class="field">
-      <label>Hız: <span id="speed-val-tnlv">1.0</span>x</label>
-      <input type="range" id="tnlv-speed" min="0.5" max="2.0" step="0.05" value="1.0"
-        oninput="document.getElementById('speed-val-tnlv').textContent = parseFloat(this.value).toFixed(2)">
-    </div>
-  </div>
-
-  <div class="field">
-    <label>DeepSeek API Key</label>
-    <div id="tnlv-apikey-status" style="font-size:13px;padding:10px 12px;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-888888);">
-      Kontrol ediliyor...
-    </div>
-  </div>
-
-  <button onclick="generateTrendLongVideo()" id="btn-tnlv">
-    <div class="spinner" id="spin-tnlv"></div>
-    Trend Video Üret
-  </button>
-
-  <div class="error" id="err-tnlv"></div>
-
-  <div class="result" id="result-tnlv">
-    <p>Başlık</p>
-    <div class="transcript" id="tnlv-title-out" style="font-size:16px;font-weight:600;color:var(--c-ffffff);"></div>
-    <p style="margin-top:8px;font-size:12px;color:var(--c-666666);" id="tnlv-topics-out"></p>
-    <p style="margin-top:12px">Video</p>
-    <video id="tnlv-video" controls style="width:100%;margin-top:8px;border-radius:6px;"></video>
-    <a id="dl-tnlv" class="dl-btn" download="trend-haber-video.mp4">İndir</a>
-    <p style="margin-top:12px;font-size:12px;color:var(--c-666666);" id="tnlv-duration-out"></p>
-
-    <div id="tnlv-thumb-wrap" style="display:none;margin-top:16px;">
-      <p>Kapak Fotoğrafı</p>
-      <img id="tnlv-thumb" style="max-width:320px;border-radius:8px;margin-top:8px;display:block;border:1px solid var(--c-333333);">
-      <a id="dl-tnlv-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
-    </div>
-
-    <div id="tnlv-yt-upload-section" style="display:none;margin-top:24px;border-top:1px solid var(--c-222222);padding-top:20px;">
-      <p style="margin-bottom:16px;color:var(--c-ffffff);font-size:14px;">YouTube'a Yükle</p>
-      <div id="tnlv-yt-not-linked" style="display:none;">
-        <p style="font-size:13px;color:var(--c-888888);margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
-        <button onclick="window.location='/auth/youtube'" style="background:var(--c-cc0000);">Google ile Bağlan</button>
-      </div>
-      <div id="tnlv-yt-linked" style="display:none;">
-        <div class="field">
-          <label>Başlık</label>
-          <input type="text" id="tnlv-yt-title" placeholder="Video başlığı..." style="width:100%;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-e0e0e0);font-size:14px;padding:12px;outline:none;">
-        </div>
-        <div class="field" style="margin-top:12px;">
-          <label>Açıklama</label>
-          <textarea id="tnlv-yt-desc" placeholder="Video açıklaması..." style="min-height:80px;"></textarea>
-        </div>
-        <div class="field" style="margin-top:12px;">
-          <label>Etiketler (virgülle ayır, # gerekmez)</label>
-          <input type="text" id="tnlv-yt-tags" placeholder="gündem, haberler, trendler" style="width:100%;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-e0e0e0);font-size:14px;padding:12px;outline:none;">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
-          <div class="field">
-            <label>Gizlilik</label>
-            <select id="tnlv-yt-privacy">
-              <option value="public">Herkese Açık</option>
-              <option value="unlisted">Listelenmemiş</option>
-              <option value="private">Gizli</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Kategori</label>
-            <select id="tnlv-yt-category">
-              <option value="25" selected>Haberler & Politika</option>
-              <option value="27">Eğitim</option>
-              <option value="28">Bilim & Teknoloji</option>
-              <option value="22">İnsanlar & Bloglar</option>
-            </select>
-          </div>
-        </div>
-        <button onclick="uploadTNLVToYouTube()" id="btn-tnlv-yt-upload" style="margin-top:16px;background:var(--c-cc0000);">
-          <div class="spinner" id="spin-tnlv-yt"></div>
-          YouTube'a Yükle
-        </button>
-        <div class="error" id="err-tnlv-yt"></div>
-        <div id="tnlv-yt-success" style="display:none;margin-top:12px;background:var(--c-0a1f0a);border:1px solid var(--c-1a5a1a);color:var(--c-4ade80);padding:12px 16px;border-radius:8px;font-size:13px;">
-          Yüklendi! → <a id="tnlv-yt-link" href="#" target="_blank" style="color:var(--c-4ade80);"></a>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="panel" id="tab-analytics">
   <!-- Başlık + filtreler -->
   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
@@ -1726,64 +1511,6 @@
           <div id="lv-sched-last-status"></div>
           <div id="lv-sched-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
           <div id="lv-sched-last-url"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. Trend Haber LV -->
-    <div class="acc-item" id="acc-tr-tnlv">
-      <div class="acc-header" onclick="toggleAcc('tr-tnlv')">
-        <span class="acc-title">📰 Trend Haber LV</span>
-        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-tnlv"></span><span class="acc-chevron" id="acc-chev-tr-tnlv">›</span></span>
-      </div>
-      <div class="acc-body" id="acc-body-tr-tnlv">
-        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">Günde 2 kez trend haberlerden otomatik uzun video üretir ve YouTube'a yükler</p>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
-            <input type="checkbox" id="tnlv-sched-enabled" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveTNLVScheduler()">
-            Otomatik trend haber LV'yi etkinleştir
-          </label>
-        </div>
-        <div class="field" style="margin-bottom:12px;">
-          <label>Yayın saatleri (virgülle ayır, 24s format)</label>
-          <input type="text" id="tnlv-sched-times" value="08:00,20:00" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-          <div class="field">
-            <label>Dil</label>
-            <select id="tnlv-sched-lang" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
-              <option value="tr" selected>Türkçe</option>
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-              <option value="fr">Français</option>
-              <option value="es">Español</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Ses</label>
-            <select id="tnlv-sched-voice" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
-              <option value="E-Emel" selected>Emel — doğal (Edge)</option>
-              <option value="E-Ahmet">Ahmet — doğal (Edge)</option>
-              <option value="F1">F1 (Kadın · Supertonic)</option>
-              <option value="F2">F2 (Kadın · Supertonic)</option>
-              <option value="F3">F3 (Kadın · Supertonic)</option>
-              <option value="M1">M1 (Erkek · Supertonic)</option>
-              <option value="M2">M2 (Erkek · Supertonic)</option>
-              <option value="M3">M3 (Erkek · Supertonic)</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-          <button onclick="saveTNLVScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-          <button onclick="runTNLVNow()" id="btn-tnlv-run-now" style="background:var(--c-2a1a0a);font-size:12px;padding:8px 16px;">
-            <div class="spinner" id="spin-tnlv-run-now"></div>Şimdi Çalıştır
-          </button>
-        </div>
-        <div id="tnlv-sched-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
-          <div id="tnlv-sched-next" style="color:var(--c-888888);"></div>
-          <div id="tnlv-sched-last-status"></div>
-          <div id="tnlv-sched-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
-          <div id="tnlv-sched-last-url"></div>
         </div>
       </div>
     </div>
@@ -2196,6 +1923,28 @@
           </p>
         </div>
 
+
+        <!-- Outro videosu — TÜM videoların sonuna eklenir (app.py:_append_outro_template).
+             Arayüzü eskiden "Bilgi Shorts" panelindeydi; o sekme silinince kontrol
+             kaybolmasın diye buraya (genel ayarlara) taşındı. -->
+        <p style="color:var(--c-888888);font-size:12px;font-weight:600;margin:18px 0 8px;text-transform:uppercase;">Outro Videosu</p>
+        <p style="color:var(--c-555555);font-size:11px;margin-bottom:10px;">Üretilen her videonun sonuna otomatik eklenir. CapCut vb. ile hazırlayıp MP4 olarak yükle.</p>
+        <div id="outro-current" style="display:none;margin-bottom:8px;padding:10px;background:var(--c-111111);border:1px solid var(--c-2a2a2a);border-radius:8px;">
+          <div style="color:var(--c-aaaaaa);font-size:13px;margin-bottom:8px;">✅ Outro yüklü — <span id="outro-size"></span></div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="document.getElementById('outro-input').click()" style="flex:1;padding:7px;background:var(--c-333333);border:none;color:var(--c-dddddd);border-radius:5px;cursor:pointer;font-size:12px;">Değiştir</button>
+            <button onclick="deleteOutroTemplate()" style="flex:1;padding:7px;background:var(--c-5a1a1a);border:none;color:var(--c-ff8888);border-radius:5px;cursor:pointer;font-size:12px;">Kaldır</button>
+          </div>
+        </div>
+        <div id="outro-empty" onclick="document.getElementById('outro-input').click()"
+          style="border:2px dashed var(--c-333333);border-radius:8px;padding:16px;text-align:center;cursor:pointer;"
+          ondragover="event.preventDefault();this.style.borderColor='var(--c-e1306c)'"
+          ondragleave="this.style.borderColor='var(--c-333333)'"
+          ondrop="handleOutroDrop(event)">
+          <div style="color:var(--c-555555);font-size:13px;">🎬 Outro MP4 yükle</div>
+        </div>
+        <input type="file" id="outro-input" accept="video/mp4,video/*" style="display:none" onchange="uploadOutroTemplate(event)">
+
         <div id="clone-status-box" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--c-aaaaaa);">
           Yükleniyor...
         </div>
@@ -2341,14 +2090,13 @@ async function loadMeta() {
   voices = d.voices;
   langs = d.languages;
 
-  const voiceSelects = ['tts-voice', 'vid-voice', 'tr-voice', 'shorts-voice', 'lv-voice', 'tnlv-voice', 'info-voice'];
-  const langSelects = ['tts-lang', 'vid-lang', 'tr-target', 'shorts-lang', 'lv-lang', 'tnlv-lang', 'info-lang'];
-  const translateSelect = document.getElementById('vid-translate');
-  const sourceSelect = document.getElementById('tr-source');
+  const voiceSelects = ['tts-voice', 'shorts-voice', 'lv-voice'];
+  const langSelects = ['tts-lang', 'shorts-lang', 'lv-lang'];
 
   const voiceLabels = d.voice_labels || {};
   voiceSelects.forEach(id => {
     const el = document.getElementById(id);
+    if (!el) return;
     voices.forEach(v => {
       const o = document.createElement('option');
       o.value = v;
@@ -2361,6 +2109,7 @@ async function loadMeta() {
 
   langSelects.forEach(id => {
     const el = document.getElementById(id);
+    if (!el) return;
     Object.entries(langs).forEach(([code, name]) => {
       const o = document.createElement('option');
       o.value = code; o.textContent = name;
@@ -2369,19 +2118,10 @@ async function loadMeta() {
     });
   });
 
-  Object.entries(langs).forEach(([code, name]) => {
-    const o1 = document.createElement('option');
-    o1.value = code; o1.textContent = name;
-    translateSelect.appendChild(o1);
-
-    const o2 = document.createElement('option');
-    o2.value = code; o2.textContent = name;
-    sourceSelect.appendChild(o2);
-  });
 }
 
 // Alt navigasyonda doğrudan görünen sekmeler; geri kalanı "Daha Fazla" menüsüne toplanır.
-const MORE_TABS = ['text', 'video', 'translate', 'longvideo', 'tnlv', 'comedy', 'infoshorts', 'iganalytics', 'prompt'];
+const MORE_TABS = ['text', 'longvideo', 'iganalytics', 'prompt'];
 const BNAV_DIRECT = { shorts: 'bnav-shorts', analytics: 'bnav-analytics', instagram: 'bnav-instagram' };
 
 // ── Instagram sekmesi ───────────────────────────────────────────────────
@@ -2396,9 +2136,7 @@ function switchTab(name) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   updateNavActiveState(name);
-  if (name === 'tnlv') updateTNLVApiKeyStatus();
   if (name === 'longvideo') { updateLVApiKeyStatus(); checkLVStatusOnLoad(); }
-  if (name === 'infoshorts') { updateInfoApiKeyStatus(); loadInfoEndcardStatus(); loadOutroTemplateStatus(); }
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
   if (name === 'instagram') loadInstagramTab();
@@ -2676,91 +2414,9 @@ async function synthesize() {
   }
 }
 
-function showFilename(input) {
-  const badge = document.getElementById('file-badge');
-  badge.innerHTML = input.files[0]
-    ? `<span class="filename-badge">${input.files[0].name}</span>` : '';
-}
 
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('drop-zone').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  const input = document.getElementById('video-file');
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  input.files = dt.files;
-  showFilename(input);
-}
 
-async function voiceVideo() {
-  const file = document.getElementById('video-file').files[0];
-  if (!file) return showError('err-video', 'Video seçin.');
-  showError('err-video', '');
-  setLoading('btn-video', 'spin-video', true);
 
-  try {
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('lang', document.getElementById('vid-lang').value);
-    fd.append('voice', document.getElementById('vid-voice').value);
-    fd.append('speed', document.getElementById('vid-speed').value);
-    fd.append('translate_to', document.getElementById('vid-translate').value);
-
-    const r = await fetch('/api/voice-video', { method: 'POST', body: fd });
-    if (!r.ok) throw new Error((await r.json()).detail);
-    const d = await r.json();
-
-    document.getElementById('video-transcript').textContent = d.transcript;
-    document.getElementById('video-out').src = d.video;
-    document.getElementById('dl-video').href = d.video;
-    document.getElementById('result-video').classList.add('show');
-  } catch(e) {
-    showError('err-video', e.message);
-  } finally {
-    setLoading('btn-video', 'spin-video', false);
-  }
-}
-
-async function translateAndSynth() {
-  const text = document.getElementById('tr-text').value.trim();
-  if (!text) return showError('err-tr', 'Metin boş olamaz.');
-  showError('err-tr', '');
-  setLoading('btn-tr', 'spin-tr', true);
-
-  try {
-    const tfd = new FormData();
-    tfd.append('text', text);
-    tfd.append('source', document.getElementById('tr-source').value);
-    tfd.append('target', document.getElementById('tr-target').value);
-
-    const tr = await fetch('/api/translate', { method: 'POST', body: tfd });
-    if (!tr.ok) throw new Error((await tr.json()).detail);
-    const td = await tr.json();
-
-    document.getElementById('tr-translated').textContent = td.translated;
-
-    const sfd = new FormData();
-    sfd.append('text', td.translated);
-    sfd.append('lang', document.getElementById('tr-target').value);
-    sfd.append('voice', document.getElementById('tr-voice').value);
-    sfd.append('speed', document.getElementById('tr-speed').value);
-
-    const sr = await fetch('/api/synthesize', { method: 'POST', body: sfd });
-    if (!sr.ok) throw new Error((await sr.json()).detail);
-    const sd = await sr.json();
-
-    document.getElementById('audio-tr').src = sd.file;
-    document.getElementById('dl-tr').href = sd.file;
-    document.getElementById('result-tr').classList.add('show');
-    document.getElementById('audio-tr').play();
-  } catch(e) {
-    showError('err-tr', e.message);
-  } finally {
-    setLoading('btn-tr', 'spin-tr', false);
-  }
-}
 
 let currentVideoFilename = null;
 let currentThumbnailFilename = null;
@@ -2807,7 +2463,7 @@ async function checkYTStatus() {
   } catch(e) {}
 }
 
-const _ACC_IDS = ['tr-short','tr-lv','tr-tnlv','en-belgesel','en-short','ig-api','live-stream','api-keys','sistem'];
+const _ACC_IDS = ['tr-short','tr-lv','en-belgesel','en-short','ig-api','live-stream','api-keys','sistem'];
 
 function toggleAcc(id) {
   const body = document.getElementById('acc-body-' + id);
@@ -2859,8 +2515,6 @@ async function openSettings() {
   } catch(e) {}
   loadSchedulerStatus();
   loadLVSchedulerStatus();
-  loadTNLVSchedulerStatus();
-  updateTNLVApiKeyStatus();
   checkYTENStatus();
   loadLVENSchedulerStatus();
   loadENShortsSchedulerStatus();
@@ -3842,9 +3496,6 @@ function updateLVApiKeyStatus() {
   }
 }
 updateLVApiKeyStatus();
-updateTNLVApiKeyStatus();
-updateInfoApiKeyStatus();
-loadInfoEndcardStatus();
 loadOutroTemplateStatus();
 
 function saveApiKey() {
@@ -3855,8 +3506,6 @@ function saveApiKey() {
   s.textContent = '✓ Kaydedildi';
   s.style.color = 'var(--c-4ade80)';
   updateLVApiKeyStatus();
-  updateTNLVApiKeyStatus();
-  updateInfoApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = 'var(--c-444444)'; }, 2000);
 }
 function clearApiKey() {
@@ -3865,8 +3514,6 @@ function clearApiKey() {
   const s = document.getElementById('apikey-status');
   s.textContent = 'Temizlendi.'; s.style.color = 'var(--c-f87171)';
   updateLVApiKeyStatus();
-  updateTNLVApiKeyStatus();
-  updateInfoApiKeyStatus();
   setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = 'var(--c-444444)'; }, 2000);
 }
 
@@ -3936,106 +3583,15 @@ async function runLVNow() {
 }
 
 // ── Trend Haber LV ───────────────────────────────────────────────────────────
-function updateTNLVApiKeyStatus() {
-  const key = localStorage.getItem('ds_api_key') || '';
-  const el = document.getElementById('tnlv-apikey-status');
-  if (!el) return;
-  el.innerHTML = key
-    ? '<span style="color:var(--c-4ade80);">✓ API key var (Ayarlar\'dan değiştirilebilir)</span>'
-    : '<span style="color:var(--c-f87171);">⚠ API key girilmedi — Ayarlar\'dan ekle</span>';
-}
 
 // ── Bilgi Shorts ──────────────────────────────────────────────────────────────
 let _infoSelectedFormat = 'biliyormuydunuz';
 
-function selectInfoFormat(btn) {
-  document.querySelectorAll('.info-fmt-btn').forEach(b => {
-    b.style.borderColor = 'var(--c-2a2a2a)';
-    b.style.background = 'var(--c-111111)';
-    b.style.color = 'var(--c-aaaaaa)';
-  });
-  btn.style.borderColor = 'var(--c-f5c518)';
-  btn.style.background = 'var(--c-1a1a00)';
-  btn.style.color = 'var(--c-f5c518)';
-  _infoSelectedFormat = btn.dataset.fmt;
-}
 
-function updateInfoApiKeyStatus() {
-  const key = localStorage.getItem('ds_api_key') || '';
-  const el = document.getElementById('info-apikey-status');
-  if (!el) return;
-  el.innerHTML = key
-    ? '<span style="color:var(--c-4ade80);">✓ API key var (Ayarlar\'dan değiştirilebilir)</span>'
-    : '<span style="color:var(--c-f87171);">⚠ API key girilmedi — Ayarlar\'dan ekle</span>';
-}
 
 let _infoShortsPollTimer = null;
 
-async function fetchInfoShortsTrend() {
-  const apiKey = localStorage.getItem('ds_api_key') || '';
-  const category = document.getElementById('info-category').value;
-  if (!apiKey) return showError('err-infoshorts', 'Önce API key kaydedin.');
-  if (!category) return showError('err-infoshorts', 'Önce bir kategori seçin.');
-  setLoading('btn-info-trend', 'spin-info-trend', true);
-  document.getElementById('info-trend-hook').style.display = 'none';
-  try {
-    const fd = new FormData();
-    fd.append('category', category);
-    fd.append('api_key', apiKey);
-    fd.append('lang', document.getElementById('info-lang').value);
-    fd.append('info_format', _infoSelectedFormat);
-    const r = await fetch('/api/info-shorts-trend', { method: 'POST', body: fd });
-    if (!r.ok) throw new Error((await r.json()).detail || 'Hata');
-    const d = await r.json();
-    if (d.topic) {
-      document.getElementById('info-topic').value = d.topic;
-      if (d.hook) {
-        document.getElementById('info-trend-hook').textContent = '💡 ' + d.hook;
-        document.getElementById('info-trend-hook').style.display = 'block';
-      }
-    }
-  } catch(e) {
-    showError('err-infoshorts', e.message);
-  } finally {
-    setLoading('btn-info-trend', 'spin-info-trend', false);
-  }
-}
 
-async function generateInfoShorts() {
-  const apiKey = localStorage.getItem('ds_api_key') || '';
-  const topic = document.getElementById('info-topic').value.trim();
-  if (!apiKey) return showError('err-infoshorts', 'Önce "Shorts Üret" sekmesinden DeepSeek API key kaydedin.');
-  if (!topic) return showError('err-infoshorts', 'Konu boş olamaz.');
-  showError('err-infoshorts', '');
-  document.getElementById('result-infoshorts').classList.remove('show');
-
-  const fd = new FormData();
-  fd.append('topic', topic);
-  fd.append('info_format', _infoSelectedFormat);
-  fd.append('api_key', apiKey);
-  fd.append('lang', document.getElementById('info-lang').value);
-  fd.append('voice', document.getElementById('info-voice').value);
-  fd.append('speed', document.getElementById('info-speed').value);
-  fd.append('use_video', document.getElementById('info-use-video').checked ? 'true' : 'false');
-  const coverFile = document.getElementById('info-cover-input').files[0];
-  if (coverFile) fd.append('cover_image', coverFile);
-
-  try {
-    setLoading('btn-infoshorts', 'spin-infoshorts', true);
-    const r = await fetch('/api/generate-info-shorts-async', { method: 'POST', body: fd });
-    if (!r.ok) {
-      const ct = r.headers.get('content-type') || '';
-      const err = ct.includes('json') ? (await r.json()).detail : await r.text();
-      throw new Error(err);
-    }
-    document.getElementById('infoshorts-progress').style.display = 'block';
-    document.getElementById('infoshorts-progress').textContent = 'Üretim başladı. Arka planda devam eder…';
-    _startInfoShortsPolling();
-  } catch(e) {
-    setLoading('btn-infoshorts', 'spin-infoshorts', false);
-    showError('err-infoshorts', e.message);
-  }
-}
 
 async function loadOutroTemplateStatus() {
   try {
@@ -4075,250 +3631,14 @@ async function deleteOutroTemplate() {
   await loadOutroTemplateStatus();
 }
 
-async function loadInfoEndcardStatus() {
-  try {
-    const s = await fetch('/api/info-endcard/status').then(r => r.json());
-    if (s.has_endcard) {
-      document.getElementById('info-endcard-preview').src = s.path + '?t=' + Date.now();
-      document.getElementById('info-endcard-current').style.display = 'block';
-      document.getElementById('info-endcard-empty').style.display = 'none';
-    } else {
-      document.getElementById('info-endcard-current').style.display = 'none';
-      document.getElementById('info-endcard-empty').style.display = 'block';
-    }
-  } catch(e) {}
-}
-async function uploadInfoEndcard(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const fd = new FormData();
-  fd.append('file', file);
-  try {
-    const r = await fetch('/api/info-endcard/upload', { method: 'POST', body: fd });
-    if (!r.ok) throw new Error((await r.json()).detail);
-    await loadInfoEndcardStatus();
-  } catch(err) { alert('Yükleme hatası: ' + err.message); }
-}
-function handleInfoEndcardDrop(e) {
-  e.preventDefault();
-  e.currentTarget.style.borderColor = 'var(--c-333333)';
-  const file = e.dataTransfer.files[0];
-  if (!file || !file.type.startsWith('image/')) return;
-  const dt = new DataTransfer(); dt.items.add(file);
-  const inp = document.getElementById('info-endcard-input');
-  inp.files = dt.files;
-  uploadInfoEndcard({ target: { files: [file] } });
-}
-async function deleteInfoEndcard() {
-  if (!confirm('Kapanış sahnesi kaldırılsın mı?')) return;
-  await fetch('/api/info-endcard', { method: 'DELETE' });
-  document.getElementById('info-endcard-input').value = '';
-  await loadInfoEndcardStatus();
-}
 
-function handleInfoCoverSelect(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const url = URL.createObjectURL(file);
-  document.getElementById('info-cover-preview').src = url;
-  document.getElementById('info-cover-preview-wrap').style.display = 'block';
-  document.getElementById('info-cover-placeholder').style.display = 'none';
-  document.getElementById('info-cover-drop').style.borderColor = 'var(--c-f5c518)';
-}
-function handleInfoCoverDrop(e) {
-  e.preventDefault();
-  document.getElementById('info-cover-drop').style.borderColor = 'var(--c-333333)';
-  const file = e.dataTransfer.files[0];
-  if (!file || !file.type.startsWith('image/')) return;
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  document.getElementById('info-cover-input').files = dt.files;
-  handleInfoCoverSelect({ target: { files: [file] } });
-}
-function clearInfoCover() {
-  document.getElementById('info-cover-input').value = '';
-  document.getElementById('info-cover-preview').src = '';
-  document.getElementById('info-cover-preview-wrap').style.display = 'none';
-  document.getElementById('info-cover-placeholder').style.display = 'block';
-  document.getElementById('info-cover-drop').style.borderColor = 'var(--c-333333)';
-}
 
-function _startInfoShortsPolling() {
-  if (_infoShortsPollTimer) return;
-  _infoShortsPollTimer = setInterval(async () => {
-    try {
-      const s = await fetch('/api/manual-shorts/status').then(r => r.json());
-      if (s.status === 'done' && s.result) {
-        clearInterval(_infoShortsPollTimer); _infoShortsPollTimer = null;
-        document.getElementById('infoshorts-progress').style.display = 'none';
-        setLoading('btn-infoshorts', 'spin-infoshorts', false);
-        document.getElementById('infoshorts-title-out').textContent = s.result.title || '';
-        document.getElementById('infoshorts-video').src = s.result.video || '';
-        document.getElementById('dl-infoshorts').href = s.result.video || '';
-        document.getElementById('infoshorts-desc-out').value = s.result.suggested_description || '';
-        document.getElementById('infoshorts-tags-out').value = s.result.suggested_tags || '';
-        document.getElementById('result-infoshorts').classList.add('show');
-      } else if (s.status === 'error') {
-        clearInterval(_infoShortsPollTimer); _infoShortsPollTimer = null;
-        document.getElementById('infoshorts-progress').style.display = 'none';
-        setLoading('btn-infoshorts', 'spin-infoshorts', false);
-        showError('err-infoshorts', s.error || 'Üretim hatası');
-      } else if (s.status === 'running') {
-        const elapsed = s.elapsed ? ` (${Math.round(s.elapsed)}s)` : '';
-        document.getElementById('infoshorts-progress').textContent = `Üretim devam ediyor…${elapsed}`;
-      }
-    } catch(e) {}
-  }, 4000);
-}
 
-async function generateTrendLongVideo() {
-  const apiKey = localStorage.getItem('ds_api_key') || '';
-  if (!apiKey) { document.getElementById('err-tnlv').textContent = 'DeepSeek API key girilmedi. Ayarlardan ekleyin.'; return; }
 
-  document.getElementById('err-tnlv').textContent = '';
-  document.getElementById('result-tnlv').style.display = 'none';
-  document.getElementById('spin-tnlv').style.display = 'inline-block';
-  document.getElementById('btn-tnlv').disabled = true;
 
-  try {
-    const fd = new FormData();
-    fd.append('api_key', apiKey);
-    fd.append('lang', document.getElementById('tnlv-lang').value);
-    fd.append('voice', document.getElementById('tnlv-voice').value);
-    fd.append('speed', document.getElementById('tnlv-speed').value);
-    fd.append('region', 'TR');
 
-    const r = await fetch('/api/generate-trend-long-video', { method: 'POST', body: fd });
-    const d = await r.json();
-    if (!r.ok) { document.getElementById('err-tnlv').textContent = d.detail || 'Hata oluştu'; return; }
 
-    currentTNLVFilename = d.video.split('/').pop();
-    currentTNLVThumbnailFilename = d.thumbnail ? d.thumbnail.split('/').pop() : null;
 
-    document.getElementById('tnlv-title-out').textContent = d.title;
-    document.getElementById('tnlv-topics-out').textContent = d.topics ? 'Konular: ' + d.topics.join(' • ') : '';
-    document.getElementById('tnlv-duration-out').textContent = `Süre: ${Math.round(d.duration_sec)}s • ${d.scene_count} sahne`;
-    document.getElementById('tnlv-video').src = d.video;
-    document.getElementById('dl-tnlv').href = d.video;
-
-    if (d.thumbnail) {
-      document.getElementById('tnlv-thumb').src = d.thumbnail;
-      document.getElementById('dl-tnlv-thumb').href = d.thumbnail;
-      document.getElementById('tnlv-thumb-wrap').style.display = 'block';
-    } else {
-      document.getElementById('tnlv-thumb-wrap').style.display = 'none';
-    }
-
-    document.getElementById('tnlv-yt-title').value = d.title;
-    document.getElementById('tnlv-yt-desc').value = d.description || '';
-    document.getElementById('tnlv-yt-tags').value = _stripHashtags(d.suggested_tags);
-
-    document.getElementById('tnlv-yt-upload-section').style.display = 'block';
-    document.getElementById('tnlv-yt-success').style.display = 'none';
-    checkYTStatusTNLV();
-
-    document.getElementById('result-tnlv').style.display = 'block';
-  } catch(e) {
-    document.getElementById('err-tnlv').textContent = 'İstek hatası: ' + e.message;
-  } finally {
-    document.getElementById('spin-tnlv').style.display = 'none';
-    document.getElementById('btn-tnlv').disabled = false;
-  }
-}
-
-async function checkYTStatusTNLV() {
-  try {
-    const r = await fetch('/api/yt/config');
-    const d = await r.json();
-    const linked = d.authorized;
-    document.getElementById('tnlv-yt-linked').style.display = linked ? 'block' : 'none';
-    document.getElementById('tnlv-yt-not-linked').style.display = linked ? 'none' : 'block';
-  } catch(e) {}
-}
-
-async function uploadTNLVToYouTube() {
-  if (!currentTNLVFilename) return;
-  document.getElementById('err-tnlv-yt').textContent = '';
-  document.getElementById('spin-tnlv-yt').style.display = 'inline-block';
-  document.getElementById('btn-tnlv-yt-upload').disabled = true;
-
-  try {
-    const fd = new FormData();
-    fd.append('filename', currentTNLVFilename);
-    fd.append('title', document.getElementById('tnlv-yt-title').value);
-    fd.append('description', document.getElementById('tnlv-yt-desc').value);
-    fd.append('tags', document.getElementById('tnlv-yt-tags').value);
-    fd.append('privacy', document.getElementById('tnlv-yt-privacy').value);
-    fd.append('category_id', document.getElementById('tnlv-yt-category').value);
-    fd.append('age_restricted', 'false');
-    if (currentTNLVThumbnailFilename) fd.append('thumbnail_filename', currentTNLVThumbnailFilename);
-
-    const r = await fetch('/api/yt/upload', { method: 'POST', body: fd });
-    const d = await r.json();
-    if (!r.ok) { document.getElementById('err-tnlv-yt').textContent = d.detail || 'Yükleme hatası'; return; }
-
-    document.getElementById('tnlv-yt-link').href = d.url;
-    document.getElementById('tnlv-yt-link').textContent = d.url;
-    document.getElementById('tnlv-yt-success').style.display = 'block';
-  } catch(e) {
-    document.getElementById('err-tnlv-yt').textContent = 'İstek hatası: ' + e.message;
-  } finally {
-    document.getElementById('spin-tnlv-yt').style.display = 'none';
-    document.getElementById('btn-tnlv-yt-upload').disabled = false;
-  }
-}
-
-async function loadTNLVSchedulerStatus() {
-  try {
-    const r = await fetch('/api/tnlv-scheduler/config');
-    const d = await r.json();
-    document.getElementById('tnlv-sched-enabled').checked = d.enabled;
-    document.getElementById('tnlv-sched-times').value = (d.times || ['08:00','20:00']).join(',');
-    if (d.lang) document.getElementById('tnlv-sched-lang').value = d.lang;
-    if (d.voice) document.getElementById('tnlv-sched-voice').value = d.voice;
-
-    const st = document.getElementById('tnlv-sched-status');
-    if (d.next_run || d.log?.ts) {
-      st.style.display = 'block';
-      document.getElementById('tnlv-sched-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
-      const log = d.log || {};
-      const color = log.status === 'success' ? 'var(--c-4ade80)' : log.status === 'error' ? 'var(--c-f87171)' : 'var(--c-facc15)';
-      const label = log.status === 'success' ? 'Başarılı' : log.status === 'error' ? 'Hata' : 'Çalışıyor';
-      document.getElementById('tnlv-sched-last-status').innerHTML = log.status ? `<span style="color:${color}">${label}</span>` : '';
-      _setMsg('tnlv-sched-last-msg', log, '/api/tnlv-scheduler/run-now', 'loadTNLVSchedulerStatus');
-      document.getElementById('tnlv-sched-last-url').innerHTML = log.url ? `<a href="${log.url}" target="_blank" style="color:var(--c-7c3aed);">${log.url}</a>` : '';
-    }
-    setAccBadge('tr-tnlv', d.log, d.enabled);
-  } catch(e) {}
-}
-
-async function saveTNLVScheduler() {
-  const enabled = document.getElementById('tnlv-sched-enabled').checked;
-  const fd = new FormData();
-  fd.append('enabled', enabled ? 'true' : 'false');
-  fd.append('times', document.getElementById('tnlv-sched-times').value);
-  fd.append('lang', document.getElementById('tnlv-sched-lang').value);
-  fd.append('voice', document.getElementById('tnlv-sched-voice').value);
-  await fetch('/api/tnlv-scheduler/config', { method: 'POST', body: fd });
-  await loadTNLVSchedulerStatus();
-}
-
-async function runTNLVNow() {
-  document.getElementById('spin-tnlv-run-now').style.display = 'inline-block';
-  document.getElementById('btn-tnlv-run-now').disabled = true;
-  await fetch('/api/tnlv-scheduler/run-now', { method: 'POST' });
-  const poll = setInterval(async () => {
-    const r = await fetch('/api/tnlv-scheduler/config');
-    const d = await r.json();
-    const log = d.log || {};
-    if (log.status && log.status !== 'running') {
-      clearInterval(poll);
-      document.getElementById('spin-tnlv-run-now').style.display = 'none';
-      document.getElementById('btn-tnlv-run-now').disabled = false;
-      loadTNLVSchedulerStatus();
-    }
-  }, 5000);
-}
 
 async function checkYTENStatus() {
   try {
@@ -5903,119 +5223,6 @@ function _buildFullAnalyticsHTML(d) {
   }
   return html;
 }
-
-// ─── KOMİK HABER ────────────────────────────────────────────────────────────
-let _comedySessionId = null;
-let _comedyUid = null;
-
-document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('comedy-photos');
-  if (input) input.addEventListener('change', () => {
-    const thumbs = document.getElementById('comedy-thumbs');
-    thumbs.innerHTML = '';
-    const btn = document.getElementById('comedy-upload-btn');
-    if (!input.files.length) { btn.style.display = 'none'; return; }
-    for (let i = 0; i < input.files.length; i++) {
-      const f = input.files[i];
-      const url = URL.createObjectURL(f);
-      thumbs.innerHTML += `<div style="text-align:center;">
-        <img src="${url}" style="width:70px;height:95px;object-fit:cover;border-radius:6px;border:2px solid var(--c-3b2d6e);">
-        <div style="color:var(--c-a78bfa);font-size:11px;margin-top:2px;">${i+1}</div>
-      </div>`;
-    }
-    document.getElementById('comedy-upload-status').textContent = `${input.files.length} fotoğraf seçildi — sırayı kontrol et, sonra yükle.`;
-    btn.style.display = 'flex';
-  });
-});
-
-async function uploadComedyPhotos() {
-  const input = document.getElementById('comedy-photos');
-  if (!input.files.length) { alert('Önce fotoğraf seç'); return; }
-  const status = document.getElementById('comedy-upload-status');
-  status.textContent = 'Yükleniyor...';
-  document.getElementById('comedy-upload-btn').disabled = true;
-  const fd = new FormData();
-  for (const f of input.files) fd.append('files', f);
-  try {
-    const r = await fetch('/api/comedy/upload', { method: 'POST', body: fd });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
-    _comedySessionId = d.session_id;
-    status.textContent = `✓ ${d.count} fotoğraf yüklendi`;
-    document.getElementById('comedy-session-id').textContent = d.session_id;
-    document.getElementById('comedy-session-info').style.display = 'block';
-    document.getElementById('comedy-create-section').style.display = 'block';
-    document.getElementById('comedy-upload-btn').style.display = 'none';
-  } catch(e) {
-    status.textContent = 'Hata: ' + e.message;
-    document.getElementById('comedy-upload-btn').disabled = false;
-  }
-}
-
-async function createComedyVideo() {
-  if (!_comedySessionId) { alert('Önce fotoğraf yükle'); return; }
-  const jsonText = document.getElementById('comedy-scenes-json').value.trim();
-  if (!jsonText) { alert('JSON alanı boş — Claude\'dan aldığın metni yapıştır'); return; }
-  let parsed;
-  try { parsed = JSON.parse(jsonText); } catch(e) { alert('JSON geçersiz: ' + e.message); return; }
-  const status = document.getElementById('comedy-video-status');
-  status.textContent = 'Video oluşturuluyor... (birkaç dakika sürebilir)';
-  document.getElementById('comedy-create-btn').disabled = true;
-  try {
-    const r = await fetch('/api/comedy/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session_id: _comedySessionId,
-        scenes: parsed.scenes || parsed,
-        voice: parsed.voice || 'M3',
-        title: parsed.title || '',
-      })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
-    _comedyUid = d.uid;
-    status.textContent = '✓ Video hazır!';
-    document.getElementById('comedy-video-player').src = d.video;
-    document.getElementById('comedy-preview-section').style.display = 'block';
-  } catch(e) {
-    status.textContent = 'Hata: ' + e.message;
-  } finally {
-    document.getElementById('comedy-create-btn').disabled = false;
-  }
-}
-
-async function sendComedyToInstagram() {
-  if (!_comedyUid) { alert('Önce video oluştur'); return; }
-  const caption = document.getElementById('comedy-caption').value.trim();
-  const status = document.getElementById('comedy-send-status');
-  status.textContent = 'Instagram\'a gönderiliyor...';
-  try {
-    const r = await fetch('/api/comedy/send-instagram', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: _comedyUid, caption })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      status.style.color = 'var(--c-4ade80)';
-      status.textContent = '✓ Instagram\'a gönderildi! Media ID: ' + d.media_id;
-    } else {
-      status.style.color = 'var(--c-f87171)';
-      status.textContent = 'Hata: ' + d.error;
-    }
-  } catch(e) {
-    status.style.color = 'var(--c-f87171)';
-    status.textContent = 'Hata: ' + e.message;
-  }
-}
-
-function deleteComedyVideo() {
-  document.getElementById('comedy-video-player').src = '';
-  document.getElementById('comedy-preview-section').style.display = 'none';
-  document.getElementById('comedy-send-status').textContent = '';
-  _comedyUid = null;
-}
 </script>
 
 <!-- INSTAGRAM ANALİTİK PANELİ -->
@@ -6169,213 +5376,6 @@ function deleteComedyVideo() {
     <div id="ig-an-posts" style="display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 </div>
-
-<!-- KOMİK HABER PANELİ -->
-<div class="panel" id="tab-comedy">
-  <h2 style="color:var(--c-ffffff);margin-bottom:6px;">📰 Komik Haber Video</h2>
-  <p style="color:var(--c-666666);font-size:13px;margin-bottom:24px;">Fotoğraflarını yükle → bana gönder → ben haberi yazarım → video hazır → beğenirsen Instagram'a gönder</p>
-
-  <div style="background:var(--c-111111);border:1px solid var(--c-222222);border-radius:10px;padding:20px;margin-bottom:20px;">
-    <h3 style="color:var(--c-a78bfa);font-size:14px;margin-bottom:10px;">1. Fotoğrafları Seç &amp; Yükle</h3>
-    <p style="color:var(--c-888888);font-size:12px;margin-bottom:14px;">Yeniden isimlendirmeye gerek yok. Galeride <strong style="color:var(--c-cccccc);">sırayla tıklayarak</strong> seç — o sıra sahne sırası olur.</p>
-    <input type="file" id="comedy-photos" multiple style="display:none">
-    <div onclick="document.getElementById('comedy-photos').click()" style="border:2px dashed var(--c-3b2d6e);border-radius:10px;padding:28px;text-align:center;cursor:pointer;background:var(--c-0d0d1e);margin-bottom:12px;" onmouseover="this.style.borderColor='var(--c-7c3aed)'" onmouseout="this.style.borderColor='var(--c-3b2d6e)'">
-      <div style="font-size:36px;margin-bottom:8px;">📷</div>
-      <div style="color:var(--c-a78bfa);font-size:15px;font-weight:600;">Fotoğraf Seç</div>
-      <div style="color:var(--c-555555);font-size:12px;margin-top:4px;">Birden fazla seçebilirsin</div>
-    </div>
-    <button id="comedy-upload-btn" onclick="uploadComedyPhotos()" style="display:none;width:100%;justify-content:center;">📤 Yükle</button>
-    <div id="comedy-upload-status" style="color:var(--c-888888);margin-top:10px;font-size:13px;"></div>
-    <div id="comedy-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
-    <div id="comedy-session-info" style="display:none;margin-top:12px;background:var(--c-1a1a2e);padding:8px 12px;border-radius:8px;font-size:11px;color:var(--c-666666);">
-      Session: <span id="comedy-session-id" style="color:var(--c-a78bfa);font-family:monospace;"></span>
-    </div>
-  </div>
-
-  <div id="comedy-create-section" style="display:none;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:10px;padding:20px;margin-bottom:20px;">
-    <h3 style="color:var(--c-a78bfa);font-size:14px;margin-bottom:10px;">2. Haber Metnini Yapıştır</h3>
-    <p style="color:var(--c-888888);font-size:12px;margin-bottom:10px;">Claude'dan aldığın JSON'u buraya yapıştır, sonra "Video Oluştur"a bas.</p>
-    <textarea id="comedy-scenes-json" placeholder='{"scenes":[{"photo":"1.jpg","text":"...","tts":"..."}], "title":"...", "voice":"M3"}' style="width:100%;min-height:160px;background:var(--c-0a0a1a);border:1px solid var(--c-333333);color:var(--c-cccccc);border-radius:8px;padding:10px;font-size:12px;font-family:monospace;resize:vertical;margin-bottom:10px;"></textarea>
-    <button id="comedy-create-btn" onclick="createComedyVideo()">▶ Video Oluştur</button>
-    <div id="comedy-video-status" style="color:var(--c-888888);font-size:13px;margin-top:10px;"></div>
-  </div>
-
-  <div id="comedy-preview-section" style="display:none;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:10px;padding:20px;">
-    <h3 style="color:var(--c-a78bfa);font-size:14px;margin-bottom:12px;">3. İzle &amp; Gönder</h3>
-    <video id="comedy-video-player" controls style="width:100%;max-width:360px;border-radius:8px;background:var(--c-000000);display:block;margin-bottom:14px;"></video>
-    <input type="text" id="comedy-caption" placeholder="Instagram alt yazısı (opsiyonel — boş bırakırsan varsayılan kullanılır)" style="width:100%;padding:10px 12px;background:var(--c-1a1a2e);border:1px solid var(--c-333333);color:var(--c-ffffff);border-radius:8px;font-size:13px;margin-bottom:10px;">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <button onclick="sendComedyToInstagram()" style="background:var(--c-059669);">📤 Instagram'a Gönder</button>
-      <button onclick="deleteComedyVideo()" style="background:var(--c-333333);color:var(--c-cccccc);">🗑 Sil</button>
-    </div>
-    <div id="comedy-send-status" style="margin-top:10px;font-size:13px;"></div>
-  </div>
-</div>
-
-<!-- BİLGİ SHORTS PANELİ -->
-<div class="panel" id="tab-infoshorts">
-  <h2 style="color:var(--c-ffffff);margin-bottom:4px;">💡 Bilgi Shorts</h2>
-  <p style="color:var(--c-666666);font-size:13px;margin-bottom:20px;">Eğitici, bilgilendirici kısa videolar — "Bunu biliyor muydunuz?" formatında. Haber değil, bilgi.</p>
-
-  <div class="field">
-    <label>Format</label>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="info-format-grid">
-      <button class="info-fmt-btn active" data-fmt="biliyormuydunuz" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid var(--c-f5c518);background:var(--c-1a1a00);color:var(--c-f5c518);font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
-        🤯 Bunu biliyor muydunuz?
-      </button>
-      <button class="info-fmt-btn" data-fmt="aklinizda" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid var(--c-2a2a2a);background:var(--c-111111);color:var(--c-aaaaaa);font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
-        📌 Aklınızda bulunsun
-      </button>
-      <button class="info-fmt-btn" data-fmt="30saniye" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid var(--c-2a2a2a);background:var(--c-111111);color:var(--c-aaaaaa);font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
-        ⚡ 30 saniyede öğren
-      </button>
-      <button class="info-fmt-btn" data-fmt="cogusinsan" onclick="selectInfoFormat(this)" style="padding:10px 12px;border-radius:8px;border:2px solid var(--c-2a2a2a);background:var(--c-111111);color:var(--c-aaaaaa);font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
-        🔍 Çoğu insan bilmiyor
-      </button>
-    </div>
-  </div>
-
-  <div class="field">
-    <label>Kategori (opsiyonel — trend konu bulmak için)</label>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <select id="info-category" style="flex:1;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-e0e0e0);font-size:14px;padding:10px 12px;">
-        <option value="">— Kategori seç —</option>
-        <option value="Sağlık ve Tıp">Sağlık &amp; Tıp</option>
-        <option value="Dolandırıcılık ve Güvenlik">Dolandırıcılık &amp; Güvenlik</option>
-        <option value="Emeklilik ve Haklar">Emeklilik &amp; Haklar</option>
-        <option value="Teknoloji İpuçları">Teknoloji İpuçları</option>
-        <option value="Para ve Finans">Para &amp; Finans</option>
-        <option value="Psikoloji ve Davranış">Psikoloji &amp; Davranış</option>
-        <option value="Tarih ve Bilinmeyenler">Tarih &amp; Bilinmeyenler</option>
-        <option value="Hukuk ve Haklar">Hukuk &amp; Haklar</option>
-        <option value="Beslenme ve Diyet">Beslenme &amp; Diyet</option>
-        <option value="Bilim ve Doğa">Bilim &amp; Doğa</option>
-      </select>
-      <button onclick="fetchInfoShortsTrend()" id="btn-info-trend" style="padding:10px 16px;background:var(--c-2a2a2a);border:1px solid var(--c-3a3a3a);border-radius:8px;color:var(--c-f5c518);font-size:13px;cursor:pointer;white-space:nowrap;">
-        <div class="spinner" id="spin-info-trend"></div>
-        Konu Öner
-      </button>
-    </div>
-    <div id="info-trend-hook" style="display:none;margin-top:6px;padding:8px 12px;background:var(--c-1a1a1a);border:1px solid var(--c-2a4a1a);border-radius:8px;color:var(--c-4ade80);font-size:12px;"></div>
-  </div>
-
-  <div class="field">
-    <label>Konu</label>
-    <textarea id="info-topic" placeholder="Örn: Telefon dolandırıcılığı, Emeklilik hakları, Sigorta ipuçları, Sağlıklı uyku..." style="min-height:80px;"></textarea>
-  </div>
-
-  <div class="controls">
-    <div class="field">
-      <label>Dil</label>
-      <select id="info-lang"></select>
-    </div>
-    <div class="field">
-      <label>Ses</label>
-      <select id="info-voice"></select>
-    </div>
-    <div class="field">
-      <label>Hız: <span id="speed-val-info">1.0</span>x</label>
-      <div class="speed-row">
-        <input type="range" id="info-speed" min="0.5" max="2.0" step="0.05" value="1.0"
-          oninput="document.getElementById('speed-val-info').textContent = parseFloat(this.value).toFixed(2)">
-      </div>
-    </div>
-  </div>
-
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;">
-    <label class="toggle-switch" style="margin:0;">
-      <input type="checkbox" id="info-use-video">
-      <span class="toggle-slider"></span>
-    </label>
-    <div>
-      <div style="font-size:13px;color:var(--c-d4d4d4);font-weight:600;">🎬 Pexels Video Klip Kullan</div>
-      <div style="font-size:11px;color:var(--c-555555);margin-top:2px;">Fotoğraf yerine Pexels'tan stock video klipleri kullanır</div>
-    </div>
-  </div>
-
-  <div class="field">
-    <label>Outro Videosu <span style="color:var(--c-555555);font-weight:400;">(tüm videolara sonuna eklenir)</span></label>
-    <div id="outro-current" style="display:none;margin-bottom:8px;padding:10px;background:var(--c-111111);border:1px solid var(--c-2a2a2a);border-radius:8px;">
-      <div style="color:var(--c-aaaaaa);font-size:13px;margin-bottom:8px;">✅ Outro yüklü — <span id="outro-size"></span></div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="document.getElementById('outro-input').click()" style="flex:1;padding:7px;background:var(--c-333333);border:none;color:var(--c-dddddd);border-radius:5px;cursor:pointer;font-size:12px;">Değiştir</button>
-        <button onclick="deleteOutroTemplate()" style="flex:1;padding:7px;background:var(--c-5a1a1a);border:none;color:var(--c-ff8888);border-radius:5px;cursor:pointer;font-size:12px;">Kaldır</button>
-      </div>
-    </div>
-    <div id="outro-empty" onclick="document.getElementById('outro-input').click()"
-      style="border:2px dashed var(--c-333333);border-radius:8px;padding:16px;text-align:center;cursor:pointer;"
-      ondragover="event.preventDefault();this.style.borderColor='var(--c-e1306c)'"
-      ondragleave="this.style.borderColor='var(--c-333333)'"
-      ondrop="handleOutroDrop(event)">
-      <div style="color:var(--c-555555);font-size:13px;">🎬 Outro MP4 yükle<br><span style="font-size:11px;">CapCut'ta yapıp buraya yükle — her videoya otomatik eklenir</span></div>
-    </div>
-    <input type="file" id="outro-input" accept="video/mp4,video/*" style="display:none" onchange="uploadOutroTemplate(event)">
-  </div>
-
-  <div class="field">
-    <label>Kapanış Sahnesi <span style="color:var(--c-555555);font-weight:400;">(kalıcı — tüm Bilgi Shorts'larda kullanılır)</span></label>
-    <div id="info-endcard-current" style="display:none;margin-bottom:8px;padding:10px;background:var(--c-111111);border:1px solid var(--c-2a2a2a);border-radius:8px;">
-      <img id="info-endcard-preview" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:8px;">
-      <div style="display:flex;gap:8px;">
-        <button onclick="document.getElementById('info-endcard-input').click()" style="flex:1;padding:7px;background:var(--c-333333);border:none;color:var(--c-dddddd);border-radius:5px;cursor:pointer;font-size:12px;">Değiştir</button>
-        <button onclick="deleteInfoEndcard()" style="flex:1;padding:7px;background:var(--c-5a1a1a);border:none;color:var(--c-ff8888);border-radius:5px;cursor:pointer;font-size:12px;">Kaldır</button>
-      </div>
-    </div>
-    <div id="info-endcard-empty" onclick="document.getElementById('info-endcard-input').click()"
-      style="border:2px dashed var(--c-333333);border-radius:8px;padding:16px;text-align:center;cursor:pointer;"
-      ondragover="event.preventDefault();this.style.borderColor='var(--c-f5c518)'"
-      ondragleave="this.style.borderColor='var(--c-333333)'"
-      ondrop="handleInfoEndcardDrop(event)">
-      <div style="color:var(--c-555555);font-size:13px;">🎬 Kapanış sahnesi yükle<br><span style="font-size:11px;">Yüklenince tüm Bilgi Shorts'larda son sahne bu olur</span></div>
-    </div>
-    <input type="file" id="info-endcard-input" accept="image/*" style="display:none" onchange="uploadInfoEndcard(event)">
-  </div>
-
-  <div class="field">
-    <label>İlk Sahne Görseli <span style="color:var(--c-555555);font-weight:400;">(isteğe bağlı)</span></label>
-    <div id="info-cover-drop" onclick="document.getElementById('info-cover-input').click()"
-      style="border:2px dashed var(--c-333333);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;"
-      ondragover="event.preventDefault();this.style.borderColor='var(--c-f5c518)'"
-      ondragleave="this.style.borderColor='var(--c-333333)'"
-      ondrop="handleInfoCoverDrop(event)">
-      <div id="info-cover-preview-wrap" style="display:none;margin-bottom:8px;">
-        <img id="info-cover-preview" style="max-height:120px;border-radius:6px;object-fit:cover;">
-        <button onclick="event.stopPropagation();clearInfoCover()" style="display:block;margin:6px auto 0;background:var(--c-333333);border:none;color:var(--c-cccccc);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">Kaldır</button>
-      </div>
-      <div id="info-cover-placeholder" style="color:var(--c-555555);font-size:13px;">📷 Kapak fotoğrafı yükle (ChatGPT görseli vb.)<br><span style="font-size:11px;">Tıkla veya sürükle — ilk sahne bu görsel olur</span></div>
-    </div>
-    <input type="file" id="info-cover-input" accept="image/*" style="display:none" onchange="handleInfoCoverSelect(event)">
-  </div>
-
-  <div class="field">
-    <label>DeepSeek API Key</label>
-    <div id="info-apikey-status" style="font-size:13px;padding:10px 12px;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-888888);">
-      Kontrol ediliyor...
-    </div>
-  </div>
-
-  <button onclick="generateInfoShorts()" id="btn-infoshorts">
-    <div class="spinner" id="spin-infoshorts"></div>
-    Bilgi Videosu Üret
-  </button>
-
-  <div class="error" id="err-infoshorts"></div>
-  <div id="infoshorts-progress" style="display:none;margin-top:10px;padding:10px 14px;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-f5c518);font-size:13px;"></div>
-
-  <div class="result" id="result-infoshorts">
-    <p>Başlık</p>
-    <div class="transcript" id="infoshorts-title-out" style="font-size:15px;font-weight:600;color:var(--c-ffffff);"></div>
-    <p style="margin-top:12px">Video</p>
-    <video id="infoshorts-video" controls style="width:100%;margin-top:8px;border-radius:6px;max-width:360px;"></video>
-    <a id="dl-infoshorts" class="dl-btn" download="bilgi-short.mp4">İndir</a>
-    <p style="margin-top:14px">YouTube Açıklaması</p>
-    <textarea id="infoshorts-desc-out" rows="5" style="width:100%;background:var(--c-1a1a1a);color:var(--c-eeeeee);border:1px solid var(--c-333333);border-radius:6px;padding:10px;font-size:13px;resize:vertical;" readonly></textarea>
-    <p style="margin-top:10px">Etiketler</p>
-    <textarea id="infoshorts-tags-out" rows="3" style="width:100%;background:var(--c-1a1a1a);color:var(--c-eeeeee);border:1px solid var(--c-333333);border-radius:6px;padding:10px;font-size:13px;resize:vertical;" readonly></textarea>
-  </div>
-</div>
-
-<!-- PROMPT SEKMESİ -->
 <div class="panel" id="tab-prompt">
   <h2 style="color:var(--c-a78bfa);margin-bottom:20px">🤖 DeepSeek Prompt Ayarları</h2>
 

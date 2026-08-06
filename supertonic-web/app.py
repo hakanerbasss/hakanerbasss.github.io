@@ -9572,7 +9572,12 @@ async def startup_event():
     _rebuild_lv_scheduler()
     _rebuild_lv_en_scheduler()
     _rebuild_en_shorts_scheduler()
-    _rebuild_tnlv_scheduler()
+    # Trend Haber LV zamanlayıcısı KAPALI (06.08.2026): arayüz sekmesi
+    # kullanıcı isteğiyle silindi. Kayıt burada bırakılsaydı iş arka planda
+    # YouTube'a video üretmeye devam eder, ama açıp kapatacak veya durumunu
+    # görecek hiçbir ekran kalmazdı. Fonksiyonlar ve /api/tnlv-* uç noktaları
+    # duruyor — özellik geri istenirse bu satırı geri açmak yeterli.
+    # _rebuild_tnlv_scheduler()
     _rebuild_live_roundup_scheduler()
     _rebuild_ig_only_tr_scheduler()
     scheduler.add_job(
