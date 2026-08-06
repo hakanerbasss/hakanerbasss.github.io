@@ -1660,21 +1660,28 @@ async function loadMeta() {
   voices = d.voices;
   langs = d.languages;
 
-  const voiceSelects = ['tts-voice', 'shorts-voice', 'lv-voice'];
+  const voiceSelects = ['tts-voice', 'shorts-voice'];
   const langSelects = ['tts-lang', 'shorts-lang', 'lv-lang'];
+
+  // Her seçicinin KENDİ hatırlanan tercihi var — birini değiştirmek diğerini
+  // etkilemez, tarayıcı kapanıp açılsa bile seçim kalıcı. Eskiden hiçbir
+  // kayıt yoktu, sayfa her yenilendiğinde hepsi sabit "E-Emel"e dönüyordu.
+  const VOICE_PREF_KEY = id => 'voice_pref_' + id;
+  const VOICE_DEFAULTS = { 'tts-voice': 'E-Emel', 'shorts-voice': 'E-Ahmet' };
 
   const voiceLabels = d.voice_labels || {};
   voiceSelects.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
+    const wanted = localStorage.getItem(VOICE_PREF_KEY(id)) || VOICE_DEFAULTS[id] || 'E-Emel';
     voices.forEach(v => {
       const o = document.createElement('option');
       o.value = v;
       o.textContent = voiceLabels[v] || v;
-      // Doğal Edge sesi varsayılan gelsin — Supertonic yedek olarak listede kalır
-      if (v === 'E-Emel') o.selected = true;
+      if (v === wanted) o.selected = true;
       el.appendChild(o);
     });
+    el.addEventListener('change', () => localStorage.setItem(VOICE_PREF_KEY(id), el.value));
   });
 
   langSelects.forEach(id => {
