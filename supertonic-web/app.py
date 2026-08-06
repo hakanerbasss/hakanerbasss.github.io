@@ -316,6 +316,28 @@ def _edge_voice_for(voice: str) -> str:
     return _EDGE_DEFAULT
 
 
+def _run_edge_tts_blocking(text: str, voice_id: str, rate: str, mp3_path: str) -> None:
+    """_synth_edge'in ayrı thread'de çalışan senkron gövdesi.
+
+    Neden ayrı thread + kendi event loop'u: `asyncio.wait_for` bir coroutine'i
+    doğrudan sarıp iptal ettiğinde, Python belgelerine göre 'iptalin GERÇEKTEN
+    tamamlanmasını bekler — bu yüzden toplam bekleme süresi timeout'u aşabilir'.
+    edge-tts kütüphanesinin iç bağlantı/retry mantığı CancelledError'ı düzgün
+    işlemezse, wait_for'un kendisi de asılı kalabiliyordu (önceki 15sn'lik
+    sınır işe yaramamış olabilir). Ayrı bir OS thread'i dıştan iptal
+    edilemez ama zaten çalışmaya başlamış bir thread için wait_for'un
+    cancel() çağrısı anında False döner ve wait_for HEMEN TimeoutError
+    fırlatır — thread arka planda takılı kalsa bile çağıran asla beklemez."""
+    import asyncio as _aio
+    import edge_tts
+
+    async def _go():
+        communicate = edge_tts.Communicate(text, voice_id, rate=rate)
+        await communicate.save(mp3_path)
+
+    _aio.run(_go())
+
+
 async def _synth_edge(text: str, voice: str, speed: float, out_path: Path) -> float:
     """Edge TTS ile seslendirir, süreyi saniye olarak döner.
     Hata durumunda istisna fırlatır — çağıran Supertonic'e düşer.
@@ -323,16 +345,19 @@ async def _synth_edge(text: str, voice: str, speed: float, out_path: Path) -> fl
     ÖNEMLİ: Microsoft'un ses servisine bağlantı ASILI KALABİLİYOR — bazı bulut
     sunucu (Hetzner/AWS/GCP vb.) IP aralıklarını sessizce (bağlantıyı reddetmeden)
     engelliyor. Zaman aşımı olmadan bu, tüm isteği Cloudflare/nginx 502 verene
-    kadar dondurup video üretimini de kilitliyordu. 15 sn'de kesin başarısız olur."""
-    import edge_tts
+    kadar dondurup video üretimini de kilitliyordu. 15 sn'de kesin başarısız olur
+    (bkz. _run_edge_tts_blocking — neden thread'e taşındığı orada açıklanıyor)."""
     # edge-tts hız formatı: "+0%" / "-10%" / "+15%"
     pct = int(round((speed - 1.0) * 100))
     rate = f"{pct:+d}%"
     mp3_path = out_path.with_suffix(".edge.mp3")
-    communicate = edge_tts.Communicate(_clean_tts_text(text, "tr"),
-                                       _edge_voice_for(voice), rate=rate)
+    voice_id = _edge_voice_for(voice)
+    clean_text = _clean_tts_text(text, "tr")
     try:
-        await asyncio.wait_for(communicate.save(str(mp3_path)), timeout=15)
+        await asyncio.wait_for(
+            asyncio.to_thread(_run_edge_tts_blocking, clean_text, voice_id, rate, str(mp3_path)),
+            timeout=15,
+        )
     except asyncio.TimeoutError:
         raise RuntimeError("Microsoft ses servisine 15sn içinde bağlanılamadı (sunucu IP'si engellenmiş olabilir)")
     if not mp3_path.exists() or mp3_path.stat().st_size < 512:
