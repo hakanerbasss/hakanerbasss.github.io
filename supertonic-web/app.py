@@ -1416,48 +1416,16 @@ async def _fetch_article_text(url: str, max_chars: int = 2000, expected_title: s
         return ""
 
 
-def _rss_age_hours(pubdate_raw: str) -> float | None:
-    """RSS <pubDate> (RFC 822) → şu andan kaç saat önce yayınlandığı.
-    Ayrıştırılamazsa None döner (çağıran 'bilinmiyor' olarak ele alır)."""
-    if not pubdate_raw:
-        return None
-    try:
-        from email.utils import parsedate_to_datetime
-        from datetime import datetime as _dt, timezone as _tz
-        dt = parsedate_to_datetime(pubdate_raw.strip())
-        if dt is None:
-            return None
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=_tz.utc)
-        return max(0.0, (_dt.now(_tz.utc) - dt).total_seconds() / 3600.0)
-    except Exception:
-        return None
-
-
-def _add_recency_filter(query: str, days: int) -> str:
-    """Google News arama sorgusuna when:Nd ekler.
-
-    Kritik: arama RSS'i varsayılan olarak TARİHE GÖRE DEĞİL, ALAKA DÜZEYİNE göre
-    sıralar — bu filtre olmadan haftalar öncesine ait bir makale "SON DAKİKA"
-    bandıyla paylaşılabiliyordu."""
-    if not query or "when:" in query:
-        return query
-    return f"{query} when:{days}d"
-
-
-# Haberin kabul edilebilir azami yaşı. Bunun üstündeki makale olgu çıkarımına
-# hiç sokulmaz — eski haberi güncel gibi sunmak izleyicide "yalan haber"
-# algısı yaratan en büyük sebepti.
-_NEWS_MAX_AGE_HOURS = 48.0
-
-
-async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, fetch_full_text: bool = True,
-                              max_age_hours: float = _NEWS_MAX_AGE_HOURS) -> dict:
+async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, fetch_full_text: bool = True) -> dict:
     """Google News RSS'ten haber başlıkları çeker. fetch_full_text=False olunca makale içeriği
     çekilmez (sadece RSS başlık + açıklama) — paywall siteleri tıkamaz. Hata olursa {} döner.
 
-    max_age_hours: bu yaştan eski makaleler elenir. Hiçbiri kalmazsa
-    {"found": False, "stale": True} döner — çağıran farklı konu denemeli."""
+    NOT: Bir süre bu fonksiyon tam metin açılamayan/eski makaleleri sert biçimde
+    eleyip {"found": False} dönüyordu (kaynak doğrulama kapısı) — bu, Google News
+    yönlendirme linklerinin çoğu zaman gerçek makaleye çözülememesi yüzünden
+    neredeyse HER konuyu reddedip üretimi tamamen durdurdu (15+ saat sıfır video).
+    Eski davranışa dönüldü: tam metin açılamazsa RSS özetine sessizce düşülür,
+    hiçbir zaman konuyu reddetmez."""
     import xml.etree.ElementTree as ET
     import re
     from urllib.parse import quote
@@ -1465,9 +1433,7 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
     hl = "tr" if lang == "tr" else "en"
     gl = "TR" if lang == "tr" else "US"
     ceid = f"{gl}:{hl}"
-    # Aramanın kendisini de tazelikle sınırla — filtreye daha az çürük aday gelsin.
-    search_q = _add_recency_filter(query, max(1, int(round(max_age_hours / 24)) or 1))
-    url = f"https://news.google.com/rss/search?q={quote(search_q)}&hl={hl}&gl={gl}&ceid={ceid}"
+    url = f"https://news.google.com/rss/search?q={quote(query)}&hl={hl}&gl={gl}&ceid={ceid}"
     try:
         async with httpx.AsyncClient(timeout=8) as client:
             r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -1478,19 +1444,10 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
         if channel is None:
             return {}
         articles, sources = [], []
-        _stale_dropped = 0
-        for item in channel.findall("item"):
-            if len(articles) >= max_items:
-                break
+        for item in channel.findall("item")[:max_items]:
             title = (item.findtext("title") or "").strip()
             desc = re.sub(r"<[^>]+>", "", (item.findtext("description") or "")).strip()
             link = (item.findtext("link") or "").strip()
-            age_h = _rss_age_hours(item.findtext("pubDate") or "")
-            # Yaşı bilinenler eşiğe tabi; ayrıştırılamayanlar geçer (Google bazen
-            # pubDate vermiyor — bu yüzden bilinmeyeni eleyip havuzu kurutmuyoruz).
-            if age_h is not None and age_h > max_age_hours:
-                _stale_dropped += 1
-                continue
             src_el = item.find("source")
             src_name = (src_el.text or "").strip() if src_el is not None else ""
             if not src_name:
@@ -1498,18 +1455,15 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
                 if dc is not None:
                     src_name = (dc.text or "").strip()
             if title:
-                articles.append({"title": title, "desc": desc[:600], "source": src_name,
-                                 "link": link, "age_hours": age_h})
+                articles.append({"title": title, "desc": desc[:600], "source": src_name, "link": link})
                 if src_name and src_name not in sources:
                     sources.append(src_name)
         if not articles:
-            if _stale_dropped:
-                print(f"[haber] '{query[:50]}': {_stale_dropped} makalenin hepsi "
-                      f"{max_age_hours:.0f} saatten eski — konu atlanıyor", flush=True)
-                return {"found": False, "stale": True}
             return {}
 
-        # Tam makale metinleri — sadece fetch_full_text=True ise çekilir
+        # Tam makale metinleri — sadece fetch_full_text=True ise çekilir.
+        # Başarısız olan makaleler için full_text boş kalır, RSS özeti kullanılır
+        # (aşağıda body = full_text or desc) — hiçbir makale bu yüzden elenmez.
         has_full = False
         if fetch_full_text:
             texts = await asyncio.gather(
@@ -1521,27 +1475,13 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
                     articles[i]["full_text"] = txt
             has_full = any(a.get("full_text") for a in articles)
 
-        # Olgu havuzuna SADECE gerçek gövde metni olan makaleler girer.
-        # Google News RSS <description>'ı çoğu zaman "Başlık + kaynak adı"
-        # tekrarından ibaret (bkz. trends._clean_rss_desc) — bunun üzerinden
-        # "doğrulanmış olgu" çıkarmak halüsinasyonun ana kaynağıydı.
-        def _hdr(a):
-            return f"KAYNAK: {a['title']}" + (f" [{a['source']}]" if a["source"] else "")
-
-        if fetch_full_text:
-            context_lines = [f"{_hdr(a)}\n{a['full_text']}" for a in articles if a.get("full_text")]
-            thin = [a["source"] or a["title"][:40] for a in articles if not a.get("full_text")]
-            if thin:
-                print(f"[haber] '{query[:50]}': gövde metni açılamayan {len(thin)} kaynak "
-                      f"olgu havuzuna alınmadı ({', '.join(thin[:3])})", flush=True)
-            # Tam metin hiç yoksa RSS özetine düşmek yerine açıkça "zayıf kaynak" bildir.
-            # Çağıran (require_verified_source=True akışı) bunu görüp konuyu atlayacak.
-            if not context_lines:
-                print(f"[haber] '{query[:50]}': hiçbir makalenin gövdesi açılamadı — konu atlanıyor", flush=True)
-                return {"found": False, "no_body": True, "sources": sources}
-        else:
-            # Bilinçli olarak sadece başlık/özet isteyen çağıranlar — eski davranış korunur.
-            context_lines = [f"{_hdr(a)}\n{a['desc']}" for a in articles]
+        context_lines = []
+        for a in articles:
+            header = f"KAYNAK: {a['title']}"
+            if a["source"]:
+                header += f" [{a['source']}]"
+            body = a.get("full_text") or a["desc"]
+            context_lines.append(f"{header}\n{body}")
 
         return {
             "found": True,
@@ -1549,8 +1489,6 @@ async def fetch_gnews_summary(query: str, lang: str = "tr", max_items: int = 5, 
             "sources": sources,
             "context_text": "\n\n---\n\n".join(context_lines),
             "has_full_text": has_full,
-            "freshest_age_hours": min((a["age_hours"] for a in articles
-                                       if a.get("age_hours") is not None), default=None),
         }
     except Exception:
         return {}
@@ -2423,35 +2361,20 @@ Rules:
                     print(f"[gnews] verilen link açılamadı, aramaya düşülüyor: {selected_link}", flush=True)
 
             if not gnews_data.get("found"):
-                # fetch_full_text=True: _fetch_article_text başarısız olursa sessizce
-                # boş full_text bırakır — o kaynak olgu havuzuna girmez (yukarıdaki
-                # kaynak kapısına bakınız, sadece require_verified_source=True'da
-                # devreye girer), üretim durmaz, sadece o makale elenir.
+                # fetch_full_text=True: gerçek metin açılamayan kaynaklar için
+                # fetch_gnews_summary sessizce RSS özetine düşer, üretim durmaz.
                 gnews_data = await fetch_gnews_summary(search_query, lang, fetch_full_text=True)
 
-        # ── Kaynak kapısı: doğrulama zorunluysa, kaynaksız üretime izin verilmez ────
-        # Eskiden kaynak bulunamayınca/olgu çıkmayınca üretim sessizce devam ediyor,
-        # model başlığa bakıp eğitim verisinden haber uyduruyordu. Artık durur.
-        _fix_hint = " (Elle üretiyorsan: haberin metnini 'Haber metni' alanına yapıştırıp tekrar dene.)"
-        if require_verified_source:
-            if gnews_data.get("stale"):
-                raise HTTPException(422, "Haber 48 saatten eski — güncel değil, farklı konu denenecek." + _fix_hint)
-            if gnews_data.get("no_body"):
-                raise HTTPException(422, "Hiçbir kaynağın makale metni açılamadı — farklı konu denenecek." + _fix_hint)
-            if not (gnews_data.get("found") and gnews_data.get("context_text")):
-                raise HTTPException(422, "Konu için doğrulanabilir kaynak bulunamadı — farklı konu denenecek." + _fix_hint)
-
         # ── Olgu çıkarma: her iki akışta da çalışır ─────────────────────────────────
-        # Otomatik akışta gerçek makale gövdesi üzerinde çalışır (RSS özeti artık
-        # olgu havuzuna girmiyor). Manuel akışta tam makale metni üzerinde çalışır.
+        # Otomatik akışta RSS özeti üzerinde (gerçek metin açılamazsa da devam
+        # eder — bkz. fetch_gnews_summary). Manuel akışta tam makale metni
+        # üzerinde çalışır. Kaynak/olgu bulunamazsa üretim DURMAZ — sadece
+        # news_context_instruction boş kalır, model başlıktan yazar (aşağıdaki
+        # _verify_narration_facts + severity ayrımı hâlâ 'high' seviye uydurma
+        # kurum/rakam/isim iddialarını sonradan yakalayıp engelliyor).
         facts_data = {}
         if gnews_data.get("found") and gnews_data.get("context_text"):
             facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
-
-        # Olgu çıkarılamadıysa senaryo yazacak modele dayanak kalmıyor — dur.
-        if require_verified_source and not facts_data.get("facts"):
-            raise HTTPException(
-                422, "Kaynaktan doğrulanabilir olgu çıkarılamadı — farklı konu denenecek." + _fix_hint)
 
         news_context_instruction = ""
         if facts_data.get("facts"):
