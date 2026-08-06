@@ -284,8 +284,17 @@
     align-items: center;
     gap: 12px;
   }
-  #theme-toggle {
+  #settings-btn {
     margin-left: auto;
+    width: 38px; height: 38px; flex-shrink: 0;
+    padding: 0; font-size: 17px; line-height: 1;
+    background: var(--c-1a1a1a);
+    border: 1px solid var(--c-333333);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  #settings-btn:hover { background: var(--c-2a2a2a); }
+  #theme-toggle {
     width: 38px; height: 38px; flex-shrink: 0;
     padding: 0; font-size: 17px; line-height: 1;
     background: var(--c-1a1a1a);
@@ -664,6 +673,7 @@
 <header>
   <h1>Supertonic TTS</h1>
   <span>yerel · hızlı · çok dilli</span>
+  <button id="settings-btn" onclick="openSettings()" title="Ayarlar" aria-label="Ayarlar">⚙️</button>
   <button id="theme-toggle" onclick="toggleTheme()" title="Açık / karanlık tema"
           aria-label="Tema değiştir">🌙</button>
 </header>
@@ -687,8 +697,8 @@
   <div class="bnav-item" id="bnav-instagram" onclick="switchTab('instagram')">
     <span class="bnav-icon">📸</span><span class="bnav-label">Instagram</span>
   </div>
-  <div class="bnav-item" id="bnav-settings" onclick="openSettings()">
-    <span class="bnav-icon">⚙️</span><span class="bnav-label">Ayarlar</span>
+  <div class="bnav-item" id="bnav-live" onclick="switchTab('live')">
+    <span class="bnav-icon">📡</span><span class="bnav-label">Canlı Yayın</span>
   </div>
   <div class="bnav-item" id="bnav-more" onclick="toggleMoreMenu()">
     <span class="bnav-icon">☰</span><span class="bnav-label">Daha Fazla</span>
@@ -1384,121 +1394,9 @@
     </div>
 
     <!-- 7b. Canlı Yayın -->
-    <div class="acc-item" id="acc-live-stream">
-      <div class="acc-header" onclick="toggleAcc('live-stream')">
-        <span class="acc-title">📡 Canlı Yayın (YouTube)</span>
-        <span class="acc-right"><span class="acc-badge" id="acc-badge-live-stream"></span><span class="acc-chevron" id="acc-chev-live-stream">›</span></span>
-      </div>
-      <div class="acc-body" id="acc-body-live-stream">
-        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">
-          Kısa video yerine 7/24 açık kalan bir yayın — izleyici sekmeyi arka planda bıraksa bile
-          izlenme saati birikiyor. TR Instagram-Only'nin ürettiği her video, başarıyla
-          paylaşıldıktan sonra otomatik olarak havuza eklenir — ekstra üretim yapılmaz.
-          Havuzda <b>1 saatlik</b> video birikmeden yayın hiç açılmaz (aşağıda ilerlemeyi
-          görebilirsin). Yayın açılınca videolar sırayla oynar, bitince başa sarar; havuz
-          <b>24 saati</b> geçince en eski video havuzdan düşer — yayın her zaman "son 24 saat"i
-          gösterir.
-        </p>
-        <div class="field">
-          <label>Yayın Başlığı</label>
-          <input type="text" id="live-title" placeholder="Son Dakika — Canlı Haber Akışı" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
-        </div>
-        <div class="field">
-          <label>Açıklama</label>
-          <textarea id="live-description" placeholder="Güncel haberler yapay zeka destekli olarak otomatik üretilip burada akıyor." style="min-height:60px;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;"></textarea>
-        </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:13px;margin:10px 0 14px;">
-          <input type="checkbox" id="live-enabled" style="width:16px;height:16px;accent-color:var(--c-7c3aed);">
-          Yeni videoları otomatik kuyruğa ekle
-        </label>
-        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-          <button onclick="saveLiveConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-          <button onclick="startLiveStream()" id="btn-live-start" style="background:var(--c-1a3a1a);font-size:12px;padding:8px 16px;">▶ Yayını Başlat</button>
-          <button onclick="stopLiveStream()" id="btn-live-stop" style="background:var(--c-3a1a1a);font-size:12px;padding:8px 16px;">■ Yayını Durdur</button>
-        </div>
-        <div id="live-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.8;">
-          Kontrol ediliyor...
-        </div>
-        <div class="error" id="err-live" style="margin-top:8px;"></div>
-
-        <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--c-222222);">
-          <p style="color:var(--c-666666);font-size:12px;margin-bottom:10px;">
-            Havuzu hızlandırmak istersen: 12 farklı haberi tek uzun videoda birleştirip
-            (aynı Instagram görsel/ses formatında) havuza ekler. Instagram'a göndermez,
-            haber sitesine eklemez — sadece canlı yayın havuzu için. Otomasyon yok,
-            sadece bastığında bir kere çalışır.
-          </p>
-          <button onclick="generateLiveRoundup()" id="btn-live-roundup" style="background:var(--c-2a1a3a);font-size:12px;padding:8px 16px;">
-            <div class="spinner" id="spin-live-roundup"></div>🎬 Uzun Video Üret
-          </button>
-          <div id="live-roundup-status" style="font-size:12px;color:var(--c-888888);margin-top:8px;"></div>
-
-          <!-- Progress çubuğu -->
-          <div id="live-roundup-progress-box" style="display:none;margin-top:12px;background:var(--c-0d1117);border:1px solid var(--c-1a2a3a);border-radius:8px;padding:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <span id="lrp-label" style="font-size:12px;color:var(--c-cccccc);">Segment 1/12</span>
-              <span id="lrp-time" style="font-size:11px;color:var(--c-555555);"></span>
-            </div>
-            <div style="background:var(--c-1a1a2a);border-radius:4px;height:8px;overflow:hidden;">
-              <div id="lrp-bar" style="background:var(--c-7c3aed);height:8px;border-radius:4px;transition:width .5s;width:0%;"></div>
-            </div>
-            <div id="lrp-topic" style="font-size:11px;color:var(--c-666666);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
-            <div id="lrp-avg" style="font-size:10px;color:var(--c-444444);margin-top:4px;"></div>
-          </div>
-
-          <!-- Otomatik Roundup Cron -->
-          <div style="margin-top:16px;border-top:1px solid var(--c-1a1a2a);padding-top:14px;">
-            <div style="font-size:12px;font-weight:600;color:var(--c-888888);margin-bottom:10px;">⏰ Otomatik Gece Roundup (01:00–06:59 rastgele)</div>
-            <div style="font-size:11px;color:var(--c-555555);margin-bottom:10px;">Her gece farklı bir saatte üretir. Son 7 günde kullanılan saatlere girmez. Saati sen seçemezsin — bu kasıtlı.</div>
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--c-cccccc);">
-                <input type="checkbox" id="lrs-enabled" onchange="saveLiveRoundupSched()" style="accent-color:var(--c-7c3aed);">
-                Aktif
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--c-aaaaaa);">
-                <input type="checkbox" id="lrs-upload" onchange="saveLiveRoundupSched()" style="accent-color:var(--c-4ade80);" checked>
-                YouTube'a da yükle
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-aaaaaa);">
-                <span>Segment sayısı:</span>
-                <input type="number" id="lrs-segcount" min="3" max="20" value="10"
-                  onchange="saveLiveRoundupSched()"
-                  style="width:52px;background:var(--c-0e0e1a);border:1px solid var(--c-2a2a3a);border-radius:4px;color:var(--c-cccccc);padding:2px 6px;font-size:12px;text-align:center;">
-              </label>
-            </div>
-            <div id="lrs-log" style="font-size:11px;color:var(--c-555555);"></div>
-            <div id="lrs-hours" style="font-size:10px;color:var(--c-444444);margin-top:6px;"></div>
-          </div>
-
-          <div id="live-roundup-result" style="display:none;margin-top:14px;">
-            <p style="color:var(--c-666666);font-size:12px;margin-bottom:8px;">
-              Elle YouTube'a yüklemek için hazır — videoyu indir, aşağıdaki başlık/açıklama/etiketleri kopyala.
-            </p>
-            <div class="field">
-              <label>Başlık</label>
-              <input type="text" id="live-roundup-title" readonly onclick="this.select()" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;">
-              <button onclick="copyRoundupField('live-roundup-title', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:var(--c-1a1a2a);">📋 Başlığı Kopyala</button>
-            </div>
-            <div class="field" style="margin-top:8px;">
-              <label>Açıklama</label>
-              <textarea id="live-roundup-desc" readonly onclick="this.select()" style="min-height:180px;width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;"></textarea>
-              <button onclick="copyRoundupField('live-roundup-desc', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:var(--c-1a1a2a);">📋 Açıklamayı Kopyala</button>
-            </div>
-            <div class="field" style="margin-top:8px;">
-              <label>Etiketler</label>
-              <input type="text" id="live-roundup-tags" readonly onclick="this.select()" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;">
-              <button onclick="copyRoundupField('live-roundup-tags', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:var(--c-1a1a2a);">🏷️ Etiket Öner (Kopyala)</button>
-            </div>
-            <a id="live-roundup-download" href="#" download class="dl-btn" style="margin-top:10px;">⬇ Videoyu İndir</a>
-          </div>
-
-          <div style="margin-top:14px;">
-            <button onclick="loadLivePoolFiles()" style="font-size:12px;padding:7px 14px;background:var(--c-1a1a2a);">📂 Havuzdaki Videoları Göster</button>
-            <div id="live-pool-files" style="margin-top:10px;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Canlı yayın artık kendi sekmesinde (alt menü: 📡 Canlı Yayın).
+         Yayın kontrolü, havuz durumu, gece roundup'ı ve "Uzun Video Üret"
+         hepsi orada. -->
 
     <!-- 8. API Bağlantıları -->
     <div class="acc-item" id="acc-api-keys">
@@ -1812,11 +1710,20 @@ async function loadMeta() {
 
 // Alt navigasyonda doğrudan görünen sekmeler; geri kalanı "Daha Fazla" menüsüne toplanır.
 const MORE_TABS = ['text', 'iganalytics', 'prompt'];
-const BNAV_DIRECT = { shorts: 'bnav-shorts', analytics: 'bnav-analytics', instagram: 'bnav-instagram' };
+const BNAV_DIRECT = { shorts: 'bnav-shorts', instagram: 'bnav-instagram', live: 'bnav-live', analytics: 'bnav-analytics' };
 
 // ── Instagram sekmesi ───────────────────────────────────────────────────
 // Bu içerik eskiden Ayarlar akordiyonundaydı; yükleyicileri openSettings()
 // çağırıyordu. Kendi sekmesine taşındığı için artık sekme açılınca çalışıyor.
+// ── Canlı Yayın sekmesi ─────────────────────────────────────────────────
+// Eskiden Ayarlar akordiyonundaydı; yükleyicileri openSettings() çağırıyordu.
+function loadLiveTab() {
+  loadLiveConfig();
+  refreshLiveStatus();
+  loadLiveRoundupSched();
+  _pollRoundupProgress();
+}
+
 function loadInstagramTab() {
   loadIGOnlyTRStatus();
   loadIGFailedUploads();
@@ -1829,6 +1736,7 @@ function switchTab(name) {
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
   if (name === 'instagram') loadInstagramTab();
+  if (name === 'live') loadLiveTab();
   if (name === 'prompt') loadPromptPreview();
 }
 
@@ -1977,7 +1885,7 @@ async function checkYTStatus() {
   } catch(e) {}
 }
 
-const _ACC_IDS = ['tr-short','en-short','ig-api','live-stream','api-keys','sistem'];
+const _ACC_IDS = ['tr-short','en-short','ig-api','api-keys','sistem'];
 
 function toggleAcc(id) {
   const body = document.getElementById('acc-body-' + id);
@@ -2029,16 +1937,12 @@ async function openSettings() {
   } catch(e) {}
   loadSchedulerStatus();
   loadENShortsSchedulerStatus();
-  loadLiveRoundupSched();
-  _pollRoundupProgress();
   loadTelegramConfig();
   checkOpenAIStatus();
   checkInstagramStatus();
   loadInstagramLog();
   loadBannedTopics();
   loadCloneStatus();
-  loadLiveConfig();
-  refreshLiveStatus();
 }
 
 // ── Canlı Yayın (YouTube) ─────────────────────────────────────────────────
@@ -4569,6 +4473,121 @@ function _buildFullAnalyticsHTML(d) {
 
 <!-- INSTAGRAM ANALİTİK PANELİ -->
 <!-- INSTAGRAM (otomatik paylaşım) -->
+<!-- CANLI YAYIN -->
+<div class="panel" id="tab-live">
+  <h2 style="font-size:18px;margin-bottom:4px;">📡 Canlı Yayın</h2>
+  <p style="color:var(--c-666666);font-size:12px;margin-bottom:18px;">
+    7/24 açık kalan YouTube yayını. Havuzdaki videolar sırayla oynar, bitince başa sarar.
+  </p>
+        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">
+          Kısa video yerine 7/24 açık kalan bir yayın — izleyici sekmeyi arka planda bıraksa bile
+          izlenme saati birikiyor. TR Instagram-Only'nin ürettiği her video, başarıyla
+          paylaşıldıktan sonra otomatik olarak havuza eklenir — ekstra üretim yapılmaz.
+          Havuzda <b>1 saatlik</b> video birikmeden yayın hiç açılmaz (aşağıda ilerlemeyi
+          görebilirsin). Yayın açılınca videolar sırayla oynar, bitince başa sarar; havuz
+          <b>24 saati</b> geçince en eski video havuzdan düşer — yayın her zaman "son 24 saat"i
+          gösterir.
+        </p>
+        <div class="field">
+          <label>Yayın Başlığı</label>
+          <input type="text" id="live-title" placeholder="Son Dakika — Canlı Haber Akışı" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
+        </div>
+        <div class="field">
+          <label>Açıklama</label>
+          <textarea id="live-description" placeholder="Güncel haberler yapay zeka destekli olarak otomatik üretilip burada akıyor." style="min-height:60px;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;"></textarea>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:13px;margin:10px 0 14px;">
+          <input type="checkbox" id="live-enabled" style="width:16px;height:16px;accent-color:var(--c-7c3aed);">
+          Yeni videoları otomatik kuyruğa ekle
+        </label>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="saveLiveConfig()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="startLiveStream()" id="btn-live-start" style="background:var(--c-1a3a1a);font-size:12px;padding:8px 16px;">▶ Yayını Başlat</button>
+          <button onclick="stopLiveStream()" id="btn-live-stop" style="background:var(--c-3a1a1a);font-size:12px;padding:8px 16px;">■ Yayını Durdur</button>
+        </div>
+        <div id="live-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.8;">
+          Kontrol ediliyor...
+        </div>
+        <div class="error" id="err-live" style="margin-top:8px;"></div>
+
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--c-222222);">
+          <p style="color:var(--c-666666);font-size:12px;margin-bottom:10px;">
+            Havuzu hızlandırmak istersen: 12 farklı haberi tek uzun videoda birleştirip
+            (aynı Instagram görsel/ses formatında) havuza ekler. Instagram'a göndermez,
+            haber sitesine eklemez — sadece canlı yayın havuzu için. Otomasyon yok,
+            sadece bastığında bir kere çalışır.
+          </p>
+          <button onclick="generateLiveRoundup()" id="btn-live-roundup" style="background:var(--c-2a1a3a);font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-live-roundup"></div>🎬 Uzun Video Üret
+          </button>
+          <div id="live-roundup-status" style="font-size:12px;color:var(--c-888888);margin-top:8px;"></div>
+
+          <!-- Progress çubuğu -->
+          <div id="live-roundup-progress-box" style="display:none;margin-top:12px;background:var(--c-0d1117);border:1px solid var(--c-1a2a3a);border-radius:8px;padding:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span id="lrp-label" style="font-size:12px;color:var(--c-cccccc);">Segment 1/12</span>
+              <span id="lrp-time" style="font-size:11px;color:var(--c-555555);"></span>
+            </div>
+            <div style="background:var(--c-1a1a2a);border-radius:4px;height:8px;overflow:hidden;">
+              <div id="lrp-bar" style="background:var(--c-7c3aed);height:8px;border-radius:4px;transition:width .5s;width:0%;"></div>
+            </div>
+            <div id="lrp-topic" style="font-size:11px;color:var(--c-666666);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+            <div id="lrp-avg" style="font-size:10px;color:var(--c-444444);margin-top:4px;"></div>
+          </div>
+
+          <!-- Otomatik Roundup Cron -->
+          <div style="margin-top:16px;border-top:1px solid var(--c-1a1a2a);padding-top:14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--c-888888);margin-bottom:10px;">⏰ Otomatik Gece Roundup (01:00–06:59 rastgele)</div>
+            <div style="font-size:11px;color:var(--c-555555);margin-bottom:10px;">Her gece farklı bir saatte üretir. Son 7 günde kullanılan saatlere girmez. Saati sen seçemezsin — bu kasıtlı.</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--c-cccccc);">
+                <input type="checkbox" id="lrs-enabled" onchange="saveLiveRoundupSched()" style="accent-color:var(--c-7c3aed);">
+                Aktif
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--c-aaaaaa);">
+                <input type="checkbox" id="lrs-upload" onchange="saveLiveRoundupSched()" style="accent-color:var(--c-4ade80);" checked>
+                YouTube'a da yükle
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-aaaaaa);">
+                <span>Segment sayısı:</span>
+                <input type="number" id="lrs-segcount" min="3" max="20" value="10"
+                  onchange="saveLiveRoundupSched()"
+                  style="width:52px;background:var(--c-0e0e1a);border:1px solid var(--c-2a2a3a);border-radius:4px;color:var(--c-cccccc);padding:2px 6px;font-size:12px;text-align:center;">
+              </label>
+            </div>
+            <div id="lrs-log" style="font-size:11px;color:var(--c-555555);"></div>
+            <div id="lrs-hours" style="font-size:10px;color:var(--c-444444);margin-top:6px;"></div>
+          </div>
+
+          <div id="live-roundup-result" style="display:none;margin-top:14px;">
+            <p style="color:var(--c-666666);font-size:12px;margin-bottom:8px;">
+              Elle YouTube'a yüklemek için hazır — videoyu indir, aşağıdaki başlık/açıklama/etiketleri kopyala.
+            </p>
+            <div class="field">
+              <label>Başlık</label>
+              <input type="text" id="live-roundup-title" readonly onclick="this.select()" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;">
+              <button onclick="copyRoundupField('live-roundup-title', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:var(--c-1a1a2a);">📋 Başlığı Kopyala</button>
+            </div>
+            <div class="field" style="margin-top:8px;">
+              <label>Açıklama</label>
+              <textarea id="live-roundup-desc" readonly onclick="this.select()" style="min-height:180px;width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;"></textarea>
+              <button onclick="copyRoundupField('live-roundup-desc', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:var(--c-1a1a2a);">📋 Açıklamayı Kopyala</button>
+            </div>
+            <div class="field" style="margin-top:8px;">
+              <label>Etiketler</label>
+              <input type="text" id="live-roundup-tags" readonly onclick="this.select()" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;">
+              <button onclick="copyRoundupField('live-roundup-tags', this)" style="margin-top:6px;font-size:11px;padding:6px 12px;background:var(--c-1a1a2a);">🏷️ Etiket Öner (Kopyala)</button>
+            </div>
+            <a id="live-roundup-download" href="#" download class="dl-btn" style="margin-top:10px;">⬇ Videoyu İndir</a>
+          </div>
+
+          <div style="margin-top:14px;">
+            <button onclick="loadLivePoolFiles()" style="font-size:12px;padding:7px 14px;background:var(--c-1a1a2a);">📂 Havuzdaki Videoları Göster</button>
+            <div id="live-pool-files" style="margin-top:10px;"></div>
+          </div>
+        </div>
+</div>
+
 <div class="panel" id="tab-instagram">
   <h2 style="font-size:18px;margin-bottom:4px;">📸 Instagram Otomatik Paylaşım</h2>
   <p style="color:var(--c-666666);font-size:12px;margin-bottom:18px;">
