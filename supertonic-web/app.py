@@ -9568,14 +9568,17 @@ async def startup_event():
     ]
 
     scheduler.start()
-    _rebuild_scheduler()
+    # TR Otomatik Short zamanlayıcısı KAPALI (06.08.2026): kullanıcı YouTube'a
+    # otomatik üretimi bıraktı, "Short Üret" sekmesinden elle gönderiyor.
+    # _rebuild_scheduler()
     # Uzun Video (TR) ve EN Belgesel zamanlayıcıları KAPALI (06.08.2026):
     # arayüz sekmeleri kullanıcı isteğiyle silindi. Kayıtlı kalsalardı
     # arka planda YouTube'a video üretmeye devam ederlerdi ama açıp
     # kapatacak ekran kalmazdı. Fonksiyonlar ve uç noktalar duruyor.
     # _rebuild_lv_scheduler()
     # _rebuild_lv_en_scheduler()
-    _rebuild_en_shorts_scheduler()
+    # EN Otomatik Short zamanlayıcısı KAPALI (06.08.2026): aynı gerekçe.
+    # _rebuild_en_shorts_scheduler()
     # Trend Haber LV zamanlayıcısı KAPALI (06.08.2026): arayüz sekmesi
     # kullanıcı isteğiyle silindi. Kayıt burada bırakılsaydı iş arka planda
     # YouTube'a video üretmeye devam eder, ama açıp kapatacak veya durumunu
