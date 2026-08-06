@@ -460,6 +460,83 @@
   .upload-area p { color: var(--c-555555); font-size: 14px; margin-top: 8px; }
   .upload-area strong { color: var(--c-888888); }
 
+  /* ── Bölüm etiketi — Short Üret gibi çok adımlı akışlarda gruplama ─────── */
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--c-666666); margin: 30px 0 12px;
+  }
+  .section-label:first-of-type { margin-top: 0; }
+
+  /* ── Buton hiyerarşisi ────────────────────────────────────────────────
+     Eskiden tüm butonlar (API key kaydet, 4 trend butonu, Shorts Üret,
+     Trend Haberden Üret) aynı görsel ağırlıktaydı — hangisinin asıl eylem
+     olduğu belli değildi. Üç kademe: */
+  .btn-primary {
+    width: 100%; justify-content: center;
+    font-size: 15px; font-weight: 600; padding: 15px 24px;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--c-a78bfa);
+    border: 1px solid var(--c-333333);
+    font-weight: 500;
+  }
+  .btn-secondary:hover { background: var(--c-1a1a1a); border-color: var(--c-444444); }
+  .btn-secondary:disabled { background: transparent; border-color: var(--c-222222); }
+  .btn-chip {
+    background: var(--c-1a1a1a);
+    border: 1px solid var(--c-2a2a2a);
+    color: var(--c-cccccc);
+    font-size: 12.5px; font-weight: 500;
+    padding: 9px 14px;
+  }
+  .btn-chip:hover { background: var(--c-2a2a2a); border-color: var(--c-333333); }
+
+  /* ── Toggle switch ────────────────────────────────────────────────────
+     .toggle-switch/.toggle-slider HTML'de 5 yerde kullanılıyordu ama hiç
+     tanımlanmamıştı — düz, biçimsiz bir checkbox gibi görünüyorlardı. */
+  .toggle-switch { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; cursor: pointer; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: var(--c-333333);
+    border-radius: 999px; transition: background .15s;
+  }
+  .toggle-slider::before {
+    content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+    background: var(--c-eeeeee); border-radius: 50%; transition: transform .15s;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--c-7c3aed); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+  .toggle-switch input:focus-visible + .toggle-slider { outline: 2px solid var(--c-7c3aed); outline-offset: 2px; }
+
+  /* ── Gelişmiş seçenekler — katlanabilir kart ─────────────────────────
+     Video modu / Kendi Görsellerim / Özel Kapak / Spiker Modu eskiden 4
+     ayrı, her zaman açık, aynı ağırlıkta kart olarak duruyordu — nadiren
+     kullanılan seçenekler ana akışı boğuyordu. */
+  details.opt-card {
+    background: var(--c-111111); border: 1px solid var(--c-222222);
+    border-radius: 10px; padding: 0 16px; margin-bottom: 20px;
+  }
+  details.opt-card summary {
+    list-style: none; cursor: pointer; padding: 14px 0;
+    font-size: 14px; font-weight: 600; color: var(--c-e0e0e0);
+    display: flex; align-items: center; gap: 8px;
+  }
+  details.opt-card summary::-webkit-details-marker { display: none; }
+  details.opt-card summary::after {
+    content: "›"; margin-left: auto; font-size: 20px; color: var(--c-555555);
+    transition: transform .15s;
+  }
+  details.opt-card[open] summary::after { transform: rotate(90deg); }
+  details.opt-card .opt-body {
+    padding: 2px 0 16px;
+    display: flex; flex-direction: column; gap: 16px;
+    border-top: 1px solid var(--c-1e1e1e);
+    padding-top: 16px;
+  }
+  .opt-row { display: flex; align-items: center; gap: 12px; }
+  .opt-row .opt-text-sub { font-size: 11px; color: var(--c-555555); margin-top: 2px; }
+
   .spinner {
     width: 18px; height: 18px;
     border: 2px solid var(--c-ffffff44);
@@ -768,79 +845,93 @@
 </div>
 <div class="panel active" id="tab-shorts">
 
-  <div class="field">
-    <label>DeepSeek API Key</label>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <input type="password" id="shorts-apikey" placeholder="sk-..." style="flex:1;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-e0e0e0);font-size:14px;padding:12px;outline:none;">
-      <button onclick="saveApiKey()" style="padding:12px 16px;font-size:13px;white-space:nowrap;">Kaydet</button>
-      <button onclick="clearApiKey()" style="padding:12px 16px;font-size:13px;background:var(--c-2a1a1a);white-space:nowrap;">Temizle</button>
+  <!-- API key: zaten kayıtlıysa küçük bir durum satırı, ilk kurulumda tam alan.
+       Eskiden her ziyarette tam genişlikte, "Shorts Üret" ile eşit ağırlıkta
+       görünüyordu — halbuki bir kere girilip unutulan bir alan. -->
+  <div class="field" id="apikey-field">
+    <div id="apikey-compact" style="display:none;align-items:center;justify-content:space-between;gap:10px;background:var(--c-0d1a0d);border:1px solid var(--c-1a3a1a);border-radius:8px;padding:10px 14px;">
+      <span style="font-size:13px;color:var(--c-6dbf6d);">✓ DeepSeek API key kayıtlı</span>
+      <button type="button" onclick="_toggleApikeyEdit(true)" class="btn-chip" style="padding:5px 12px;">Değiştir</button>
     </div>
-    <div id="apikey-status" style="font-size:12px;color:var(--c-444444);margin-top:6px;">Tarayıcıda saklanır, sunucuya gönderilmez.</div>
+    <div id="apikey-expanded">
+      <label>DeepSeek API Key</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="password" id="shorts-apikey" placeholder="sk-..." style="flex:1;background:var(--c-1a1a1a);border:1px solid var(--c-2a2a2a);border-radius:8px;color:var(--c-e0e0e0);font-size:14px;padding:12px;outline:none;">
+        <button onclick="saveApiKey()" style="padding:12px 16px;font-size:13px;white-space:nowrap;">Kaydet</button>
+        <button onclick="clearApiKey()" style="padding:12px 16px;font-size:13px;background:var(--c-2a1a1a);white-space:nowrap;">Temizle</button>
+      </div>
+      <div id="apikey-status" style="font-size:12px;color:var(--c-444444);margin-top:6px;">Tarayıcıda saklanır, sunucuya gönderilmez.</div>
+    </div>
   </div>
+
+  <div class="section-label">1. Konu</div>
 
   <div class="field">
     <label>Konu</label>
     <textarea id="shorts-topic" placeholder="Örn: Yapay zekanın geleceği, Mars'a yolculuk, Kuantum fiziği nedir..." style="min-height:90px;"></textarea>
   </div>
 
-  <div style="margin-bottom:14px;padding:10px 14px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <label class="toggle-switch" style="margin:0;">
-        <input type="checkbox" id="use-manual-source" onchange="document.getElementById('manual-source-wrap').style.display = this.checked ? 'flex' : 'none';">
-        <span class="toggle-slider"></span>
-      </label>
-      <div>
-        <div style="font-size:13px;color:var(--c-d4d4d4);font-weight:600;">🔗 Kaynak Linki / Metni Elle Gir (opsiyonel)</div>
-        <div style="font-size:11px;color:var(--c-555555);margin-top:2px;">Sistem otomatik link bulamazsa veya yanlış habere gidiyorsa, buraya haberin linkini ya da metnini yapıştır — video SADECE bu kaynağa dayanarak üretilir.</div>
-      </div>
-    </div>
-    <div id="manual-source-wrap" style="display:none;margin-top:10px;flex-direction:column;gap:8px;">
-      <div>
-        <label style="font-size:12px;color:var(--c-888888);">Haber Linki (opsiyonel)</label>
-        <input type="url" id="manual-source-link" placeholder="https://..." style="font-size:13px;">
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--c-888888);">veya Haber Metnini Buraya Yapıştır (linkten önceliklidir)</label>
-        <textarea id="manual-source-content" placeholder="Haberin tam metnini buraya yapıştırabilirsin. Bu doluysa link hiç çekilmez, video doğrudan bu metne dayanır." style="min-height:100px;font-size:13px;"></textarea>
-      </div>
-    </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+    <button onclick="fetchTrends()" id="btn-trends" class="btn-chip">
+      <div class="spinner" id="spin-trends"></div>
+      📈 Günün Trendleri
+    </button>
+    <button onclick="fetchTrends(true)" id="btn-trends-gurbetci" class="btn-chip">
+      <div class="spinner" id="spin-trends-gurbetci"></div>
+      🌍 Trend + Gurbetçi
+    </button>
+    <button onclick="fetchTrends('combined')" id="btn-trends-combined" class="btn-chip">
+      <div class="spinner" id="spin-trends-combined"></div>
+      🔗 Birleşik Havuz
+    </button>
+    <button onclick="fetchAIRankedPool()" id="btn-ai-pool" class="btn-chip">
+      <div class="spinner" id="spin-ai-pool"></div>
+      🤖 AI Jürili Havuz
+    </button>
   </div>
 
-  <div style="margin-bottom:20px;">
-    <button onclick="fetchTrends()" id="btn-trends" style="background:var(--c-1a3a1a);font-size:13px;padding:10px 18px;">
-      <div class="spinner" id="spin-trends"></div>
-      Günün Trendlerini Getir
-    </button>
-    <button onclick="fetchTrends(true)" id="btn-trends-gurbetci" style="background:var(--c-1a2a3a);font-size:13px;padding:10px 18px;margin-left:8px;">
-      <div class="spinner" id="spin-trends-gurbetci"></div>
-      🌍 Trend + Gurbetçi Haberleri Getir
-    </button>
-    <button onclick="fetchTrends('combined')" id="btn-trends-combined" style="background:var(--c-2a1a3a);font-size:13px;padding:10px 18px;margin-left:8px;">
-      <div class="spinner" id="spin-trends-combined"></div>
-      🔗 Birleşik Havuz (Filtreli)
-    </button>
-    <button onclick="fetchAIRankedPool()" id="btn-ai-pool" style="background:var(--c-1a2a2a);font-size:13px;padding:10px 18px;margin-left:8px;">
-      <div class="spinner" id="spin-ai-pool"></div>
-      🤖 AI Jürili Havuz (Telegram'daki Liste)
-    </button>
-    <div id="trends-box" style="display:none;margin-top:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:14px;">
-      <div style="font-size:12px;color:var(--c-666666);margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
-      <div id="trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
-      <div id="gurbetci-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--c-222222);">
-        <div style="font-size:12px;color:var(--c-7dd3fc);margin-bottom:8px;">🌍 Gurbetçi haber havuzu — sadece manuel inceleme için, otomatik akışa dahil değil</div>
-        <div id="gurbetci-trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
-      </div>
-      <div id="combined-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--c-222222);">
-        <div style="font-size:12px;color:var(--c-c4b5fd);margin-bottom:8px;">🔗 Birleşik + filtreli havuz — trend + gurbetçi, ölüm/vefat/dedikodu ve ASAYİŞ kategorisi elenmiş. Sadece manuel inceleme için.</div>
-        <div id="combined-trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
-      </div>
-      <div id="ai-pool-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--c-222222);">
-        <div style="font-size:12px;color:var(--c-5eead4);margin-bottom:8px;">🤖 AI jürili havuz — Telegram'a giden VE otomatik tekli haber seçiminde kullanılan aynı liste (kural puanlama + AI jüri). Sadece manuel inceleme için, DeepSeek API key gerekir.</div>
-        <div id="ai-pool-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
-      </div>
-      <div style="font-size:11px;color:var(--c-444444);margin-top:10px;" id="trends-time"></div>
+  <div id="trends-box" style="display:none;margin-bottom:14px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:14px;">
+    <div style="font-size:12px;color:var(--c-666666);margin-bottom:8px;">Bir konuya tıkla → konu alanına doldurulsun</div>
+    <div id="trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+    <div id="gurbetci-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--c-222222);">
+      <div style="font-size:12px;color:var(--c-7dd3fc);margin-bottom:8px;">🌍 Gurbetçi haber havuzu — sadece manuel inceleme için, otomatik akışa dahil değil</div>
+      <div id="gurbetci-trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
     </div>
+    <div id="combined-trends-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--c-222222);">
+      <div style="font-size:12px;color:var(--c-c4b5fd);margin-bottom:8px;">🔗 Birleşik + filtreli havuz — trend + gurbetçi, ölüm/vefat/dedikodu ve ASAYİŞ kategorisi elenmiş. Sadece manuel inceleme için.</div>
+      <div id="combined-trends-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+    </div>
+    <div id="ai-pool-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--c-222222);">
+      <div style="font-size:12px;color:var(--c-5eead4);margin-bottom:8px;">🤖 AI jürili havuz — Telegram'a giden VE otomatik tekli haber seçiminde kullanılan aynı liste (kural puanlama + AI jüri). Sadece manuel inceleme için, DeepSeek API key gerekir.</div>
+      <div id="ai-pool-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+    </div>
+    <div style="font-size:11px;color:var(--c-444444);margin-top:10px;" id="trends-time"></div>
   </div>
+
+  <details class="opt-card">
+    <summary>🔗 Kaynak Linki / Metni Elle Gir <span style="font-weight:400;color:var(--c-555555);font-size:12px;">(opsiyonel)</span></summary>
+    <div class="opt-body">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <label class="toggle-switch" style="margin:0;">
+          <input type="checkbox" id="use-manual-source" onchange="document.getElementById('manual-source-wrap').style.display = this.checked ? 'flex' : 'none';">
+          <span class="toggle-slider"></span>
+        </label>
+        <div class="opt-text-sub" style="margin:0;">Sistem otomatik link bulamazsa veya yanlış habere gidiyorsa, buraya haberin linkini ya da metnini yapıştır — video SADECE bu kaynağa dayanarak üretilir.</div>
+      </div>
+      <div id="manual-source-wrap" style="display:none;flex-direction:column;gap:8px;">
+        <div>
+          <label style="font-size:12px;color:var(--c-888888);">Haber Linki (opsiyonel)</label>
+          <input type="url" id="manual-source-link" placeholder="https://..." style="font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--c-888888);">veya Haber Metnini Buraya Yapıştır (linkten önceliklidir)</label>
+          <textarea id="manual-source-content" placeholder="Haberin tam metnini buraya yapıştırabilirsin. Bu doluysa link hiç çekilmez, video doğrudan bu metne dayanır." style="min-height:100px;font-size:13px;"></textarea>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <div class="section-label">2. Ses ve Dil</div>
 
   <div class="controls">
     <div class="field">
@@ -862,75 +953,6 @@
     </div>
   </div>
 
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;">
-    <label class="toggle-switch" style="margin:0;">
-      <input type="checkbox" id="use-video-mode">
-      <span class="toggle-slider"></span>
-    </label>
-    <div>
-      <div style="font-size:13px;color:var(--c-d4d4d4);font-weight:600;">🎬 Videolu İçerik Üret</div>
-      <div style="font-size:11px;color:var(--c-555555);margin-top:2px;">Pexels'tan stock video klip kullanır, bulamazsa fotoğrafa döner</div>
-    </div>
-  </div>
-
-  <div style="margin-bottom:14px;padding:10px 14px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <label class="toggle-switch" style="margin:0;">
-        <input type="checkbox" id="use-custom-images" onchange="document.getElementById('custom-images-wrap').style.display = this.checked ? 'block' : 'none';">
-        <span class="toggle-slider"></span>
-      </label>
-      <div>
-        <div style="font-size:13px;color:var(--c-d4d4d4);font-weight:600;">🖼️ Kendi Görsellerimi Kullan</div>
-        <div style="font-size:11px;color:var(--c-555555);margin-top:2px;">Ör. kendi uygulamanın/ürününün tanıtımı — stok fotoğraf yerine yüklediğin görseller sahnelerde sırayla kullanılır</div>
-      </div>
-    </div>
-    <div id="custom-images-wrap" style="display:none;margin-top:10px;">
-      <input type="file" id="custom-images-input" accept="image/*" multiple style="font-size:12px;color:var(--c-999999);">
-      <div style="font-size:11px;color:var(--c-555555);margin-top:6px;">Sahne sayısından az görsel yüklersen, kalan sahnelerde baştan tekrarlanır.</div>
-    </div>
-  </div>
-
-  <div style="margin-bottom:14px;padding:10px 14px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <label class="toggle-switch" style="margin:0;">
-        <input type="checkbox" id="use-intro-cover" onchange="document.getElementById('intro-cover-wrap').style.display = this.checked ? 'block' : 'none';">
-        <span class="toggle-slider"></span>
-      </label>
-      <div>
-        <div style="font-size:13px;color:var(--c-d4d4d4);font-weight:600;">🎨 Özel Açılış Kapağı Kullan (deneysel)</div>
-        <div style="font-size:11px;color:var(--c-555555);margin-top:2px;">Kendi tasarladığın (ör. ChatGPT'de üretilmiş) görsel, ilk sahnedeki stok fotoğrafın yerine geçer — zoom efekti ve sarı/kırmızı banner uygulanmaz, statik durur. Seslendirme, süre ve geri kalan her şey aynen çalışır. Instagram ve YouTube'da aynı şekilde işler.</div>
-      </div>
-    </div>
-    <div id="intro-cover-wrap" style="display:none;margin-top:10px;">
-      <input type="file" id="intro-cover-input" accept="image/*" style="font-size:12px;color:var(--c-999999);">
-      <div style="font-size:11px;color:var(--c-555555);margin-top:6px;">1080x1920 (dikey) formatına en yakın görsel en iyi sonucu verir.</div>
-    </div>
-  </div>
-
-  <div id="spiker-section" style="margin-bottom:14px;padding:10px 14px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <label class="toggle-switch" style="margin:0;">
-        <input type="checkbox" id="use-spiker-mode" onchange="onSpikerToggle(this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-      <div>
-        <div style="font-size:13px;color:var(--c-d4d4d4);font-weight:600;">🎙️ Spiker Modu</div>
-        <div style="font-size:11px;color:var(--c-555555);margin-top:2px;">Fotoğrafını yükle — seni konuşturarak video sağ altına ekler (LongCat AI, ek 2-3 dk)</div>
-      </div>
-    </div>
-    <div id="spiker-wrap" style="display:none;margin-top:12px;">
-      <div id="spiker-avatar-preview" style="display:none;margin-bottom:8px;">
-        <img id="spiker-avatar-img" src="" style="width:64px;height:64px;object-fit:cover;border-radius:50%;border:2px solid var(--c-333333);vertical-align:middle;">
-        <span style="font-size:12px;color:var(--c-6dbf6d);margin-left:8px;">Kayıtlı fotoğraf kullanılacak</span>
-        <button onclick="clearSpikerAvatar()" style="margin-left:10px;padding:2px 8px;background:var(--c-2a1a1a);border:1px solid var(--c-5a2a2a);border-radius:6px;color:var(--c-f87171);font-size:11px;cursor:pointer;">Değiştir</button>
-      </div>
-      <div id="spiker-upload-area">
-        <input type="file" id="avatar-input" accept="image/*" onchange="onAvatarSelected(this)" style="font-size:12px;color:var(--c-999999);">
-        <div style="font-size:11px;color:var(--c-555555);margin-top:6px;">Önden çekilmiş, net bir yüz fotoğrafı kullan. Bir kez yükle, sonra otomatik hatırlanır.</div>
-      </div>
-    </div>
-  </div>
-
   <div class="field" style="margin-bottom:14px;">
     <label>Hangi platform için?</label>
     <div style="display:flex;gap:8px;">
@@ -946,14 +968,89 @@
     <div style="font-size:11px;color:var(--c-555555);margin-top:6px;">Seçtiğine göre kapanış çağrısı (Takip Et vs Abone Ol) ve video sonundaki kapanış görseli değişir.</div>
   </div>
 
-  <div style="display:flex;gap:10px;flex-wrap:wrap;">
-    <button onclick="generateShorts()" id="btn-shorts">
+  <div class="section-label">3. Gelişmiş Seçenekler</div>
+
+  <details class="opt-card">
+    <summary>🎬 Videolu İçerik Üret</summary>
+    <div class="opt-body">
+      <div class="opt-row">
+        <label class="toggle-switch" style="margin:0;">
+          <input type="checkbox" id="use-video-mode">
+          <span class="toggle-slider"></span>
+        </label>
+        <div class="opt-text-sub" style="margin:0;">Pexels'tan stock video klip kullanır, bulamazsa fotoğrafa döner</div>
+      </div>
+    </div>
+  </details>
+
+  <details class="opt-card">
+    <summary>🖼️ Kendi Görsellerimi Kullan</summary>
+    <div class="opt-body">
+      <div class="opt-row">
+        <label class="toggle-switch" style="margin:0;">
+          <input type="checkbox" id="use-custom-images" onchange="document.getElementById('custom-images-wrap').style.display = this.checked ? 'block' : 'none';">
+          <span class="toggle-slider"></span>
+        </label>
+        <div class="opt-text-sub" style="margin:0;">Ör. kendi uygulamanın/ürününün tanıtımı — stok fotoğraf yerine yüklediğin görseller sahnelerde sırayla kullanılır</div>
+      </div>
+      <div id="custom-images-wrap" style="display:none;">
+        <input type="file" id="custom-images-input" accept="image/*" multiple style="font-size:12px;color:var(--c-999999);">
+        <div style="font-size:11px;color:var(--c-555555);margin-top:6px;">Sahne sayısından az görsel yüklersen, kalan sahnelerde baştan tekrarlanır.</div>
+      </div>
+    </div>
+  </details>
+
+  <details class="opt-card">
+    <summary>🎨 Özel Açılış Kapağı <span style="font-weight:400;color:var(--c-555555);font-size:12px;">(deneysel)</span></summary>
+    <div class="opt-body">
+      <div class="opt-row">
+        <label class="toggle-switch" style="margin:0;">
+          <input type="checkbox" id="use-intro-cover" onchange="document.getElementById('intro-cover-wrap').style.display = this.checked ? 'block' : 'none';">
+          <span class="toggle-slider"></span>
+        </label>
+        <div class="opt-text-sub" style="margin:0;">Kendi tasarladığın (ör. ChatGPT'de üretilmiş) görsel, ilk sahnedeki stok fotoğrafın yerine geçer — zoom efekti ve banner uygulanmaz, statik durur. Seslendirme, süre ve geri kalan her şey aynen çalışır.</div>
+      </div>
+      <div id="intro-cover-wrap" style="display:none;">
+        <input type="file" id="intro-cover-input" accept="image/*" style="font-size:12px;color:var(--c-999999);">
+        <div style="font-size:11px;color:var(--c-555555);margin-top:6px;">1080x1920 (dikey) formatına en yakın görsel en iyi sonucu verir.</div>
+      </div>
+    </div>
+  </details>
+
+  <details class="opt-card" id="spiker-section">
+    <summary>🎙️ Spiker Modu</summary>
+    <div class="opt-body">
+      <div class="opt-row">
+        <label class="toggle-switch" style="margin:0;">
+          <input type="checkbox" id="use-spiker-mode" onchange="onSpikerToggle(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <div class="opt-text-sub" style="margin:0;">Fotoğrafını yükle — seni konuşturarak video sağ altına ekler (LongCat AI, ek 2-3 dk)</div>
+      </div>
+      <div id="spiker-wrap" style="display:none;">
+        <div id="spiker-avatar-preview" style="display:none;margin-bottom:8px;">
+          <img id="spiker-avatar-img" src="" style="width:64px;height:64px;object-fit:cover;border-radius:50%;border:2px solid var(--c-333333);vertical-align:middle;">
+          <span style="font-size:12px;color:var(--c-6dbf6d);margin-left:8px;">Kayıtlı fotoğraf kullanılacak</span>
+          <button onclick="clearSpikerAvatar()" style="margin-left:10px;padding:2px 8px;background:var(--c-2a1a1a);border:1px solid var(--c-5a2a2a);border-radius:6px;color:var(--c-f87171);font-size:11px;cursor:pointer;">Değiştir</button>
+        </div>
+        <div id="spiker-upload-area">
+          <input type="file" id="avatar-input" accept="image/*" onchange="onAvatarSelected(this)" style="font-size:12px;color:var(--c-999999);">
+          <div style="font-size:11px;color:var(--c-555555);margin-top:6px;">Önden çekilmiş, net bir yüz fotoğrafı kullan. Bir kez yükle, sonra otomatik hatırlanır.</div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <div class="section-label">4. Üret</div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <button onclick="generateShorts()" id="btn-shorts" class="btn-primary">
       <div class="spinner" id="spin-shorts"></div>
       Shorts Üret
     </button>
-    <button onclick="generateFromTrend()" id="btn-trend-gen" style="background:var(--c-1a3a1a);">
+    <button onclick="generateFromTrend()" id="btn-trend-gen" class="btn-secondary" style="width:100%;justify-content:center;">
       <div class="spinner" id="spin-trend-gen"></div>
-      Trend Haberden Üret
+      Trend Haberden Üret (konuyu boş bırakıp otomatik seçtir)
     </button>
   </div>
 
@@ -971,14 +1068,8 @@
     <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
     <a id="dl-shorts" class="dl-btn" download="shorts.mp4">İndir</a>
 
-    <div id="shorts-thumb-wrap" style="display:none;margin-top:16px;">
-      <p>Kapak Fotoğrafı</p>
-      <img id="shorts-thumb" style="max-width:180px;border-radius:8px;margin-top:8px;display:block;border:1px solid var(--c-333333);">
-      <a id="dl-shorts-thumb" class="dl-btn" download="kapak.jpg" style="margin-top:8px;">Kapak İndir</a>
-    </div>
-
     <div id="yt-upload-form" style="margin-top:24px;border-top:1px solid var(--c-222222);padding-top:20px;">
-      <p style="margin-bottom:16px;color:var(--c-ffffff);font-size:14px;">YouTube'a Yükle</p>
+      <p style="margin-bottom:16px;color:var(--c-e0e0e0);font-size:14px;">YouTube'a Yükle</p>
 
       <div id="yt-not-linked" style="display:none;">
         <p style="font-size:13px;color:var(--c-888888);margin-bottom:12px;">Önce YouTube hesabını bağla:</p>
@@ -1038,7 +1129,9 @@
           🤝 Ücretli tanıtım/markalı içerik: <b style="color:var(--c-888888);">Hayır</b> ·
           📄 Lisans: <b style="color:var(--c-888888);">Standart YouTube Lisansı</b>
         </div>
-        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+
+        <div class="section-label" style="margin:20px 0 10px;">Yayınla</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button onclick="uploadToYouTube()" id="btn-yt-upload" style="background:var(--c-cc0000);">
             <div class="spinner" id="spin-yt"></div>
             YouTube'a Yükle
@@ -2588,15 +2681,10 @@ function _showShortsResult(d) {
   document.getElementById('yt-tags').value = d.suggested_tags ? _stripHashtags(d.suggested_tags) : '';
   currentSourceText = d.source_text || '';
   document.getElementById('ig-caption').value = d.instagram_caption || '';
-  currentThumbnailFilename = null;
-  if (d.thumbnail) {
-    currentThumbnailFilename = d.thumbnail.split('/').pop();
-    document.getElementById('shorts-thumb').src = d.thumbnail;
-    document.getElementById('dl-shorts-thumb').href = d.thumbnail;
-    document.getElementById('shorts-thumb-wrap').style.display = 'block';
-  } else {
-    document.getElementById('shorts-thumb-wrap').style.display = 'none';
-  }
+  // Kapak fotoğrafı önizleme/indirme arayüzü kaldırıldı (videoya sonradan
+  // eklenmiyor) — ama dosya adı YouTube küçük resmi yüklemesi için hâlâ
+  // gerekli (bkz. thumbnail_filename, uploadToYouTube).
+  currentThumbnailFilename = d.thumbnail ? d.thumbnail.split('/').pop() : null;
   document.getElementById('result-shorts').classList.add('show');
   checkYTStatus();
 }
@@ -2741,6 +2829,15 @@ function clearSpikerAvatar() {
 const dsKey = document.getElementById('shorts-apikey');
 dsKey.value = localStorage.getItem('ds_api_key') || '';
 
+// Zaten kayıtlıysa kompakt durum satırını göster, tam formu gizle —
+// bir kere girilip unutulan bir alan, her ziyarette tam genişlikte
+// "Shorts Üret" ile aynı ağırlıkta görünmesin diye.
+function _toggleApikeyEdit(showExpanded) {
+  document.getElementById('apikey-compact').style.display = showExpanded ? 'none' : 'flex';
+  document.getElementById('apikey-expanded').style.display = showExpanded ? 'block' : 'none';
+}
+_toggleApikeyEdit(!dsKey.value.trim());
+
 loadOutroTemplateStatus();
 
 function saveApiKey() {
@@ -2750,7 +2847,10 @@ function saveApiKey() {
   const s = document.getElementById('apikey-status');
   s.textContent = '✓ Kaydedildi';
   s.style.color = 'var(--c-4ade80)';
-  setTimeout(() => { s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = 'var(--c-444444)'; }, 2000);
+  setTimeout(() => {
+    s.textContent = 'Tarayıcıda saklanır, sunucuya gönderilmez.'; s.style.color = 'var(--c-444444)';
+    _toggleApikeyEdit(false);
+  }, 900);
 }
 function clearApiKey() {
   localStorage.removeItem('ds_api_key');
