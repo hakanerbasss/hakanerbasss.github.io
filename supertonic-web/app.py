@@ -2518,27 +2518,21 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 
         scenes = data["scenes"]
 
-        # ── Olgu doğrulama: üretilen senaryo, çıkarılan olgularla karşılaştırılır ──
-        # Desteklenmeyen iddia (örn. "bankalar da kesebilir" — kaynakta yoksa) yakalanır.
-        # require_verified_source=True = otomatik akış; RSS kısa olunca facts_data az ama
-        # yine de varsa doğrulama çalıştır. Hata → 422 → dış döngü farklı konu dener.
+        # ── Olgu doğrulama: sadece LOG, artık üretimi HİÇ durdurmuyor ──────────────
+        # Kullanıcı isteği (06.08.2026): tüm engelleyici doğrulama kaldırıldı —
+        # bu katman videoyu iptal ediyordu ("Bugün bu vergide yeni bir dönem resmen
+        # başladı" gibi sıradan bir çerçeveleme cümlesi bile "high" sayılıp
+        # reddedilebiliyordu). Artık sadece logluyor, hiçbir zaman raise etmiyor.
         if require_verified_source and facts_data.get("facts"):
-            _narration_text = " ".join(s.get("text", "") for s in scenes)
-            _unsupported = await _verify_narration_facts(client, _narration_text, facts_data)
-            # Sadece "high" seviye (uydurma sayı/isim/kurum/olay) videoyu iptal eder.
-            # "low" (yokluk bildirimi, çerçeveleme, başlığın yeniden ifadesi) sadece loglanır —
-            # bunlar için video iptal edilirse günde 5 haber yerine 1 haber üretilir hale geliyordu.
-            _hard = [c["claim"] for c in _unsupported if c["severity"] == "high"]
-            _soft = [c["claim"] for c in _unsupported if c["severity"] != "high"]
-            if _soft:
-                print(f"[verify] hafif uyarı ({len(_soft)} adet, iptal yok): {' | '.join(_soft[:3])[:200]}", flush=True)
-            if _hard:
-                _claims_str = " | ".join(_hard[:3])
-                print(f"[verify] DESTEKLENMEYEN İDDİA ({len(_hard)} adet): {_claims_str}", flush=True)
-                raise HTTPException(
-                    422,
-                    f"Senaryo kaynakta olmayan iddia içeriyor: {_claims_str[:300]} — farklı konu denenecek.",
-                )
+            try:
+                _narration_text = " ".join(s.get("text", "") for s in scenes)
+                _unsupported = await _verify_narration_facts(client, _narration_text, facts_data)
+                if _unsupported:
+                    _claims_str = " | ".join(c["claim"] for c in _unsupported[:3])
+                    print(f"[verify] bilgi amaçlı uyarı ({len(_unsupported)} adet, iptal yok): "
+                          f"{_claims_str[:250]}", flush=True)
+            except Exception as e:
+                print(f"[verify] doğrulama çalışmadı ({type(e).__name__}) — önemsiz, devam", flush=True)
 
         if lang == "tr":
             try:
