@@ -678,6 +678,7 @@
   <div class="more-item" id="more-item-tnlv" onclick="selectMoreTab('tnlv')">Trend Haber LV</div>
   <div class="more-item" id="more-item-comedy" onclick="selectMoreTab('comedy')">📰 Komik Haber</div>
   <div class="more-item" id="more-item-infoshorts" onclick="selectMoreTab('infoshorts')">💡 Bilgi Shorts</div>
+  <div class="more-item" id="more-item-iganalytics" onclick="selectMoreTab('iganalytics')">📸 Instagram Analitik</div>
   <div class="more-item" id="more-item-prompt" onclick="selectMoreTab('prompt')">🤖 Prompt</div>
 </div>
 
@@ -689,8 +690,8 @@
   <div class="bnav-item" id="bnav-analytics" onclick="switchTab('analytics')">
     <span class="bnav-icon">📊</span><span class="bnav-label">Analitik YT</span>
   </div>
-  <div class="bnav-item" id="bnav-iganalytics" onclick="switchTab('iganalytics')">
-    <span class="bnav-icon">📸</span><span class="bnav-label">Analitik IG</span>
+  <div class="bnav-item" id="bnav-instagram" onclick="switchTab('instagram')">
+    <span class="bnav-icon">📸</span><span class="bnav-label">Instagram</span>
   </div>
   <div class="bnav-item" id="bnav-settings" onclick="openSettings()">
     <span class="bnav-icon">⚙️</span><span class="bnav-label">Ayarlar</span>
@@ -1918,79 +1919,16 @@
     </div>
 
     <!-- 6. TR Instagram-Only -->
-    <div class="acc-item" id="acc-tr-ig-only">
-      <div class="acc-header" onclick="toggleAcc('tr-ig-only')">
-        <span class="acc-title">📸 TR Instagram-Only</span>
-        <span class="acc-right"><span class="acc-badge" id="acc-badge-tr-ig-only"></span><span class="acc-chevron" id="acc-chev-tr-ig-only">›</span></span>
-      </div>
-      <div class="acc-body" id="acc-body-tr-ig-only">
-        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">Sadece Instagram'a gönderir — YouTube'a yüklenmez. TR trend haberlerinden video üretir.</p>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
-            <input type="checkbox" id="ig-only-tr-enabled" style="width:18px;height:18px;accent-color:var(--c-e1306c);" onchange="saveIGOnlyTRScheduler()">
-            Instagram-Only otomatiği etkinleştir
-          </label>
-        </div>
-        <div class="field" style="margin-bottom:12px;">
-          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:var(--c-555555);font-size:11px;">(virgülle ayır — örn: 09:22,12:38)</span></label>
-          <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="ig-times-mon" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="ig-times-tue" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="ig-times-wed" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="ig-times-thu" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="ig-times-fri" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="ig-times-sat" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="ig-times-sun" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
-          </table>
-        </div>
-        <div class="field" style="margin-bottom:14px;">
-          <label>Ses</label>
-          <select id="ig-only-tr-voice" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
-            <option value="E-Emel" selected>Emel — doğal (Edge)</option>
-            <option value="E-Ahmet">Ahmet — doğal (Edge)</option>
-            <option value="F1">F1 (Kadın · Supertonic)</option>
-            <option value="F2">F2 (Kadın · Supertonic)</option>
-            <option value="F3">F3 (Kadın · Supertonic)</option>
-            <option value="M1">M1 (Erkek · Supertonic)</option>
-            <option value="M2">M2 (Erkek · Supertonic)</option>
-            <option value="M3">M3 (Erkek · Supertonic)</option>
-          </select>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;padding:12px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;flex:1;">
-            <input type="checkbox" id="ig-only-tr-video-mode" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveIGOnlyTRScheduler()">
-            🎬 Video modu <span style="color:var(--c-666666);font-size:12px;margin-left:4px;">(%40 ihtimalle Pexels video klip, yoksa görsel)</span>
-          </label>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;padding:12px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;flex:1;">
-            <input type="checkbox" id="ig-only-tr-telegram-pick" style="width:18px;height:18px;accent-color:var(--c-0ea5e9);" onchange="saveIGOnlyTRScheduler()">
-            🗳️ Telegram'dan haber seç <span style="color:var(--c-666666);font-size:12px;margin-left:4px;">(zamanı gelince listeyi Telegram'a atar, 5 dk içinde numarayla cevap verirsen o haberi yapar, vermezsen otomatik seçer)</span>
-          </label>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-          <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
-          <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:var(--c-1a1a3a);font-size:12px;padding:8px 16px;">
-            <div class="spinner" id="spin-ig-only-tr-run-now"></div>Şimdi Çalıştır
-          </button>
-          <button onclick="runIGOnlyTRNowTelegram()" id="btn-ig-only-tr-run-now-tg" style="background:var(--c-0c2a3a);font-size:12px;padding:8px 16px;">
-            <div class="spinner" id="spin-ig-only-tr-run-now-tg"></div>📱 Telegram'dan Test Et
-          </button>
-        </div>
-        <div id="ig-only-tr-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
-          <div id="ig-only-tr-next" style="color:var(--c-888888);"></div>
-          <div id="ig-only-tr-last-status"></div>
-          <div id="ig-only-tr-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
-        </div>
-        <div class="error" id="err-cfg" style="margin-top:8px;"></div>
+    <!-- Ayar fonksiyonlarının ortak hata alanı (savePexelsConfig, saveYTConfig,
+         saveDSConfig, saveScheduler, saveLVScheduler, runNow, runLVNow).
+         Eskiden Instagram akordiyonunun içindeydi; o blok kendi sekmesine
+         taşınınca burada kaldı, yoksa ayar hataları gizli sekmeye yazılıp
+         görünmez oluyordu. -->
+    <div class="error" id="err-cfg" style="margin:10px 16px 0;"></div>
 
-        <!-- Başarısız Instagram Yüklemeleri -->
-        <div id="ig-failed-panel" style="display:none;margin-top:14px;">
-          <div style="color:var(--c-e1306c);font-size:12px;font-weight:600;margin-bottom:8px;">⚠️ Bekleyen Yüklemeler</div>
-          <div id="ig-failed-list"></div>
-        </div>
-      </div>
-    </div>
+    <!-- Instagram otomatiği artık kendi sekmesinde (alt menü: 📸 Instagram).
+         Buradaki akordiyon kaldırıldı; kimlik bilgileri aşağıdaki
+         "Instagram API" bölümünde kalmaya devam ediyor. -->
 
     <!-- 7. Instagram API -->
     <div class="acc-item" id="acc-ig-api">
@@ -2443,8 +2381,16 @@ async function loadMeta() {
 }
 
 // Alt navigasyonda doğrudan görünen sekmeler; geri kalanı "Daha Fazla" menüsüne toplanır.
-const MORE_TABS = ['text', 'video', 'translate', 'longvideo', 'tnlv', 'comedy', 'infoshorts', 'prompt'];
-const BNAV_DIRECT = { shorts: 'bnav-shorts', analytics: 'bnav-analytics', iganalytics: 'bnav-iganalytics' };
+const MORE_TABS = ['text', 'video', 'translate', 'longvideo', 'tnlv', 'comedy', 'infoshorts', 'iganalytics', 'prompt'];
+const BNAV_DIRECT = { shorts: 'bnav-shorts', analytics: 'bnav-analytics', instagram: 'bnav-instagram' };
+
+// ── Instagram sekmesi ───────────────────────────────────────────────────
+// Bu içerik eskiden Ayarlar akordiyonundaydı; yükleyicileri openSettings()
+// çağırıyordu. Kendi sekmesine taşındığı için artık sekme açılınca çalışıyor.
+function loadInstagramTab() {
+  loadIGOnlyTRStatus();
+  loadIGFailedUploads();
+}
 
 function switchTab(name) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -2455,6 +2401,7 @@ function switchTab(name) {
   if (name === 'infoshorts') { updateInfoApiKeyStatus(); loadInfoEndcardStatus(); loadOutroTemplateStatus(); }
   if (name === 'analytics') loadAnalytics();
   if (name === 'iganalytics') loadIGAnalytics();
+  if (name === 'instagram') loadInstagramTab();
   if (name === 'prompt') loadPromptPreview();
 }
 
@@ -2860,7 +2807,7 @@ async function checkYTStatus() {
   } catch(e) {}
 }
 
-const _ACC_IDS = ['tr-short','tr-lv','tr-tnlv','en-belgesel','en-short','tr-ig-only','ig-api','live-stream','api-keys','sistem'];
+const _ACC_IDS = ['tr-short','tr-lv','tr-tnlv','en-belgesel','en-short','ig-api','live-stream','api-keys','sistem'];
 
 function toggleAcc(id) {
   const body = document.getElementById('acc-body-' + id);
@@ -2917,10 +2864,8 @@ async function openSettings() {
   checkYTENStatus();
   loadLVENSchedulerStatus();
   loadENShortsSchedulerStatus();
-  loadIGOnlyTRStatus();
   loadLiveRoundupSched();
   _pollRoundupProgress();
-  loadIGFailedUploads();
   loadTelegramConfig();
   checkOpenAIStatus();
   checkInstagramStatus();
@@ -4559,7 +4504,6 @@ async function loadIGOnlyTRStatus() {
       statusEl.textContent = statusText;
       statusEl.style.color = log.status === 'success' ? 'var(--c-4ade80)' : log.status === 'error' ? 'var(--c-f87171)' : 'var(--c-fbbf24)';
       _setMsg('ig-only-tr-last-msg', log, '/api/ig-only-tr/run-now', 'loadIGOnlyTRStatus');
-      setAccBadge('tr-ig-only', log, d.enabled);
 
       if (log.status === 'running') {
         // Job devam ediyorsa her 8 saniyede bir yenile
@@ -6075,6 +6019,79 @@ function deleteComedyVideo() {
 </script>
 
 <!-- INSTAGRAM ANALİTİK PANELİ -->
+<!-- INSTAGRAM (otomatik paylaşım) -->
+<div class="panel" id="tab-instagram">
+  <h2 style="font-size:18px;margin-bottom:4px;">📸 Instagram Otomatik Paylaşım</h2>
+  <p style="color:var(--c-666666);font-size:12px;margin-bottom:18px;">
+    Belirlediğin saatlerde TR trend haberlerinden video üretip Instagram'a gönderir.
+    YouTube'a yüklemez. Hesap/token ayarları ⚙ Ayarlar → Instagram API bölümünde.
+  </p>
+        <p style="color:var(--c-666666);font-size:12px;margin-bottom:12px;">Sadece Instagram'a gönderir — YouTube'a yüklenmez. TR trend haberlerinden video üretir.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;">
+            <input type="checkbox" id="ig-only-tr-enabled" style="width:18px;height:18px;accent-color:var(--c-e1306c);" onchange="saveIGOnlyTRScheduler()">
+            Instagram-Only otomatiği etkinleştir
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:8px;">Haftalık Yayın Saatleri <span style="color:var(--c-555555);font-size:11px;">(virgülle ayır — örn: 09:22,12:38)</span></label>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;white-space:nowrap;width:80px;">Pazartesi</td><td><input type="text" id="ig-times-mon" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Salı</td><td><input type="text" id="ig-times-tue" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Çarşamba</td><td><input type="text" id="ig-times-wed" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Perşembe</td><td><input type="text" id="ig-times-thu" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cuma</td><td><input type="text" id="ig-times-fri" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Cumartesi</td><td><input type="text" id="ig-times-sat" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+            <tr><td style="color:var(--c-888888);font-size:12px;padding:3px 10px 3px 0;">Pazar</td><td><input type="text" id="ig-times-sun" style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:6px;color:var(--c-e0e0e0);font-size:12px;padding:5px 8px;outline:none;"></td></tr>
+          </table>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Ses</label>
+          <select id="ig-only-tr-voice" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;">
+            <option value="E-Emel" selected>Emel — doğal (Edge)</option>
+            <option value="E-Ahmet">Ahmet — doğal (Edge)</option>
+            <option value="F1">F1 (Kadın · Supertonic)</option>
+            <option value="F2">F2 (Kadın · Supertonic)</option>
+            <option value="F3">F3 (Kadın · Supertonic)</option>
+            <option value="M1">M1 (Erkek · Supertonic)</option>
+            <option value="M2">M2 (Erkek · Supertonic)</option>
+            <option value="M3">M3 (Erkek · Supertonic)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;padding:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;flex:1;">
+            <input type="checkbox" id="ig-only-tr-video-mode" style="width:18px;height:18px;accent-color:var(--c-7c3aed);" onchange="saveIGOnlyTRScheduler()">
+            🎬 Video modu <span style="color:var(--c-666666);font-size:12px;margin-left:4px;">(%40 ihtimalle Pexels video klip, yoksa görsel)</span>
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;padding:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--c-cccccc);font-size:14px;margin:0;flex:1;">
+            <input type="checkbox" id="ig-only-tr-telegram-pick" style="width:18px;height:18px;accent-color:var(--c-0ea5e9);" onchange="saveIGOnlyTRScheduler()">
+            🗳️ Telegram'dan haber seç <span style="color:var(--c-666666);font-size:12px;margin-left:4px;">(zamanı gelince listeyi Telegram'a atar, 5 dk içinde numarayla cevap verirsen o haberi yapar, vermezsen otomatik seçer)</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button onclick="saveIGOnlyTRScheduler()" style="font-size:12px;padding:8px 16px;">Kaydet</button>
+          <button onclick="runIGOnlyTRNow()" id="btn-ig-only-tr-run-now" style="background:var(--c-1a1a3a);font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-ig-only-tr-run-now"></div>Şimdi Çalıştır
+          </button>
+          <button onclick="runIGOnlyTRNowTelegram()" id="btn-ig-only-tr-run-now-tg" style="background:var(--c-0c2a3a);font-size:12px;padding:8px 16px;">
+            <div class="spinner" id="spin-ig-only-tr-run-now-tg"></div>📱 Telegram'dan Test Et
+          </button>
+        </div>
+        <div id="ig-only-tr-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
+          <div id="ig-only-tr-next" style="color:var(--c-888888);"></div>
+          <div id="ig-only-tr-last-status"></div>
+          <div id="ig-only-tr-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
+        </div>
+
+        <!-- Başarısız Instagram Yüklemeleri -->
+        <div id="ig-failed-panel" style="display:none;margin-top:14px;">
+          <div style="color:var(--c-e1306c);font-size:12px;font-weight:600;margin-bottom:8px;">⚠️ Bekleyen Yüklemeler</div>
+          <div id="ig-failed-list"></div>
+        </div>
+</div>
+
 <div class="panel" id="tab-iganalytics">
   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
     <h2 style="color:var(--c-ffffff);font-size:18px;margin:0;flex:1;">📸 Instagram Analitik</h2>
