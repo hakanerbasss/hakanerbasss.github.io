@@ -3865,7 +3865,11 @@ _BANNER_COLOR_SCHEMES = {
     "yesil_siyah":      {"band": (0, 140, 70),   "band_txt": (255, 255, 255), "headline": (255, 255, 255), "emphasis": (0, 255, 140),   "badge": (20, 20, 20),  "badge_hl": (0, 170, 90),   "badge_txt": (255, 255, 255), "glow": (0, 200, 100, 80)},
     "mor_altin":        {"band": (110, 30, 160), "band_txt": (255, 255, 255), "headline": (255, 208, 0),   "emphasis": (255, 255, 255), "badge": (90, 20, 140), "badge_hl": (180, 80, 230), "badge_txt": (255, 215, 0),   "glow": (150, 50, 220, 90)},
     "turuncu_lacivert": {"band": (230, 105, 0),  "band_txt": (17, 17, 17),   "headline": (255, 255, 255), "emphasis": (255, 208, 0),   "badge": (20, 30, 90),  "badge_hl": (50, 70, 160),  "badge_txt": (255, 208, 0),   "glow": (255, 140, 0, 90)},
-    "kirmizi_siyah":    {"band": (20, 20, 20),   "band_txt": (255, 255, 255), "headline": (230, 20, 20),   "emphasis": (255, 255, 255), "badge": (180, 0, 0),   "badge_hl": (230, 30, 30),  "badge_txt": (255, 255, 255), "glow": (255, 0, 0, 90)},
+    # headline BEYAZ (kırmızı değil) — başlık metni fotoğrafın üzerine sadece ince
+    # siyah gölgeyle çiziliyor (kutu yok), kırmızı metin kırmızı/turuncu tonlu
+    # fotoğraflarda (ahşap, ten rengi, tuğla) kayboluyordu. Band/badge kırmızı
+    # kalıyor — onlar kendi dolgulu şerit zemininde olduğu için güvenli.
+    "kirmizi_siyah":    {"band": (20, 20, 20),   "band_txt": (255, 255, 255), "headline": (255, 255, 255), "emphasis": (255, 208, 0),   "badge": (180, 0, 0),   "badge_hl": (230, 30, 30),  "badge_txt": (255, 255, 255), "glow": (255, 0, 0, 90)},
     "turkuaz_beyaz":    {"band": (0, 150, 170),  "band_txt": (255, 255, 255), "headline": (255, 255, 255), "emphasis": (0, 230, 255),   "badge": (0, 110, 130), "badge_hl": (0, 190, 210),  "badge_txt": (255, 255, 255), "glow": (0, 200, 220, 80)},
 }
 _DEFAULT_BANNER_SCHEME = "sari_kirmizi"
