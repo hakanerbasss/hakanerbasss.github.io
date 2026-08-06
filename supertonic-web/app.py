@@ -6,6 +6,8 @@ import subprocess
 import json
 import time
 import re
+import base64
+import html as html_lib
 import hashlib
 import secrets
 import random
@@ -1313,6 +1315,57 @@ def _title_matches_content(title: str, content: str, min_overlap: float = 0.2) -
     return (len(overlap) / len(title_kw)) >= min_overlap
 
 
+async def _resolve_google_news_link(client: httpx.AsyncClient, url: str) -> str:
+    """Google News RSS 'link' alanı gerçek makale URL'si DEĞİL — bir yönlendirme
+    token'ı (news.google.com/rss/articles/CBMi...). Bu token'ı doğrudan GET
+    etmek genelde 403/boş JS kabuğu döner, gerçek makale metni hiç gelmez —
+    require_verified_source kapısı eklenene kadar bu sessizce RSS özetine
+    düşülerek maskeleniyordu, artık üretimi 422 ile durdurduğu için çözülmesi
+    zorunlu hale geldi.
+
+    İki yöntemle gerçek yayıncı URL'sini bulmaya çalışır, olmazsa orijinal
+    url'i döner (çağıran zaten onu deneyip başarısız olacak, zararı yok):
+      1) Token'ın base64 gövdesinde doğrudan gömülü http(s) URL arar —
+         ağ isteği gerektirmez, eski format token'larda çalışır.
+      2) Sayfayı çekip yönlendirme linkini/meta etiketini okur.
+    """
+    if "news.google.com" not in url:
+        return url
+    try:
+        m = re.search(r"/articles/([A-Za-z0-9_-]+)", url)
+        if m:
+            token = m.group(1)
+            padded = token + "=" * (-len(token) % 4)
+            raw = base64.urlsafe_b64decode(padded)
+            idx = raw.find(b"http")
+            if idx >= 0:
+                end = idx
+                while end < len(raw) and (32 <= raw[end] < 127):
+                    end += 1
+                candidate = raw[idx:end].decode("ascii", "ignore").strip()
+                if candidate.startswith("http") and "google.com" not in candidate:
+                    return candidate
+    except Exception:
+        pass
+    try:
+        r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        html = r.text
+        m = re.search(r'data-n-au="([^"]+)"', html)
+        if m:
+            cand = html_lib.unescape(m.group(1))
+            if cand.startswith("http"):
+                return cand
+        m = re.search(r'<a[^>]+class="[^"]*VDXfz[^"]*"[^>]+href="([^"]+)"', html)
+        if m:
+            return html_lib.unescape(m.group(1))
+        m = re.search(r'<a[^>]+href="(https?://(?!(?:news\.)?google\.com)[^"]+)"', html)
+        if m:
+            return html_lib.unescape(m.group(1))
+    except Exception:
+        pass
+    return url
+
+
 async def _fetch_article_text(url: str, max_chars: int = 2000, expected_title: str = "") -> str:
     """Haber URL'sine gidip tam makale metnini çeker. Başarısız olursa boş string döner.
     expected_title verilirse, çekilen metnin başlıkla en az bir miktar kelime örtüşmesi
@@ -1325,6 +1378,7 @@ async def _fetch_article_text(url: str, max_chars: int = 2000, expected_title: s
             follow_redirects=True,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
         ) as client:
+            url = await _resolve_google_news_link(client, url)
             r = await client.get(url)
         if r.status_code != 200:
             return ""
@@ -2354,22 +2408,26 @@ Rules:
             }
             print(f"[gnews] manuel içerik kullanıldı, kaynaklar: {_parsed_sources}", flush=True)
         elif search_query:
-            if require_verified_source:
-                # Otomatik akış: önce makaleyi açmayı dene, açılamazsa RSS özetiyle devam et.
-                # fetch_full_text=True: _fetch_article_text başarısız olursa sessizce RSS'e düşer,
-                # üretim hiç durmaz — paywall/bot engeli olan siteler otomatik olarak RSS moduna geçer.
+            # Kullanıcı elle bir haber linki verdiyse (manual_link/topic_link)
+            # ÖNCE o denenir — require_verified_source=True olsa bile.
+            # ESKİDEN: require_verified_source=True ise bu blok tamamen atlanıp
+            # doğrudan yeniden aramaya gidiliyordu; kullanıcının yapıştırdığı
+            # link hiç kullanılmıyordu (Short Üret sekmesinde link eklense de
+            # her seferinde "kaynak bulunamadı" ile sonuçlanan bug buydu).
+            selected_link = (manual_link or topic_link or "").strip()
+            if selected_link:
+                gnews_data = await fetch_gnews_article_by_link(selected_link, search_query, "")
+                if gnews_data.get("found"):
+                    print(f"[gnews] gerçek link üzerinden çekildi: {selected_link}", flush=True)
+                else:
+                    print(f"[gnews] verilen link açılamadı, aramaya düşülüyor: {selected_link}", flush=True)
+
+            if not gnews_data.get("found"):
+                # fetch_full_text=True: _fetch_article_text başarısız olursa sessizce
+                # boş full_text bırakır — o kaynak olgu havuzuna girmez (yukarıdaki
+                # kaynak kapısına bakınız, sadece require_verified_source=True'da
+                # devreye girer), üretim durmaz, sadece o makale elenir.
                 gnews_data = await fetch_gnews_summary(search_query, lang, fetch_full_text=True)
-            else:
-                # Manuel akış: tam makale çekme eski yöntemle devam eder.
-                selected_link = (manual_link or topic_link or "").strip()
-                selected_source = ""
-                # ranked_candidates kaldırıldı — link doğrudan topic_link'ten gelir
-                if selected_link:
-                    gnews_data = await fetch_gnews_article_by_link(selected_link, search_query, selected_source)
-                    if gnews_data.get("found"):
-                        print(f"[gnews] gerçek link üzerinden çekildi: {selected_link}", flush=True)
-                if not gnews_data.get("found"):
-                    gnews_data = await fetch_gnews_summary(search_query, lang)
 
         # ── Kaynak kapısı: doğrulama zorunluysa, kaynaksız üretime izin verilmez ────
         # Eskiden kaynak bulunamayınca/olgu çıkmayınca üretim sessizce devam ediyor,
