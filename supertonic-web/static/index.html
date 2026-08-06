@@ -379,7 +379,7 @@
   <div class="error" id="err-synth"></div>
 
   <div class="result" id="result-synth">
-    <p>Oluşturulan ses</p>
+    <p>Oluşturulan ses <span id="synth-engine-badge" style="font-size:12px;color:#a78bfa;font-weight:600;"></span></p>
     <audio id="audio-synth" controls></audio>
     <a id="dl-synth" class="dl-btn" download="ses.wav">İndir</a>
   </div>
@@ -2339,6 +2339,16 @@ async function synthesize() {
     document.getElementById('dl-synth').href = d.file;
     document.getElementById('result-synth').classList.add('show');
     document.getElementById('audio-synth').play();
+
+    // Hangi motorun gerçekten çaldığını göster — Edge sesi seçilse bile
+    // sessizce Supertonic'e düşülmüş olabilir, bunu görünür kılıyoruz.
+    const engineEl = document.getElementById('synth-engine-badge');
+    if (engineEl) {
+      const label = d.engine === 'edge' ? '🎙️ Edge (doğal ses) ile üretildi'
+                  : d.engine === 'supertonic' ? '🔊 Supertonic ile üretildi'
+                  : '';
+      engineEl.textContent = label;
+    }
   } catch(e) {
     showError('err-synth', e.message);
   } finally {

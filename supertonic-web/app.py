@@ -1039,11 +1039,17 @@ async def synthesize(
 
     out_file = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
 
-    # Edge sesi seçildiyse ortak _synth_audio yolunu kullan — Edge hata
-    # verirse orada zaten Supertonic'e düşülüyor.
+    # Bu test sekmesi bilerek SESSİZ DÜŞMÜYOR — üretim hattında (_synth_audio)
+    # Edge hata verirse fark edilmeden Supertonic'e düşülür (doğru davranış,
+    # video üretimini durdurmaz), ama bu ayrım test ederken "Ahmet/Emel gerçekten
+    # Edge mi yoksa aslında Supertonic mi çalıyor?" sorusunu görünmez kılıyordu.
+    # Burada Edge başarısız olursa gerçek hata mesajıyla 502 dönüyoruz.
     if voice in EDGE_VOICES:
-        dur = await _synth_audio(text, lang, voice, speed, out_file)
-        return {"file": f"/api/audio/{out_file.name}", "duration": round(float(dur), 2)}
+        try:
+            dur = await _synth_edge(text, voice, speed, out_file)
+            return {"file": f"/api/audio/{out_file.name}", "duration": round(float(dur), 2), "engine": "edge"}
+        except Exception as e:
+            raise HTTPException(502, f"Edge TTS başarısız: {type(e).__name__}: {e}")
 
     tts = get_tts()
     style = tts.get_voice_style(voice_name=voice)
@@ -1056,7 +1062,7 @@ async def synthesize(
     tts.save_audio(wav, str(out_file))
 
     dur = float(duration[0]) if hasattr(duration, '__getitem__') else float(duration)
-    return {"file": f"/api/audio/{out_file.name}", "duration": round(dur, 2)}
+    return {"file": f"/api/audio/{out_file.name}", "duration": round(dur, 2), "engine": "supertonic"}
 
 
 @app.post("/api/translate")
