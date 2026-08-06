@@ -304,7 +304,7 @@
   }
   #theme-toggle:hover { background: var(--c-2a2a2a); }
 
-  header h1 { font-size: 20px; font-weight: 600; color: var(--c-ffffff); }
+  header h1 { font-size: 20px; font-weight: 600; color: var(--c-e0e0e0); }
   header span { font-size: 12px; color: var(--c-666666); }
 
   /* Alt navigasyon (mobil uygulama tarzı) */
@@ -751,6 +751,51 @@
       beyaz yazı. Satır içi color tanımı olmayanlar gövde rengini alır. */
 :root[data-theme="light"] .spinner { border-top-color: currentColor; }
 
+/* ── Açık tema: buton/input görünürlüğü ──────────────────────────────────
+   Sorun: --c-XXXXXX degiskenleri hem buton zemini hem kart/panel zemini
+   olarak PAYLAŞIMLI kullanılıyor. Degiskenin kendisini degistirmek kartları
+   da bozardı. Bunun yerine SADECE butona/inputa ozel, kesin-esleşmeli
+   secicilerle (attribute selector + !important) inline stili geçersiz
+   kılıyoruz — paylaşılan degisken dokunulmadan kalıyor. Marka renkleri
+   (mor/kirmizi/pembe — zaten canlı ve dogru) BİLEREK bu listede yok. */
+:root[data-theme="light"] button[style*="background:var(--c-0c2a3a)"] { background: #c5dfed !important; border: 1px solid #4d9fcb !important; }
+:root[data-theme="light"] button[style*="background:var(--c-0d2d1a)"] { background: #c5edd5 !important; border: 1px solid #4dcb80 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a0d00)"] { background: #edd9c5 !important; border: 1px solid #cb8c4d !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a1a1a)"] { background: #e3e0e0 !important; border: 1px solid #bbb4b4 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a1a2a)"] { background: #cdcde4 !important; border: 1px solid #6868b1 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a1a2e)"] { background: #cdcde4 !important; border: 1px solid #6868b1 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a1a3a)"] { background: #cacae7 !important; border: 1px solid #6161b8 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a2a1e)"] { background: #cde4d3 !important; border: 1px solid #68b17a !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a3a1a)"] { background: #cae7ca !important; border: 1px solid #61b861 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-1a3a5a)"] { background: #c5d9ed !important; border: 1px solid #4d8ccb !important; }
+:root[data-theme="light"] button[style*="background:var(--c-2a0a0a)"] { background: #edc5c5 !important; border: 1px solid #cb4d4d !important; }
+:root[data-theme="light"] button[style*="background:var(--c-2a1a1a)"] { background: #e4cdcd !important; border: 1px solid #b16868 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-2a1a3a)"] { background: #d9cae7 !important; border: 1px solid #8c61b8 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-2a2a2a)"] { background: #e3e0e0 !important; border: 1px solid #bbb4b4 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-333333)"] { background: #e3e0e0 !important; border: 1px solid #bbb4b4 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-3a1a1a)"] { background: #e7caca !important; border: 1px solid #b86161 !important; }
+:root[data-theme="light"] button[style*="background:var(--c-5a1a1a)"] { background: #edc5c5 !important; border: 1px solid #cb4d4d !important; }
+
+/* Input/select özel zeminleri (genel gri kutu kuralını geçersiz kılanlar) */
+:root[data-theme="light"] input[style*="background:var(--c-0e0e1a)"], :root[data-theme="light"] select[style*="background:var(--c-0e0e1a)"] { background: #cdcde4 !important; }
+:root[data-theme="light"] input[style*="background:var(--c-111111)"], :root[data-theme="light"] select[style*="background:var(--c-111111)"] { background: #e3e0e0 !important; }
+:root[data-theme="light"] input[style*="background:var(--c-1a1a1a)"], :root[data-theme="light"] select[style*="background:var(--c-1a1a1a)"] { background: #e3e0e0 !important; }
+
+/* Input/select/buton özel kenarlıkları (marka rengi kenarlıklar hariç) */
+:root[data-theme="light"] [style*="border:1px solid var(--c-1a4a2e)"] { border-color: #55c383 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-1a5a35)"] { border-color: #4dcb82 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-2a2a2a)"] { border-color: #bbb4b4 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-2a2a3a)"] { border-color: #6868b1 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-2a5a8a)"] { border-color: #4f8cc9 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-333333)"] { border-color: #bbb4b4 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-3a1a1a)"] { border-color: #b86161 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-3b2d6e)"] { border-color: #715cbc !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-444444)"] { border-color: #bbb4b4 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-5a1a1a)"] { border-color: #cb4d4d !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-5a2a00)"] { border-color: #cb884d !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-5a2a2a)"] { border-color: #b66363 !important; }
+:root[data-theme="light"] [style*="border:1px solid var(--c-fbbf24)"] { border-color: #cba84d !important; }
+
 </style>
 
 <script>
@@ -1159,7 +1204,7 @@
 <div class="panel" id="tab-analytics">
   <!-- Başlık + filtreler -->
   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
-    <h2 style="color:var(--c-ffffff);font-size:18px;margin:0;flex:1;">📊 Kanal Analitik</h2>
+    <h2 style="color:var(--c-e0e0e0);font-size:18px;margin:0;flex:1;">📊 Kanal Analitik</h2>
     <select id="analytics-channel" onchange="loadAnalytics()" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:8px;outline:none;">
       <option value="tr">🇹🇷 TR Kanal</option>
       <option value="en">🇬🇧 EN Kanal</option>
@@ -1320,7 +1365,7 @@
 
     <!-- Sticky başlık -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--c-2a2a2a);position:sticky;top:0;background:var(--c-1a1a1a);z-index:2;">
-      <span style="font-size:15px;font-weight:700;color:var(--c-ffffff);">⚙ Ayarlar</span>
+      <span style="font-size:15px;font-weight:700;color:var(--c-e0e0e0);">⚙ Ayarlar</span>
       <button onclick="closeYTModal()" style="background:var(--c-2a2a2a);border-radius:6px;padding:4px 10px;font-size:16px;line-height:1;">✕</button>
     </div>
 
@@ -4525,7 +4570,7 @@ function _buildFullAnalyticsHTML(d) {
 
 <div class="panel" id="tab-iganalytics">
   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
-    <h2 style="color:var(--c-ffffff);font-size:18px;margin:0;flex:1;">📸 Instagram Analitik</h2>
+    <h2 style="color:var(--c-e0e0e0);font-size:18px;margin:0;flex:1;">📸 Instagram Analitik</h2>
     <button onclick="loadIGAnalytics()" style="font-size:12px;padding:8px 14px;">↻ Yenile</button>
     <button onclick="loadIGAnalyticsFull(false)" style="font-size:12px;padding:8px 14px;background:var(--c-0d2d1a);color:var(--c-4ade80);border:1px solid var(--c-1a5a35);">🔍 Tam Analitik</button>
     <button onclick="loadIGAnalyticsFull(true)" style="font-size:12px;padding:8px 14px;background:var(--c-1a0d00);color:var(--c-fb923c);border:1px solid var(--c-5a2a00);">⟳ Zorla Çek</button>
