@@ -726,9 +726,12 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             'ÜFE': 'Üretici Fiyat Endeksi',
             'GSYH': 'Gayrisafi Yurt İçi Hasıla',
             # ── Diğer kamu kurumları ──
+            # AFAD BİLEREK burada değil — aşağıdaki _TR_KISALTMA_KELIME_GIBI
+            # listesinde zaten "tek kelime gibi okunsun" diye işaretli (NATO
+            # ile aynı mantık). Buraya eklemek o eski kararı ezip geçerdi,
+            # çünkü bu döngü _harf_harf güvenlik ağından önce çalışıyor.
             'RTÜK': 'Radyo ve Televizyon Üst Kurulu',
             'EGM': 'Emniyet Genel Müdürlüğü',
-            'AFAD': 'Afet ve Acil Durum Yönetimi Başkanlığı',
             'DSİ': 'Devlet Su İşleri',
             # ── Siyaset ──
             'ABD': 'Amerika Birleşik Devletleri',
@@ -736,6 +739,8 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             'CHP': 'Cumhuriyet Halk Partisi',
             'MHP': 'Milliyetçi Hareket Partisi',
             'HDP': 'Halkların Demokratik Partisi',
+            'BBP': 'Büyük Birlik Partisi',
+            'YRP': 'Yeniden Refah Partisi',
             'BM': 'Birleşmiş Milletler',
             'AB': 'Avrupa Birliği',
         }
@@ -802,6 +807,18 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             # Bu kısaltmaların hiçbiri gerçek Türkçe kelimeyle çakışmadığı için
             # (ab/bm/yks vb. tek başına anlamlı kelime değil) risksiz.
             text = re.sub(rf'\b{re.escape(_kis)}\b' + _EKYAK_ERKEN, _repl, text, flags=re.IGNORECASE)
+
+        # TİP (Türkiye İşçi Partisi) BİLEREK yukarıdaki gruba değil — "tip" (tür/
+        # çeşit) ve "tıp" (hekimlik) gerçek, yaygın Türkçe kelimeler. IGNORECASE
+        # ile eşleştirilse "bu tip olaylar" gibi her cümle partiye dönüşürdü.
+        # Sadece tam büyük harf + noktalı İ ('TİP') eşleşir, küçük harfli hiçbir
+        # varyant tetiklemez — parti isimleri kaynak metinde zaten hep böyle
+        # büyük yazılır, riski pratikte sıfıra indiriyor.
+        _TR_KISALTMA_BUYUK_HARF_SART = {'TİP': 'Türkiye İşçi Partisi'}
+        for _kis, _acilim in _TR_KISALTMA_BUYUK_HARF_SART.items():
+            def _repl2(m, _ac=_acilim):
+                return _kisaltma_ek_bagla(_ac, m.group(1) or '')
+            text = re.sub(rf'\b{re.escape(_kis)}\b' + _EKYAK_ERKEN, _repl2, text)
 
         # Sayıya BİTİŞİK yazılan birim kısaltmalarının arasına boşluk sok
         # (5GB → 5 GB) — aşağıdaki birim regex'lerinin hepsi \b sınırına
