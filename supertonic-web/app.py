@@ -699,23 +699,62 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
         # duyarlı — bu kısaltmalar Türkçe metinde her zaman büyük harfle yazılır,
         # rastgele kelime çakışmasını önler.
         _TR_KISALTMA_ACILIM = {
+            # ── Eğitim/sınav ──
             'TBMM': 'Türkiye Büyük Millet Meclisi',
             'YKS': 'Yükseköğretim Kurumları Sınavı',
             'LGS': 'Liselere Geçiş Sınavı',
             'ÖSS': 'Öğrenci Seçme Sınavı',
             'ÖSYM': 'Ölçme, Seçme ve Yerleştirme Merkezi',
+            'MEB': 'Milli Eğitim Bakanlığı',
+            'KYK': 'Kredi ve Yurtlar Kurumu',
+            'TÜBİTAK': 'Türkiye Bilimsel ve Teknolojik Araştırma Kurumu',
+            # ── Sosyal güvenlik/emeklilik — kullanıcı kitlesi 45+ ve emekli
+            # ağırlıklı olduğu için bu grup özellikle sık geçiyor ──
             'SGK': 'Sosyal Güvenlik Kurumu',
+            'SSK': 'Sosyal Sigortalar Kurumu',
+            'İŞKUR': 'Türkiye İş Kurumu',
+            # ── Maliye/vergi/ekonomi ──
+            'TÜİK': 'Türkiye İstatistik Kurumu',
+            'TCMB': 'Türkiye Cumhuriyet Merkez Bankası',
+            'BDDK': 'Bankacılık Düzenleme ve Denetleme Kurumu',
+            'SPK': 'Sermaye Piyasası Kurulu',
+            'EPDK': 'Enerji Piyasası Düzenleme Kurumu',
+            'GİB': 'Gelir İdaresi Başkanlığı',
+            'KDV': 'Katma Değer Vergisi',
+            'ÖTV': 'Özel Tüketim Vergisi',
+            'TÜFE': 'Tüketici Fiyat Endeksi',
+            'ÜFE': 'Üretici Fiyat Endeksi',
+            'GSYH': 'Gayrisafi Yurt İçi Hasıla',
+            # ── Diğer kamu kurumları ──
+            'RTÜK': 'Radyo ve Televizyon Üst Kurulu',
+            'EGM': 'Emniyet Genel Müdürlüğü',
+            'AFAD': 'Afet ve Acil Durum Yönetimi Başkanlığı',
+            'DSİ': 'Devlet Su İşleri',
+            # ── Siyaset ──
             'ABD': 'Amerika Birleşik Devletleri',
             'AKP': 'Adalet ve Kalkınma Partisi',
             'CHP': 'Cumhuriyet Halk Partisi',
             'MHP': 'Milliyetçi Hareket Partisi',
-            'TÜBİTAK': 'Türkiye Bilimsel ve Teknolojik Araştırma Kurumu',
-            'MEB': 'Milli Eğitim Bakanlığı',
-            'TÜİK': 'Türkiye İstatistik Kurumu',
-            'TCMB': 'Türkiye Cumhuriyet Merkez Bankası',
+            'HDP': 'Halkların Demokratik Partisi',
             'BM': 'Birleşmiş Milletler',
             'AB': 'Avrupa Birliği',
         }
+        # ── Fonetik düzeltme — İSİM AÇILIMI DEĞİL, TELAFFUZ düzeltmesi ────────
+        # Yukarıdaki grup gerçek harf-harf kurum kısaltması (TBMM → tam ad okunur).
+        # Bunlar farklı bir hata sınıfı: yabancı kökenli, TEK KELİME gibi okunan
+        # kısaltmalar (IBAN "iban" diye okunur, TBMM gibi harf harf değil). Sorunun
+        # kaynağı Türkçe'nin noktalı İ/noktasız I ayrımı — kaynak metin ASCII "IBAN"
+        # yazınca büyük I'nın noktalı mı noktasız mı okunacağı belirsizleşiyor,
+        # motor "ıban" gibi yanlış okuyabiliyor. Düz küçük harfle ('iban') hedefe
+        # yazınca ASCII küçük i her zaman noktalı olduğu için belirsizlik kalmıyor.
+        # NOT: Bu yalnızca SESLENDİRMEYİ etkiler — ekrandaki altyazı orijinal
+        # (temizlenmemiş) metni kullandığı için "IBAN" yazımı olduğu gibi kalır.
+        _TR_KISALTMA_FONETIK = {
+            'IBAN': 'iban',
+            'PIN': 'pin',
+            'SIM': 'sim',
+        }
+        _TR_KISALTMA_TUM = {**_TR_KISALTMA_ACILIM, **_TR_KISALTMA_FONETIK}
         # Açılımın SON kelimesi ünlüyle bittiği için hal eki tampon 'n' ister
         # (Kurumu'ndan, Meclisi'nde gibi) — genel güvenlik ağı sadece apostrofu
         # silip harfleri bitiştirdiği için tampon kayboluyordu ('Kurumudan').
@@ -731,6 +770,18 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
             'Birliği':    {'dative':'Birliğine','locative':'Birliğinde','ablative':'Birliğinden','genitive':'Birliğinin'},
             'Sınavı':     {'dative':'Sınavına','locative':'Sınavında','ablative':'Sınavından','genitive':'Sınavının'},
             'Bakanlığı':  {'dative':'Bakanlığına','locative':'Bakanlığında','ablative':'Bakanlığından','genitive':'Bakanlığının'},
+            'Kurulu':     {'dative':'Kuruluna','locative':'Kurulunda','ablative':'Kurulundan','genitive':'Kurulunun'},
+            'Başkanlığı': {'dative':'Başkanlığına','locative':'Başkanlığında','ablative':'Başkanlığından','genitive':'Başkanlığının'},
+            'Vergisi':    {'dative':'Vergisine','locative':'Vergisinde','ablative':'Vergisinden','genitive':'Vergisinin'},
+            'Endeksi':    {'dative':'Endeksine','locative':'Endeksinde','ablative':'Endeksinden','genitive':'Endeksinin'},
+            'Hasıla':     {'dative':'Hasılaya','locative':'Hasılada','ablative':'Hasıladan','genitive':'Hasılanın'},
+            'Müdürlüğü':  {'dative':'Müdürlüğüne','locative':'Müdürlüğünde','ablative':'Müdürlüğünden','genitive':'Müdürlüğünün'},
+            'İşleri':     {'dative':'İşlerine','locative':'İşlerinde','ablative':'İşlerinden','genitive':'İşlerinin'},
+            # Fonetik düzeltmelerin (_TR_KISALTMA_FONETIK) hal ekleri — ünlü uyumu:
+            # 'iban' son ünlüsü kalın 'a' → kalın ek; 'pin'/'sim' son ünlüsü ince 'i' → ince ek.
+            'iban':       {'dative':'ibana','locative':'ibanda','ablative':'ibandan','genitive':'ibanın'},
+            'pin':        {'dative':'pine','locative':'pinde','ablative':'pinden','genitive':'pinin'},
+            'sim':        {'dative':'sime','locative':'simde','ablative':'simden','genitive':'simin'},
         }
         def _kisaltma_ek_bagla(acilim, raw_suffix):
             if not raw_suffix:
@@ -743,7 +794,7 @@ def _clean_tts_text(text: str, lang: str = "tr") -> str:
                 return ' '.join(words)
             return acilim
         _EKYAK_ERKEN = r"(?:['’]([a-zçğıöşüA-ZÇĞİÖŞÜ]{1,4}))?"
-        for _kis, _acilim in _TR_KISALTMA_ACILIM.items():
+        for _kis, _acilim in _TR_KISALTMA_TUM.items():
             def _repl(m, _ac=_acilim):
                 return _kisaltma_ek_bagla(_ac, m.group(1) or '')
             # IGNORECASE: DeepSeek her zaman tam büyük harfle yazmıyor ('Yks',
