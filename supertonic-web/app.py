@@ -318,7 +318,12 @@ def _edge_voice_for(voice: str) -> str:
 
 async def _synth_edge(text: str, voice: str, speed: float, out_path: Path) -> float:
     """Edge TTS ile seslendirir, süreyi saniye olarak döner.
-    Hata durumunda istisna fırlatır — çağıran Supertonic'e düşer."""
+    Hata durumunda istisna fırlatır — çağıran Supertonic'e düşer.
+
+    ÖNEMLİ: Microsoft'un ses servisine bağlantı ASILI KALABİLİYOR — bazı bulut
+    sunucu (Hetzner/AWS/GCP vb.) IP aralıklarını sessizce (bağlantıyı reddetmeden)
+    engelliyor. Zaman aşımı olmadan bu, tüm isteği Cloudflare/nginx 502 verene
+    kadar dondurup video üretimini de kilitliyordu. 15 sn'de kesin başarısız olur."""
     import edge_tts
     # edge-tts hız formatı: "+0%" / "-10%" / "+15%"
     pct = int(round((speed - 1.0) * 100))
@@ -326,7 +331,10 @@ async def _synth_edge(text: str, voice: str, speed: float, out_path: Path) -> fl
     mp3_path = out_path.with_suffix(".edge.mp3")
     communicate = edge_tts.Communicate(_clean_tts_text(text, "tr"),
                                        _edge_voice_for(voice), rate=rate)
-    await communicate.save(str(mp3_path))
+    try:
+        await asyncio.wait_for(communicate.save(str(mp3_path)), timeout=15)
+    except asyncio.TimeoutError:
+        raise RuntimeError("Microsoft ses servisine 15sn içinde bağlanılamadı (sunucu IP'si engellenmiş olabilir)")
     if not mp3_path.exists() or mp3_path.stat().st_size < 512:
         raise RuntimeError("edge-tts boş çıktı üretti")
     # Hattın geri kalanı 44.1kHz mono WAV bekliyor (concat aşaması PCM birleştiriyor)
