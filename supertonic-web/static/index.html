@@ -1585,11 +1585,13 @@
             <button onclick="deleteOutroTemplate()" style="flex:1;padding:7px;background:var(--c-5a1a1a);border:none;color:var(--c-ff8888);border-radius:5px;cursor:pointer;font-size:12px;">Kaldır</button>
           </div>
         </div>
+        <!-- Sürükle-bırak (ondragover/ondrop) BİLEREK yok — bu tamamen
+             mobil-öncelikli bir panel, masaüstü drag&drop API'si MIUI/Android
+             WebView'de dokunmatik "sürükleme" jestiyle çakışıp yarı saydam,
+             oval bir işletim-sistemi kaplaması (drag ghost) tetikliyordu.
+             Dosya seçimi zaten onclick ile çalışıyor, tek kullanım yolu bu. -->
         <div id="outro-empty" onclick="document.getElementById('outro-input').click()"
-          style="border:2px dashed var(--c-333333);border-radius:8px;padding:16px;text-align:center;cursor:pointer;"
-          ondragover="event.preventDefault();this.style.borderColor='var(--c-e1306c)'"
-          ondragleave="this.style.borderColor='var(--c-333333)'"
-          ondrop="handleOutroDrop(event)">
+          style="border:2px dashed var(--c-333333);border-radius:8px;padding:16px;text-align:center;cursor:pointer;">
           <div style="color:var(--c-555555);font-size:13px;">🎬 Outro MP4 yükle</div>
         </div>
         <input type="file" id="outro-input" accept="video/mp4,video/*" style="display:none" onchange="uploadOutroTemplate(event)">
@@ -2984,13 +2986,6 @@ async function uploadOutroTemplate(e) {
     if (!r.ok) throw new Error((await r.json()).detail || 'Hata');
     await loadOutroTemplateStatus();
   } catch(err) { alert('Yükleme hatası: ' + err.message); }
-}
-function handleOutroDrop(e) {
-  e.preventDefault();
-  e.currentTarget.style.borderColor = 'var(--c-333333)';
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  uploadOutroTemplate({ target: { files: [file] } });
 }
 async function deleteOutroTemplate() {
   if (!confirm('Outro videosu kaldırılsın mı?')) return;
