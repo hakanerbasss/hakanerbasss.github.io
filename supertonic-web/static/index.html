@@ -796,6 +796,40 @@
 :root[data-theme="light"] [style*="border:1px solid var(--c-5a2a2a)"] { border-color: #b66363 !important; }
 :root[data-theme="light"] [style*="border:1px solid var(--c-fbbf24)"] { border-color: #cba84d !important; }
 
+
+/* ── Açık tema: HER YERDE net kenarlık (kullanıcı isteği) ─────────────────
+   Önceki düzeltme sadece satır-içi stilli belirli buton/input'ları
+   kapsıyordu. .btn-chip (trend butonları), düz <textarea>/<select>
+   (genel CSS kuralı kullanıyor, satır içi değil), .opt-card, kart
+   kutuları gibi CSS-SINIFI tabanlı elemanlar hiç kapsanmamıştı — açık
+   temada zemin ve kenarlık ikisi de soluk olunca "dümdüz beyaz" gibi
+   görünüp sayfaya karışıyorlardı. Renk-bazlı ince ayar yerine EN BASİT
+   ve SAĞLAM çözüm: her form elemanına/kutuya net, koyu gri bir kenarlık.
+   Tip seçiciler (input/select/textarea/button) düşük özgüllükte olduğu
+   için yukarıdaki 17 renkli buton kuralını EZMİYOR — sadece onların
+   kapsamadığı her yerde güvenlik ağı olarak devreye giriyor. */
+:root[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea {
+  background: #ffffff !important;
+  border: 1px solid #888b93 !important;
+}
+/* Marka renkli butonlar (mor/kırmızı/pembe) hariç — onlar zaten dolgun
+   renkli, arkaplan geçersiz kılınırsa canlı rengi kaybolurdu. Sadece
+   kenarlık ekleniyor, zemine dokunulmuyor. */
+:root[data-theme="light"] button:not([style*="background:var(--c-7c3aed)"]):not([style*="background:var(--c-cc0000)"]):not([style*="background:var(--c-dc2626)"]):not([style*="background:var(--c-e1306c)"]):not([style*="background:linear-gradient"]) {
+  border: 1px solid #888b93 !important;
+}
+:root[data-theme="light"] .btn-chip,
+:root[data-theme="light"] .opt-card,
+:root[data-theme="light"] .result,
+:root[data-theme="light"] .upload-area,
+:root[data-theme="light"] .transcript,
+:root[data-theme="light"] #trends-box,
+:root[data-theme="light"] #apikey-compact {
+  background: #ffffff !important;
+  border: 1px solid #888b93 !important;
+}
 </style>
 
 <script>
