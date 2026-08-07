@@ -29,6 +29,21 @@ systemctl restart tts
 
 ## Noktalar
 
+### `c6f6ece` — Ayarlar modalı blob hatası ÇÖZÜLDÜ (gerçek kaynak)
+**Tarih:** 07.08.2026
+**Durum:** Playwright ile modal açılıp blob yeniden üretildi, düzeltme
+doğrulandı (hem açık hem koyu tema). Bilinen-çalışan.
+
+- Sebep: "Ses Klonu" bölümündeki "Doğal ses motorunu kullan" toggle'ı
+  `class="toggle"` kullanıyordu, olması gereken `class="toggle-switch"`
+  (diğer 5 toggle'da doğru). `.toggle-slider` (position:absolute;inset:0)
+  konumlandırma referansını `.toggle-switch`'in position:relative'inden
+  alıyordu; yanlış class'ta bu hiç uygulanmadığından en yakın
+  position:fixed ata olan modal kutusuna göre tüm modalı kaplıyordu,
+  border-radius:999px de bunu oval/yumurta şekline çeviriyordu.
+- `fbb8f3e`'deki sürükle-bırak ve mobil `button{width:100%}` teorileri
+  yanlıştı ama zararsız olduğundan geri alınmadı.
+
 ### `fbb8f3e` — Telegram tekrar-gönderim + Ayarlar modalı blob/geniş buton düzeltmesi
 **Tarih:** 07.08.2026
 **Durum:** Bilinen-çalışan (bekleniyor: kullanıcı sunucuda doğrulayacak).
