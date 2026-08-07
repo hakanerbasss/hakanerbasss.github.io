@@ -9216,7 +9216,17 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                         f"Cevap gelmezse otomatik seçeceğim.\n\n{numbered}"
                     )
                     if sent:
-                        save_ig_only_tr_log("running", "📰 Telegram'a haber listesi gönderildi, cevap bekleniyor (5 dk)...")
+                        # "running" DEĞİL — bilerek ayrı bir status. Rescue mekanizması
+                        # (_rescue_interrupted_jobs_task) status=="running" olan job'ları
+                        # servis yeniden başladığında "kesildi" sayıp otomatik yeniden
+                        # tetikliyor. Telegram cevabı beklerken (5 dk) araya bir deploy
+                        # girerse bu "running" damgası kalıyor, restart sonrası rescue
+                        # job'u tekrar tetikliyor, o da tekrar 5 dk bekliyor — sık deploy
+                        # yapıldığında Telegram'a haber listesi art arda gidiyordu.
+                        # Bu aşamada henüz hiçbir üretim yapılmadığından (sadece insan
+                        # cevabı bekleniyor) kaybedilecek iş yok; kaçırılırsa zaten
+                        # sıradaki zamanlanmış saatte tekrar sorulur.
+                        save_ig_only_tr_log("waiting_telegram", "📰 Telegram'a haber listesi gönderildi, cevap bekleniyor (5 dk)...")
                         choice = await wait_for_telegram_numeric_reply(offset, len(pool), timeout_sec=300)
                         if choice == "CANCEL":
                             await send_telegram_plain("🚫 İptal edildi, bu saat diliminde paylaşım yapılmayacak.")

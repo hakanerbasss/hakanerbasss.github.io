@@ -267,7 +267,7 @@
   --c-ffffff44: #00000044;
 }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -615,6 +615,12 @@
     .result video { max-height: 280px; }
 
     #yt-upload-form button { width: auto; }
+
+    /* Ayarlar modalındaki küçük ikon/aksiyon butonları (✕ kapat, Değiştir,
+       Kaldır, Test Et vb.) bu genel width:100% kuralından kaçtırılmalı —
+       aksi halde ✕ kapat butonu tüm satırı kaplayan geniş gri bir çubuğa
+       dönüşüyor ve diğer ikili buton satırları (Eski/Yeni vb.) bozuluyor. */
+    #yt-modal button { width: auto; }
 
     /* Modal tam ekran mobilde */
     #yt-modal > div {
@@ -3061,12 +3067,13 @@ async function loadIGOnlyTRStatus() {
       document.getElementById('ig-only-tr-next').textContent = d.next_run ? `Sonraki: ${d.next_run}` : '';
       const log = d.log || {};
       const statusEl = document.getElementById('ig-only-tr-last-status');
-      let statusText = log.status ? `Durum: ${log.status}` : '';
+      const IG_STATUS_LABELS = { running: 'Üretiliyor', waiting_telegram: 'Telegram cevabı bekleniyor', success: 'Tamamlandı', error: 'Hata' };
+      let statusText = log.status ? `Durum: ${IG_STATUS_LABELS[log.status] || log.status}` : '';
       if (log.ts) {
         const startTime = new Date(log.ts * 1000).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
         statusText += ` — Başladı: ${startTime}`;
       }
-      if (log.status === 'running' && log.ts) {
+      if ((log.status === 'running' || log.status === 'waiting_telegram') && log.ts) {
         const mins = Math.round((Date.now()/1000 - log.ts) / 60);
         if (mins > 0) statusText += ` (${mins} dk)`;
       }
@@ -3074,7 +3081,7 @@ async function loadIGOnlyTRStatus() {
       statusEl.style.color = log.status === 'success' ? 'var(--c-4ade80)' : log.status === 'error' ? 'var(--c-f87171)' : 'var(--c-fbbf24)';
       _setMsg('ig-only-tr-last-msg', log, '/api/ig-only-tr/run-now', 'loadIGOnlyTRStatus');
 
-      if (log.status === 'running') {
+      if (log.status === 'running' || log.status === 'waiting_telegram') {
         // Job devam ediyorsa her 8 saniyede bir yenile
         if (!_igOnlyTRPolling) {
           _igOnlyTRPolling = setInterval(loadIGOnlyTRStatus, 8000);
