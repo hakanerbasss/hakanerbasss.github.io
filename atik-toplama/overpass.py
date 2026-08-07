@@ -24,6 +24,31 @@ class NeighborhoodNotFound(Exception):
     pass
 
 
+def _overpass_post(query, retries=2, request_timeout=60):
+    """Overpass'a sorgu gönderir; genel (ücretsiz) sunucu yoğunlukta sık sık
+    429/502/503/504 döner — bu gerçek bir "veri yok" durumu değildir, bu
+    yüzden birkaç kez artan bekleme ile yeniden denenir."""
+    last_error = None
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                OVERPASS_URL,
+                data={'data': query},
+                headers={'User-Agent': USER_AGENT},
+                timeout=request_timeout,
+            )
+            if resp.status_code in (429, 502, 503, 504):
+                last_error = Exception(f'Overpass geçici hata döndü: HTTP {resp.status_code}')
+                time.sleep(5 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            last_error = e
+            time.sleep(5 * (attempt + 1))
+    raise last_error or Exception('Overpass sorgusu başarısız oldu')
+
+
 def resolve_neighborhood(query):
     """Mahalle adını Nominatim ile OSM relation'a çözer.
 
@@ -98,15 +123,12 @@ def search_districts(province_name):
 
     area_id = 3600000000 + osm_id
     query = f"""
-    [out:json][timeout:30];
+    [out:json][timeout:60];
     area({area_id})->.p;
     relation(area.p)["admin_level"="6"]["name"]["boundary"="administrative"];
     out tags;
     """
-    resp = requests.post(OVERPASS_URL, data={'data': query},
-                         headers={'User-Agent': USER_AGENT}, timeout=60)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _overpass_post(query)
     districts = []
     for el in data.get('elements', []):
         name = el.get('tags', {}).get('name')
@@ -137,15 +159,12 @@ def search_neighborhoods(district_name, province_name):
 
     area_id = 3600000000 + osm_id
     query = f"""
-    [out:json][timeout:30];
+    [out:json][timeout:60];
     area({area_id})->.d;
     relation(area.d)["admin_level"~"^(8|9|10)$"]["name"]["boundary"="administrative"];
     out tags;
     """
-    resp = requests.post(OVERPASS_URL, data={'data': query},
-                         headers={'User-Agent': USER_AGENT}, timeout=60)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _overpass_post(query)
     neighborhoods = []
     for el in data.get('elements', []):
         name = el.get('tags', {}).get('name')
@@ -155,14 +174,10 @@ def search_neighborhoods(district_name, province_name):
     return neighborhoods
 
 
-def fetch_streets(osm_relation_id, retries=3):
+def fetch_streets(osm_relation_id):
     """Verilen relation id sınırı içindeki isimli yolları geometrileriyle döner.
 
     Döner: [{'osm_way_id': int, 'name': str, 'coords': [[lat, lon], ...]}, ...]
-
-    Overpass'ın genel (ücretsiz) sunucusu yoğunluk altında sık sık 504/502/
-    429 döner; bu durum gerçekte "sokak yok" değildir. Bu yüzden birkaç kez
-    yeniden denenir, aksi halde çağıran kod bunu sessizce "0 sokak" sanabilir.
     """
     highway_filter = '|'.join(HIGHWAY_TYPES)
     area_id = 3600000000 + osm_relation_id  # Overpass area id konvansiyonu
@@ -172,27 +187,7 @@ def fetch_streets(osm_relation_id, retries=3):
     way(area.a)["highway"~"^({highway_filter})$"]["name"];
     out geom;
     """
-    last_error = None
-    for attempt in range(retries):
-        try:
-            resp = requests.post(
-                OVERPASS_URL,
-                data={'data': query},
-                headers={'User-Agent': USER_AGENT},
-                timeout=120,
-            )
-            if resp.status_code in (429, 502, 503, 504):
-                last_error = Exception(f'Overpass geçici hata döndü: HTTP {resp.status_code}')
-                time.sleep(5 * (attempt + 1))
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-            break
-        except requests.RequestException as e:
-            last_error = e
-            time.sleep(5 * (attempt + 1))
-    else:
-        raise last_error or Exception('Overpass sorgusu başarısız oldu')
+    data = _overpass_post(query, request_timeout=90)
 
     streets = {}
     for el in data.get('elements', []):
