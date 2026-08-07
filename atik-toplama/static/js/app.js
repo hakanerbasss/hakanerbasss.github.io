@@ -1384,7 +1384,11 @@ el('menuBtn').addEventListener('click', async () => {
             district_id: S.user.district_id,
           }),
         });
-        toast(`${mahalle} eklendi — ${res.street_count || 0} sokak ✅`, 'success', 5000);
+        if (res.street_fetch_error) {
+          toast(res.street_fetch_error, 'error', 8000);
+        } else {
+          toast(`${mahalle} eklendi — ${res.street_count || 0} sokak ✅`, 'success', 5000);
+        }
         const me = await api('/api/me');
         S.neighborhoods = me.neighborhoods;
         const nbSel = el('nbSelect');

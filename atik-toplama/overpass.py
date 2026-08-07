@@ -7,6 +7,7 @@ Akış:
 Not: Nominatim ve Overpass halka açık, ücretsiz servislerdir; kullanım
 politikaları gereği istekler arası makul aralık ve User-Agent zorunludur.
 """
+import time
 import requests
 
 NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
@@ -154,27 +155,44 @@ def search_neighborhoods(district_name, province_name):
     return neighborhoods
 
 
-def fetch_streets(osm_relation_id):
+def fetch_streets(osm_relation_id, retries=3):
     """Verilen relation id sınırı içindeki isimli yolları geometrileriyle döner.
 
     Döner: [{'osm_way_id': int, 'name': str, 'coords': [[lat, lon], ...]}, ...]
+
+    Overpass'ın genel (ücretsiz) sunucusu yoğunluk altında sık sık 504/502/
+    429 döner; bu durum gerçekte "sokak yok" değildir. Bu yüzden birkaç kez
+    yeniden denenir, aksi halde çağıran kod bunu sessizce "0 sokak" sanabilir.
     """
     highway_filter = '|'.join(HIGHWAY_TYPES)
     area_id = 3600000000 + osm_relation_id  # Overpass area id konvansiyonu
     query = f"""
-    [out:json][timeout:60];
+    [out:json][timeout:90];
     area({area_id})->.a;
     way(area.a)["highway"~"^({highway_filter})$"]["name"];
     out geom;
     """
-    resp = requests.post(
-        OVERPASS_URL,
-        data={'data': query},
-        headers={'User-Agent': USER_AGENT},
-        timeout=90,
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    last_error = None
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                OVERPASS_URL,
+                data={'data': query},
+                headers={'User-Agent': USER_AGENT},
+                timeout=120,
+            )
+            if resp.status_code in (429, 502, 503, 504):
+                last_error = Exception(f'Overpass geçici hata döndü: HTTP {resp.status_code}')
+                time.sleep(5 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            break
+        except requests.RequestException as e:
+            last_error = e
+            time.sleep(5 * (attempt + 1))
+    else:
+        raise last_error or Exception('Overpass sorgusu başarısız oldu')
 
     streets = {}
     for el in data.get('elements', []):
