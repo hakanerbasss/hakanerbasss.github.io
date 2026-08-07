@@ -29,6 +29,23 @@ systemctl restart tts
 
 ## Noktalar
 
+### `fbb8f3e` — Telegram tekrar-gönderim + Ayarlar modalı blob/geniş buton düzeltmesi
+**Tarih:** 07.08.2026
+**Durum:** Bilinen-çalışan (bekleniyor: kullanıcı sunucuda doğrulayacak).
+
+- `app.py`: TR Instagram-Only job'u Telegram cevabı beklerken (5 dk) artık
+  "running" değil "waiting_telegram" damgası kullanıyor — sık deploy'larda
+  `_rescue_interrupted_jobs_task` job'u tekrar tetikleyip Telegram'a haber
+  listesini art arda göndermesin diye.
+- `index.html`: Ayarlar modalındaki (`#yt-modal`) butonlar artık mobil
+  `button{width:100%}` kuralından muaf — ✕ kapat butonu tüm satırı kaplayan
+  geniş gri çubuğa dönüşüyordu. Ayrıca tüm elemanlarda
+  `-webkit-tap-highlight-color: transparent` eklendi (olası MIUI/WebView
+  dokunma-vurgulama kaynaklı blob'lara karşı).
+- Bir önceki commit'teki (`441e572`) sürükle-bırak teorisi YANLIŞTI —
+  kullanıcı deploy sonrası hatanın sürdüğünü bildirdi. O değişiklik zararsız
+  olduğu için geri alınmadı ama asıl blob sebebi bu commit'teki buton kuralı.
+
 ### `893ff66` — arayüz yeniden düzenlemesi TAMAMLANDI
 **Tarih:** 06.08.2026
 **Durum:** Arayüz 6096 → 4857 satır. 5 adımın hepsi bitti.
