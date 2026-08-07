@@ -187,12 +187,32 @@ def create_neighborhood():
 
     conn = get_db()
     existing = conn.execute(
-        'SELECT id FROM neighborhoods WHERE district_id = ? AND name = ?',
+        'SELECT id, osm_id FROM neighborhoods WHERE district_id = ? AND name = ?',
         (district_id, query)
     ).fetchone()
+
     if existing:
+        street_count = conn.execute(
+            'SELECT COUNT(*) AS c FROM streets WHERE neighborhood_id = ?', (existing['id'],)
+        ).fetchone()['c']
+        # Daha önce 0 sokak ile kaldıysa (Overpass geçici hatası olabilir) tekrar dene
+        if street_count == 0 and existing['osm_id']:
+            try:
+                streets = fetch_streets(existing['osm_id'])
+            except Exception as e:
+                conn.close()
+                return jsonify({'error': f'Sokaklar çekilemedi, tekrar deneyin: {e}'}), 502
+            for s in streets:
+                conn.execute(
+                    'INSERT OR IGNORE INTO streets (neighborhood_id, osm_way_id, name, geometry, created_at) '
+                    'VALUES (?, ?, ?, ?, ?)',
+                    (existing['id'], s['osm_way_id'], s['name'], json.dumps(s['coords']), now())
+                )
+            conn.commit()
+            conn.close()
+            return jsonify({'id': existing['id'], 'name': query, 'existing': True, 'street_count': len(streets)})
         conn.close()
-        return jsonify({'id': existing['id'], 'name': query, 'existing': True})
+        return jsonify({'id': existing['id'], 'name': query, 'existing': True, 'street_count': street_count})
 
     try:
         info = resolve_neighborhood(query)
@@ -215,13 +235,20 @@ def create_neighborhood():
         'INSERT OR IGNORE INTO user_neighborhoods (user_id, neighborhood_id, is_primary) VALUES (?, ?, ?)',
         (session['user_id'], nb_id, 1)
     )
+    conn.commit()
 
     streets = []
     if info.get('osm_id'):
         try:
             streets = fetch_streets(info['osm_id'])
         except Exception as e:
+            conn.close()
             app.logger.warning(f'Sokak çekme hatası: {e}')
+            return jsonify({
+                'id': nb_id, 'name': query, 'street_count': 0,
+                'street_fetch_error': f'Mahalle eklendi ama sokaklar çekilemedi (Overpass hatası): {e}. '
+                                       'Aynı mahalleyi tekrar seçip "+ Mahalle Ekle" ile yeniden deneyebilirsiniz.'
+            })
 
     for s in streets:
         conn.execute(
