@@ -872,6 +872,7 @@ function renderStreetList() {
     <div class="street-row" data-street-id="${s.id}">
       <span class="sname">${esc(s.name)}</span>
       <span class="badge ${s.completed ? 'done' : ''}">${s.completed ? '✅ Tamam' : '⬛ Bekliyor'}</span>
+      <button data-detail="${s.id}">Detay</button>
       <button data-fly="${s.id}">Git</button>
     </div>
   `).join('');
@@ -894,6 +895,15 @@ function renderStreetList() {
       S.map.flyTo(mid, 17, {animate:true, duration:.7});
       speak(street.name);
       el('sidePanel').classList.remove('open');
+    };
+  });
+
+  body.querySelectorAll('[data-detail]').forEach(btn => {
+    btn.onclick = () => {
+      const street = pool.find(s => s.id === Number(btn.dataset.detail));
+      if (!street) return;
+      el('sidePanel').classList.remove('open');
+      openStreetDetail(street);
     };
   });
 }
