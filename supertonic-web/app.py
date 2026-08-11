@@ -2735,8 +2735,11 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
             elif pollinations_key:
                 # Test: AI ile Görsel Üret (Pollinations, ücretsiz Flux modeli) —
                 # başarısız olursa normal hiyerarşiye (DALL-E → Pexels → Wikimedia) düşer.
-                data = _generate_pollinations_image(keyword, "portrait", pollinations_key)
-                if data and _save_as_jpeg(data, png_path):
+                # NOT: değişken adı "data" OLMAMALI — fonksiyonun üst kapsamında script
+                # JSON'unu tutan aynı isimli "data" değişkenini ezip NoneType hatasına
+                # yol açıyordu (Pollinations başarısız dönünce data=None oluyordu).
+                _ai_img_data = _generate_pollinations_image(keyword, "portrait", pollinations_key)
+                if _ai_img_data and _save_as_jpeg(_ai_img_data, png_path):
                     photo_saved, visual_err = True, ""
                 else:
                     visual_warnings.add(f"Pollinations başarısız, hiyerarşiye düşüldü: '{keyword}'")
