@@ -1086,6 +1086,19 @@
   </details>
 
   <details class="opt-card">
+    <summary>🌻 AI ile Görsel Üret (Pollinations) <span style="font-weight:400;color:var(--c-555555);font-size:12px;">(test)</span></summary>
+    <div class="opt-body">
+      <div class="opt-row">
+        <label class="toggle-switch" style="margin:0;">
+          <input type="checkbox" id="use-ai-images">
+          <span class="toggle-slider"></span>
+        </label>
+        <div class="opt-text-sub" style="margin:0;">Stok fotoğraf yerine her sahne için Pollinations (ücretsiz Flux modeli) ile özgün görsel üretir. Ayarlar → API Bağlantıları'nda key gerekir. Başarısız olursa otomatik normal görsel kaynağına döner.</div>
+      </div>
+    </div>
+  </details>
+
+  <details class="opt-card">
     <summary>🎨 Özel Açılış Kapağı <span style="font-weight:400;color:var(--c-555555);font-size:12px;">(deneysel)</span></summary>
     <div class="opt-body">
       <div class="opt-row">
@@ -1519,6 +1532,18 @@
         </div>
 
         <hr style="border-color:var(--c-222222);margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:var(--c-888888);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🌻 Pollinations AI (Opsiyonel, ücretsiz)</div>
+        <p style="color:var(--c-555555);font-size:11px;margin-bottom:10px;">enter.pollinations.ai → giriş yap → Keys → Secret Key oluştur</p>
+        <div id="pollinations-saved-state" style="display:none;background:var(--c-0d1f0d);border:1px solid var(--c-1a4a1a);border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:var(--c-4ade80);font-size:13px;margin-bottom:8px;">✓ Pollinations bağlı</div>
+          <button onclick="resetPollinationsConfig()" style="background:var(--c-2a1a1a);font-size:12px;padding:6px 12px;">Değiştir</button>
+        </div>
+        <div id="pollinations-input-state">
+          <input type="password" id="cfg-pollinations-key" placeholder="sk-..." style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+          <button onclick="savePollinationsConfig()">Kaydet</button>
+        </div>
+
+        <hr style="border-color:var(--c-222222);margin:16px 0;">
         <div style="font-size:12px;font-weight:600;color:var(--c-888888);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🎨 OpenAI DALL-E (Opsiyonel)</div>
         <p style="color:var(--c-555555);font-size:11px;margin-bottom:10px;">DALL-E 3 API key — varsa görseller DALL-E ile üretilir, yoksa Wikimedia → Pexels kullanılır</p>
         <div id="openai-key-status" style="font-size:13px;margin-bottom:10px;color:var(--c-888888);">Kontrol ediliyor...</div>
@@ -1942,6 +1967,14 @@ async function checkYTStatus() {
     }
   } catch(e) {}
   try {
+    const plr = await fetch('/api/pollinations/config');
+    const pld = await plr.json();
+    if (pld.configured) {
+      document.getElementById('pollinations-saved-state').style.display = 'block';
+      document.getElementById('pollinations-input-state').style.display = 'none';
+    }
+  } catch(e) {}
+  try {
     const r = await fetch('/api/yt/config');
     const d = await r.json();
     const authorized = d.authorized;
@@ -2354,6 +2387,26 @@ async function savePexelsConfig() {
 function resetPexelsConfig() {
   document.getElementById('pexels-saved-state').style.display = 'none';
   document.getElementById('pexels-input-state').style.display = 'block';
+}
+
+async function savePollinationsConfig() {
+  const key = document.getElementById('cfg-pollinations-key').value.trim();
+  if (!key) return showError('err-cfg', 'API key girin.');
+  const fd = new FormData();
+  fd.append('api_key', key);
+  const r = await fetch('/api/pollinations/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('pollinations-saved-state').style.display = 'block';
+    document.getElementById('pollinations-input-state').style.display = 'none';
+    document.getElementById('cfg-pollinations-key').value = '';
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+function resetPollinationsConfig() {
+  document.getElementById('pollinations-saved-state').style.display = 'none';
+  document.getElementById('pollinations-input-state').style.display = 'block';
 }
 
 function resetYTConfig() {
@@ -2834,6 +2887,7 @@ async function generateShorts(allowEmpty = false) {
       const files = document.getElementById('custom-images-input').files;
       for (let i = 0; i < files.length; i++) fd.append('custom_images', files[i]);
     }
+    fd.append('use_ai_images', document.getElementById('use-ai-images').checked ? 'true' : 'false');
 
     if (document.getElementById('use-intro-cover').checked) {
       const introFile = document.getElementById('intro-cover-input').files[0];

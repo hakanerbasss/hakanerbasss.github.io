@@ -2311,6 +2311,7 @@ async def _generate_shorts_core(
     require_verified_source: bool = False,
     manual_link: str = "",
     manual_content: str = "",
+    use_ai_images: bool = False,
 ):
     import json
     import httpx
@@ -2321,6 +2322,7 @@ async def _generate_shorts_core(
 
     use_video_mode = use_video.lower() in ("true", "1", "yes")
     pexels_key = get_pexels_key()
+    pollinations_key = get_pollinations_key() if use_ai_images else ""
 
     client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
     lang_name = LANG_MAP.get(lang, "Turkish")
@@ -2729,6 +2731,15 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
                     _sh.copy2(str(src_img), str(png_path))
                     photo_saved, visual_err = True, ""
                 except Exception:
+                    photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
+            elif pollinations_key:
+                # Test: AI ile Görsel Üret (Pollinations, ücretsiz Flux modeli) —
+                # başarısız olursa normal hiyerarşiye (DALL-E → Pexels → Wikimedia) düşer.
+                data = _generate_pollinations_image(keyword, "portrait", pollinations_key)
+                if data and _save_as_jpeg(data, png_path):
+                    photo_saved, visual_err = True, ""
+                else:
+                    visual_warnings.add(f"Pollinations başarısız, hiyerarşiye düşüldü: '{keyword}'")
                     photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
             # Video modu: önce Pexels video dene, başarısız olursa görsele düş
             # İlk sahne (i==0) her zaman görsel — banner overlay için PNG şart
@@ -3223,13 +3234,13 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content=""):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content="", use_ai_images=False):
     global _manual_shorts_lock
     try:
         # info_format (Bilgi Shorts) haber değil — kaynak/olgu zorunluluğu uygulanmaz.
         # Haber shorts'ta doğrulama artık burada da açık: elle üretilen videolarda
         # halüsinasyon ağı kapalıydı, uydurma kurum/rakam buradan geçiyordu.
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, require_verified_source=not info_format)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, require_verified_source=not info_format, use_ai_images=use_ai_images)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -3277,6 +3288,7 @@ async def generate_shorts_async_endpoint(
     topic_link: str = Form(""),
     manual_link: str = Form(""),
     manual_content: str = Form(""),
+    use_ai_images: str = Form("false"),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -3316,7 +3328,8 @@ async def generate_shorts_async_endpoint(
     _manual_shorts_lock = True
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content))
+    ai_images_on = use_ai_images.lower() in ("true", "1", "yes")
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, use_ai_images=ai_images_on))
     return {"ok": True}
 
 
@@ -5286,6 +5299,7 @@ CONFIG_FILE = Path("yt_config.json")
 TOKEN_FILE = Path("yt_token.json")
 TOKEN_FILE_EN = Path("yt_token_en.json")
 PEXELS_CONFIG = Path("pexels_config.json")
+POLLINATIONS_CONFIG = Path("pollinations_config.json")
 DS_CONFIG = Path("deepseek_config.json")
 OPENAI_CONFIG = Path("openai_config.json")
 IG_CONFIG = Path("ig_config.json")
@@ -5507,6 +5521,12 @@ SCOPES = [
 def get_pexels_key():
     if PEXELS_CONFIG.exists():
         return json.loads(PEXELS_CONFIG.read_text()).get("api_key", "")
+    return ""
+
+
+def get_pollinations_key():
+    if POLLINATIONS_CONFIG.exists():
+        return json.loads(POLLINATIONS_CONFIG.read_text()).get("api_key", "")
     return ""
 
 
@@ -6019,6 +6039,29 @@ def _generate_dalle_image(keyword: str, orientation: str, openai_key: str) -> by
     return None
 
 
+def _generate_pollinations_image(keyword: str, orientation: str, pollinations_key: str) -> bytes | None:
+    """Pollinations.ai (Flux modeli, ücretsiz) ile sahne görseli üretir."""
+    from urllib.parse import quote
+    try:
+        width, height = (1024, 1536) if orientation == "portrait" else (1536, 1024)
+        prompt = (
+            f"Professional high-quality documentary-style photo of {keyword}, "
+            "realistic, cinematic lighting, no text, no watermarks, no logos"
+        )
+        resp = httpx.get(
+            f"https://image.pollinations.ai/prompt/{quote(prompt)}",
+            params={"width": width, "height": height, "nologo": "true", "model": "flux"},
+            headers={"Authorization": f"Bearer {pollinations_key}"},
+            timeout=30,
+        )
+        if resp.status_code == 200 and resp.content:
+            return resp.content
+        print(f"[GÖRSEL] Pollinations hata: '{keyword}' HTTP {resp.status_code}", file=sys.stderr)
+    except Exception as e:
+        print(f"[GÖRSEL] Pollinations hata: '{keyword}' {e}", file=sys.stderr)
+    return None
+
+
 def _save_as_jpeg(data: bytes, img_path: Path) -> bool:
     """Herhangi bir görsel formatını (SVG hariç) JPEG olarak kaydeder."""
     from PIL import Image
@@ -6229,6 +6272,17 @@ async def save_pexels_config(api_key: str = Form(...)):
 @app.get("/api/pexels/config")
 async def get_pexels_config():
     return {"configured": bool(get_pexels_key())}
+
+
+@app.post("/api/pollinations/config")
+async def save_pollinations_config(api_key: str = Form(...)):
+    POLLINATIONS_CONFIG.write_text(json.dumps({"api_key": api_key}))
+    return {"ok": True}
+
+
+@app.get("/api/pollinations/config")
+async def get_pollinations_config():
+    return {"configured": bool(get_pollinations_key())}
 
 
 @app.get("/api/openai/config")
