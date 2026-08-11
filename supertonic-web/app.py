@@ -2577,7 +2577,8 @@ Return ONLY valid JSON, no markdown, no explanation:
   "scenes": [
     {{
       "text": "narration for this scene (1-2 short sentences)",
-      "keyword": "english search keyword for stock photo (2-3 words, specific and visual)"
+      "keyword": "english search keyword for stock photo (2-3 words, specific and visual)",
+      "image_prompt": "one detailed English sentence describing exactly what should be depicted for an AI image generator — concrete people/objects/setting/action/mood specific to THIS scene, not a generic stock category"
     }}
   ]
 }}
@@ -2614,6 +2615,7 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 - badge_text: a short (max 3-4 words), punchy phrase in {lang_name} for the opening banner (max 2-5 words for the whole banner text overall — this must stay readable in under 2 seconds for a 45+ audience). MUST match the certainty_level you determined — never let the banner claim more certainty than the story actually has: at level A pick "Resmi Açıklama", "Yeni Düzenleme", "SGK", "Ekonomi", "Hava Durumu", "Deprem" (or "SON DAKİKA" only if it's genuinely urgent and just happened); at level B pick "Hazırlık", "Taslak", "Teklif" (or an equivalent honest stage-marker); at level C pick "Henüz Resmi Değil" or "Kaynaklara Göre". Within whatever level applies, still vary the exact wording — do not default to the same phrase or reuse the identical phrase across consecutive videos.
 - emphasis_word: exactly one word or short phrase (max 2 words) copied VERBATIM from the title, representing the core subject the story is actually about — this word will be visually highlighted in the opening banner.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
+- image_prompt: English, one full sentence, written for an AI image generator (not a search engine) — describe the actual concrete scene (who/what/where/doing what), photorealistic documentary style, never mention text/logos/watermarks/charts/numbers appearing in the image
 - Total narration between 45 and 55 seconds — NEVER shorter than 45 seconds. If the facts feel thin, elaborate naturally on the facts you have (implications, who it affects, timing) instead of cutting the video short or inventing new details.
 - hashtags: 10-15 tags — ALL of them must be specific to THIS video's actual topic/people/places/institutions (e.g. if the video is about the Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya", "erişim", "keşfetsayfası"...). Do NOT pad the list with generic filler tags like "sondakika", "gündem", "haberler", "güncel", "viral" — only ONE fixed/generic tag is allowed in the entire list: "Shorts" (always last). Every other tag must be traceable to something specific in this exact story.
 {_custom_block}"""
@@ -2686,6 +2688,7 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
     png_files = []
     durations = []
     visual_warnings: set = set()
+    pollinations_hits = 0  # Pollinations gerçekten kaç sahnede başarılı oldu (test edilebilsin diye)
     scene_raw_videos = []  # video modunda her sahne için ham video yolu (None = foto kullan)
 
     for i, scene in enumerate(scenes):
@@ -2738,9 +2741,14 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
                 # NOT: değişken adı "data" OLMAMALI — fonksiyonun üst kapsamında script
                 # JSON'unu tutan aynı isimli "data" değişkenini ezip NoneType hatasına
                 # yol açıyordu (Pollinations başarısız dönünce data=None oluyordu).
-                _ai_img_data = _generate_pollinations_image(keyword, "portrait", pollinations_key)
+                # image_prompt: DeepSeek'in ürettiği, sahneye özel zengin İngilizce
+                # betimleme — 2-3 kelimelik "keyword" (Pexels arama terimi) AI üretici
+                # için çok jenerik/alakasız görsel veriyordu, o yüzden onu kullanmıyoruz.
+                _ai_prompt = scene.get("image_prompt") or f"a photo related to: {keyword}"
+                _ai_img_data = _generate_pollinations_image(_ai_prompt, "portrait", pollinations_key)
                 if _ai_img_data and _save_as_jpeg(_ai_img_data, png_path):
                     photo_saved, visual_err = True, ""
+                    pollinations_hits += 1
                 else:
                     visual_warnings.add(f"Pollinations başarısız, hiyerarşiye düşüldü: '{keyword}'")
                     photo_saved, visual_err = fetch_scene_visual(keyword, "portrait", pexels_key, png_path)
@@ -3171,6 +3179,7 @@ Kurallar:
         "suggested_description": ig_caption_desc,
         "suggested_description_yt": yt_description_with_source,
         "visual_warning": " | ".join(sorted(visual_warnings)) if visual_warnings else "",
+        "pollinations_hits": pollinations_hits,
         "source_text": source_text,
         "instagram_caption": _build_ig_caption(generated_title, ig_caption_desc, source_text, video_tags),
     }
@@ -6042,15 +6051,15 @@ def _generate_dalle_image(keyword: str, orientation: str, openai_key: str) -> by
     return None
 
 
-def _generate_pollinations_image(keyword: str, orientation: str, pollinations_key: str) -> bytes | None:
-    """Pollinations.ai (Flux modeli, ücretsiz) ile sahne görseli üretir."""
+def _generate_pollinations_image(description: str, orientation: str, pollinations_key: str) -> bytes | None:
+    """Pollinations.ai (Flux modeli, ücretsiz) ile sahne görseli üretir.
+    `description` fikren zengin, sahneye özel bir cümle olmalı (scene["image_prompt"]) —
+    2-3 kelimelik Pexels arama anahtarı (scene["keyword"]) burada kullanılırsa görsel
+    alakasız/jenerik çıkıyor, AI üretici stok-arama motoru gibi çalışmıyor."""
     from urllib.parse import quote
     try:
         width, height = (1024, 1536) if orientation == "portrait" else (1536, 1024)
-        prompt = (
-            f"Professional high-quality documentary-style photo of {keyword}, "
-            "realistic, cinematic lighting, no text, no watermarks, no logos"
-        )
+        prompt = f"{description}, photorealistic, documentary style, cinematic lighting, no text, no watermarks, no logos"
         resp = httpx.get(
             f"https://image.pollinations.ai/prompt/{quote(prompt)}",
             params={"width": width, "height": height, "nologo": "true", "model": "flux"},
@@ -6058,10 +6067,11 @@ def _generate_pollinations_image(keyword: str, orientation: str, pollinations_ke
             timeout=30,
         )
         if resp.status_code == 200 and resp.content:
+            print(f"[GÖRSEL] Pollinations başarılı: '{description[:60]}'", file=sys.stderr)
             return resp.content
-        print(f"[GÖRSEL] Pollinations hata: '{keyword}' HTTP {resp.status_code}", file=sys.stderr)
+        print(f"[GÖRSEL] Pollinations hata: '{description[:60]}' HTTP {resp.status_code}", file=sys.stderr)
     except Exception as e:
-        print(f"[GÖRSEL] Pollinations hata: '{keyword}' {e}", file=sys.stderr)
+        print(f"[GÖRSEL] Pollinations hata: '{description[:60]}' {e}", file=sys.stderr)
     return None
 
 

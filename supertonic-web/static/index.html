@@ -1162,6 +1162,7 @@
   <div class="result" id="result-shorts">
     <p style="display:flex;align-items:center;gap:10px;">Script <button type="button" onclick="copyFieldValue('shorts-script',this)" style="background:var(--c-2a2a2a);border:1px solid var(--c-333333);border-radius:6px;font-size:12px;padding:4px 10px;color:var(--c-cccccc);cursor:pointer;width:auto;">📋 Kopyala</button></p>
     <div class="transcript" id="shorts-script"></div>
+    <div id="shorts-visual-source" style="display:none;font-size:12px;color:var(--c-888888);margin-top:8px;"></div>
     <p style="margin-top:16px">Video</p>
     <video id="shorts-video" controls style="max-height:500px;width:auto;display:block;margin:0 auto;"></video>
     <a id="dl-shorts" class="dl-btn" download="shorts.mp4">İndir</a>
@@ -2832,6 +2833,17 @@ function _showShortsResult(d) {
   // eklenmiyor) — ama dosya adı YouTube küçük resmi yüklemesi için hâlâ
   // gerekli (bkz. thumbnail_filename, uploadToYouTube).
   currentThumbnailFilename = d.thumbnail ? d.thumbnail.split('/').pop() : null;
+  const vsEl = document.getElementById('shorts-visual-source');
+  if (document.getElementById('use-ai-images').checked) {
+    const hits = d.pollinations_hits || 0;
+    const total = d.scene_count || 0;
+    vsEl.textContent = hits > 0
+      ? `🌻 Pollinations AI görsel: ${hits}/${total} sahnede kullanıldı${hits < total ? ' (kalanlar normal görsel kaynağına düştü)' : ''}`
+      : `⚠️ Pollinations hiçbir sahnede kullanılamadı, normal görsel kaynağına (Pexels/DALL-E/Wikimedia) düşüldü — key'i kontrol et`;
+    vsEl.style.display = 'block';
+  } else {
+    vsEl.style.display = 'none';
+  }
   document.getElementById('result-shorts').classList.add('show');
   checkYTStatus();
 }
