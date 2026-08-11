@@ -6067,7 +6067,11 @@ def _generate_pollinations_image(description: str, orientation: str, pollination
     width, height = (1024, 1536) if orientation == "portrait" else (1536, 1024)
     prompt = f"{description}, photorealistic, documentary style, cinematic lighting, no text, no watermarks, no logos"
     url = f"https://image.pollinations.ai/prompt/{quote(prompt)}"
-    params = {"width": width, "height": height, "nologo": "true", "model": "flux"}
+    params = {
+        "width": width, "height": height, "nologo": "true", "model": "flux",
+        "enhance": "true",
+        "negative_prompt": "blurry, low quality, distorted face, deformed, disfigured, warped features, extra limbs, bad anatomy",
+    }
     headers = {"Authorization": f"Bearer {pollinations_key}"}
 
     for attempt in range(3):
