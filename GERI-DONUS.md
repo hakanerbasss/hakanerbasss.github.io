@@ -29,6 +29,25 @@ systemctl restart tts
 
 ## Noktalar
 
+### `e3cdc09` — Pollinations AI ile sahne görseli üretimi (test)
+**Tarih:** 10.08.2026
+**Durum:** Kod doğrulandı (syntax + HTML/JS bütünlük), sunucuda henüz test
+edilmedi — key girilip Short Üret'te denenecek.
+
+- Yeni: Ayarlar → API Bağlantıları'na "Pollinations AI" key alanı
+  (`pollinations_config.json`, Pexels ile aynı desen).
+- Yeni: Short Üret → Gelişmiş Seçenekler'e "AI ile Görsel Üret
+  (Pollinations)" toggle'ı — açılınca her sahne görseli stok fotoğraf
+  yerine Pollinations'ın ücretsiz Flux modeliyle üretiliyor
+  (`image.pollinations.ai/prompt`, `nologo=true`, MIT lisanslı, ticari
+  kullanım net).
+- Başarısız olursa (key yok/hata) otomatik olarak mevcut hiyerarşiye
+  (DALL-E → Pexels → Wikimedia) düşüyor — video hiç kesintiye uğramıyor.
+- Not: Bu turda ayrıca `atik-toplama` projesine (farklı, ilgisiz proje —
+  sokak temizlik takip uygulaması) Sokaklar listesine "Detay" butonu ve
+  service worker önbellek düzeltmesi eklendi, karışmasın diye ayrı not
+  düşülüyor: `4bb3931`, `e1d866b`.
+
 ### `c6f6ece` — Ayarlar modalı blob hatası ÇÖZÜLDÜ (gerçek kaynak)
 **Tarih:** 07.08.2026
 **Durum:** Playwright ile modal açılıp blob yeniden üretildi, düzeltme
