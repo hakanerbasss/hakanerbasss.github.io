@@ -6055,23 +6055,37 @@ def _generate_pollinations_image(description: str, orientation: str, pollination
     """Pollinations.ai (Flux modeli, ücretsiz) ile sahne görseli üretir.
     `description` fikren zengin, sahneye özel bir cümle olmalı (scene["image_prompt"]) —
     2-3 kelimelik Pexels arama anahtarı (scene["keyword"]) burada kullanılırsa görsel
-    alakasız/jenerik çıkıyor, AI üretici stok-arama motoru gibi çalışmıyor."""
+    alakasız/jenerik çıkıyor, AI üretici stok-arama motoru gibi çalışmıyor.
+
+    Gözlemlenen gerçek davranış (log): ilk istek bazen 30sn'den uzun sürüyor
+    (timeout), hemen ardından gelen istekler de 429 (rate limit) alıyor —
+    muhtemelen zaman aşımına uğrattığımız istek Pollinations tarafında hâlâ
+    işleniyor ve limite sayılıyor. Timeout 60sn'ye çıkarıldı, 429'da kısa bir
+    bekleyip yeniden denemek eklendi (429 genelde geçici, hemen vazgeçmeye
+    gerek yok)."""
     from urllib.parse import quote
-    try:
-        width, height = (1024, 1536) if orientation == "portrait" else (1536, 1024)
-        prompt = f"{description}, photorealistic, documentary style, cinematic lighting, no text, no watermarks, no logos"
-        resp = httpx.get(
-            f"https://image.pollinations.ai/prompt/{quote(prompt)}",
-            params={"width": width, "height": height, "nologo": "true", "model": "flux"},
-            headers={"Authorization": f"Bearer {pollinations_key}"},
-            timeout=30,
-        )
-        if resp.status_code == 200 and resp.content:
-            print(f"[GÖRSEL] Pollinations başarılı: '{description[:60]}'", file=sys.stderr)
-            return resp.content
-        print(f"[GÖRSEL] Pollinations hata: '{description[:60]}' HTTP {resp.status_code}", file=sys.stderr)
-    except Exception as e:
-        print(f"[GÖRSEL] Pollinations hata: '{description[:60]}' {e}", file=sys.stderr)
+    width, height = (1024, 1536) if orientation == "portrait" else (1536, 1024)
+    prompt = f"{description}, photorealistic, documentary style, cinematic lighting, no text, no watermarks, no logos"
+    url = f"https://image.pollinations.ai/prompt/{quote(prompt)}"
+    params = {"width": width, "height": height, "nologo": "true", "model": "flux"}
+    headers = {"Authorization": f"Bearer {pollinations_key}"}
+
+    for attempt in range(3):
+        try:
+            resp = httpx.get(url, params=params, headers=headers, timeout=60)
+            if resp.status_code == 200 and resp.content:
+                print(f"[GÖRSEL] Pollinations başarılı: '{description[:60]}'", file=sys.stderr)
+                return resp.content
+            if resp.status_code == 429 and attempt < 2:
+                wait = 6 * (attempt + 1)
+                print(f"[GÖRSEL] Pollinations 429, {wait}sn bekleyip tekrar denenecek: '{description[:60]}'", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            print(f"[GÖRSEL] Pollinations hata: '{description[:60]}' HTTP {resp.status_code}", file=sys.stderr)
+            return None
+        except Exception as e:
+            print(f"[GÖRSEL] Pollinations hata: '{description[:60]}' {e}", file=sys.stderr)
+            return None
     return None
 
 
