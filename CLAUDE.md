@@ -28,6 +28,43 @@ Ana proje: `supertonic-web/` klasörü.
 - `supertonic-web/` dışındaki klasörler başka projeler — karıştırma
 - Secrets: sunucudaki `supertonic-web/ig_config.json`, `supertonic-web/secrets.json`
 
+## InsTube — ikinci, bağımsız yayın paneli
+
+`instube/` klasörü. supertonic-web'in iç içe geçmiş scheduler'ları ve
+"site bazen hiç açılmıyor" sorunlarından kaçınmak için sıfırdan yazılmış,
+supertonic-web'e **hiç bağımlı olmayan** ayrı bir video üretim +
+Instagram/YouTube yayın paneli. **v1 — scheduler yok, her şey elle/manuel**
+(sayfa başına: sadece Instagram, veya YouTube + isteğe bağlı IG çapraz paylaşım).
+
+- **Sunucu:** Aynı sunucu (77.42.45.229), farklı port: `8002`
+- **Erişim:** Şu an sunucuda çalışıyor. Ayrı bir subdomain/nginx yönlendirmesi
+  bu repoda tanımlı değil — muhtemelen `http://77.42.45.229:8002` üzerinden
+  doğrudan erişiliyor (emin değilsen kontrol et). YouTube OAuth callback
+  URI'leri de bu adrese göre ayarlı: `/auth/youtube/callback` (TR),
+  `/auth/youtube/en/callback` (EN).
+- **Servis:** `systemctl status instube` (systemd servisi)
+- **Deploy:** `cd /root/hakanerbasss.github.io && git pull && systemctl restart instube`
+- **Python ortamı:** ⚠️ supertonic-web'in aksine **kendi venv'i yok** —
+  `instube.service` doğrudan sistem Python'unu çalıştırıyor
+  (`ExecStart=/usr/bin/python3 -m uvicorn app:app ...`). supertonic-web'deki
+  "sistem Python'una asla pip install yapma" kuralı burada zaten uygulanmıyor
+  ama aynı çakışma riski (firebase-admin vb. diğer projelerle) geçerli —
+  yeni paket eklerken dikkatli ol.
+- **Ana dosya:** `instube/app.py` — router'ları bağlayan ince modül. Gerçek
+  mantık ayrı dosyalarda: `generator.py` (DeepSeek + Supertonic TTS + ffmpeg
+  pipeline), `visuals.py` (sahne görselleri: DALL-E/Wikimedia/Pexels),
+  `youtube.py`, `instagram.py`, `trends.py`
+- **Sayfalar:** `/` (durum rozetleri), `/settings.html` (API key'ler +
+  Instagram/YouTube bağlantısı), `/instagram.html` (sadece IG Reels üret/test/yayınla),
+  `/youtube.html` (YouTube'a yükle, toggle açıksa IG'ye de gönder)
+- **Ayarlar/secrets (git'e dahil değil):** `instube/settings.json` (DeepSeek
+  ve Pexels key zorunlu, OpenAI opsiyonel, Instagram kimliği), `instube/yt_config.json`
+  + `yt_token.json` / `yt_token_en.json` (YouTube OAuth, TR/EN kanal ayrı)
+- **Bağımlılık:** `ffmpeg` ve Supertonic TTS sunucuda zaten kurulu olmalı
+  (supertonic-web kullandığı için mevcut, ayrıca kurulum gerekmez)
+
+Detaylı kod yapısı ve ilk kurulum adımları: `instube/README.md`.
+
 ## Diğer Klasörler
 
 - `whatsapp-api-server/` — WhatsApp servisi (`wa.wizaicorp.com`)
