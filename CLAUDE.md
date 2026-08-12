@@ -36,12 +36,12 @@ supertonic-web'e **hiç bağımlı olmayan** ayrı bir video üretim +
 Instagram/YouTube yayın paneli. **v1 — scheduler yok, her şey elle/manuel**
 (sayfa başına: sadece Instagram, veya YouTube + isteğe bağlı IG çapraz paylaşım).
 
-- **Sunucu:** Aynı sunucu (77.42.45.229), farklı port: `8002`
-- **Erişim:** Şu an sunucuda çalışıyor. Ayrı bir subdomain/nginx yönlendirmesi
-  bu repoda tanımlı değil — muhtemelen `http://77.42.45.229:8002` üzerinden
-  doğrudan erişiliyor (emin değilsen kontrol et). YouTube OAuth callback
-  URI'leri de bu adrese göre ayarlı: `/auth/youtube/callback` (TR),
-  `/auth/youtube/en/callback` (EN).
+- **Sunucu:** Aynı sunucu (77.42.45.229), arka planda port `8002`
+- **Erişim:** **https://panel.wizaicorp.com/** — nginx bu adresi sunucudaki
+  `8002` portuna yönlendiriyor (aynı sunucu, ayrı subdomain, tıpkı
+  `bathonea.wizaicorp.com` gibi). YouTube OAuth callback URI'leri de bu
+  domaine göre ayarlı: `https://panel.wizaicorp.com/auth/youtube/callback` (TR),
+  `https://panel.wizaicorp.com/auth/youtube/en/callback` (EN).
 - **Servis:** `systemctl status instube` (systemd servisi)
 - **Deploy:** `cd /root/hakanerbasss.github.io && git pull && systemctl restart instube`
 - **Python ortamı:** ⚠️ supertonic-web'in aksine **kendi venv'i yok** —
