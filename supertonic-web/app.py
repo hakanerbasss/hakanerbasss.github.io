@@ -1134,6 +1134,33 @@ async def voices():
     return {"voices": UI_VOICES, "voice_labels": VOICE_LABELS, "languages": LANG_MAP}
 
 
+@app.post("/api/tts-only")
+async def tts_only(
+    text: str = Form(...),
+    voice: str = Form("E-Ahmet"),   # E-Ahmet | E-Emel
+    speed: float = Form(1.0),
+):
+    """Sadece Edge TTS ile seslendirme, video üretim akışına hiç dokunmaz —
+    dışarıdaki bir pipeline (ör. başka bir Claude oturumu kendi Playwright/ffmpeg
+    görselleriyle birleştirmek için) gerçek Ahmet/Emel sesini almak istediğinde
+    kullanılır. _synth_edge() zaten uyguladığı temizlik (_clean_tts_text) ve ses
+    eşlemesi (_edge_voice_for) burada da otomatik uygulanıyor."""
+    if not text.strip():
+        raise HTTPException(400, "text boş olamaz")
+    tmp_path = UPLOAD_DIR / f"ttsonly_{uuid.uuid4().hex}.wav"
+    try:
+        dur = await _synth_edge(text, voice, speed, tmp_path)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"edge-tts başarısız: {e}"})
+    data = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+    return Response(
+        content=data,
+        media_type="audio/wav",
+        headers={"X-Duration-Seconds": str(dur)},
+    )
+
+
 @app.post("/api/synthesize")
 async def synthesize(
     text: str = Form(...),
