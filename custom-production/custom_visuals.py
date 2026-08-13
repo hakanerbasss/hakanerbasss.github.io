@@ -380,6 +380,7 @@ def render_scene_clip(
 
         browser = _get_browser()
         # record_video_size sabitlenmeli, aksi halde Playwright viewport'tan türetir
+        t0 = time.monotonic()
         context = browser.new_context(
             viewport={"width": W, "height": H},
             record_video_dir=str(rec_dir),
@@ -387,6 +388,13 @@ def render_scene_clip(
         )
         page = context.new_page()
         page.set_content(html, wait_until="load")
+        # KRİTİK: context/page oluşturma ile set_content'in gerçekten boyanması
+        # arasında ~300-450ms BOŞ/BEYAZ bir kayıt boşluğu oluyor (Chromium'un
+        # video recorder'ı context açılır açılmaz kaydetmeye başlıyor, ama
+        # sayfa henüz about:blank). Bu boşluğu ffmpeg'de -ss ile atlamazsak
+        # klibin İLK karesi (=Instagram/YouTube'un otomatik kapak seçtiği kare)
+        # boş/beyaz çıkıyor — canlı yayında tam olarak bu bug yaşandı.
+        lead_in = time.monotonic() - t0
         # Gerçek zamanlı kayıt — sahne sesinin süresi kadar bekle (+ küçük pay)
         time.sleep(max(0.6, float(duration)) + 0.15)
         video = page.video
@@ -394,10 +402,13 @@ def render_scene_clip(
         context.close()  # dosya ancak context kapanınca diske yazılır
 
         raw_video = Path(video.path())
-        # ffmpeg ile hedef süreye kırp + standart h264/yuv420p'ye çevir
-        # (concat aşaması tüm kliplerin aynı codec/pix_fmt olmasını bekliyor)
+        # ffmpeg ile boş baş kısmını at (-ss) + hedef süreye kırp (-t) +
+        # standart h264/yuv420p'ye çevir (concat aşaması tüm kliplerin aynı
+        # codec/pix_fmt olmasını bekliyor). Küçük bir güvenlik payı ekleniyor
+        # ki tam boyama anının hemen öncesi bir kare bile sızmasın.
+        skip = round(lead_in + 0.08, 3)
         result = subprocess.run([
-            "ffmpeg", "-y", "-i", str(raw_video), "-t", str(duration),
+            "ffmpeg", "-y", "-ss", str(skip), "-i", str(raw_video), "-t", str(duration),
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-an", str(out_mp4_path),
         ], capture_output=True, timeout=60)
@@ -424,6 +435,12 @@ _HOOK_TEMPLATE = """<!DOCTYPE html>
     background-image: linear-gradient(#fff 1px, transparent 1px),
                        linear-gradient(90deg, #fff 1px, transparent 1px);
     background-size: 64px 64px;
+  }}
+  /* Köşeleri karartan vignette -- düz gradyanın "yassı/ucuz" hissini kırıp
+     daha "fotoğraf gibi" derinlik hissi veriyor. */
+  .vignette {{
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.55) 100%);
   }}
   .flash {{
     position: absolute; top: 50%; left: 50%; width: 1600px; height: 1600px;
@@ -454,13 +471,14 @@ _HOOK_TEMPLATE = """<!DOCTYPE html>
     opacity: 0.9; letter-spacing: 1px;
   }}
   .hook {{
-    position: absolute; left: 70px; right: 70px; top: 50%;
+    position: absolute; left: 60px; right: 60px; top: 42%;
     transform: translateY(-50%) scale(1.35);
     color: #ffffff; font-weight: 900; font-size: {font_size}px;
-    line-height: 1.18; text-align: center;
+    line-height: 1.16; text-align: center;
     opacity: 0;
     animation: impact 0.4s cubic-bezier(.15,1.2,.35,1) 0.08s both;
-    text-shadow: 0 6px 30px rgba(0,0,0,0.55);
+    text-shadow: 0 4px 0 rgba(0,0,0,0.4), 0 10px 40px rgba(0,0,0,0.65);
+    -webkit-text-stroke: 2px rgba(0,0,0,0.25);
   }}
   @keyframes impact {{
     0%   {{ opacity: 0; transform: translateY(-50%) scale(1.55); }}
@@ -468,12 +486,30 @@ _HOOK_TEMPLATE = """<!DOCTYPE html>
     100% {{ opacity: 1; transform: translateY(-50%) scale(1); }}
   }}
   .hook em {{ color: {accent}; font-style: normal; }}
+  /* Eski sistemdeki kalın "SON DAKİKA/UYARI" bandının karşılığı: parlak
+     renkli, koyu metinli, tam genişlik bir şerit -- kapak/thumbnail
+     otomatik seçilse bile tek başına anında okunur bir "çengel" olsun diye. */
+  .ribbon {{
+    position: absolute; left: 0; right: 0; bottom: 30%;
+    background: {accent}; color: #10131c;
+    font-weight: 900; font-size: 44px; letter-spacing: 1px;
+    padding: 22px 40px; text-align: center;
+    transform: translateY(40px); opacity: 0;
+    animation: ribbonin 0.35s ease-out 0.42s both;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }}
+  @keyframes ribbonin {{
+    0%   {{ opacity: 0; transform: translateY(40px); }}
+    100% {{ opacity: 1; transform: translateY(0); }}
+  }}
 </style></head>
 <body>
   <div class="grid"></div>
+  <div class="vignette"></div>
   <div class="flash"></div>
   <div class="badge">{badge}</div>
   <div class="brand">{brand}</div>
+  <div class="ribbon">{ribbon}</div>
   <div class="hook">{hook_html}</div>
 </body></html>"""
 
@@ -494,21 +530,25 @@ def render_hook_card(
     out_mp4_path,
     badge_text: str = None,
     emphasis_word: str = None,
-    duration: float = 1.35,
+    duration: float = 2.2,
     lang: str = "tr",
     brand: str = BRAND_DEFAULT,
     theme_idx: int = 0,
+    ribbon_text: str = None,
 ) -> bool:
     """Videonun İLK karesi: tüm başlık ANINDA (kelime kelime değil) büyük ve
-    çarpıcı bir 'impact' animasyonuyla belirir — eski sistemin kalın SON
-    DAKİKA/UYARI bandı kadar 'dur-geçme' etkisi versin diye, ama kendi marka
-    dilimizde (fotoğraf yok, düz gradyan + rozet). Video kapağı/thumbnail
-    genelde ilk kareden alındığı için bu kart özellikle önemli — karaoke
-    altyazı (render_scene_clip) tek başına ilk karede yeterince 'dolu'
-    görünmüyordu, bu kart onu tamamlıyor, yerini almıyor."""
+    çarpıcı bir 'impact' animasyonuyla belirir, ardından eski sistemdeki kalın
+    renkli "SON DAKİKA/UYARI" bandının karşılığı olan bir 'ribbon' şerit
+    beliriyor — tek bakışta okunan bir çengel versin diye (kendi marka
+    dilimizde: fotoğraf yok, düz gradyan + rozet + parlak renkli şerit).
+    Video kapağı/thumbnail genelde ilk saniyelerden otomatik seçildiği için
+    (hem Instagram hem YouTube) bu kart özellikle önemli — süre bilerek
+    2+ saniyeye çıkarıldı ki otomatik kapak seçici HANGİ kareyi seçerse
+    seçsin hâlâ bu kartın içinde, dolu ve okunur bir karede kalsın."""
     try:
         theme = THEMES[theme_idx % len(THEMES)]
         badge = _esc((badge_text or ("BİLGİ" if lang == "tr" else "INFO")).upper()[:40])
+        ribbon = _esc((ribbon_text or badge_text or ("ÖNEMLİ BİLGİ" if lang == "tr" else "IMPORTANT")).upper()[:44])
         title_e = _esc(title or "")
         ew = (emphasis_word or "").strip()
         if ew:
@@ -517,14 +557,16 @@ def render_hook_card(
                 title_e = pattern.sub(lambda m: f"<em>{m.group(0)}</em>", title_e, count=1)
         html = _HOOK_TEMPLATE.format(
             bg1=theme["bg1"], bg2=theme["bg2"], accent=theme["accent"], accent2=theme["accent2"],
-            badge=badge, brand=_esc(brand), hook_html=title_e,
+            badge=badge, brand=_esc(brand), hook_html=title_e, ribbon=ribbon,
             font_size=_hook_font_size(title or ""),
         )
         out_mp4_path = Path(out_mp4_path)
         rec_dir = out_mp4_path.parent / (out_mp4_path.stem + "_rec")
         rec_dir.mkdir(parents=True, exist_ok=True)
 
+        import time
         browser = _get_browser()
+        t0 = time.monotonic()
         context = browser.new_context(
             viewport={"width": W, "height": H},
             record_video_dir=str(rec_dir),
@@ -532,15 +574,20 @@ def render_hook_card(
         )
         page = context.new_page()
         page.set_content(html, wait_until="load")
-        import time
+        # Bkz. render_scene_clip'teki aynı yorum — bu klip özellikle KRİTİK
+        # çünkü bu kart videonun tam açılışı ve genelde otomatik kapak/thumbnail
+        # buradan seçiliyor. Boş kayıt boşluğunu (context açılışı ile içerik
+        # boyanması arası) mutlaka atlamamız lazım, yoksa kapak bomboş çıkıyor.
+        lead_in = time.monotonic() - t0
         time.sleep(max(0.6, float(duration)) + 0.15)
         video = page.video
         page.close()
         context.close()
 
         raw_video = Path(video.path())
+        skip = round(lead_in + 0.08, 3)
         result = subprocess.run([
-            "ffmpeg", "-y", "-i", str(raw_video), "-t", str(duration),
+            "ffmpeg", "-y", "-ss", str(skip), "-i", str(raw_video), "-t", str(duration),
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-an", str(out_mp4_path),
         ], capture_output=True, timeout=60)
