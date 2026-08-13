@@ -2340,7 +2340,26 @@ async def _generate_shorts_core(
     scenes = []
     gnews_data = {}
 
-    if info_format:
+    if pasted_content:
+        # Önceden yazılmış script (ör. Claude tarafından hazırlanmış) — DeepSeek'in
+        # client.chat.completions.create çağrısı TAMAMEN atlanır, trend/haber arama
+        # da yapılmaz. DeepSeek kotası bittiğinde veya editoryal kontrolün elle/başka
+        # bir AI tarafından yapılması istendiğinde kullanılır. Beklenen şekil, normal
+        # DeepSeek JSON çıktısıyla birebir aynı: title, hashtags, comment_hook,
+        # badge_text, emphasis_word, certainty_level, scenes[].{text,keyword,image_prompt}.
+        data = pasted_content
+        if not isinstance(data, dict) or not data.get("scenes"):
+            raise HTTPException(400, "pasted_content geçersiz — en az 'scenes' listesi gerekli")
+        scenes = data["scenes"]
+        facts_data = {}  # kaynak doğrulaması bu yolda yapılmaz — içerik zaten hazır/güvenilir kabul edilir
+        if lang == "tr":
+            try:
+                add_recent_category(news_site.guess_category(data.get("title", ""))[0])
+            except Exception:
+                pass
+        if scenes and not skip_closing_cta:
+            scenes[-1]["text"] = _pick_varied_cta_text(lang, platform, data.get("comment_hook", ""))
+    elif info_format:
         # BİLGİ SHORTS — eğitici/bilgilendirici format, trend/haber atlanır
         _format_hooks = {
             "biliyormuydunuz": "FIRST scene MUST start with 'Bunu biliyor muydunuz?' — open with a shocking or surprising fact that stops the scroll.",
@@ -3256,13 +3275,13 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content="", use_ai_images=False):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content="", use_ai_images=False, pasted_content=None):
     global _manual_shorts_lock
     try:
         # info_format (Bilgi Shorts) haber değil — kaynak/olgu zorunluluğu uygulanmaz.
         # Haber shorts'ta doğrulama artık burada da açık: elle üretilen videolarda
         # halüsinasyon ağı kapalıydı, uydurma kurum/rakam buradan geçiyordu.
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, require_verified_source=not info_format, use_ai_images=use_ai_images)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, require_verified_source=not info_format, use_ai_images=use_ai_images, pasted_content=pasted_content)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -3311,12 +3330,20 @@ async def generate_shorts_async_endpoint(
     manual_link: str = Form(""),
     manual_content: str = Form(""),
     use_ai_images: str = Form("false"),
+    pasted_content: str = Form(""),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
         raise HTTPException(400, "API key eksik")
     if _manual_shorts_lock:
         raise HTTPException(409, "Üretim devam ediyor, lütfen bekleyin")
+
+    parsed_pasted_content = None
+    if pasted_content.strip():
+        try:
+            parsed_pasted_content = json.loads(pasted_content)
+        except Exception as e:
+            raise HTTPException(400, f"pasted_content geçerli JSON değil: {e}")
 
     custom_image_paths = []
     for i, img in enumerate(custom_images):
@@ -3351,7 +3378,7 @@ async def generate_shorts_async_endpoint(
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
     ai_images_on = use_ai_images.lower() in ("true", "1", "yes")
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, use_ai_images=ai_images_on))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, use_ai_images=ai_images_on, pasted_content=parsed_pasted_content))
     return {"ok": True}
 
 
