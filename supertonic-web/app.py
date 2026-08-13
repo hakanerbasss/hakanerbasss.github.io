@@ -10369,6 +10369,25 @@ async def upload_raw_video(video: UploadFile = File(...)):
     return {"ok": True, "filename": dest.name}
 
 
+@app.post("/api/upload-raw-thumbnail")
+async def upload_raw_thumbnail(image: UploadFile = File(...)):
+    """upload-raw-video ile aynı desen ama THUMB_DIR'a kaydeder — /api/yt/upload'ın
+    thumbnail_filename parametresi dosyayı OUTPUT_DIR değil THUMB_DIR'da arıyor
+    (bkz. satır ~7946), bu yüzden video ile aynı endpoint'i paylaşamaz. Dışarıda
+    (custom-production/produce.py'nin hook kartından çıkardığı sabit kapak JPEG'i
+    gibi) üretilmiş bir kapak görselini sunucuya taşımak için."""
+    if not image.filename:
+        raise HTTPException(400, "Dosya gerekli")
+    ext = Path(image.filename).suffix.lower() or ".jpg"
+    if ext not in (".jpg", ".jpeg", ".png"):
+        raise HTTPException(400, "Sadece görsel dosyası kabul edilir (.jpg/.jpeg/.png)")
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    dest = THUMB_DIR / f"raw_{uuid.uuid4().hex}{ext}"
+    data = await image.read()
+    dest.write_bytes(data)
+    return {"ok": True, "filename": dest.name}
+
+
 @app.post("/api/shorts/send-instagram")
 async def shorts_send_instagram(request: Request):
     """Manuel üretilen shorts videosunu Instagram Reels olarak gönder."""

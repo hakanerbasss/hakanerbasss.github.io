@@ -123,15 +123,18 @@ def produce(script: dict, out_path: Path, platform: str = "youtube", voice: str 
     else:
         audio_files, clip_files = [], []
 
-        # Açılış (hook) kartı: başlık ANINDA büyük/çarpıcı belirir — video
-        # kapağı/thumbnail ilk kareden alındığı için scroll durdurma gücü
-        # burada. Karaoke altyazılı sahneler ondan SONRA başlar.
+        # Açılış (hook) kartı: başlık ANINDA büyük/çarpıcı belirir + eski
+        # sistemdeki kalın renkli banda karşılık gelen 'ribbon' şerit. Video
+        # kapağı/thumbnail genelde ilk saniyelerden otomatik seçildiği için
+        # (hem IG hem YT) süre bilerek 2.2s'ye çıkarıldı — hangi kare
+        # seçilirse seçilsin hâlâ dolu/okunur bir karede kalsın diye.
         title = script.get("title", scenes[0]["text"][:70] if scenes else "")
-        hook_dur = 1.35
+        ribbon_text = script.get("ribbon_text") or badge_text
+        hook_dur = 2.2
         hook_clip = work / "clip_hook.mp4"
         hook_ok = cv.render_hook_card(
             title, hook_clip, badge_text=badge_text, emphasis_word=emphasis_word,
-            duration=hook_dur, lang=lang, brand=brand,
+            duration=hook_dur, lang=lang, brand=brand, ribbon_text=ribbon_text,
         )
         if hook_ok:
             hook_audio = work / "audio_hook.wav"
@@ -141,6 +144,24 @@ def produce(script: dict, out_path: Path, platform: str = "youtube", voice: str 
             ], timeout=30)
             clip_files.append(hook_clip)
             audio_files.append(hook_audio)
+            if _cache is not None:
+                # YouTube'un/Instagram'ın otomatik kapak seçimine güvenmek
+                # yerine hook kartının tam oturmuş halinden (1.0s, impact
+                # animasyonu bitmiş + ribbon görünür) sabit bir JPEG kapak
+                # çıkarıyoruz. thumbnail_filename ile /api/yt/upload'a
+                # verilebilir (Instagram tarafında API üzerinden ayrı kapak
+                # set etme seçeneği yok, ama artık ilk kare zaten dolu
+                # olduğundan IG'nin kendi otomatik seçimi de düzeldi).
+                thumb_path = work / "thumb_cover.jpg"
+                try:
+                    run([
+                        "ffmpeg", "-y", "-ss", "1.0", "-i", str(hook_clip),
+                        "-frames:v", "1", "-q:v", "2", str(thumb_path),
+                    ], timeout=30)
+                    if thumb_path.exists() and thumb_path.stat().st_size > 0:
+                        _cache["thumb_path"] = thumb_path
+                except Exception:
+                    pass
 
         synth = _synth_scenes(scenes, work, voice, lang)
         for i, (scene, (audio_path, dur_val)) in enumerate(zip(scenes, synth)):
@@ -239,13 +260,25 @@ def _finish(script, content_clip_files, content_audio_files, out_path: Path, pla
 def produce_dual(script: dict, out_youtube: Path, out_instagram: Path, voice: str = "E-Ahmet", lang: str = "tr"):
     """Aynı senaryoyu TEK SEFER seslendirip/render edip, sadece kapanış
     kartı farklı iki final video üretir (YouTube: Abone Ol, Instagram:
-    Takip Et). TTS ve sahne render'ını 2 katına çıkarmaz."""
+    Takip Et). TTS ve sahne render'ını 2 katına çıkarmaz.
+
+    Dönen 3. değer (thumb_path): hook kartının 1.0s'deki sabit karesinden
+    çıkarılmış JPEG kapak — /api/yt/upload'a thumbnail_filename olarak
+    verilmek üzere (önce /api/upload-raw-video benzeri bir görsel yükleme
+    ucundan panele yüklenmesi gerekir, bkz. SISTEM_BILGI.md). None ise
+    hook kartı render edilememiş demektir, YouTube kendi otomatik kapağını
+    kullanır (artık ilk kare boş olmadığı için bu da makul bir sonuç verir)."""
     cache: dict = {}
     yt_path = produce(script, out_youtube, platform="youtube", voice=voice, lang=lang, _cache=cache)
     ig_path = produce(script, out_instagram, platform="instagram", voice=voice, lang=lang, _cache=cache)
     cv.close_browser()
+    thumb_out = None
+    src_thumb = cache.get("thumb_path")
+    if src_thumb and Path(src_thumb).exists():
+        thumb_out = out_youtube.parent / "thumb_cover.jpg"
+        shutil.copy2(str(src_thumb), str(thumb_out))
     shutil.rmtree(cache["work"], ignore_errors=True)
-    return yt_path, ig_path
+    return yt_path, ig_path, thumb_out
 
 
 if __name__ == "__main__":

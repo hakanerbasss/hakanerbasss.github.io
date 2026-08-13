@@ -97,6 +97,15 @@ değil, kalıcı/pratik bilgi (SGK kuralları, haklar, hesaplama mantığı vb.)
   - `POST /api/tts-only` — **YENİ**: form `text`, `voice` (E-Ahmet/E-Emel),
     `speed` → ham WAV ses + `X-Duration-Seconds` header döner. DeepSeek/
     üretim akışına dokunmadan sadece gerçek Edge TTS sesini almak için.
+  - `POST /api/upload-raw-thumbnail` — **YENİ**: `upload-raw-video` ile aynı
+    desen ama görsel için (`image=@kapak.jpg`, `.jpg/.jpeg/.png`), THUMB_DIR'a
+    kaydeder ve `{"filename": "raw_<hex>.jpg"}` döner. `produce_dual()`'ın 3.
+    dönüş değeri olan `thumb_out` (hook kartının 1.0s'deki sabit karesi) bu
+    endpoint'e yüklenip dönen filename `/api/yt/upload`'a `thumbnail_filename`
+    olarak verilebilir — YouTube'un kendi otomatik kapak seçimine güvenmek
+    yerine sabit, garanti-dolu bir kapak sağlar. Instagram'da API üzerinden
+    ayrı kapak set etme seçeneği yok, ama artık ilk kare zaten dolu olduğundan
+    IG'nin kendi otomatik seçimi de düzeldi (bkz. custom_visuals.py -ss fix'i).
 
 ### B) Kendi bağımsız üretim sistemim (Cowork sandbox'ında, bu oturumda kuruldu)
 Neden: sunucudaki stok fotoğraf görselleri (Pexels/Wikimedia) çoğu zaman
