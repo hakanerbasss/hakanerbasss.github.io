@@ -223,27 +223,28 @@ _CARD_TEMPLATE = """<!DOCTYPE html>
     line-height: 1.4; text-align: center;
   }}
   /* Karaoke kelime animasyonu: her kelime konuşma sırası geldiğinde
-     büyüyerek+renk değiştirerek belirir, sonra normale döner ve kalır.
-     Vurgulu kelimeler (word-emph) rengi/az büyümüş halini korur. */
+     yumuşakça belirir (fade + hafif yükselme) ve renk değiştirir, sonra
+     kalır. ÖNCEDEN scale(0.4)->1.16->1.0 ile "büyüyüp küçülen" bir pop
+     efekti vardı — kullanıcı geri bildirimi: art arda çok sayıda kelimede
+     bu sürekli büyüyüp-küçülme "titreme/bozuk" hissi veriyordu. Scale
+     tamamen kaldırıldı, sadece opacity+translateY+renk kaldı — daha sakin
+     ama hâlâ net bir "konuşma sırası geldi" sinyali veriyor. */
   .word {{
     display: inline-block;
     margin: 0 10px 6px 0;
-    opacity: 0; transform: scale(0.4);
-    transform-origin: center bottom;
-    animation: wordpop 0.45s cubic-bezier(.2,1.7,.4,1) both;
+    opacity: 0; transform: translateY(14px);
+    animation: wordpop 0.32s ease-out both;
   }}
   @keyframes wordpop {{
-    0%   {{ opacity: 0; transform: scale(0.4); color: var(--accent); }}
-    55%  {{ opacity: 1; transform: scale(1.16); color: var(--accent); }}
-    100% {{ opacity: 1; transform: scale(1);    color: #f2f5fb; }}
+    0%   {{ opacity: 0; transform: translateY(14px); color: var(--accent); }}
+    100% {{ opacity: 1; transform: translateY(0);    color: #f2f5fb; }}
   }}
   .word-emph {{
     animation-name: wordpop-emph;
   }}
   @keyframes wordpop-emph {{
-    0%   {{ opacity: 0; transform: scale(0.4); color: var(--accent); }}
-    55%  {{ opacity: 1; transform: scale(1.22); color: var(--accent); }}
-    100% {{ opacity: 1; transform: scale(1.05); color: var(--accent); }}
+    0%   {{ opacity: 0; transform: translateY(14px); color: var(--accent); }}
+    100% {{ opacity: 1; transform: translateY(0);    color: var(--accent); }}
   }}
   .dots {{
     position: absolute; bottom: 200px; left: 0; right: 0; text-align: center;
