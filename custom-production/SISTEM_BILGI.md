@@ -52,7 +52,11 @@ değil, kalıcı/pratik bilgi (SGK kuralları, haklar, hesaplama mantığı vb.)
     atıldı — sunucu tarafında iş devam ediyor olabilir, önce log/analytics
     kontrol et).
   - `POST /api/yt/upload` — form: filename, title, description, tags,
-    privacy, channel=tr.
+    privacy, channel=tr. **`category_id=27` (Eğitim) gönder, sunucunun
+    varsayılanı olan `25` (Haberler ve Politika) DEĞİL** — içerik artık
+    haber değil evergreen SGK/emekli bilgi içeriği, kategori de buna göre
+    doğru olmalı (hem YouTube'un doğru kitleye önermesi hem de "Haberler
+    ve Politika" kategorisinin tabi olduğu ekstra incelemeden kaçınmak için).
   - `POST /api/upload-raw-video` — **YENİ (Ağustos 2026 ortasında Termux
     tarafından eklendi)**: multipart `video=@dosya.mp4` → sunucuya HAM,
     hazır bir video yükler, `{"filename": "raw_<hex>.mp4"}` döner. Ardından
