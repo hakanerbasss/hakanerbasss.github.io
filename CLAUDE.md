@@ -67,6 +67,11 @@ Detaylı kod yapısı ve ilk kurulum adımları: `instube/README.md`.
 
 ## Diğer Klasörler
 
+- `custom-production/` — supertonic-web'e bağımsız, Cowork oturumlarının (Playwright ile
+  özel görsel + Supertonic yerel TTS) ürettiği "Türkiye Bilgi Merkezi" video pipeline'ı.
+  Sunucu koduna hiç dokunmuyor, bitmiş videoyu `/api/upload-raw-video` ile sunucuya
+  yükleyip mevcut `/api/shorts/send-instagram` + `/api/yt/upload` ile yayınlıyor.
+  Detay/devir notu: `custom-production/SISTEM_BILGI.md`.
 - `whatsapp-api-server/` — WhatsApp servisi (`wa.wizaicorp.com`)
 - `ses-klonu/` — Kendi sesle TTS (XTTS-v2, ücretsiz HuggingFace Space'e deploy edilir) + konuşan fotoğraf (Wav2Lip, `konusan-foto/`)
 - Namaz Vakitleri Android uygulaması → **kendi deposuna taşındı**: https://github.com/hakanerbasss/namaz-vakitleri (2026-07-22). Bu depoda değil.
