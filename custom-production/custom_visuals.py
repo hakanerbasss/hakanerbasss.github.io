@@ -227,12 +227,14 @@ _CARD_TEMPLATE = """<!DOCTYPE html>
      Vurgulu kelimeler (word-emph) rengi/az büyümüş halini korur. */
   .word {{
     display: inline-block;
+    margin: 0 10px 6px 0;
     opacity: 0; transform: scale(0.4);
+    transform-origin: center bottom;
     animation: wordpop 0.45s cubic-bezier(.2,1.7,.4,1) both;
   }}
   @keyframes wordpop {{
     0%   {{ opacity: 0; transform: scale(0.4); color: var(--accent); }}
-    55%  {{ opacity: 1; transform: scale(1.32); color: var(--accent); }}
+    55%  {{ opacity: 1; transform: scale(1.16); color: var(--accent); }}
     100% {{ opacity: 1; transform: scale(1);    color: #f2f5fb; }}
   }}
   .word-emph {{
@@ -240,8 +242,8 @@ _CARD_TEMPLATE = """<!DOCTYPE html>
   }}
   @keyframes wordpop-emph {{
     0%   {{ opacity: 0; transform: scale(0.4); color: var(--accent); }}
-    55%  {{ opacity: 1; transform: scale(1.4); color: var(--accent); }}
-    100% {{ opacity: 1; transform: scale(1.08); color: var(--accent); }}
+    55%  {{ opacity: 1; transform: scale(1.22); color: var(--accent); }}
+    100% {{ opacity: 1; transform: scale(1.05); color: var(--accent); }}
   }}
   .dots {{
     position: absolute; bottom: 200px; left: 0; right: 0; text-align: center;
@@ -394,6 +396,149 @@ def render_scene_clip(
         raw_video = Path(video.path())
         # ffmpeg ile hedef süreye kırp + standart h264/yuv420p'ye çevir
         # (concat aşaması tüm kliplerin aynı codec/pix_fmt olmasını bekliyor)
+        result = subprocess.run([
+            "ffmpeg", "-y", "-i", str(raw_video), "-t", str(duration),
+            "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-an", str(out_mp4_path),
+        ], capture_output=True, timeout=60)
+        shutil.rmtree(rec_dir, ignore_errors=True)
+        if result.returncode != 0 or not out_mp4_path.exists() or out_mp4_path.stat().st_size == 0:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+_HOOK_TEMPLATE = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  html, body {{ background: {bg1}; }}
+  body {{
+    width: 1080px; height: 1920px;
+    background: linear-gradient(160deg, {bg1} 0%, {bg2} 100%);
+    font-family: 'DejaVu Sans', Arial, sans-serif;
+    position: relative; overflow: hidden;
+  }}
+  .grid {{
+    position: absolute; inset: -60px; opacity: 0.07;
+    background-image: linear-gradient(#fff 1px, transparent 1px),
+                       linear-gradient(90deg, #fff 1px, transparent 1px);
+    background-size: 64px 64px;
+  }}
+  .flash {{
+    position: absolute; top: 50%; left: 50%; width: 1600px; height: 1600px;
+    margin: -800px 0 0 -800px; border-radius: 50%;
+    background: radial-gradient(circle, {accent}55 0%, transparent 65%);
+    animation: flash 0.5s ease-out both;
+  }}
+  @keyframes flash {{
+    0%   {{ opacity: 0; transform: scale(0.3); }}
+    35%  {{ opacity: 1; transform: scale(1.1); }}
+    100% {{ opacity: 0.55; transform: scale(1); }}
+  }}
+  .badge {{
+    position: absolute; top: 96px; left: 60px;
+    background: {accent}; color: #10131c;
+    font-weight: 900; font-size: 32px;
+    padding: 14px 34px; border-radius: 999px;
+    letter-spacing: 0.5px; max-width: 620px;
+    animation: badgein 0.35s ease-out 0.05s both;
+  }}
+  @keyframes badgein {{
+    0% {{ transform: scale(0.5); opacity: 0; }}
+    100% {{ transform: scale(1); opacity: 1; }}
+  }}
+  .brand {{
+    position: absolute; top: 108px; right: 60px;
+    color: {accent2}; font-weight: 800; font-size: 26px;
+    opacity: 0.9; letter-spacing: 1px;
+  }}
+  .hook {{
+    position: absolute; left: 70px; right: 70px; top: 50%;
+    transform: translateY(-50%) scale(1.35);
+    color: #ffffff; font-weight: 900; font-size: {font_size}px;
+    line-height: 1.18; text-align: center;
+    opacity: 0;
+    animation: impact 0.4s cubic-bezier(.15,1.2,.35,1) 0.08s both;
+    text-shadow: 0 6px 30px rgba(0,0,0,0.55);
+  }}
+  @keyframes impact {{
+    0%   {{ opacity: 0; transform: translateY(-50%) scale(1.55); }}
+    60%  {{ opacity: 1; transform: translateY(-50%) scale(0.96); }}
+    100% {{ opacity: 1; transform: translateY(-50%) scale(1); }}
+  }}
+  .hook em {{ color: {accent}; font-style: normal; }}
+</style></head>
+<body>
+  <div class="grid"></div>
+  <div class="flash"></div>
+  <div class="badge">{badge}</div>
+  <div class="brand">{brand}</div>
+  <div class="hook">{hook_html}</div>
+</body></html>"""
+
+
+def _hook_font_size(text: str) -> int:
+    n = len(text)
+    if n <= 40:
+        return 92
+    if n <= 65:
+        return 76
+    if n <= 90:
+        return 64
+    return 54
+
+
+def render_hook_card(
+    title: str,
+    out_mp4_path,
+    badge_text: str = None,
+    emphasis_word: str = None,
+    duration: float = 1.35,
+    lang: str = "tr",
+    brand: str = BRAND_DEFAULT,
+    theme_idx: int = 0,
+) -> bool:
+    """Videonun İLK karesi: tüm başlık ANINDA (kelime kelime değil) büyük ve
+    çarpıcı bir 'impact' animasyonuyla belirir — eski sistemin kalın SON
+    DAKİKA/UYARI bandı kadar 'dur-geçme' etkisi versin diye, ama kendi marka
+    dilimizde (fotoğraf yok, düz gradyan + rozet). Video kapağı/thumbnail
+    genelde ilk kareden alındığı için bu kart özellikle önemli — karaoke
+    altyazı (render_scene_clip) tek başına ilk karede yeterince 'dolu'
+    görünmüyordu, bu kart onu tamamlıyor, yerini almıyor."""
+    try:
+        theme = THEMES[theme_idx % len(THEMES)]
+        badge = _esc((badge_text or ("BİLGİ" if lang == "tr" else "INFO")).upper()[:40])
+        title_e = _esc(title or "")
+        ew = (emphasis_word or "").strip()
+        if ew:
+            pattern = re.compile(re.escape(_esc(ew)), re.IGNORECASE)
+            if pattern.search(title_e):
+                title_e = pattern.sub(lambda m: f"<em>{m.group(0)}</em>", title_e, count=1)
+        html = _HOOK_TEMPLATE.format(
+            bg1=theme["bg1"], bg2=theme["bg2"], accent=theme["accent"], accent2=theme["accent2"],
+            badge=badge, brand=_esc(brand), hook_html=title_e,
+            font_size=_hook_font_size(title or ""),
+        )
+        out_mp4_path = Path(out_mp4_path)
+        rec_dir = out_mp4_path.parent / (out_mp4_path.stem + "_rec")
+        rec_dir.mkdir(parents=True, exist_ok=True)
+
+        browser = _get_browser()
+        context = browser.new_context(
+            viewport={"width": W, "height": H},
+            record_video_dir=str(rec_dir),
+            record_video_size={"width": W, "height": H},
+        )
+        page = context.new_page()
+        page.set_content(html, wait_until="load")
+        import time
+        time.sleep(max(0.6, float(duration)) + 0.15)
+        video = page.video
+        page.close()
+        context.close()
+
+        raw_video = Path(video.path())
         result = subprocess.run([
             "ffmpeg", "-y", "-i", str(raw_video), "-t", str(duration),
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",

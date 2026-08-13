@@ -1,5 +1,41 @@
 # Türkiye Bilgi Merkezi — Devir Notu (Cowork oturumları için)
 
+## GÜNCEL DURUM (2026-08-13, en son değişiklikler — önce burayı oku)
+
+- `produce.py` artık **gerçek Edge TTS (E-Ahmet)** kullanıyor, `/api/tts-only`
+  endpoint'i üzerinden (`PANEL_COOKIE` ortam değişkeni ile — her oturumda
+  yeniden login olup taze cookie almak gerekir, cookie'ler süreli). Supertonic
+  (M1) sadece sahne bazlı fallback, artık varsayılan değil.
+- `produce_dual(script, out_youtube, out_instagram, ...)` eklendi: aynı
+  senaryoyu TEK SEFER seslendirip render eder, sadece kapanış kartı farklı
+  iki final video üretir (TTS/render maliyeti 2 katına çıkmaz).
+- **YENİ: `render_hook_card` / açılış kartı.** Videonun İLK ~1.35 saniyesi
+  artık başlığın TAMAMININ anında, büyük, çarpıcı bir "impact" animasyonuyla
+  belirdiği bir kart (karaoke değil — kelime kelime değil, hepsi birden).
+  Neden: kullanıcı geri bildirimi — karaoke altyazı tek başına video kapağı/
+  ilk kare için yeterince "scroll durdurucu" değildi (eski sistemin kalın
+  SON DAKİKA/UYARI bandına kıyasla). `produce()` içinde otomatik en başa
+  ekleniyor, ayrıca çağırmaya gerek yok.
+- Karaoke kelime animasyonunda bir kusur düzeltildi: kelimeler büyürken
+  bitişiğe biniyordu ("emeklilereyeni" gibi) — `.word` span'lerine margin
+  eklendi, scale tepe değerleri düşürüldü (1.32→1.16, emphasis 1.4→1.22).
+- YouTube kategori ID notu (Termux/Claude Code doğruladı): 25 = Haberler ve
+  Politika, 27 = Eğitim. `/api/yt/upload` çağrılırken **`category_id=27`**
+  gönderilmeli (sunucu varsayılanı hâlâ 25 — override ETMEK gerekiyor,
+  göndermezsen yanlış kategoriye düşer).
+- İlk gerçek yayın yapıldı ve doğrulandı: YouTube (https://youtu.be/mjuttYyD6W4)
+  + Instagram (media_id 18193510315387106), konu: 2026 dijital emekli kartı.
+  Bu yayında category_id gönderilmedi (henüz bu düzeltme yokken atıldı) —
+  istenirse YouTube Studio'dan manuel düzeltilebilir, kritik değil.
+- **Cron/scheduled task `trig_01Lm6ja1sfk5ZgTL7QxmDQAj` ŞU AN DEVRE DIŞI
+  (`enabled: false`).** Eski haber-tabanlı mantıkla yazılıydı (DeepSeek,
+  eski marka), yeni sisteme uymuyordu — kullanıcı onaylamadan tekrar
+  aktifleştirilmemeli. Yeniden kurulacaksa bu dosyanın tamamını referans
+  alarak sıfırdan, yeni pipeline'a göre yazılmalı.
+- Kullanıcı yayın sıklığını kendisi kontrol etmek istiyor şu an ("5-6 saat
+  sonra atarız") — otomatik/sık yayın YAPMA, açıkça istenmeden yayınlama.
+
+
 Bu dosyayı yeni bir Cowork oturumunun BAŞINDA, dosya olarak ekleyip
 "bu sistemi devral, aşağıdaki talimatlara göre devam et" diye yapıştır.
 Yeni oturum bu tek dosyayla neredeyse sıfırdan başlamadan devam edebilir.
@@ -52,11 +88,7 @@ değil, kalıcı/pratik bilgi (SGK kuralları, haklar, hesaplama mantığı vb.)
     atıldı — sunucu tarafında iş devam ediyor olabilir, önce log/analytics
     kontrol et).
   - `POST /api/yt/upload` — form: filename, title, description, tags,
-    privacy, channel=tr. **`category_id=27` (Eğitim) gönder, sunucunun
-    varsayılanı olan `25` (Haberler ve Politika) DEĞİL** — içerik artık
-    haber değil evergreen SGK/emekli bilgi içeriği, kategori de buna göre
-    doğru olmalı (hem YouTube'un doğru kitleye önermesi hem de "Haberler
-    ve Politika" kategorisinin tabi olduğu ekstra incelemeden kaçınmak için).
+    privacy, channel=tr.
   - `POST /api/upload-raw-video` — **YENİ (Ağustos 2026 ortasında Termux
     tarafından eklendi)**: multipart `video=@dosya.mp4` → sunucuya HAM,
     hazır bir video yükler, `{"filename": "raw_<hex>.mp4"}` döner. Ardından
