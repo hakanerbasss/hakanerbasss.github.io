@@ -10323,6 +10323,25 @@ async def comedy_create_video(request: Request):
     }
 
 
+@app.post("/api/upload-raw-video")
+async def upload_raw_video(video: UploadFile = File(...)):
+    """Dışarıda (ör. başka bir Claude oturumu, kendi Playwright+ffmpeg pipeline'ıyla)
+    üretilmiş bitmiş bir video dosyasını OUTPUT_DIR'a kaydeder ve dosya adını döner.
+    Bu endpoint zaten normal session-cookie auth'una tabi (auth_middleware'in
+    bypass listesinde DEĞİL) — token/kimlik paylaşmaya gerek kalmadan, dönen
+    filename ile mevcut /api/shorts/send-instagram ve /api/yt/upload uçları
+    (ikisi de sadece OUTPUT_DIR'daki dosya adına bakıyor) doğrudan kullanılabilir."""
+    if not video.filename:
+        raise HTTPException(400, "Dosya gerekli")
+    ext = Path(video.filename).suffix.lower() or ".mp4"
+    if ext not in (".mp4", ".mov", ".m4v"):
+        raise HTTPException(400, "Sadece video dosyası kabul edilir (.mp4/.mov/.m4v)")
+    dest = OUTPUT_DIR / f"raw_{uuid.uuid4().hex}{ext}"
+    data = await video.read()
+    dest.write_bytes(data)
+    return {"ok": True, "filename": dest.name}
+
+
 @app.post("/api/shorts/send-instagram")
 async def shorts_send_instagram(request: Request):
     """Manuel üretilen shorts videosunu Instagram Reels olarak gönder."""
