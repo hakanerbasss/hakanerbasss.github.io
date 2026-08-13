@@ -92,14 +92,24 @@ def _valid_session(token: str | None) -> bool:
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     host = (request.headers.get("host") or "").split(":")[0]
-    # Login sayfası, statik dosyalar ve genel haber sitesi serbest (anonim erişim)
-    if (path in ("/login", "/logout", "/ads.txt", "/robots.txt", "/llms.txt")
+    is_news_host = host == news_site.NEWS_DOMAIN or host in news_site.NEWS_LEGACY_HOSTS
+    # Login sayfası, statik dosyalar ve genel haber sitesi serbest (anonim erişim).
+    # ÖNEMLİ: host eşleşmesi (is_news_host) SADECE "/" için bypass sağlar — "/"
+    # index() içinde zaten host'a göre haber anasayfası/bot paneli ayrımı yapıyor.
+    # Eskiden is_news_host TÜM path'leri (dahil /api/instagram/* gibi admin
+    # uçlarını) host eşleşince şifresiz geçiriyordu — haber sitesi domainiyle
+    # (hakanerbas.wizaicorp.com) hiç login olmadan admin API'lerine erişilebiliyordu.
+    # Gerçekten herkese açık haber sayfaları artık path bazlı (host'tan bağımsız)
+    # listede — böylece yanlışlıkla başka path'leri de açmasınlar diye host'a
+    # hiç bakılmıyor.
+    if (path in ("/login", "/logout", "/ads.txt", "/robots.txt", "/llms.txt",
+                 "/sitemap.xml", "/api/haberler", "/hakkinda",
+                 "/gizlilik-politikasi", "/iletisim", "/istatistikler")
             or path.startswith("/static/")
             or path.startswith("/haberler")
             or path.startswith("/haber/")
             or path.startswith("/api/thumbnail/")
-            or host == news_site.NEWS_DOMAIN
-            or host in news_site.NEWS_LEGACY_HOSTS):
+            or (path == "/" and is_news_host)):
         return await call_next(request)
     # Localhost'tan gelen scheduler iç çağrıları serbest
     client_host = request.client.host if request.client else ""
