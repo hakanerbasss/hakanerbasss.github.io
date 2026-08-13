@@ -405,9 +405,12 @@ def render_scene_clip(
         raw_video = Path(video.path())
         # ffmpeg ile boş baş kısmını at (-ss) + hedef süreye kırp (-t) +
         # standart h264/yuv420p'ye çevir (concat aşaması tüm kliplerin aynı
-        # codec/pix_fmt olmasını bekliyor). Küçük bir güvenlik payı ekleniyor
-        # ki tam boyama anının hemen öncesi bir kare bile sızmasın.
-        skip = round(lead_in + 0.08, 3)
+        # codec/pix_fmt olmasını bekliyor). lead_in ÖLÇÜMÜ tek başına GÜVENİLİR
+        # DEĞİL — test edildi, iki ardışık çalıştırmada 0.17sn ile 0.59sn arası
+        # (3.5 kat fark) çıktı, sistem yüküne göre değişiyor. Bu yüzden sabit
+        # bir taban (0.4sn) + ölçülen değer üstüne pay — düşük ölçülse bile
+        # yetersiz kalmasın diye.
+        skip = round(max(lead_in + 0.08, 0.4), 3)
         result = subprocess.run([
             "ffmpeg", "-y", "-ss", str(skip), "-i", str(raw_video), "-t", str(duration),
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
@@ -586,7 +589,15 @@ def render_hook_card(
         context.close()
 
         raw_video = Path(video.path())
-        skip = round(lead_in + 0.08, 3)
+        # Bu kartta .ribbon en geç başlayan/biten eleman:
+        # animation-delay:0.42s + duration:0.35s = 0.77sn'de tamamlanıyor.
+        # lead_in'in kendisi de güvenilmez (bkz. render_scene_clip'teki not) —
+        # bu yüzden taban 1.0sn'ye çekildi, hem boş-kare hem de ribbon'un
+        # animasyonu bitmeden alınan yarım/bozuk kare riskini kapatıyor.
+        # Instagram'ın Reels kapağı bu klibin BİRİNCİ karesinden otomatik
+        # seçiliyor (API üzerinden ayrı kapak set etme seçeneği yok), o yüzden
+        # bu ilk kare kesinlikle tam oturmuş olmalı.
+        skip = round(max(lead_in + 0.08, 1.0), 3)
         result = subprocess.run([
             "ffmpeg", "-y", "-ss", str(skip), "-i", str(raw_video), "-t", str(duration),
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
