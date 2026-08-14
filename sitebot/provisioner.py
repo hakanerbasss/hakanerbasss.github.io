@@ -55,15 +55,44 @@ def _log(site_id: int, step: str, ok: bool = True, detail: str = "") -> None:
 # ----------------------------------------------------------- admin arayüzü
 
 def admin_bundle(slug: str) -> dict[str, str]:
-    """Müşterinin reposuna gidecek statik admin paneli.
+    """Müşterinin reposuna gidecek admin sayfası.
 
-    İçinde hiçbir gizli anahtar yok — sadece API adresini ve site
-    kimliğini biliyor. Tüm yetkilendirme sunucu tarafında.
+    Panelin kendisi BURAYA gömülmüyor — bir bakım yaptığımızda her
+    müşterinin tekrar "Yayınla" demesini beklemek yerine, bu ince kabuk
+    en güncel paneli sunucudan (kur.wizaicorp.com) her açılışta canlı
+    çekiyor. Adres çubuğunda müşterinin kendi alan adı görünmeye devam
+    ediyor — "kendi paneli" hissi bozulmuyor — ama içerik hep taze:
+    panel düzeltmeleri artık HİÇBİR siteyi yeniden yayınlamadan anında
+    herkese ulaşıyor.
+
+    Sunucuya erişilemezse (bakım, ağ sorunu) doğrudan bağlantı veren bir
+    yedek mesaj gösteriliyor; site adminsiz de yayında kalmaya devam
+    eder, sadece o an düzenlenemez.
     """
     cfg = config.load()
-    api = f"https://{cfg['panel_domain']}"
-    html = (PANEL_DIR / "site_admin.html").read_text("utf-8")
-    html = html.replace("__API_BASE__", api).replace("__SITE_SLUG__", slug)
+    panel_url = f"https://{cfg['panel_domain']}/panel/{slug}"
+    html = f"""<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Site Yönetimi</title>
+<style>
+*,*::before,*::after{{box-sizing:border-box}}
+html,body{{margin:0;height:100%;background:#0c1018}}
+iframe{{position:fixed;inset:0;width:100%;height:100%;border:0;background:#0c1018}}
+.fb{{position:fixed;inset:0;display:none;place-items:center;padding:24px;text-align:center;
+  background:#0c1018;color:#e9edf6;font:15px/1.6 -apple-system,'Segoe UI',sans-serif}}
+.fb a{{color:#5b8cff;font-weight:700}}
+</style></head>
+<body>
+<iframe id="pf" src="{panel_url}" title="Site Yönetimi"></iframe>
+<div class="fb" id="fb"><div>Panel şu an yüklenemedi.<br><br>
+  <a href="{panel_url}" target="_top">Buraya tıklayıp doğrudan açın →</a></div></div>
+<script>
+  var t=setTimeout(function(){{document.getElementById('fb').style.display='grid'}},8000);
+  document.getElementById('pf').addEventListener('load',function(){{clearTimeout(t)}});
+</script>
+</body></html>"""
     return {
         "admin/index.html": html,
         "admin/.nojekyll": "",

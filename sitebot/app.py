@@ -84,13 +84,15 @@ def admin_redirect() -> RedirectResponse:
 
 @app.get("/panel/{slug}")
 def musteri_paneli(slug: str) -> HTMLResponse:
-    """Müşteri panelinin yedek adresi.
+    """Panelin gerçek kaynağı.
 
-    Normalde panel müşterinin kendi sitesinden açılıyor
-    (hurdaci.wizaicorp.com/admin/). O sayfa bir sebeple erişilemezse —
-    depo bozulmuş, Pages derlemesi takılmış, alan adı taşınıyor —
-    buradan aynı panele girilebilir. Aynı köken olduğu için CORS'a da
-    ihtiyaç duymaz.
+    Her müşterinin kendi sitesindeki hurdaci.wizaicorp.com/admin/ artık
+    burayı bir <iframe> ile gösteren ince bir kabuk — panel içeriği
+    kalıcı olarak repoya gömülmüyor. Böylece buradaki her düzeltme, hiçbir
+    siteyi yeniden yayınlamaya gerek kalmadan anında tüm müşterilere
+    ulaşıyor. Doğrudan bu adresten de açılabilir (kabuk yüklenemezse
+    gösterilen yedek bağlantı burayı işaret ediyor). Aynı kökenden
+    servis edildiği için CORS'a ihtiyaç duymuyor.
     """
     site = db.get_site_by_slug(slug)
     if not site:

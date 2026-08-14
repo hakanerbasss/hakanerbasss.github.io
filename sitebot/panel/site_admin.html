@@ -285,6 +285,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
     </div>
     <span class="badge hidden" id="dirtyBadge">yayınlanmamış değişiklik</span>
     <span class="spacer"></span>
+    <a class="btn ghost sm" id="siteBtn" href="#" target="_blank" rel="noopener">Siteyi görüntüle ↗</a>
     <button class="btn ghost sm" id="prevToggle" style="display:none">Önizleme</button>
     <button class="btn ghost sm" id="saveBtn">Kaydet</button>
     <button class="btn pub sm" id="pubBtn">Yayınla</button>
@@ -542,6 +543,7 @@ async function boot(){
   $("#login").style.display="none"; $("#app").classList.add("on");
   $("#siteName").textContent = C.site.title || me.site.title;
   const dom=$("#siteDom"); dom.textContent=me.site.domain; dom.href="https://"+me.site.domain;
+  $("#siteBtn").href="https://"+me.site.domain+"/";
   MINPW = me.min_password || 6;
   $("#pwRule").textContent = `En az ${MINPW} karakter.`;
   $("#dirtyBadge").classList.toggle("hidden", !me.unpublished);
