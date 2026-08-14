@@ -65,7 +65,7 @@ body{--maxw:1180px}
 .pgrid{display:grid;gap:clamp(16px,2.4vw,30px);
   grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))}
 .pitem{position:relative}
-.pitem .ph{aspect-ratio:3/4;overflow:hidden;border-radius:var(--r);background:var(--surface-2);
+.pitem .ph{position:relative;aspect-ratio:3/4;overflow:hidden;border-radius:var(--r);background:var(--surface-2);
   border:1px solid var(--border);margin-bottom:14px}
 .pitem img{width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
 .pitem:hover img{transform:scale(1.05)}
@@ -73,6 +73,9 @@ body{--maxw:1180px}
 .pitem .m{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
 .pitem .price{font-weight:800;color:var(--accent);white-space:nowrap}
 .pitem .desc{color:var(--muted);font-size:.9rem;margin-top:6px}
+.pitem .pmore{display:inline-block;margin-top:10px;font-size:.88rem;font-weight:700;
+  color:var(--accent);border-bottom:1px solid transparent;transition:border-color .2s}
+.pitem .pmore:hover{border-bottom-color:currentColor}
 
 .cta-final{text-align:center;padding:clamp(70px,11vw,150px) 0}
 .cta-final h2{font-size:clamp(2rem,6vw,4.4rem);margin-bottom:22px}
@@ -167,7 +170,10 @@ body{--maxw:1180px}
       {% for pr in products %}
       <article class="pitem rv">
         <div class="ph">
-          {% if pr.images %}<img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy">
+          {% if pr.images %}
+          <img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy"
+               data-imgs="{% for im in pr.images %}/{{ im }}{{ '|' if not loop.last }}{% endfor %}">
+          {% if pr.images|length > 1 %}<span class="imgcount">📷 {{ pr.images|length }}</span>{% endif %}
           {% else %}<div class="noimg">🖼</div>{% endif %}
         </div>
         <div class="m">
@@ -175,6 +181,11 @@ body{--maxw:1180px}
           {% if pr.price %}<span class="price">{{ pr.price }} {{ pr.currency }}</span>{% endif %}
         </div>
         {% if pr.desc %}<p class="desc">{{ pr.desc }}</p>{% endif %}
+        {% set hedef = pr.link or whatsapp or tel %}
+        {% if hedef %}
+        <a class="pmore" href="{{ hedef }}"
+           {% if 'http' in hedef %}target="_blank" rel="noopener"{% endif %}>Bilgi al →</a>
+        {% endif %}
       </article>
       {% endfor %}
     </div>

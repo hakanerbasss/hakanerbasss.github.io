@@ -140,8 +140,12 @@
         <div class="ph">
           {% if pr.badge %}<span class="tag">{{ pr.badge }}</span>{% endif %}
           {% if pr.images %}
-          <img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy">
-          {% if pr.images|length > 1 %}<img src="/{{ pr.images[1] }}" alt="" loading="lazy" aria-hidden="true">{% endif %}
+          <img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy"
+               data-imgs="{% for im in pr.images %}/{{ im }}{{ '|' if not loop.last }}{% endfor %}">
+          {% if pr.images|length > 1 %}
+          <img src="/{{ pr.images[1] }}" alt="" loading="lazy" aria-hidden="true">
+          <span class="imgcount">📷 {{ pr.images|length }}</span>
+          {% endif %}
           {% else %}<div class="empty">🖼</div>{% endif %}
         </div>
         <div class="pb">

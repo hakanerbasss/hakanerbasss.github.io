@@ -735,6 +735,8 @@ function prdRow(p,i,arr){
   r2.appendChild(fieldEl("Kategori",p,"category","text","Metal"));
   r2.appendChild(fieldEl("Rozet",p,"badge","text","Yeni / İndirim"));
   d.appendChild(r2);
+  d.appendChild(fieldEl("Sipariş / detay bağlantısı",p,"link","text",
+    "boş bırakırsanız WhatsApp'a bağlanır"));
   const f=document.createElement("div"); f.className="f";
   f.innerHTML="<label>Ürün görselleri</label>";
   const g=document.createElement("div"); g.className="gal-grid";

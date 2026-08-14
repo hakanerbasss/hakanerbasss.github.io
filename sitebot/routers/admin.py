@@ -148,9 +148,17 @@ async def publish(sess: dict = Depends(auth.require_admin)) -> dict[str, Any]:
 
 def _previewable(html: str, site_id: int) -> str:
     """Henüz repoya gitmemiş görselleri önizlemede gösterebilmek için
-    /assets/... yollarını sunucudaki geçici uca çevir."""
-    return html.replace('src="/assets/', f'src="/api/admin/asset/{site_id}/') \
-               .replace("url(/assets/", f"url(/api/admin/asset/{site_id}/")
+    /assets/... yollarını sunucudaki geçici uca çevir.
+
+    Görselin geçebileceği her yeri kapsamalı: src özniteliği, CSS url(),
+    ve ürün galerisinin data-imgs listesi (boru işaretiyle ayrılmış).
+    Biri atlanırsa müşteri önizlemede kırık görsel görür.
+    """
+    hedef = f"/api/admin/asset/{site_id}/"
+    for eski in ('src="/assets/', "url(/assets/", 'data-imgs="/assets/', "|/assets/"):
+        yeni = eski.replace("/assets/", hedef)
+        html = html.replace(eski, yeni)
+    return html
 
 
 @router.get("/asset/{site_id}/{name}")

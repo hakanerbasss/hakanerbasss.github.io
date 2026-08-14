@@ -209,7 +209,12 @@
 
 
 {%- macro scripts() -%}
-<div class="lightbox" id="lb"><img src="" alt=""></div>
+<div class="lightbox" id="lb">
+  <button class="lb-nav prev" id="lbPrev" aria-label="Önceki">‹</button>
+  <img src="" alt="">
+  <button class="lb-nav next" id="lbNext" aria-label="Sonraki">›</button>
+  <span class="lb-count" id="lbCount"></span>
+</div>
 <script>
 (function(){
   var nav=document.getElementById('nav');
@@ -247,13 +252,45 @@
     });
   }
 
-  var lb=document.getElementById('lb'),lbi=lb.querySelector('img');
+  /* Buyutulmus gorsel. Bir urunun birden fazla fotografi varsa ana gorsele
+     data-imgs ile hepsi bagli oluyor; burada oklarla gezilebiliyor. */
+  var lb=document.getElementById('lb'),lbi=lb.querySelector('img'),
+      lbc=document.getElementById('lbCount'),
+      prev=document.getElementById('lbPrev'),next=document.getElementById('lbNext'),
+      list=[],idx=0;
+
+  function show(i){
+    if(!list.length)return;
+    idx=(i+list.length)%list.length;
+    lbi.src=list[idx];
+    var many=list.length>1;
+    prev.hidden=next.hidden=!many;
+    lbc.hidden=!many;
+    lbc.textContent=(idx+1)+' / '+list.length;
+  }
+  function open(el){
+    var d=el.getAttribute('data-imgs');
+    list=d?d.split('|').filter(Boolean):[el.currentSrc||el.src];
+    lbi.alt=el.alt||'';
+    show(0);
+    lb.classList.add('on');
+    document.body.style.overflow='hidden';
+  }
+  function close(){lb.classList.remove('on');document.body.style.overflow=''}
+
   document.addEventListener('click',function(e){
     var z=e.target.closest('.zoom');
-    if(z){lbi.src=z.currentSrc||z.src;lbi.alt=z.alt||'';lb.classList.add('on');return}
-    if(e.target.closest('.lightbox'))lb.classList.remove('on');
+    if(z){open(z);return}
+    if(e.target===prev){show(idx-1);return}
+    if(e.target===next){show(idx+1);return}
+    if(e.target.closest('.lightbox'))close();
   });
-  addEventListener('keydown',function(e){if(e.key==='Escape')lb.classList.remove('on')});
+  addEventListener('keydown',function(e){
+    if(!lb.classList.contains('on'))return;
+    if(e.key==='Escape')close();
+    if(e.key==='ArrowLeft')show(idx-1);
+    if(e.key==='ArrowRight')show(idx+1);
+  });
 })();
 </script>
 {%- endmacro -%}

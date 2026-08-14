@@ -217,3 +217,27 @@ p{text-wrap:pretty}
 .lightbox img{max-width:min(1100px,94vw);max-height:88vh;width:auto;
   border-radius:var(--r);box-shadow:var(--shadow-lg)}
 .zoom{cursor:zoom-in}
+.lb-nav{
+  position:absolute;top:50%;transform:translateY(-50%);z-index:2;
+  width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;
+  background:rgba(255,255,255,.14);color:#fff;font-size:2rem;line-height:1;
+  display:grid;place-items:center;backdrop-filter:blur(6px);transition:background .2s;
+}
+.lb-nav:hover{background:rgba(255,255,255,.3)}
+.lb-nav.prev{left:max(12px,3vw)}
+.lb-nav.next{right:max(12px,3vw)}
+.lb-nav[hidden]{display:none}
+.lb-count{
+  position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:2;
+  color:#fff;font-size:.85rem;font-weight:700;letter-spacing:.05em;
+  background:rgba(0,0,0,.55);padding:7px 15px;border-radius:99px;backdrop-filter:blur(6px);
+}
+.lb-count[hidden]{display:none}
+
+/* Birden fazla fotografi olan urunlerde kac tane oldugunu goster */
+.imgcount{
+  position:absolute;right:10px;bottom:10px;z-index:3;pointer-events:none;
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.73rem;font-weight:800;padding:5px 10px;border-radius:99px;
+  background:rgba(0,0,0,.6);color:#fff;backdrop-filter:blur(6px);
+}

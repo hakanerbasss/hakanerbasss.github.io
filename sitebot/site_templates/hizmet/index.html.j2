@@ -199,16 +199,20 @@
       <article class="card pcard rv">
         <div class="ph">
           {% if pr.badge %}<span class="tag">{{ pr.badge }}</span>{% endif %}
-          {% if pr.images %}<img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy">
+          {% if pr.images %}
+          <img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy"
+               data-imgs="{% for im in pr.images %}/{{ im }}{{ '|' if not loop.last }}{% endfor %}">
+          {% if pr.images|length > 1 %}<span class="imgcount">📷 {{ pr.images|length }}</span>{% endif %}
           {% else %}<div class="noimg">🖼</div>{% endif %}
         </div>
         <div class="pb">
           <h3>{{ pr.name }}</h3>
           {% if pr.desc %}<p class="desc">{{ pr.desc }}</p>{% endif %}
           {% if pr.price %}<div class="price">{{ pr.price }} {{ pr.currency }}</div>{% endif %}
-          {% if whatsapp %}
-          <a class="btn btn--accent" style="margin-top:6px"
-             href="{{ whatsapp }}" target="_blank" rel="noopener">Bilgi al</a>
+          {% set hedef = pr.link or whatsapp or tel %}
+          {% if hedef %}
+          <a class="btn btn--accent" style="margin-top:6px" href="{{ hedef }}"
+             {% if 'http' in hedef %}target="_blank" rel="noopener"{% endif %}>Bilgi al</a>
           {% endif %}
         </div>
       </article>
