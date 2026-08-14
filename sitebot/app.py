@@ -12,9 +12,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               RedirectResponse)
 
 import config
 import db
@@ -79,6 +80,24 @@ def kurulum() -> FileResponse:
 def admin_redirect() -> RedirectResponse:
     """Yanlışlıkla panel adresinden /admin açanlar için yönlendirme."""
     return RedirectResponse("/", status_code=307)
+
+
+@app.get("/panel/{slug}")
+def musteri_paneli(slug: str) -> HTMLResponse:
+    """Müşteri panelinin yedek adresi.
+
+    Normalde panel müşterinin kendi sitesinden açılıyor
+    (hurdaci.wizaicorp.com/admin/). O sayfa bir sebeple erişilemezse —
+    depo bozulmuş, Pages derlemesi takılmış, alan adı taşınıyor —
+    buradan aynı panele girilebilir. Aynı köken olduğu için CORS'a da
+    ihtiyaç duymaz.
+    """
+    site = db.get_site_by_slug(slug)
+    if not site:
+        raise HTTPException(404, "Site bulunamadı.")
+    html = (PANEL_DIR / "site_admin.html").read_text("utf-8")
+    html = html.replace("__API_BASE__", "").replace("__SITE_SLUG__", site["slug"])
+    return HTMLResponse(html, headers={"X-Robots-Tag": "noindex"})
 
 
 @app.get("/onizleme/{slug}")

@@ -194,15 +194,17 @@ async def health(site_id: int) -> dict[str, Any]:
     if not site:
         return {}
     out: dict[str, Any] = {"domain": site["domain"], "status": site["status"]}
+    # Durum sorgusu hiçbir koşulda hata döndürmemeli: GitHub ya da Cloudflare
+    # ulaşılamıyorsa bile panel açılmaya devam etsin, sadece "bilinmiyor" yazsın.
     try:
         out["pages"] = await gh.pages_status(site["repo"])
-    except gh.GitHubError as exc:
-        out["pages"] = {"status": "bilinmiyor", "detail": str(exc)}
+    except Exception as exc:                          # noqa: BLE001
+        out["pages"] = {"status": "bilinmiyor", "detail": str(exc)[:200]}
     try:
         rec = await cf.find_record(site["custom_domain"] or site["domain"])
         out["dns"] = {"var": bool(rec), "proxied": rec.get("proxied") if rec else None}
-    except cf.CloudflareError as exc:
-        out["dns"] = {"var": None, "detail": str(exc)}
+    except Exception as exc:                          # noqa: BLE001
+        out["dns"] = {"var": None, "detail": str(exc)[:200]}
     return out
 
 

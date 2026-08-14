@@ -33,13 +33,31 @@ TEMPLATES = {
 }
 
 # Hazır renk paletleri — müşteri kod yazmadan tüm siteyi değiştirsin diye.
+# 'dark' bayrağı panelin Aydınlık/Karanlık seçicisini besliyor; her iki kipte
+# de yeterli seçenek kalsın diye yeni palet eklerken dengeyi koru.
 PRESETS = {
-    "gece": {"bg": "#0b1020", "fg": "#e8ecf5", "primary": "#5b8cff", "accent": "#ff6b35", "dark": True},
-    "kar": {"bg": "#ffffff", "fg": "#12151c", "primary": "#111827", "accent": "#e11d48", "dark": False},
-    "toprak": {"bg": "#faf7f2", "fg": "#2b2118", "primary": "#8b5e34", "accent": "#c2410c", "dark": False},
-    "okyanus": {"bg": "#f3f8fb", "fg": "#0c2231", "primary": "#0369a1", "accent": "#06b6d4", "dark": False},
-    "orman": {"bg": "#0d1512", "fg": "#e6f2ec", "primary": "#34d399", "accent": "#fbbf24", "dark": True},
-    "gun_batimi": {"bg": "#1a1020", "fg": "#f6ecff", "primary": "#a855f7", "accent": "#f59e0b", "dark": True},
+    # --- aydınlık ---
+    "kar": {"ad": "Kar", "bg": "#ffffff", "fg": "#12151c",
+            "primary": "#111827", "accent": "#e11d48", "dark": False},
+    "toprak": {"ad": "Toprak", "bg": "#faf7f2", "fg": "#2b2118",
+               "primary": "#8b5e34", "accent": "#c2410c", "dark": False},
+    "okyanus": {"ad": "Okyanus", "bg": "#f3f8fb", "fg": "#0c2231",
+                "primary": "#0369a1", "accent": "#06b6d4", "dark": False},
+    "mermer": {"ad": "Mermer", "bg": "#f7f7f4", "fg": "#14181a",
+               "primary": "#14532d", "accent": "#b45309", "dark": False},
+    "pastel": {"ad": "Pastel", "bg": "#faf7ff", "fg": "#241b33",
+               "primary": "#7c3aed", "accent": "#ec4899", "dark": False},
+    # --- karanlık ---
+    "gece": {"ad": "Gece", "bg": "#0b1020", "fg": "#e8ecf5",
+             "primary": "#5b8cff", "accent": "#ff6b35", "dark": True},
+    "orman": {"ad": "Orman", "bg": "#0d1512", "fg": "#e6f2ec",
+              "primary": "#34d399", "accent": "#fbbf24", "dark": True},
+    "gun_batimi": {"ad": "Gün Batımı", "bg": "#1a1020", "fg": "#f6ecff",
+                   "primary": "#a855f7", "accent": "#f59e0b", "dark": True},
+    "komur": {"ad": "Kömür", "bg": "#08090b", "fg": "#f4f4f5",
+              "primary": "#fafafa", "accent": "#f59e0b", "dark": True},
+    "neon": {"ad": "Neon", "bg": "#0a0a1f", "fg": "#e6e9ff",
+             "primary": "#22d3ee", "accent": "#ff00ff", "dark": True},
 }
 
 FONTS = {

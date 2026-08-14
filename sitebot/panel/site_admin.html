@@ -21,10 +21,19 @@ img{display:block;max-width:100%}
 /* ---------- giriş ---------- */
 .login{min-height:100svh;display:grid;place-items:center;padding:24px;
   background:radial-gradient(70% 60% at 50% 0%,rgba(91,140,255,.16),transparent 65%)}
-.login form{width:min(400px,100%);background:var(--panel);border:1px solid var(--line);
-  border-radius:18px;padding:32px}
-.login h1{font-size:1.35rem;margin-bottom:6px;letter-spacing:-.02em}
+.login form{width:min(410px,100%);background:var(--panel);border:1px solid var(--line);
+  border-radius:20px;padding:clamp(26px,5vw,36px);box-shadow:0 30px 70px -30px #000}
+.login h1{font-size:1.4rem;margin-bottom:6px;letter-spacing:-.025em}
 .login p{color:var(--muted);font-size:.9rem;margin-bottom:24px}
+.brand-mark{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06101f;
+  font-size:1.5rem;font-weight:900;margin-bottom:18px}
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:46px!important}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;
+  border:0;background:transparent;cursor:pointer;opacity:.5;font-size:1rem;border-radius:8px}
+.pw-eye:hover{opacity:1;background:var(--panel2)}
+.login-note{color:var(--muted);font-size:.8rem;margin:16px 0 0;line-height:1.5}
 
 /* ---------- düzen ---------- */
 .app{display:none;height:100svh;grid-template-rows:auto 1fr}
@@ -39,7 +48,7 @@ img{display:block;max-width:100%}
 
 .body{display:grid;grid-template-columns:214px minmax(340px,1fr) minmax(360px,.9fr);
   overflow:hidden}
-@media(max-width:1180px){.body{grid-template-columns:190px 1fr}.preview{display:none}
+@media(max-width:1240px){.body{grid-template-columns:190px 1fr}.preview{display:none}
   .body.showprev{grid-template-columns:190px 1fr}.body.showprev .edit{display:none}
   .body.showprev .preview{display:flex}}
 @media(max-width:720px){.body{grid-template-columns:1fr}.side{position:fixed;inset:52px auto 0 0;
@@ -60,18 +69,29 @@ img{display:block;max-width:100%}
 .edit .hint{color:var(--muted);font-size:.87rem;margin-bottom:20px}
 .pane{display:none}.pane.on{display:block}
 
-.preview{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel)}
-.preview .bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
-.preview .bar span{font-size:.78rem;color:var(--muted);flex:1}
-.preview iframe{flex:1;width:100%;border:0;background:#fff}
+.preview{display:flex;flex-direction:column;min-height:0;
+  border-left:1px solid var(--line);background:var(--panel)}
+.preview .bar{display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-bottom:1px solid var(--line);flex:none}
+.preview .bar span{font-size:.78rem;color:var(--muted);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vp{display:flex;gap:3px}
 .vp button{padding:5px 9px;border-radius:7px;border:1px solid var(--line);background:transparent;
   cursor:pointer;font-size:.74rem;color:var(--muted)}
 .vp button.on{background:var(--panel2);color:var(--fg);border-color:var(--accent)}
-.frame-wrap{flex:1;display:grid;place-items:center;overflow:auto;background:#0a0d13;padding:0}
-.frame-wrap.mobile{padding:16px}
-.frame-wrap.mobile iframe{width:390px;max-width:100%;height:100%;max-height:844px;
-  border-radius:20px;border:6px solid #222b3c}
+
+/* Onizleme cercevesi kutuyu TAMAMEN doldurmali. Grid'i ortalarsak iframe
+   kendi kucuk varsayilan boyuna cekiliyor — panelin ilk surumundeki hata buydu. */
+.frame-wrap{flex:1;min-height:0;display:grid;grid-template:1fr / 1fr;
+  overflow:hidden;background:#0a0d13}
+.frame-wrap > iframe{width:100%;height:100%;border:0;background:#fff;display:block}
+.frame-wrap.mobile{place-items:center;padding:14px;overflow:auto}
+.frame-wrap.mobile > iframe{width:390px;max-width:100%;height:100%;max-height:844px;
+  border-radius:22px;border:7px solid #222b3c;box-shadow:0 24px 60px -20px #000}
+
+/* Tam ekran onizleme */
+.preview.full{position:fixed;inset:0;z-index:150;border-left:0}
+.preview.full .bar{padding:11px 16px}
 
 /* ---------- form ---------- */
 .f{margin-bottom:16px}
@@ -82,6 +102,12 @@ img{display:block;max-width:100%}
   border:1px solid var(--line);background:var(--bg);transition:border-color .15s,box-shadow .15s}
 .f input:focus,.f textarea:focus,.f select:focus{outline:0;border-color:var(--accent);
   box-shadow:0 0 0 3px rgba(91,140,255,.18)}
+/* Tarayicinin otomatik doldurma renklendirmesi kutuyu bembeyaz yapiyordu —
+   koyu temada okunmaz hale geliyor. */
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{
+  -webkit-text-fill-color:var(--fg);caret-color:var(--fg);
+  -webkit-box-shadow:0 0 0 1000px var(--bg) inset;
+  transition:background-color 9999s ease-in-out 0s}
 .f textarea{min-height:110px;resize:vertical}
 .f .sub{font-size:.79rem;color:var(--muted);margin-top:5px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -130,18 +156,57 @@ img{display:block;max-width:100%}
 .add-tile:hover{border-color:var(--accent);color:var(--accent)}
 
 /* ---------- tasarım seçimi ---------- */
-.tpl-grid{display:grid;gap:11px;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));margin-bottom:8px}
-.tpl{border:2px solid var(--line);border-radius:var(--r);padding:14px;background:var(--panel);
-  cursor:pointer;text-align:left;transition:border-color .18s,transform .12s}
+.tpl-grid{display:grid;gap:11px;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));margin-bottom:8px}
+.tpl{border:2px solid var(--line);border-radius:var(--r);padding:0;background:var(--panel);
+  cursor:pointer;text-align:left;transition:border-color .18s,transform .12s;overflow:hidden}
 .tpl:hover{transform:translateY(-2px)}
-.tpl.on{border-color:var(--accent);background:rgba(91,140,255,.09)}
+.tpl.on{border-color:var(--accent)}
+.tpl .txt{padding:12px 14px 14px}
 .tpl b{display:block;font-size:.95rem;margin-bottom:4px}
-.tpl span{font-size:.79rem;color:var(--muted);line-height:1.45}
+.tpl span{font-size:.79rem;color:var(--muted);line-height:1.45;display:block}
+
+/* Sablon minyaturu — gercek duzeni gosteren, CSS ile cizilmis kucuk maket.
+   Gorsel dosyasi yok: sablon degisince maket de elle guncellenmeli. */
+.mock{height:104px;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:8px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+.mock i{display:block;background:var(--line);border-radius:2px;height:4px}
+.mock .bar1{display:flex;gap:4px;align-items:center;margin-bottom:2px}
+.mock .bar1 u{width:11px;height:11px;border-radius:3px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));flex:none}
+.mock .bar1 i{flex:1;max-width:34px}
+.mock .row{display:flex;gap:4px}
+.mock .row i{flex:1;height:100%}
+.mock .hero{height:30px;border-radius:4px;
+  background:linear-gradient(115deg,rgba(91,140,255,.5),rgba(255,107,53,.4))}
+.mock .btn2{width:26px;height:7px;border-radius:3px;background:var(--accent)}
+.mock .cards{display:flex;gap:4px;flex:1}
+.mock .cards em{flex:1;border:1px solid var(--line);border-radius:4px;background:var(--panel2)}
+.mock .grid4{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;flex:1}
+.mock .grid4 em{border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.mock .lines{display:flex;flex-direction:column;gap:4px;flex:1;justify-content:center}
+.mock .lines i:nth-child(1){width:70%}
+.mock .lines i:nth-child(2){width:45%}
+.mock .split{display:flex;gap:5px;flex:1}
+.mock .split em{flex:1;border-radius:4px;background:var(--panel2);border:1px solid var(--line)}
+.mock .split div{flex:1;display:flex;flex-direction:column;gap:4px;justify-content:center}
 .pal-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}
-.pal{border:2px solid var(--line);border-radius:11px;padding:9px;cursor:pointer;background:var(--panel)}
+.pal{border:2px solid var(--line);border-radius:11px;padding:9px;cursor:pointer;background:var(--panel);
+  transition:border-color .18s,transform .12s}
+.pal:hover{transform:translateY(-2px)}
 .pal.on{border-color:var(--accent)}
-.pal .sw{height:38px;border-radius:8px;margin-bottom:7px}
+.pal .sw{height:38px;border-radius:8px;margin-bottom:7px;position:relative;overflow:hidden}
+.pal .sw::after{content:"";position:absolute;left:6px;bottom:5px;width:22px;height:5px;
+  border-radius:3px;background:currentColor;opacity:.9}
 .pal small{font-size:.76rem;color:var(--muted);text-transform:capitalize}
+
+/* Aydinlik / Karanlik secici */
+.seg{display:inline-flex;padding:4px;gap:4px;border:1px solid var(--line);
+  border-radius:12px;background:var(--panel)}
+.seg button{padding:9px 18px;border:0;border-radius:9px;background:transparent;
+  color:var(--muted);font-weight:700;font-size:.88rem;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;transition:background .18s,color .18s}
+.seg button:hover{color:var(--fg)}
+.seg button.on{background:var(--accent);color:#06101f}
 
 /* ---------- bölüm sırası ---------- */
 .sec-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);
@@ -177,14 +242,22 @@ img{display:block;max-width:100%}
 <!-- ============ GİRİŞ ============ -->
 <div class="login" id="login">
   <form id="loginForm">
+    <div class="brand-mark"><span id="loginInitial">S</span></div>
     <h1>Site Yönetimi</h1>
     <p id="loginDom">Yönetim panelinize giriş yapın.</p>
     <div class="err-box hidden" id="loginErr"></div>
     <div class="f"><label for="le">E-posta</label>
-      <input id="le" type="email" autocomplete="username" required></div>
+      <input id="le" type="email" autocomplete="username" required
+             placeholder="size verilen e-posta"></div>
     <div class="f"><label for="lp">Şifre</label>
-      <input id="lp" type="password" autocomplete="current-password" required></div>
-    <button class="btn" style="width:100%" id="loginBtn">Giriş yap</button>
+      <div class="pw-wrap">
+        <input id="lp" type="password" autocomplete="current-password" required
+               placeholder="size verilen şifre">
+        <button type="button" class="pw-eye" id="pwEye" aria-label="Şifreyi göster">👁</button>
+      </div></div>
+    <button class="btn" style="width:100%;padding:13px" id="loginBtn">Giriş yap</button>
+    <p class="login-note">Giriş bilgilerinizi kaybettiyseniz sitenizi kuran kişiyle
+      iletişime geçin — panelden sıfırlanabilir.</p>
   </form>
 </div>
 
@@ -308,6 +381,13 @@ img{display:block;max-width:100%}
         <h2>Tasarım</h2>
         <p class="hint">Şablonu değiştirseniz de tüm içeriğiniz olduğu gibi kalır — sadece görünüm değişir.</p>
         <div class="f"><label>Şablon</label><div class="tpl-grid" id="tplGrid"></div></div>
+        <div class="f"><label>Görünüm</label>
+          <div class="seg" id="modeSeg">
+            <button type="button" data-mode="light">☀️ Aydınlık</button>
+            <button type="button" data-mode="dark">🌙 Karanlık</button>
+          </div>
+          <div class="sub">Sitenizin genel zemini. Aydınlık daha kurumsal, karanlık daha çarpıcı durur.</div>
+        </div>
         <div class="f"><label>Renk paleti</label><div class="pal-grid" id="palGrid"></div></div>
         <div class="row">
           <div class="f"><label>Yazı tipi</label><select data-path="theme.font" id="fontSel"></select></div>
@@ -373,6 +453,7 @@ img{display:block;max-width:100%}
         <div class="vp">
           <button data-vp="desktop" class="on">Masaüstü</button>
           <button data-vp="mobile">Telefon</button>
+          <button id="fullBtn" title="Tam ekran">⛶</button>
         </div>
       </div>
       <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="Önizleme"></iframe></div>
@@ -452,7 +533,15 @@ async function boot(){
   $("#statusDot").title = me.site.status==="yayinda" ? "Site yayında" : "Durum: "+me.site.status;
   buildStatic(); render(); refreshPreview(); loadHealth();
 }
-if(TOKEN){ boot().catch(()=>logout()); } else { $("#loginDom").textContent = SLUG+" yönetim paneli"; }
+$("#pwEye").onclick=()=>{
+  const i=$("#lp"); i.type = i.type==="password" ? "text" : "password";
+};
+if(TOKEN){
+  boot().catch(()=>logout());
+} else {
+  $("#loginDom").textContent = location.hostname;
+  $("#loginInitial").textContent = (SLUG[0]||"S").toUpperCase();
+}
 
 /* ------------------------------------------------------------ sekmeler */
 $$(".side a").forEach(a=>a.onclick=()=>{
@@ -463,16 +552,68 @@ $$(".side a").forEach(a=>a.onclick=()=>{
 $("#burger").onclick=()=>$("#side").classList.toggle("open");
 $("#prevToggle").onclick=()=>$("#bodyGrid").classList.toggle("showprev");
 function fitLayout(){
-  const narrow = innerWidth<=1180;
+  const narrow = innerWidth<=1240;
   $("#prevToggle").style.display = narrow ? "" : "none";
   $("#burger").style.display = innerWidth<=720 ? "grid" : "none";
   if(!narrow) $("#bodyGrid").classList.remove("showprev");
 }
 addEventListener("resize",fitLayout); fitLayout();
-$$(".vp button").forEach(b=>b.onclick=()=>{
-  $$(".vp button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+$$(".vp button[data-vp]").forEach(b=>b.onclick=()=>{
+  $$(".vp button[data-vp]").forEach(x=>x.classList.remove("on")); b.classList.add("on");
   $("#frameWrap").classList.toggle("mobile", b.dataset.vp==="mobile");
 });
+$("#fullBtn").onclick=()=>{
+  const on=$("#preview").classList.toggle("full");
+  $("#fullBtn").textContent = on ? "✕" : "⛶";
+  $("#fullBtn").title = on ? "Kapat" : "Tam ekran";
+};
+addEventListener("keydown",e=>{
+  if(e.key==="Escape" && $("#preview").classList.contains("full")) $("#fullBtn").click();
+});
+
+/* Sablon minyaturleri — her biri o sablonun gercek duzenini taklit ediyor.
+   Yeni sablon eklerken buraya da bir maket eklemeyi unutma. */
+const MOCKS={
+  hizmet:`<div class="mock">
+    <div class="bar1"><u></u><i></i></div>
+    <div class="hero"></div>
+    <div class="btn2"></div>
+    <div class="cards"><em></em><em></em><em></em></div></div>`,
+  katalog:`<div class="mock">
+    <div class="bar1"><u></u><i></i></div>
+    <div class="row" style="height:22px"><i style="border-radius:4px"></i><i style="border-radius:4px;max-width:34%"></i></div>
+    <div class="grid4"><em></em><em></em><em></em><em></em><em></em><em></em></div></div>`,
+  kurumsal:`<div class="mock">
+    <div class="bar1"><u></u><i></i></div>
+    <div class="lines"><i style="height:9px"></i><i style="height:9px"></i></div>
+    <div class="split"><em></em><div><i></i><i style="width:70%"></i><i style="width:50%"></i></div></div></div>`,
+};
+
+/* Secili paletin aydinlik mi karanlik mi oldugu tek dogruluk kaynagi:
+   paletin kendi 'dark' bayragi. Ayri bir alan tutmuyoruz ki ikisi
+   birbirinden ayrismasin. */
+function currentMode(){
+  const p=META.presets[C.theme.preset];
+  return (p && p.dark) ? "dark" : "light";
+}
+function renderPalettes(){
+  const mode=currentMode();
+  $$("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.mode===mode));
+  const pg=$("#palGrid"); pg.innerHTML="";
+  Object.entries(META.presets)
+    .filter(([,p])=>(!!p.dark)===(mode==="dark"))
+    .forEach(([k,p])=>{
+      const b=document.createElement("button");
+      b.className="pal"+(C.theme.preset===k?" on":""); b.type="button";
+      b.innerHTML=`<div class="sw" style="background:${p.bg};color:${p.accent};
+          box-shadow:inset 0 0 0 1px rgba(128,128,128,.35)">
+          <span style="position:absolute;inset:6px auto auto 6px;width:26px;height:8px;
+            border-radius:3px;background:${p.primary}"></span></div>
+        <small>${p.ad||k}</small>`;
+      b.onclick=()=>{ C.theme.preset=k; renderPalettes(); markDirty(); };
+      pg.appendChild(b);
+    });
+}
 
 /* ------------------------------------------------------------ statik alanlar */
 function buildStatic(){
@@ -480,21 +621,19 @@ function buildStatic(){
   Object.entries(META.templates).forEach(([k,t])=>{
     const b=document.createElement("button");
     b.className="tpl"+(C.theme.template===k?" on":""); b.type="button";
-    b.innerHTML=`<b>${t.name}</b><span>${t.desc}</span>`;
+    b.innerHTML=`${MOCKS[k]||""}<div class="txt"><b>${t.name}</b><span>${t.desc}</span></div>`;
     b.onclick=()=>{ C.theme.template=k; $$(".tpl",tg).forEach(x=>x.classList.remove("on"));
       b.classList.add("on"); markDirty(); };
     tg.appendChild(b);
   });
 
-  const pg=$("#palGrid"); pg.innerHTML="";
-  Object.entries(META.presets).forEach(([k,p])=>{
-    const b=document.createElement("button");
-    b.className="pal"+(C.theme.preset===k?" on":""); b.type="button";
-    b.innerHTML=`<div class="sw" style="background:linear-gradient(120deg,${p.primary},${p.accent});
-      box-shadow:inset 0 0 0 4px ${p.bg}"></div><small>${k.replace("_"," ")}</small>`;
-    b.onclick=()=>{ C.theme.preset=k; $$(".pal",pg).forEach(x=>x.classList.remove("on"));
-      b.classList.add("on"); markDirty(); };
-    pg.appendChild(b);
+  renderPalettes();
+  $$("#modeSeg button").forEach(b=>b.onclick=()=>{
+    if(currentMode()===b.dataset.mode) return;
+    // Kipi degistirince o kipteki ilk paleti sec — kullanici asla eslesmeyen
+    // bir kip/palet ciftinde kalmasin.
+    const first=Object.keys(META.presets).find(k=>!!META.presets[k].dark===(b.dataset.mode==="dark"));
+    if(first){ C.theme.preset=first; renderPalettes(); markDirty(); }
   });
 
   const fs=$("#fontSel"); fs.innerHTML="";

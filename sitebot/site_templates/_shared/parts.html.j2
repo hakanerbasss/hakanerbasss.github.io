@@ -21,9 +21,15 @@
 {% else %}
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='{{ theme.primary|urlencode }}'/><text x='50' y='68' font-size='56' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='{{ theme.on_primary|urlencode }}'>{{ (site.title or 'S')[0]|upper }}</text></svg>">
 {% endif %}
+{# Yazi tipi dosyasi render'i BLOKLAMAMALI: yavas baglantida ya da Google
+   Fonts erisilemedigi durumda sayfa bembeyaz bekliyordu. Once sistem yazi
+   tipiyle ciziliyor, ozel yazi tipi gelince kendiliginden yerine geciyor. #}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Space+Grotesk:wght@400;600;700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Space+Grotesk:wght@400;600;700&family=Nunito:wght@400;700;900&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Space+Grotesk:wght@400;600;700&family=Nunito:wght@400;700;900&display=swap"></noscript>
 <script type="application/ld+json">
 {{ ld_json() }}
 </script>
