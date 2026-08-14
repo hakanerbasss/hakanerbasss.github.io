@@ -24,6 +24,10 @@ import db
 SESSION_TTL = 60 * 60 * 24 * 14      # 14 gün
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 14, 8, 1
 
+# Şifre uzunluk kuralı tek yerde dursun — panel arayüzleri de bu sayıyı
+# /api/super/status üzerinden okuyor, iki yerde ayrı ayrı yazılmıyor.
+MIN_PASSWORD = 6
+
 _TR_MAP = str.maketrans({
     "ı": "i", "İ": "i", "ş": "s", "Ş": "s", "ğ": "g", "Ğ": "g",
     "ü": "u", "Ü": "u", "ö": "o", "Ö": "o", "ç": "c", "Ç": "c",
@@ -33,8 +37,8 @@ _TR_MAP = str.maketrans({
 # ------------------------------------------------------------------- şifreler
 
 def hash_password(password: str) -> str:
-    if len(password) < 8:
-        raise HTTPException(400, "Şifre en az 8 karakter olmalı.")
+    if len(password) < MIN_PASSWORD:
+        raise HTTPException(400, f"Şifre en az {MIN_PASSWORD} karakter olmalı.")
     salt = secrets.token_bytes(16)
     key = hashlib.scrypt(password.encode(), salt=salt,
                          n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=32)

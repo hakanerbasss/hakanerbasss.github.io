@@ -90,6 +90,7 @@ def me(sess: dict = Depends(auth.require_admin)) -> dict[str, Any]:
         "presets": schema.PRESETS,
         "fonts": list(schema.FONTS),
         "sections": schema.DEFAULT_SECTION_ORDER,
+        "min_password": auth.MIN_PASSWORD,
         "storage": {
             "site_id": site["id"],          # önizlemede görsel adresini kurmak için
             "used": db.site_asset_bytes(site["id"]),

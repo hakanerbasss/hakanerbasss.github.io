@@ -438,7 +438,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
         <div id="pwMsg"></div>
         <div class="f"><label>Mevcut şifre</label><input type="password" id="pwCur" autocomplete="current-password"></div>
         <div class="f"><label>Yeni şifre</label><input type="password" id="pwNew" autocomplete="new-password">
-          <div class="sub">En az 8 karakter.</div></div>
+          <div class="sub" id="pwRule">En az 6 karakter.</div></div>
         <div class="f"><label>Yeni şifre (tekrar)</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
         <button class="btn" id="pwBtn">Şifreyi değiştir</button>
         <h2 style="margin-top:34px">Site durumu</h2>
@@ -472,6 +472,7 @@ const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 let TOKEN   = localStorage.getItem("sitebot_token_"+SLUG) || "";
 let C       = null;     // içerik
 let META    = null;     // site + şablon listeleri
+let MINPW   = 6;   // sunucudan /me ile guncelleniyor
 let DIRTY   = false;
 let SAVED   = true;
 
@@ -528,6 +529,8 @@ async function boot(){
   $("#login").style.display="none"; $("#app").classList.add("on");
   $("#siteName").textContent = C.site.title || me.site.title;
   const dom=$("#siteDom"); dom.textContent=me.site.domain; dom.href="https://"+me.site.domain;
+  MINPW = me.min_password || 6;
+  $("#pwRule").textContent = `En az ${MINPW} karakter.`;
   $("#dirtyBadge").classList.toggle("hidden", !me.unpublished);
   $("#statusDot").className = "dot" + (me.site.status==="yayinda" ? "" : " warn");
   $("#statusDot").title = me.site.status==="yayinda" ? "Site yayında" : "Durum: "+me.site.status;
@@ -904,7 +907,7 @@ $("#pwBtn").onclick=async()=>{
   const box=$("#pwMsg");
   const show=(t,c)=>box.innerHTML=`<div class="${c}">${t}</div>`;
   if($("#pwNew").value!==$("#pwNew2").value) return show("Yeni şifreler aynı değil.","err-box");
-  if($("#pwNew").value.length<8) return show("Yeni şifre en az 8 karakter olmalı.","err-box");
+  if($("#pwNew").value.length<MINPW) return show(`Yeni şifre en az ${MINPW} karakter olmalı.`,"err-box");
   try{
     await api("/api/admin/password",{method:"POST",
       body:JSON.stringify({current:$("#pwCur").value,new:$("#pwNew").value})});
