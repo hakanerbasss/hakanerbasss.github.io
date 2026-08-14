@@ -34,6 +34,8 @@ ok "Port $PORT bos"
 # --- 2. Python ortami ------------------------------------------------------
 say "Python sanal ortami kuruluyor (sistem Python'una dokunulmuyor)"
 command -v python3 >/dev/null || die "python3 bulunamadi."
+# --system-site-packages BILEREK kullanilmiyor: ortam tam izole olsun,
+# sunucudaki diger botlarin paketlerini ne gorsun ne de degistirsin.
 python3 -m venv "$DIR/.venv" 2>/dev/null || true
 [ -x "$DIR/.venv/bin/pip" ] || die "venv kurulamadi. 'apt install python3-venv' deneyin."
 "$DIR/.venv/bin/pip" install --quiet --upgrade pip
@@ -114,11 +116,24 @@ MSG
 fi
 
 if ! command -v certbot >/dev/null; then
-    apt-get install -y certbot python3-certbot-nginx >/dev/null 2>&1 \
-        || die "certbot kurulamadi: apt install certbot python3-certbot-nginx"
+    # Betigin sistem geneline dokunan TEK yeri burasi. apt paketleri
+    # /usr/lib/python3/dist-packages altina gider; pip ile kurulmus paketler
+    # (firebase-admin vb.) /usr/local/... altinda ve daha yuksek oncelikli,
+    # yani uzerlerine yazilmaz. Yine de istemezsen atlayabilirsin:
+    #    SITEBOT_SKIP_SSL=1 bash kur.sh
+    if [ "${SITEBOT_SKIP_SSL:-0}" = "1" ]; then
+        ok "certbot kurulumu atlandi (SITEBOT_SKIP_SSL=1) — site http:// ile calisiyor"
+        SKIP_CERT=1
+    else
+        printf "    certbot kurulu degil, apt ile kuruluyor (sistemdeki tek degisiklik)\n"
+        apt-get install -y certbot python3-certbot-nginx >/dev/null 2>&1 \
+            || die "certbot kurulamadi: apt install certbot python3-certbot-nginx"
+    fi
 fi
 
-if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
+if [ "${SKIP_CERT:-0}" = "1" ]; then
+    printf "    SSL atlandi. Site: http://%s/\n" "$DOMAIN"
+elif certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
        --register-unsafely-without-email --redirect >/tmp/sitebot-certbot.log 2>&1; then
     ok "Sertifika alindi"
 else
@@ -143,6 +158,9 @@ cat <<DONE
      systemctl status sitebot
      systemctl restart sitebot
      journalctl -u sitebot -f
+
+   Diger botlara dokunulmadi — sitebot kendi Python'unu kullaniyor:
+     $DIR/.venv/bin/python
   ────────────────────────────────────────────────
 
 DONE
