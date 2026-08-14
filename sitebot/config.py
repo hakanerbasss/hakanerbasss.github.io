@@ -16,7 +16,7 @@ UPLOAD_DIR = BASE_DIR / "uploads"
 DEFAULTS: dict[str, Any] = {
     # --- GitHub ---
     "github_token": "",          # fine-grained PAT (Administration/Contents/Pages: RW)
-    "github_org": "wizaicorp",   # siteler bu organizasyonda açılır
+    "github_org": "wizaicorp",   # siteler bu hesapta açılır (org ya da kullanıcı)
     "github_pages_host": "",     # boşsa <org>.github.io olarak hesaplanır
 
     # --- Cloudflare ---

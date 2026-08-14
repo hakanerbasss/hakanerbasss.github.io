@@ -54,13 +54,47 @@ async def _req(client: httpx.AsyncClient, method: str, path: str,
     return r.json()
 
 
-async def check_token() -> dict[str, Any]:
-    """Kurulum ekranı için: token geçerli mi, org'a erişimi var mı?"""
+async def owner_type() -> str:
+    """Repoların açılacağı hesap organizasyon mu, normal kullanıcı mı?
+
+    İkisi de destekleniyor ve repo açma adresleri farklı olduğu için bunu
+    bilmek zorundayız. Sonuç önbelleğe alınıyor; ayarlar değişince sıfırlanır.
+    """
     cfg = config.load()
+    owner = cfg["github_org"]
+    cached = _owner_type_cache.get(owner)
+    if cached:
+        return cached
+    async with httpx.AsyncClient(timeout=TIMEOUT) as c:
+        data = await _req(c, "GET", f"/users/{owner}")
+    kind = "Organization" if data.get("type") == "Organization" else "User"
+    _owner_type_cache[owner] = kind
+    return kind
+
+
+_owner_type_cache: dict[str, str] = {}
+
+
+async def check_token() -> dict[str, Any]:
+    """Kurulum ekranı için: token geçerli mi, doğru hesaba mı bağlı?"""
+    cfg = config.load()
+    owner = cfg["github_org"]
+    _owner_type_cache.pop(owner, None)
     async with httpx.AsyncClient(timeout=TIMEOUT) as c:
         me = await _req(c, "GET", "/user")
-        org = await _req(c, "GET", f"/orgs/{cfg['github_org']}")
-        return {"login": me.get("login"), "org": org.get("login")}
+    kind = await owner_type()
+
+    if kind == "User" and me.get("login", "").lower() != owner.lower():
+        raise GitHubError(
+            f"Token '{me.get('login')}' hesabına ait ama siteler '{owner}' "
+            f"hesabında açılacak. Ya ayarlardaki hesap adını '{me.get('login')}' "
+            f"yapın ya da '{owner}' hesabına girip oradan token üretin."
+        )
+    return {
+        "login": me.get("login"),
+        "org": owner,
+        "tur": "organizasyon" if kind == "Organization" else "kullanıcı hesabı",
+    }
 
 
 async def repo_exists(repo: str) -> bool:
@@ -78,19 +112,20 @@ async def create_repo(repo: str, description: str) -> dict[str, Any]:
     API'ye konuşan statik bir arayüz.
     """
     cfg = config.load()
+    payload = {
+        "name": repo,
+        "description": description[:300],
+        "private": False,
+        "auto_init": True,                    # ilk commit'i GitHub atsın, ref hazır olsun
+        "has_issues": False,
+        "has_projects": False,
+        "has_wiki": False,
+    }
+    # Organizasyon ve kullanıcı hesabının repo açma adresleri farklı.
+    kind = await owner_type()
+    path = f"/orgs/{cfg['github_org']}/repos" if kind == "Organization" else "/user/repos"
     async with httpx.AsyncClient(timeout=TIMEOUT) as c:
-        return await _req(
-            c, "POST", f"/orgs/{cfg['github_org']}/repos",
-            json={
-                "name": repo,
-                "description": description[:300],
-                "private": False,
-                "auto_init": True,            # ilk commit'i GitHub atsın, ref hazır olsun
-                "has_issues": False,
-                "has_projects": False,
-                "has_wiki": False,
-            },
-        )
+        return await _req(c, "POST", path, json=payload)
 
 
 async def push_files(repo: str, files: dict[str, bytes | str], message: str,
