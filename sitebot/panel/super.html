@@ -440,7 +440,7 @@ $("#checkSet").onclick=async()=>{
   try{
     const r=await api("/api/super/check",{method:"POST"});
     const line=(n,d)=>d.ok
-      ? `<div class="msg ok on">✅ ${n}: bağlantı başarılı${d.org?" — org: "+d.org:""}${d.zone?" — zone: "+d.zone:""}</div>`
+      ? `<div class="msg ok on">✅ ${n}: bağlantı başarılı${d.org?" — hesap: "+d.org+(d.tur?" ("+d.tur+")":""):""}${d.yetki?" — "+d.yetki:""}${d.zone?" — zone: "+d.zone:""}</div>`
       : `<div class="msg err on">❌ ${n}: ${d.hata}</div>`;
     $("#checkOut").innerHTML=line("GitHub",r.github)+line("Cloudflare",r.cloudflare);
   }catch(e){ $("#checkOut").innerHTML=`<div class="msg err on">${e.message}</div>`; }

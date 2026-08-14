@@ -90,10 +90,28 @@ async def check_token() -> dict[str, Any]:
             f"hesabında açılacak. Ya ayarlardaki hesap adını '{me.get('login')}' "
             f"yapın ya da '{owner}' hesabına girip oradan token üretin."
         )
+    # Token gerçekten depo açabiliyor mu? Sahte bir istekle önden dene —
+    # yetkisi yoksa müşteri bilgilerini girdikten sonra değil, burada öğrenelim.
+    yetki = "bilinmiyor"
+    async with httpx.AsyncClient(timeout=TIMEOUT) as c:
+        path = f"/orgs/{owner}/repos" if kind == "Organization" else "/user/repos"
+        probe = await c.post(f"{API}{path}", headers=_headers(), json={"name": ""})
+        if probe.status_code == 403:
+            raise GitHubError(
+                "Token bağlandı ama yeni depo açma yetkisi yok. GitHub'da token "
+                "ayarlarında Repository access = 'All repositories' ve Permissions → "
+                "Administration / Contents / Pages = 'Read and write' olmalı. "
+                "Olmazsa 'Tokens (classic)' ile 'repo' + 'delete_repo' kapsamlı "
+                "token üretin — o kesin çalışır."
+            )
+        # 422 = "isim boş olamaz" → yetki var, sadece veri geçersiz. Beklenen sonuç.
+        yetki = "depo açabilir" if probe.status_code == 422 else f"HTTP {probe.status_code}"
+
     return {
         "login": me.get("login"),
         "org": owner,
         "tur": "organizasyon" if kind == "Organization" else "kullanıcı hesabı",
+        "yetki": yetki,
     }
 
 
@@ -125,7 +143,20 @@ async def create_repo(repo: str, description: str) -> dict[str, Any]:
     kind = await owner_type()
     path = f"/orgs/{cfg['github_org']}/repos" if kind == "Organization" else "/user/repos"
     async with httpx.AsyncClient(timeout=TIMEOUT) as c:
-        return await _req(c, "POST", path, json=payload)
+        try:
+            return await _req(c, "POST", path, json=payload)
+        except GitHubError as exc:
+            # GitHub bu durumda sadece "Resource not accessible" diyor; sebebi
+            # neredeyse her zaman token'ın repo açma yetkisinin olmaması.
+            if "403" in str(exc):
+                raise GitHubError(
+                    "Token yeni depo açamıyor. GitHub'da token ayarlarını kontrol edin: "
+                    "Repository access = 'All repositories' olmalı ve Permissions altında "
+                    "Administration, Contents, Pages = 'Read and write' seçili olmalı. "
+                    "Fine-grained token çalışmazsa 'Tokens (classic)' ile 'repo' + "
+                    "'delete_repo' kapsamlı bir token üretin — o kesin çalışır."
+                ) from exc
+            raise
 
 
 async def push_files(repo: str, files: dict[str, bytes | str], message: str,
