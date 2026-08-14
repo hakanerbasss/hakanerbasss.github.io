@@ -1,0 +1,253 @@
+{# Tüm şablonların paylaştığı parçalar. "with context" ile import edilir. #}
+
+{%- macro head(extra_css="") -%}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{ site.title }}{% if site.slogan %} | {{ site.slogan }}{% endif %}</title>
+<meta name="description" content="{{ site.description }}">
+{% if d.seo.keywords %}<meta name="keywords" content="{{ d.seo.keywords }}">{% endif %}
+<meta name="theme-color" content="{{ theme.bg }}">
+<link rel="canonical" href="https://{{ domain }}/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site.title }}">
+<meta property="og:title" content="{{ site.title }}">
+<meta property="og:description" content="{{ site.description }}">
+<meta property="og:url" content="https://{{ domain }}/">
+{% set og = d.seo.og_image or banner.image or site.logo %}
+{% if og %}<meta property="og:image" content="https://{{ domain }}/{{ og }}">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+{% if site.favicon %}
+<link rel="icon" href="/{{ site.favicon }}">
+{% else %}
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='{{ theme.primary|urlencode }}'/><text x='50' y='68' font-size='56' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='{{ theme.on_primary|urlencode }}'>{{ (site.title or 'S')[0]|upper }}</text></svg>">
+{% endif %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Space+Grotesk:wght@400;600;700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{{ ld_json() }}
+</script>
+<style>
+{% include "_shared/core.css.j2" %}
+{{ extra_css }}
+</style>
+{%- endmacro -%}
+
+
+{%- macro ld_json() -%}
+{
+  "@context":"https://schema.org",
+  "@type":"LocalBusiness",
+  "name":{{ site.title|tojson }},
+  "description":{{ site.description|tojson }},
+  "url":"https://{{ domain }}/"
+  {%- if contact.phone %},"telephone":{{ contact.phone|tojson }}{% endif %}
+  {%- if contact.email %},"email":{{ contact.email|tojson }}{% endif %}
+  {%- if contact.address %},"address":{"@type":"PostalAddress","streetAddress":{{ contact.address|tojson }}}{% endif %}
+  {%- if socials %},"sameAs":[{% for s in socials %}{{ s.url|tojson }}{{ "," if not loop.last }}{% endfor %}]{% endif %}
+}
+{%- endmacro -%}
+
+
+{%- macro nav(links) -%}
+<header class="nav" id="nav">
+  <a href="#top" class="brand">
+    {% if site.logo %}<img src="/{{ site.logo }}" alt="{{ site.title }}">
+    {% else %}<span class="dot">{{ (site.title or 'S')[0]|upper }}</span>{% endif %}
+    <span>{{ site.name or site.title }}</span>
+  </a>
+  <button class="nav-toggle" id="navToggle" aria-label="Menü" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+  <nav class="nav-links" id="navLinks">
+    {% for href, label in links %}<a href="{{ href }}">{{ label }}</a>{% endfor %}
+    {% if tel %}<a href="{{ tel }}" class="btn">{{ contact.phone }}</a>{% endif %}
+  </nav>
+</header>
+{%- endmacro -%}
+
+
+{%- macro contact_section() -%}
+<section class="sec" id="iletisim">
+  <div class="wrap">
+    <div class="rv" style="margin-bottom:38px">
+      <span class="eyebrow">İletişim</span>
+      <h2>Bize ulaşın</h2>
+      <p class="lead">Sorularınız için arayın, yazın ya da uğrayın.</p>
+    </div>
+    <div class="contact-grid">
+      <div class="rv">
+        {% if contact.phone %}
+        <a class="info-row" href="{{ tel }}">
+          <span class="ic">📞</span><span><b>Telefon</b><span>{{ contact.phone }}</span></span>
+        </a>
+        {% endif %}
+        {% if whatsapp %}
+        <a class="info-row" href="{{ whatsapp }}" target="_blank" rel="noopener">
+          <span class="ic">💬</span><span><b>WhatsApp</b><span>Hemen mesaj gönder</span></span>
+        </a>
+        {% endif %}
+        {% if contact.email %}
+        <a class="info-row" href="mailto:{{ contact.email }}">
+          <span class="ic">✉️</span><span><b>E-posta</b><span>{{ contact.email }}</span></span>
+        </a>
+        {% endif %}
+        {% if contact.address %}
+        <div class="info-row">
+          <span class="ic">📍</span><span><b>Adres</b><span>{{ contact.address }}</span></span>
+        </div>
+        {% endif %}
+        {% if contact.hours %}
+        <div class="info-row">
+          <span class="ic">🕐</span>
+          <span style="flex:1"><b>Çalışma Saatleri</b>
+            <ul class="hours" style="margin-top:9px">
+              {% for h in contact.hours %}<li>{{ h.day }} <span>{{ h.time }}</span></li>{% endfor %}
+            </ul>
+          </span>
+        </div>
+        {% endif %}
+        {% if socials %}<div class="socials" style="margin-top:22px">{{ social_links() }}</div>{% endif %}
+      </div>
+
+      <div class="rv">
+        {% if map_src %}
+        <div class="map">
+          <iframe src="{{ map_src }}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                  title="Konum haritası" allowfullscreen></iframe>
+        </div>
+        {% elif contact.form_endpoint %}
+        {{ contact_form() }}
+        {% endif %}
+      </div>
+    </div>
+
+    {% if map_src and contact.form_endpoint %}
+    <div class="rv" style="margin-top:clamp(24px,4vw,52px);max-width:640px">
+      {{ contact_form() }}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{%- endmacro -%}
+
+
+{%- macro contact_form() -%}
+<form class="card" action="{{ contact.form_endpoint }}" method="POST" style="padding:clamp(22px,3vw,34px)">
+  <h3 style="margin-bottom:18px">Mesaj gönderin</h3>
+  <div class="field"><label for="f-ad">Adınız</label>
+    <input id="f-ad" name="ad" required autocomplete="name"></div>
+  <div class="field"><label for="f-tel">Telefon</label>
+    <input id="f-tel" name="telefon" type="tel" required autocomplete="tel"></div>
+  <div class="field"><label for="f-msg">Mesajınız</label>
+    <textarea id="f-msg" name="mesaj" required></textarea></div>
+  <button class="btn btn--accent" type="submit" style="width:100%">Gönder</button>
+  <p class="form-note">Mesajınız doğrudan e-postamıza iletilir.</p>
+</form>
+{%- endmacro -%}
+
+
+{%- macro social_links() -%}
+{% for s in socials %}
+<a href="{{ s.url }}" target="_blank" rel="noopener" aria-label="{{ s.kind }}" title="{{ s.kind }}">
+  {{ social_icon(s.kind) }}
+</a>
+{% endfor %}
+{%- endmacro -%}
+
+
+{%- macro social_icon(kind) -%}
+{% if kind == 'instagram' %}
+<svg viewBox="0 0 24 24"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.05 1.8.25 2.2.42.6.22 1 .49 1.4.9.4.4.68.8.9 1.4.17.4.37 1 .42 2.2.06 1.3.07 1.7.07 4.9s0 3.6-.07 4.9c-.05 1.2-.25 1.8-.42 2.2-.22.6-.5 1-.9 1.4-.4.4-.8.68-1.4.9-.4.17-1 .37-2.2.42-1.3.06-1.7.07-4.9.07s-3.6 0-4.9-.07c-1.2-.05-1.8-.25-2.2-.42-.6-.22-1-.5-1.4-.9-.4-.4-.68-.8-.9-1.4-.17-.4-.37-1-.42-2.2C2.21 15.6 2.2 15.2 2.2 12s0-3.6.07-4.9c.05-1.2.25-1.8.42-2.2.22-.6.5-1 .9-1.4.4-.4.8-.68 1.4-.9.4-.17 1-.37 2.2-.42C8.4 2.21 8.8 2.2 12 2.2zm0 3.05A6.75 6.75 0 1 0 18.75 12 6.75 6.75 0 0 0 12 5.25zm0 11.13A4.38 4.38 0 1 1 16.38 12 4.38 4.38 0 0 1 12 16.38zm6.99-11.4a1.58 1.58 0 1 1-1.58-1.57 1.58 1.58 0 0 1 1.58 1.58z"/></svg>
+{% elif kind == 'facebook' %}
+<svg viewBox="0 0 24 24"><path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.5-3.89 3.77-3.89 1.1 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.45 2.89h-2.33v6.99A10 10 0 0 0 22 12z"/></svg>
+{% elif kind == 'x' %}
+<svg viewBox="0 0 24 24"><path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.65l-5.22-6.82-5.96 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.72 6.23zm-1.16 17.52h1.83L7.01 4.13H5.04z"/></svg>
+{% elif kind == 'youtube' %}
+<svg viewBox="0 0 24 24"><path d="M23 12s0-3.86-.49-5.71a2.99 2.99 0 0 0-2.1-2.12C18.55 3.66 12 3.66 12 3.66s-6.55 0-8.41.51a2.99 2.99 0 0 0-2.1 2.12C1 8.14 1 12 1 12s0 3.86.49 5.71a2.99 2.99 0 0 0 2.1 2.12c1.86.51 8.41.51 8.41.51s6.55 0 8.41-.51a2.99 2.99 0 0 0 2.1-2.12C23 15.86 23 12 23 12zM9.75 15.5v-7l6.25 3.5z"/></svg>
+{% elif kind == 'tiktok' %}
+<svg viewBox="0 0 24 24"><path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.79-2.46V9.8a5.71 5.71 0 1 0 4.88 5.65V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3a4.29 4.29 0 0 1-3.24-1.48z"/></svg>
+{% elif kind == 'linkedin' %}
+<svg viewBox="0 0 24 24"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.64h.05a4.17 4.17 0 0 1 3.75-2.06C20.4 8.58 21 11 21 14.24V21h-4v-6c0-1.43-.03-3.27-2-3.27s-2.3 1.56-2.3 3.17V21H9z"/></svg>
+{% else %}
+<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+{% endif %}
+{%- endmacro -%}
+
+
+{%- macro whatsapp_float() -%}
+{% if whatsapp %}
+<a class="wa-float" href="{{ whatsapp }}" target="_blank" rel="noopener" aria-label="WhatsApp'tan yazın">
+  <svg viewBox="0 0 24 24"><path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15s-.77.96-.94 1.16-.35.22-.65.07a8.2 8.2 0 0 1-2.4-1.48 9 9 0 0 1-1.66-2.07c-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53s-.67-1.6-.91-2.2c-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.38-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.75-.72 2-1.41.24-.7.24-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.86 9.86 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91A9.85 9.85 0 0 0 12.04 2zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23a8.19 8.19 0 0 1 8.24 8.24c0 4.54-3.7 8.23-8.24 8.23z"/></svg>
+</a>
+{% endif %}
+{%- endmacro -%}
+
+
+{%- macro footer() -%}
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div>
+      <div class="brand" style="margin-bottom:8px">
+        {% if site.logo %}<img src="/{{ site.logo }}" alt="{{ site.title }}">
+        {% else %}<span class="dot">{{ (site.title or 'S')[0]|upper }}</span>{% endif %}
+        <span>{{ site.name or site.title }}</span>
+      </div>
+      <small>© {{ year }} {{ site.title }}. Tüm hakları saklıdır.</small>
+    </div>
+    {% if socials %}<div class="socials">{{ social_links() }}</div>{% endif %}
+    <a class="credit" href="https://wizaicorp.com" target="_blank" rel="noopener">WizaiCorp ile yapıldı</a>
+  </div>
+</footer>
+{%- endmacro -%}
+
+
+{%- macro scripts() -%}
+<div class="lightbox" id="lb"><img src="" alt=""></div>
+<script>
+(function(){
+  var nav=document.getElementById('nav');
+  var onScroll=function(){nav.classList.toggle('stuck',window.scrollY>24)};
+  onScroll();addEventListener('scroll',onScroll,{passive:true});
+
+  var t=document.getElementById('navToggle'),l=document.getElementById('navLinks');
+  if(t&&l){
+    t.addEventListener('click',function(){
+      var open=l.classList.toggle('open');
+      t.setAttribute('aria-expanded',open?'true':'false');
+    });
+    l.addEventListener('click',function(e){
+      if(e.target.tagName==='A')l.classList.remove('open');
+    });
+  }
+
+  var els=document.querySelectorAll('.rv');
+  if(!('IntersectionObserver' in window)){
+    els.forEach(function(el){el.classList.add('in')});
+  }else{
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en,i){
+        if(en.isIntersecting){
+          var el=en.target;
+          setTimeout(function(){el.classList.add('in')},(el.dataset.delay||0)*1);
+          io.unobserve(el);
+        }
+      });
+    },{rootMargin:'0px 0px -8% 0px',threshold:.08});
+    els.forEach(function(el,i){
+      var p=el.parentElement;
+      if(p&&p.children.length>1&&p.children.length<13){el.dataset.delay=i%6*70}
+      io.observe(el);
+    });
+  }
+
+  var lb=document.getElementById('lb'),lbi=lb.querySelector('img');
+  document.addEventListener('click',function(e){
+    var z=e.target.closest('.zoom');
+    if(z){lbi.src=z.currentSrc||z.src;lbi.alt=z.alt||'';lb.classList.add('on');return}
+    if(e.target.closest('.lightbox'))lb.classList.remove('on');
+  });
+  addEventListener('keydown',function(e){if(e.key==='Escape')lb.classList.remove('on')});
+})();
+</script>
+{%- endmacro -%}

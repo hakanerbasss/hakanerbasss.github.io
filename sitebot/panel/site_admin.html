@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Site Yönetimi</title>
+<style>
+:root{
+  --bg:#0c1018;--panel:#141a26;--panel2:#1b2231;--line:#2a3446;--fg:#e9edf6;
+  --muted:#8e9ab1;--accent:#5b8cff;--accent2:#ff6b35;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;
+  --r:12px;
+}
+*,*::before,*::after{box-sizing:border-box}*{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 'Inter',-apple-system,Segoe UI,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--accent);text-decoration:none}
+img{display:block;max-width:100%}
+
+/* ---------- giriş ---------- */
+.login{min-height:100svh;display:grid;place-items:center;padding:24px;
+  background:radial-gradient(70% 60% at 50% 0%,rgba(91,140,255,.16),transparent 65%)}
+.login form{width:min(400px,100%);background:var(--panel);border:1px solid var(--line);
+  border-radius:18px;padding:32px}
+.login h1{font-size:1.35rem;margin-bottom:6px;letter-spacing:-.02em}
+.login p{color:var(--muted);font-size:.9rem;margin-bottom:24px}
+
+/* ---------- düzen ---------- */
+.app{display:none;height:100svh;grid-template-rows:auto 1fr}
+.app.on{display:grid}
+.top{display:flex;align-items:center;gap:14px;padding:11px 18px;
+  border-bottom:1px solid var(--line);background:var(--panel)}
+.top .name{font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .dom{color:var(--muted);font-size:.84rem}
+.spacer{flex:1}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.dot.warn{background:var(--warn)}
+
+.body{display:grid;grid-template-columns:214px minmax(340px,1fr) minmax(360px,.9fr);
+  overflow:hidden}
+@media(max-width:1180px){.body{grid-template-columns:190px 1fr}.preview{display:none}
+  .body.showprev{grid-template-columns:190px 1fr}.body.showprev .edit{display:none}
+  .body.showprev .preview{display:flex}}
+@media(max-width:720px){.body{grid-template-columns:1fr}.side{position:fixed;inset:52px auto 0 0;
+  width:210px;z-index:30;transform:translateX(-100%);transition:transform .25s}
+  .side.open{transform:none;box-shadow:0 0 0 100vw rgba(0,0,0,.5)}}
+
+.side{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px 10px}
+.side b{display:block;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);padding:14px 10px 6px}
+.side a{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;
+  color:var(--fg);font-size:.92rem;font-weight:600;cursor:pointer}
+.side a:hover{background:var(--panel2)}
+.side a.on{background:rgba(91,140,255,.16);color:#c9d9ff}
+.side a .em{width:18px;text-align:center}
+
+.edit{overflow-y:auto;padding:22px clamp(16px,2.4vw,30px) 90px}
+.edit h2{font-size:1.15rem;letter-spacing:-.02em;margin-bottom:4px}
+.edit .hint{color:var(--muted);font-size:.87rem;margin-bottom:20px}
+.pane{display:none}.pane.on{display:block}
+
+.preview{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel)}
+.preview .bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.preview .bar span{font-size:.78rem;color:var(--muted);flex:1}
+.preview iframe{flex:1;width:100%;border:0;background:#fff}
+.vp{display:flex;gap:3px}
+.vp button{padding:5px 9px;border-radius:7px;border:1px solid var(--line);background:transparent;
+  cursor:pointer;font-size:.74rem;color:var(--muted)}
+.vp button.on{background:var(--panel2);color:var(--fg);border-color:var(--accent)}
+.frame-wrap{flex:1;display:grid;place-items:center;overflow:auto;background:#0a0d13;padding:0}
+.frame-wrap.mobile{padding:16px}
+.frame-wrap.mobile iframe{width:390px;max-width:100%;height:100%;max-height:844px;
+  border-radius:20px;border:6px solid #222b3c}
+
+/* ---------- form ---------- */
+.f{margin-bottom:16px}
+.f label{display:block;font-size:.79rem;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.f input[type=text],.f input[type=tel],.f input[type=email],.f input[type=url],
+.f textarea,.f select{width:100%;padding:11px 13px;border-radius:10px;
+  border:1px solid var(--line);background:var(--bg);transition:border-color .15s,box-shadow .15s}
+.f input:focus,.f textarea:focus,.f select:focus{outline:0;border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(91,140,255,.18)}
+.f textarea{min-height:110px;resize:vertical}
+.f .sub{font-size:.79rem;color:var(--muted);margin-top:5px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.row{grid-template-columns:1fr}}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 17px;
+  border:0;border-radius:10px;background:var(--accent);color:#06101f;font-weight:700;
+  font-size:.88rem;cursor:pointer;transition:filter .15s,transform .1s;white-space:nowrap}
+.btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.pub{background:var(--accent2);color:#1a0c04}
+.btn.sm{padding:7px 12px;font-size:.8rem}
+.btn.danger{background:transparent;border:1px solid var(--line);color:var(--err)}
+.btn.danger:hover{border-color:var(--err)}
+
+/* ---------- tekrarlanan bloklar ---------- */
+.item{border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px;
+  background:var(--panel);position:relative}
+.item .head{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.item .head .t{font-weight:700;font-size:.92rem;flex:1;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;color:var(--muted)}
+.mini{width:29px;height:29px;border-radius:8px;border:1px solid var(--line);background:transparent;
+  cursor:pointer;color:var(--muted);display:grid;place-items:center;font-size:.85rem;flex:none}
+.mini:hover{color:var(--fg);border-color:var(--accent)}
+.mini.del:hover{color:var(--err);border-color:var(--err)}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:26px;text-align:center;
+  color:var(--muted);font-size:.9rem;margin-bottom:12px}
+
+/* ---------- görsel ---------- */
+.img-field{display:flex;gap:11px;align-items:center}
+.img-prev{width:74px;height:74px;border-radius:10px;border:1px solid var(--line);flex:none;
+  background:var(--bg) center/cover no-repeat;display:grid;place-items:center;
+  color:var(--muted);font-size:1.3rem;overflow:hidden}
+.img-actions{display:flex;gap:7px;flex-wrap:wrap}
+.gal-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(112px,1fr))}
+.gal-cell{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;
+  border:1px solid var(--line);background:var(--bg) center/cover no-repeat}
+.gal-cell .x{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:7px;
+  border:0;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:.8rem;line-height:1}
+.gal-cell .cap{position:absolute;inset:auto 0 0 0;background:rgba(0,0,0,.6);border:0;
+  color:#fff;font-size:.72rem;padding:5px 7px;width:100%}
+.add-tile{aspect-ratio:1;border:1px dashed var(--line);border-radius:10px;background:transparent;
+  color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:1.6rem}
+.add-tile:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- tasarım seçimi ---------- */
+.tpl-grid{display:grid;gap:11px;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));margin-bottom:8px}
+.tpl{border:2px solid var(--line);border-radius:var(--r);padding:14px;background:var(--panel);
+  cursor:pointer;text-align:left;transition:border-color .18s,transform .12s}
+.tpl:hover{transform:translateY(-2px)}
+.tpl.on{border-color:var(--accent);background:rgba(91,140,255,.09)}
+.tpl b{display:block;font-size:.95rem;margin-bottom:4px}
+.tpl span{font-size:.79rem;color:var(--muted);line-height:1.45}
+.pal-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}
+.pal{border:2px solid var(--line);border-radius:11px;padding:9px;cursor:pointer;background:var(--panel)}
+.pal.on{border-color:var(--accent)}
+.pal .sw{height:38px;border-radius:8px;margin-bottom:7px}
+.pal small{font-size:.76rem;color:var(--muted);text-transform:capitalize}
+
+/* ---------- bölüm sırası ---------- */
+.sec-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);
+  border-radius:10px;margin-bottom:8px;background:var(--panel)}
+.sec-row .n{flex:1;font-weight:600;font-size:.92rem}
+.sw-toggle{position:relative;width:42px;height:24px;border-radius:99px;background:var(--line);
+  border:0;cursor:pointer;flex:none;transition:background .2s}
+.sw-toggle::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:transform .2s}
+.sw-toggle.on{background:var(--ok)}
+.sw-toggle.on::after{transform:translateX(18px)}
+
+/* ---------- bildirim ---------- */
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,90px);z-index:200;
+  background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px 19px;
+  font-size:.9rem;font-weight:600;box-shadow:0 20px 50px -18px #000;transition:transform .3s;
+  max-width:min(520px,92vw)}
+.toast.on{transform:translate(-50%,0)}
+.toast.ok{border-color:var(--ok)}.toast.err{border-color:var(--err)}
+.badge{font-size:.72rem;font-weight:800;padding:4px 9px;border-radius:99px;
+  background:rgba(245,158,11,.16);color:var(--warn);border:1px solid rgba(245,158,11,.3)}
+.err-box{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#fca5a5;
+  border-radius:10px;padding:11px 13px;font-size:.87rem;margin-bottom:16px}
+.ok-box{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;
+  border-radius:10px;padding:11px 13px;font-size:.87rem;margin-bottom:16px}
+.hidden{display:none!important}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;padding:5px 10px;
+  border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- ============ GİRİŞ ============ -->
+<div class="login" id="login">
+  <form id="loginForm">
+    <h1>Site Yönetimi</h1>
+    <p id="loginDom">Yönetim panelinize giriş yapın.</p>
+    <div class="err-box hidden" id="loginErr"></div>
+    <div class="f"><label for="le">E-posta</label>
+      <input id="le" type="email" autocomplete="username" required></div>
+    <div class="f"><label for="lp">Şifre</label>
+      <input id="lp" type="password" autocomplete="current-password" required></div>
+    <button class="btn" style="width:100%" id="loginBtn">Giriş yap</button>
+  </form>
+</div>
+
+<!-- ============ PANEL ============ -->
+<div class="app" id="app">
+  <header class="top">
+    <button class="mini hidden" id="burger" style="display:none">☰</button>
+    <span class="dot" id="statusDot" title="Site durumu"></span>
+    <div style="min-width:0">
+      <div class="name" id="siteName">—</div>
+      <a class="dom" id="siteDom" target="_blank" rel="noopener">—</a>
+    </div>
+    <span class="badge hidden" id="dirtyBadge">yayınlanmamış değişiklik</span>
+    <span class="spacer"></span>
+    <button class="btn ghost sm" id="prevToggle" style="display:none">Önizleme</button>
+    <button class="btn ghost sm" id="saveBtn">Kaydet</button>
+    <button class="btn pub sm" id="pubBtn">Yayınla</button>
+    <button class="mini" id="outBtn" title="Çıkış">⏻</button>
+  </header>
+
+  <div class="body" id="bodyGrid">
+    <nav class="side" id="side">
+      <b>İçerik</b>
+      <a data-tab="genel" class="on"><span class="em">🏷</span>Genel</a>
+      <a data-tab="banner"><span class="em">🖼</span>Banner</a>
+      <a data-tab="hizmetler"><span class="em">⚙️</span>Hizmetler</a>
+      <a data-tab="urunler"><span class="em">🛒</span>Ürünler</a>
+      <a data-tab="galeri"><span class="em">📷</span>Galeri</a>
+      <a data-tab="hakkinda"><span class="em">📄</span>Hakkımızda</a>
+      <b>Ayarlar</b>
+      <a data-tab="tasarim"><span class="em">🎨</span>Tasarım</a>
+      <a data-tab="iletisim"><span class="em">📞</span>İletişim</a>
+      <a data-tab="sosyal"><span class="em">🔗</span>Sosyal Medya</a>
+      <a data-tab="bolumler"><span class="em">☰</span>Bölümler</a>
+      <a data-tab="hesap"><span class="em">🔒</span>Hesap</a>
+    </nav>
+
+    <main class="edit" id="edit">
+      <!-- GENEL -->
+      <section class="pane on" data-pane="genel">
+        <h2>Genel bilgiler</h2>
+        <p class="hint">Sitenizin adı, sloganı ve logosu. Arama motorlarında da bunlar görünür.</p>
+        <div class="row">
+          <div class="f"><label>Firma adı (menüde görünür)</label>
+            <input type="text" data-path="site.name"></div>
+          <div class="f"><label>Site başlığı (sekmede görünür)</label>
+            <input type="text" data-path="site.title"></div>
+        </div>
+        <div class="f"><label>Slogan</label><input type="text" data-path="site.slogan">
+          <div class="sub">Kısa ve akılda kalıcı olsun.</div></div>
+        <div class="f"><label>Kısa açıklama (Google'da görünür)</label>
+          <textarea data-path="site.description" style="min-height:80px"></textarea></div>
+        <div class="f"><label>Logo</label><div id="logoField"></div>
+          <div class="sub">Şeffaf arka planlı PNG en iyi sonucu verir. Boş bırakırsanız baş harfiniz kullanılır.</div></div>
+        <div class="f"><label>Anahtar kelimeler</label>
+          <input type="text" data-path="seo.keywords">
+          <div class="sub">Virgülle ayırın: hurdacı, bakır alım, istanbul</div></div>
+      </section>
+
+      <!-- BANNER -->
+      <section class="pane" data-pane="banner">
+        <h2>Banner</h2>
+        <p class="hint">Ziyaretçinin gördüğü ilk ekran. En önemli cümleniz burada olmalı.</p>
+        <div class="f"><label>Büyük başlık</label><input type="text" data-path="banner.headline"></div>
+        <div class="f"><label>Alt yazı</label><textarea data-path="banner.subline" style="min-height:80px"></textarea></div>
+        <div class="f"><label>Arka plan görseli</label><div id="bannerImgField"></div>
+          <div class="sub">Yatay, geniş bir fotoğraf seçin. Boş bırakırsanız renkli bir arka plan çizilir.</div></div>
+        <div class="f"><label>Görsel karartma: <span id="ovVal">55</span>%</label>
+          <input type="range" min="0" max="90" data-path="banner.overlay" style="width:100%">
+          <div class="sub">Yazının okunması için görseli koyulaştırır.</div></div>
+        <div class="row">
+          <div class="f"><label>1. buton yazısı</label><input type="text" data-path="banner.cta_text"></div>
+          <div class="f"><label>1. buton bağlantısı</label><input type="text" data-path="banner.cta_link">
+            <div class="sub">Boş bırakırsanız telefonunuza bağlanır.</div></div>
+        </div>
+        <div class="row">
+          <div class="f"><label>2. buton yazısı</label><input type="text" data-path="banner.cta2_text"></div>
+          <div class="f"><label>2. buton bağlantısı</label><input type="text" data-path="banner.cta2_link">
+            <div class="sub">Boş bırakırsanız WhatsApp'a bağlanır.</div></div>
+        </div>
+      </section>
+
+      <!-- HİZMETLER -->
+      <section class="pane" data-pane="hizmetler">
+        <h2>Hizmetler</h2>
+        <p class="hint">Ne yaptığınızı maddeler halinde anlatın. 3 ila 6 madde ideal.</p>
+        <div id="svcList"></div>
+        <button class="btn ghost" id="svcAdd">+ Hizmet ekle</button>
+      </section>
+
+      <!-- ÜRÜNLER -->
+      <section class="pane" data-pane="urunler">
+        <h2>Ürünler</h2>
+        <p class="hint">Fiyatlı ürün vitrini. Fiyat yazmazsanız "Fiyat sorunuz" görünür.</p>
+        <div id="prdList"></div>
+        <button class="btn ghost" id="prdAdd">+ Ürün ekle</button>
+      </section>
+
+      <!-- GALERİ -->
+      <section class="pane" data-pane="galeri">
+        <h2>Galeri</h2>
+        <p class="hint">Yaptığınız işlerin fotoğrafları. Birden fazla dosyayı aynı anda seçebilirsiniz.</p>
+        <div class="gal-grid" id="galGrid"></div>
+        <p class="hint" id="storeInfo" style="margin-top:14px"></p>
+      </section>
+
+      <!-- HAKKIMIZDA -->
+      <section class="pane" data-pane="hakkinda">
+        <h2>Hakkımızda</h2>
+        <p class="hint">Kaç yıldır bu işi yaptığınız ve farkınız müşteriye güven verir.</p>
+        <div class="f"><label>Başlık</label><input type="text" data-path="about.title"></div>
+        <div class="f"><label>Metin</label><textarea data-path="about.text" style="min-height:150px"></textarea></div>
+        <div class="f"><label>Görsel</label><div id="aboutImgField"></div></div>
+        <div class="f"><label>Rakamlar</label><div id="statList"></div>
+          <button class="btn ghost sm" id="statAdd">+ Rakam ekle</button>
+          <div class="sub">Örnek: “10+ Yıllık Tecrübe”, “500+ Mutlu Müşteri”.</div></div>
+      </section>
+
+      <!-- TASARIM -->
+      <section class="pane" data-pane="tasarim">
+        <h2>Tasarım</h2>
+        <p class="hint">Şablonu değiştirseniz de tüm içeriğiniz olduğu gibi kalır — sadece görünüm değişir.</p>
+        <div class="f"><label>Şablon</label><div class="tpl-grid" id="tplGrid"></div></div>
+        <div class="f"><label>Renk paleti</label><div class="pal-grid" id="palGrid"></div></div>
+        <div class="row">
+          <div class="f"><label>Yazı tipi</label><select data-path="theme.font" id="fontSel"></select></div>
+          <div class="f"><label>Köşe yuvarlaklığı: <span id="radVal">16</span>px</label>
+            <input type="range" min="0" max="34" data-path="theme.radius" style="width:100%"></div>
+        </div>
+      </section>
+
+      <!-- İLETİŞİM -->
+      <section class="pane" data-pane="iletisim">
+        <h2>İletişim</h2>
+        <p class="hint">Telefon numaranız otomatik olarak aranabilir butona dönüşür.</p>
+        <div class="row">
+          <div class="f"><label>Telefon</label><input type="tel" data-path="contact.phone" placeholder="0532 111 22 33"></div>
+          <div class="f"><label>WhatsApp</label><input type="tel" data-path="contact.whatsapp" placeholder="0532 111 22 33">
+            <div class="sub">Boş bırakırsanız telefon numaranız kullanılır.</div></div>
+        </div>
+        <div class="f"><label>E-posta</label><input type="email" data-path="contact.email"></div>
+        <div class="f"><label>Adres</label><textarea data-path="contact.address" style="min-height:70px"></textarea></div>
+        <div class="f"><label>Harita konumu</label><input type="text" data-path="contact.map_query"
+            placeholder="Kartal Sanayi Sitesi, İstanbul">
+          <div class="sub">Adresi ya da “41.0082, 28.9784” gibi koordinatı yazın; harita otomatik gelir.</div></div>
+        <div class="f"><label>İletişim formu adresi (Formspree)</label>
+          <input type="url" data-path="contact.form_endpoint" placeholder="https://formspree.io/f/xxxxxx">
+          <div class="sub">formspree.io'da ücretsiz hesap açıp e-postanızı doğrulayın, verdiği adresi buraya yapıştırın. Boş bırakırsanız form gösterilmez.</div></div>
+        <div class="f"><label>Çalışma saatleri</label><div id="hourList"></div>
+          <button class="btn ghost sm" id="hourAdd">+ Satır ekle</button></div>
+      </section>
+
+      <!-- SOSYAL -->
+      <section class="pane" data-pane="sosyal">
+        <h2>Sosyal medya</h2>
+        <p class="hint">Kullanıcı adınızı yazmanız yeterli (@ ile ya da @ olmadan). Boş olanlar gösterilmez.</p>
+        <div id="socialFields"></div>
+      </section>
+
+      <!-- BÖLÜMLER -->
+      <section class="pane" data-pane="bolumler">
+        <h2>Bölümler</h2>
+        <p class="hint">Sitedeki sırayı değiştirin ya da istemediğiniz bölümü kapatın.</p>
+        <div id="secList"></div>
+      </section>
+
+      <!-- HESAP -->
+      <section class="pane" data-pane="hesap">
+        <h2>Hesap</h2>
+        <p class="hint">Panel giriş şifrenizi buradan değiştirebilirsiniz.</p>
+        <div id="pwMsg"></div>
+        <div class="f"><label>Mevcut şifre</label><input type="password" id="pwCur" autocomplete="current-password"></div>
+        <div class="f"><label>Yeni şifre</label><input type="password" id="pwNew" autocomplete="new-password">
+          <div class="sub">En az 8 karakter.</div></div>
+        <div class="f"><label>Yeni şifre (tekrar)</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+        <button class="btn" id="pwBtn">Şifreyi değiştir</button>
+        <h2 style="margin-top:34px">Site durumu</h2>
+        <p class="hint">Sitenizin GitHub ve alan adı durumu.</p>
+        <div id="healthBox" class="chip">kontrol ediliyor…</div>
+      </section>
+    </main>
+
+    <aside class="preview" id="preview">
+      <div class="bar">
+        <span id="prevState">Önizleme</span>
+        <div class="vp">
+          <button data-vp="desktop" class="on">Masaüstü</button>
+          <button data-vp="mobile">Telefon</button>
+        </div>
+      </div>
+      <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="Önizleme"></iframe></div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API   = "__API_BASE__";
+const SLUG  = "__SITE_SLUG__";
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+
+let TOKEN   = localStorage.getItem("sitebot_token_"+SLUG) || "";
+let C       = null;     // içerik
+let META    = null;     // site + şablon listeleri
+let DIRTY   = false;
+let SAVED   = true;
+
+/* ------------------------------------------------------------ yardımcılar */
+function toast(msg, kind=""){
+  const t=$("#toast"); t.textContent=msg; t.className="toast on "+kind;
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.className="toast "+kind,4200);
+}
+function get(path){ return path.split(".").reduce((o,k)=>o&&o[k], C); }
+function set(path,val){
+  const ks=path.split("."); let o=C;
+  for(let i=0;i<ks.length-1;i++) o=o[ks[i]];
+  o[ks[ks.length-1]]=val;
+}
+async function api(path, opts={}){
+  const r = await fetch(API+path, {
+    ...opts,
+    headers:{...(opts.headers||{}),
+      ...(opts.body && !(opts.body instanceof FormData) ? {"Content-Type":"application/json"} : {}),
+      ...(TOKEN?{Authorization:"Bearer "+TOKEN}:{})}
+  });
+  if(r.status===401){ logout(); throw new Error("Oturum süresi doldu."); }
+  const ct=r.headers.get("content-type")||"";
+  const data = ct.includes("json") ? await r.json().catch(()=>({})) : await r.text();
+  if(!r.ok) throw new Error((data && data.detail) || (typeof data==="string"?data:"") || "İşlem başarısız.");
+  return data;
+}
+function markDirty(){ DIRTY=true; SAVED=false; $("#dirtyBadge").classList.remove("hidden"); schedulePreview(); }
+
+/* ------------------------------------------------------------ giriş */
+$("#loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const btn=$("#loginBtn"); btn.disabled=true; btn.textContent="Giriş yapılıyor…";
+  $("#loginErr").classList.add("hidden");
+  try{
+    const r = await api("/api/admin/login",{method:"POST",body:JSON.stringify(
+      {slug:SLUG, email:$("#le").value.trim(), password:$("#lp").value})});
+    TOKEN=r.token; localStorage.setItem("sitebot_token_"+SLUG,TOKEN);
+    await boot();
+  }catch(err){
+    $("#loginErr").textContent=err.message; $("#loginErr").classList.remove("hidden");
+  }finally{ btn.disabled=false; btn.textContent="Giriş yap"; }
+});
+function logout(){
+  TOKEN=""; localStorage.removeItem("sitebot_token_"+SLUG);
+  $("#app").classList.remove("on"); $("#login").style.display="grid";
+}
+$("#outBtn").onclick=()=>{ api("/api/admin/logout",{method:"POST"}).catch(()=>{}); logout(); };
+
+/* ------------------------------------------------------------ açılış */
+async function boot(){
+  const me = await api("/api/admin/me");
+  META=me; C=me.content;
+  $("#login").style.display="none"; $("#app").classList.add("on");
+  $("#siteName").textContent = C.site.title || me.site.title;
+  const dom=$("#siteDom"); dom.textContent=me.site.domain; dom.href="https://"+me.site.domain;
+  $("#dirtyBadge").classList.toggle("hidden", !me.unpublished);
+  $("#statusDot").className = "dot" + (me.site.status==="yayinda" ? "" : " warn");
+  $("#statusDot").title = me.site.status==="yayinda" ? "Site yayında" : "Durum: "+me.site.status;
+  buildStatic(); render(); refreshPreview(); loadHealth();
+}
+if(TOKEN){ boot().catch(()=>logout()); } else { $("#loginDom").textContent = SLUG+" yönetim paneli"; }
+
+/* ------------------------------------------------------------ sekmeler */
+$$(".side a").forEach(a=>a.onclick=()=>{
+  $$(".side a").forEach(x=>x.classList.remove("on")); a.classList.add("on");
+  $$(".pane").forEach(p=>p.classList.toggle("on", p.dataset.pane===a.dataset.tab));
+  $("#side").classList.remove("open"); $("#edit").scrollTop=0;
+});
+$("#burger").onclick=()=>$("#side").classList.toggle("open");
+$("#prevToggle").onclick=()=>$("#bodyGrid").classList.toggle("showprev");
+function fitLayout(){
+  const narrow = innerWidth<=1180;
+  $("#prevToggle").style.display = narrow ? "" : "none";
+  $("#burger").style.display = innerWidth<=720 ? "grid" : "none";
+  if(!narrow) $("#bodyGrid").classList.remove("showprev");
+}
+addEventListener("resize",fitLayout); fitLayout();
+$$(".vp button").forEach(b=>b.onclick=()=>{
+  $$(".vp button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  $("#frameWrap").classList.toggle("mobile", b.dataset.vp==="mobile");
+});
+
+/* ------------------------------------------------------------ statik alanlar */
+function buildStatic(){
+  const tg=$("#tplGrid"); tg.innerHTML="";
+  Object.entries(META.templates).forEach(([k,t])=>{
+    const b=document.createElement("button");
+    b.className="tpl"+(C.theme.template===k?" on":""); b.type="button";
+    b.innerHTML=`<b>${t.name}</b><span>${t.desc}</span>`;
+    b.onclick=()=>{ C.theme.template=k; $$(".tpl",tg).forEach(x=>x.classList.remove("on"));
+      b.classList.add("on"); markDirty(); };
+    tg.appendChild(b);
+  });
+
+  const pg=$("#palGrid"); pg.innerHTML="";
+  Object.entries(META.presets).forEach(([k,p])=>{
+    const b=document.createElement("button");
+    b.className="pal"+(C.theme.preset===k?" on":""); b.type="button";
+    b.innerHTML=`<div class="sw" style="background:linear-gradient(120deg,${p.primary},${p.accent});
+      box-shadow:inset 0 0 0 4px ${p.bg}"></div><small>${k.replace("_"," ")}</small>`;
+    b.onclick=()=>{ C.theme.preset=k; $$(".pal",pg).forEach(x=>x.classList.remove("on"));
+      b.classList.add("on"); markDirty(); };
+    pg.appendChild(b);
+  });
+
+  const fs=$("#fontSel"); fs.innerHTML="";
+  META.fonts.forEach(f=>{ const o=document.createElement("option");
+    o.value=f; o.textContent=f.charAt(0).toUpperCase()+f.slice(1); fs.appendChild(o); });
+
+  const labels={instagram:"Instagram",facebook:"Facebook",x:"X (Twitter)",
+    youtube:"YouTube",tiktok:"TikTok",linkedin:"LinkedIn"};
+  $("#socialFields").innerHTML = Object.keys(labels).map(k=>
+    `<div class="f"><label>${labels[k]}</label>
+     <input type="text" data-path="social.${k}" placeholder="@kullaniciadi"></div>`).join("");
+
+  const st=$("#storeInfo");
+  const mb=x=>(x/1048576).toFixed(1);
+  st.textContent=`Görsel alanı: ${mb(META.storage.used)} MB / ${mb(META.storage.limit)} MB kullanıldı.`;
+}
+
+/* ------------------------------------------------------------ form bağlama */
+function render(){
+  $$("[data-path]").forEach(el=>{
+    const v=get(el.dataset.path);
+    if(el.type==="range"){ el.value=v??0; }
+    else el.value = v==null ? "" : v;
+    if(!el._bound){
+      el._bound=true;
+      el.addEventListener("input",()=>{
+        set(el.dataset.path, el.type==="range" ? parseInt(el.value,10) : el.value);
+        if(el.dataset.path==="banner.overlay") $("#ovVal").textContent=el.value;
+        if(el.dataset.path==="theme.radius")  $("#radVal").textContent=el.value;
+        if(el.dataset.path==="site.title")    $("#siteName").textContent=el.value;
+        markDirty();
+      });
+    }
+  });
+  $("#ovVal").textContent=C.banner.overlay;
+  $("#radVal").textContent=C.theme.radius;
+  imgField($("#logoField"),"site.logo","logo");
+  imgField($("#bannerImgField"),"banner.image");
+  imgField($("#aboutImgField"),"about.image");
+  renderList("svcList", C.services, svcRow);
+  renderList("prdList", C.products, prdRow);
+  renderList("statList", C.about.stats, statRow, true);
+  renderList("hourList", C.contact.hours, hourRow, true);
+  renderGallery(); renderSections();
+}
+
+function renderList(id, arr, rowFn, compact){
+  const box=$("#"+id); box.innerHTML="";
+  if(!arr.length){
+    box.innerHTML=`<div class="empty">Henüz eklenmedi.</div>`; return;
+  }
+  arr.forEach((item,i)=>box.appendChild(rowFn(item,i,arr,compact)));
+}
+function itemShell(title,i,arr,rerender){
+  const d=document.createElement("div"); d.className="item";
+  const h=document.createElement("div"); h.className="head";
+  h.innerHTML=`<span class="t">${title}</span>`;
+  const mk=(txt,cls,fn)=>{const b=document.createElement("button");
+    b.className="mini "+cls; b.type="button"; b.textContent=txt; b.onclick=fn; return b;};
+  h.appendChild(mk("↑","",()=>{ if(i>0){[arr[i-1],arr[i]]=[arr[i],arr[i-1]]; rerender(); markDirty();} }));
+  h.appendChild(mk("↓","",()=>{ if(i<arr.length-1){[arr[i+1],arr[i]]=[arr[i],arr[i+1]]; rerender(); markDirty();} }));
+  h.appendChild(mk("✕","del",()=>{ arr.splice(i,1); rerender(); markDirty(); }));
+  d.appendChild(h); return d;
+}
+function fieldEl(label,obj,key,type="text",ph=""){
+  const f=document.createElement("div"); f.className="f";
+  f.innerHTML=`<label>${label}</label>`;
+  const el=document.createElement(type==="area"?"textarea":"input");
+  if(type!=="area") el.type=type;
+  el.value=obj[key]||""; el.placeholder=ph;
+  if(type==="area") el.style.minHeight="72px";
+  el.addEventListener("input",()=>{ obj[key]=el.value; markDirty(); });
+  f.appendChild(el); return f;
+}
+
+function svcRow(s,i,arr){
+  const d=itemShell(s.title||"Hizmet "+(i+1),i,arr,()=>renderList("svcList",C.services,svcRow));
+  const row=document.createElement("div"); row.className="row";
+  row.appendChild(fieldEl("Simge",s,"icon","text","⚡"));
+  row.appendChild(fieldEl("Başlık",s,"title"));
+  d.appendChild(row);
+  d.appendChild(fieldEl("Açıklama",s,"text","area"));
+  const wrap=document.createElement("div"); wrap.className="f";
+  wrap.innerHTML="<label>Görsel (isteğe bağlı)</label>";
+  const host=document.createElement("div"); wrap.appendChild(host); d.appendChild(wrap);
+  imgFieldObj(host,s,"image");
+  return d;
+}
+function prdRow(p,i,arr){
+  const rr=()=>renderList("prdList",C.products,prdRow);
+  const d=itemShell(p.name||"Ürün "+(i+1),i,arr,rr);
+  d.appendChild(fieldEl("Ürün adı",p,"name"));
+  d.appendChild(fieldEl("Açıklama",p,"desc","area"));
+  const r1=document.createElement("div"); r1.className="row";
+  r1.appendChild(fieldEl("Fiyat",p,"price","text","250"));
+  r1.appendChild(fieldEl("Para birimi",p,"currency","text","₺"));
+  d.appendChild(r1);
+  const r2=document.createElement("div"); r2.className="row";
+  r2.appendChild(fieldEl("Kategori",p,"category","text","Metal"));
+  r2.appendChild(fieldEl("Rozet",p,"badge","text","Yeni / İndirim"));
+  d.appendChild(r2);
+  const f=document.createElement("div"); f.className="f";
+  f.innerHTML="<label>Ürün görselleri</label>";
+  const g=document.createElement("div"); g.className="gal-grid";
+  (p.images||[]).forEach((src,gi)=>{
+    const c=document.createElement("div"); c.className="gal-cell";
+    c.style.backgroundImage=`url(${assetUrl(src)})`;
+    const x=document.createElement("button"); x.className="x"; x.type="button"; x.textContent="✕";
+    x.onclick=()=>{ p.images.splice(gi,1); rr(); markDirty(); };
+    c.appendChild(x); g.appendChild(c);
+  });
+  const add=document.createElement("button"); add.className="add-tile"; add.type="button"; add.textContent="+";
+  add.onclick=()=>pickFiles(async files=>{
+    for(const f2 of files){ const r=await upload(f2); if(r) (p.images=p.images||[]).push(r.path); }
+    rr(); markDirty();
+  },true);
+  g.appendChild(add); f.appendChild(g); d.appendChild(f);
+  return d;
+}
+function statRow(s,i,arr){
+  const d=itemShell(s.value||"Rakam",i,arr,()=>renderList("statList",C.about.stats,statRow,true));
+  const r=document.createElement("div"); r.className="row";
+  r.appendChild(fieldEl("Değer",s,"value","text","10+"));
+  r.appendChild(fieldEl("Etiket",s,"label","text","Yıllık Tecrübe"));
+  d.appendChild(r); return d;
+}
+function hourRow(h,i,arr){
+  const d=itemShell(h.day||"Gün",i,arr,()=>renderList("hourList",C.contact.hours,hourRow,true));
+  const r=document.createElement("div"); r.className="row";
+  r.appendChild(fieldEl("Gün",h,"day","text","Pazartesi - Cuma"));
+  r.appendChild(fieldEl("Saat",h,"time","text","09:00 - 18:00"));
+  d.appendChild(r); return d;
+}
+$("#svcAdd").onclick=()=>{ C.services.push({id:"",icon:"⚡",title:"Yeni hizmet",text:"",image:""});
+  renderList("svcList",C.services,svcRow); markDirty(); };
+$("#prdAdd").onclick=()=>{ C.products.push({id:"",name:"Yeni ürün",desc:"",price:"",currency:"₺",
+  category:"",badge:"",link:"",images:[]}); renderList("prdList",C.products,prdRow); markDirty(); };
+$("#statAdd").onclick=()=>{ C.about.stats.push({value:"",label:""});
+  renderList("statList",C.about.stats,statRow,true); markDirty(); };
+$("#hourAdd").onclick=()=>{ C.contact.hours.push({day:"",time:""});
+  renderList("hourList",C.contact.hours,hourRow,true); markDirty(); };
+
+/* ------------------------------------------------------------ görseller */
+function assetUrl(path){ return API+"/api/admin/asset/"+META.storage.site_id+"/"+path.split("/").pop(); }
+function pickFiles(cb, multiple){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*";
+  if(multiple) inp.multiple=true;
+  inp.onchange=()=>{ if(inp.files.length) cb([...inp.files]); };
+  inp.click();
+}
+async function upload(file, kind="photo"){
+  const fd=new FormData(); fd.append("file",file); fd.append("kind",kind);
+  try{
+    toast("Görsel yükleniyor…");
+    const r=await api("/api/admin/upload",{method:"POST",body:fd});
+    toast("Görsel eklendi.","ok"); return r;
+  }catch(e){ toast(e.message,"err"); return null; }
+}
+function imgField(host, path, kind){
+  imgFieldObj(host, {get v(){return get(path)}, set v(x){set(path,x)}}, "v", kind);
+}
+function imgFieldObj(host, obj, key, kind="photo"){
+  host.innerHTML="";
+  const wrap=document.createElement("div"); wrap.className="img-field";
+  const prev=document.createElement("div"); prev.className="img-prev";
+  const cur=obj[key];
+  if(cur){ prev.style.backgroundImage=`url(${assetUrl(cur)})`; } else prev.textContent="🖼";
+  const acts=document.createElement("div"); acts.className="img-actions";
+  const up=document.createElement("button"); up.className="btn ghost sm"; up.type="button";
+  up.textContent = cur ? "Değiştir" : "Görsel yükle";
+  up.onclick=()=>pickFiles(async files=>{
+    const r=await upload(files[0],kind);
+    if(r){ obj[key]=r.path; imgFieldObj(host,obj,key,kind); markDirty(); }
+  });
+  acts.appendChild(up);
+  if(cur){
+    const rm=document.createElement("button"); rm.className="btn danger sm"; rm.type="button";
+    rm.textContent="Kaldır";
+    rm.onclick=()=>{ obj[key]=""; imgFieldObj(host,obj,key,kind); markDirty(); };
+    acts.appendChild(rm);
+  }
+  wrap.appendChild(prev); wrap.appendChild(acts); host.appendChild(wrap);
+}
+function renderGallery(){
+  const g=$("#galGrid"); g.innerHTML="";
+  C.gallery.forEach((item,i)=>{
+    const c=document.createElement("div"); c.className="gal-cell";
+    c.style.backgroundImage=`url(${assetUrl(item.image)})`;
+    const x=document.createElement("button"); x.className="x"; x.type="button"; x.textContent="✕";
+    x.onclick=()=>{ C.gallery.splice(i,1); renderGallery(); markDirty(); };
+    const cap=document.createElement("input"); cap.className="cap"; cap.placeholder="Açıklama";
+    cap.value=item.caption||"";
+    cap.oninput=()=>{ item.caption=cap.value; markDirty(); };
+    c.appendChild(x); c.appendChild(cap); g.appendChild(c);
+  });
+  const add=document.createElement("button"); add.className="add-tile"; add.type="button"; add.textContent="+";
+  add.onclick=()=>pickFiles(async files=>{
+    for(const f of files){ const r=await upload(f); if(r) C.gallery.push({image:r.path,caption:""}); }
+    renderGallery(); markDirty();
+  },true);
+  g.appendChild(add);
+}
+
+/* ------------------------------------------------------------ bölümler */
+const SEC_NAMES={banner:"Banner",services:"Hizmetler",about:"Hakkımızda",
+  products:"Ürünler",gallery:"Galeri",contact:"İletişim"};
+function renderSections(){
+  const box=$("#secList"); box.innerHTML="";
+  C.sections.order.forEach((key,i)=>{
+    const row=document.createElement("div"); row.className="sec-row";
+    const up=document.createElement("button"); up.className="mini"; up.textContent="↑";
+    up.onclick=()=>{ if(i>0){const o=C.sections.order;[o[i-1],o[i]]=[o[i],o[i-1]];renderSections();markDirty();} };
+    const dn=document.createElement("button"); dn.className="mini"; dn.textContent="↓";
+    dn.onclick=()=>{ const o=C.sections.order; if(i<o.length-1){[o[i+1],o[i]]=[o[i],o[i+1]];renderSections();markDirty();} };
+    const n=document.createElement("span"); n.className="n"; n.textContent=SEC_NAMES[key]||key;
+    const t=document.createElement("button");
+    t.className="sw-toggle"+(C.sections.enabled[key]?" on":"");
+    t.onclick=()=>{ C.sections.enabled[key]=!C.sections.enabled[key];
+      t.classList.toggle("on",C.sections.enabled[key]); markDirty(); };
+    row.append(up,dn,n,t); box.appendChild(row);
+  });
+}
+
+/* ------------------------------------------------------------ önizleme */
+let prevTimer=null;
+function schedulePreview(){ clearTimeout(prevTimer); prevTimer=setTimeout(refreshPreview,650); }
+async function refreshPreview(){
+  if(!C) return;
+  $("#prevState").textContent="yenileniyor…";
+  try{
+    const html=await api("/api/admin/preview",{method:"POST",body:JSON.stringify(C)});
+    $("#frame").srcdoc=html;
+    $("#prevState").textContent = SAVED ? "Önizleme" : "Önizleme (kaydedilmedi)";
+  }catch(e){ $("#prevState").textContent="önizleme alınamadı"; }
+}
+
+/* ------------------------------------------------------------ kaydet / yayınla */
+$("#saveBtn").onclick=async()=>{
+  const b=$("#saveBtn"); b.disabled=true; b.textContent="Kaydediliyor…";
+  try{
+    const r=await api("/api/admin/content",{method:"PUT",body:JSON.stringify(C)});
+    C=r.content; SAVED=true; render(); toast("Kaydedildi. Yayınlamayı unutmayın.","ok");
+    $("#dirtyBadge").classList.remove("hidden");
+  }catch(e){ toast(e.message,"err"); }
+  finally{ b.disabled=false; b.textContent="Kaydet"; }
+};
+$("#pubBtn").onclick=async()=>{
+  const b=$("#pubBtn"); b.disabled=true; b.textContent="Yayınlanıyor…";
+  try{
+    if(!SAVED){ const r=await api("/api/admin/content",{method:"PUT",body:JSON.stringify(C)});
+      C=r.content; SAVED=true; render(); }
+    const r=await api("/api/admin/publish",{method:"POST"});
+    $("#dirtyBadge").classList.add("hidden");
+    toast(r.message||"Yayınlandı.","ok");
+    setTimeout(loadHealth,4000);
+  }catch(e){ toast(e.message,"err"); }
+  finally{ b.disabled=false; b.textContent="Yayınla"; }
+};
+addEventListener("beforeunload",e=>{ if(!SAVED){ e.preventDefault(); e.returnValue=""; } });
+addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==="s"){ e.preventDefault(); $("#saveBtn").click(); }
+});
+
+/* ------------------------------------------------------------ şifre + durum */
+$("#pwBtn").onclick=async()=>{
+  const box=$("#pwMsg");
+  const show=(t,c)=>box.innerHTML=`<div class="${c}">${t}</div>`;
+  if($("#pwNew").value!==$("#pwNew2").value) return show("Yeni şifreler aynı değil.","err-box");
+  if($("#pwNew").value.length<8) return show("Yeni şifre en az 8 karakter olmalı.","err-box");
+  try{
+    await api("/api/admin/password",{method:"POST",
+      body:JSON.stringify({current:$("#pwCur").value,new:$("#pwNew").value})});
+    show("Şifreniz değiştirildi. Tekrar giriş yapmanız gerekiyor.","ok-box");
+    setTimeout(logout,2200);
+  }catch(e){ show(e.message,"err-box"); }
+};
+async function loadHealth(){
+  try{
+    const h=await api("/api/admin/health");
+    const p=h.pages||{}; const bits=[];
+    bits.push(p.status==="built" ? "✅ Site yayında" : "⏳ Site derleniyor ("+(p.status||"?")+")");
+    if(p.certificate) bits.push(p.certificate==="approved" ? "🔒 Sertifika hazır" : "🔒 Sertifika: "+p.certificate);
+    if(h.dns) bits.push(h.dns.var ? "🌐 DNS kaydı var" : "⚠️ DNS kaydı yok");
+    $("#healthBox").textContent=bits.join("  ·  ");
+  }catch(e){ $("#healthBox").textContent="Durum alınamadı."; }
+}
+</script>
+</body>
+</html>

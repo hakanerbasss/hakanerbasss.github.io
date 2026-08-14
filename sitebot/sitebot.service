@@ -1,0 +1,14 @@
+[Unit]
+Description=SiteBot - web sitesi kurma ve yonetim paneli
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/hakanerbasss.github.io/sitebot
+ExecStart=/root/hakanerbasss.github.io/sitebot/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8003
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

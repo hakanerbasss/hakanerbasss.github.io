@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>SiteBot — Yönetim</title>
+<style>
+:root{--bg:#0c1018;--panel:#141a26;--panel2:#1b2231;--line:#2a3446;--fg:#e9edf6;--muted:#8e9ab1;
+  --accent:#5b8cff;--accent2:#ff6b35;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444}
+*,*::before,*::after{box-sizing:border-box}*{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 'Inter',-apple-system,Segoe UI,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;min-height:100svh}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent);text-decoration:none}
+
+.login{min-height:100svh;display:grid;place-items:center;padding:24px;
+  background:radial-gradient(70% 60% at 50% 0%,rgba(91,140,255,.16),transparent 65%)}
+.login form{width:min(400px,100%);background:var(--panel);border:1px solid var(--line);
+  border-radius:18px;padding:32px}
+.app{display:none}.app.on{display:block}
+
+.top{display:flex;align-items:center;gap:14px;padding:13px clamp(14px,3vw,26px);
+  border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:20}
+.logo{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-weight:900;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06101f}
+.spacer{flex:1}
+.tabs{display:flex;gap:4px}
+.tabs button{padding:8px 15px;border-radius:9px;border:0;background:transparent;color:var(--muted);
+  font-weight:600;font-size:.9rem;cursor:pointer}
+.tabs button.on{background:var(--panel2);color:var(--fg)}
+
+.wrap{padding:clamp(16px,3vw,30px);max-width:1240px;margin-inline:auto}
+.pane{display:none}.pane.on{display:block}
+h2{font-size:1.2rem;letter-spacing:-.02em;margin-bottom:5px}
+.hint{color:var(--muted);font-size:.88rem;margin-bottom:20px}
+
+.f{margin-bottom:15px}
+.f label{display:block;font-size:.78rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:6px}
+.f input,.f select{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg)}
+.f input:focus,.f select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,140,255,.18)}
+.f .sub{font-size:.79rem;color:var(--muted);margin-top:5px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+@media(max-width:640px){.row{grid-template-columns:1fr}}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 18px;border:0;
+  border-radius:10px;background:var(--accent);color:#06101f;font-weight:700;font-size:.88rem;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.sm{padding:7px 12px;font-size:.8rem}
+.btn.danger{background:transparent;border:1px solid var(--line);color:var(--err)}
+.btn.danger:hover{border-color:var(--err)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+.site{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:11px}
+.site h3{font-size:1.02rem;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.site .meta{color:var(--muted);font-size:.84rem;margin-top:5px;display:flex;gap:14px;flex-wrap:wrap}
+.site .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:700px){.site{grid-template-columns:1fr}.site .acts{justify-content:flex-start}}
+.pill{font-size:.71rem;font-weight:800;padding:3px 9px;border-radius:99px;border:1px solid}
+.pill.ok{color:var(--ok);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)}
+.pill.warn{color:var(--warn);border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.1)}
+.pill.err{color:var(--err);border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1)}
+.pill.muted{color:var(--muted);border-color:var(--line)}
+
+.msg{border-radius:10px;padding:11px 14px;font-size:.87rem;margin-bottom:16px;display:none}
+.msg.on{display:block}
+.msg.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#fca5a5}
+.msg.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,90px);z-index:200;background:var(--panel2);
+  border:1px solid var(--line);border-radius:12px;padding:13px 19px;font-size:.9rem;font-weight:600;
+  transition:transform .3s;max-width:min(520px,92vw)}
+.toast.on{transform:translate(-50%,0)}
+.creds{background:#0a1622;border:1px solid rgba(34,197,94,.35);border-radius:12px;padding:16px;margin-bottom:16px}
+.creds code{display:block;background:#060c14;border-radius:8px;padding:9px 12px;margin-top:7px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86rem;word-break:break-all}
+.log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.79rem;color:var(--muted);
+  background:#080c13;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:260px;overflow:auto}
+.log div{padding:2px 0}.log .bad{color:#fca5a5}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;place-items:center;padding:20px;z-index:100}
+.modal.on{display:grid}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;
+  width:min(560px,100%);max-height:86svh;overflow:auto}
+.hidden{display:none!important}
+.stat{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:20px}
+.stat div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 20px;min-width:120px}
+.stat b{display:block;font-size:1.7rem;font-weight:900;letter-spacing:-.03em}
+.stat span{font-size:.77rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <form id="loginForm">
+    <h2 style="margin-bottom:6px">SiteBot Yönetim</h2>
+    <p class="hint">Süper yönetici girişi.</p>
+    <div class="msg err" id="loginErr"></div>
+    <div class="f"><label>Kullanıcı adı</label><input id="lu" autocomplete="username" required></div>
+    <div class="f"><label>Şifre</label><input id="lp" type="password" autocomplete="current-password" required></div>
+    <button class="btn" style="width:100%">Giriş</button>
+  </form>
+</div>
+
+<div class="app" id="app">
+  <header class="top">
+    <span class="logo">S</span>
+    <b>SiteBot</b>
+    <span class="spacer"></span>
+    <div class="tabs">
+      <button data-tab="siteler" class="on">Siteler</button>
+      <button data-tab="yeni">Yeni site</button>
+      <button data-tab="ayarlar">Ayarlar</button>
+    </div>
+    <button class="btn ghost sm" id="outBtn">Çıkış</button>
+  </header>
+
+  <div class="wrap">
+    <!-- SİTELER -->
+    <section class="pane on" data-pane="siteler">
+      <div class="stat" id="stats"></div>
+      <div class="msg" id="listMsg"></div>
+      <div id="siteList"></div>
+    </section>
+
+    <!-- YENİ SİTE -->
+    <section class="pane" data-pane="yeni">
+      <h2>Yeni site aç</h2>
+      <p class="hint">Bilgileri girin; repo, alan adı, sertifika ve panel otomatik kurulur (~60 sn).</p>
+      <div class="msg" id="newMsg"></div>
+      <div id="credsBox"></div>
+      <div class="card">
+        <div class="row">
+          <div class="f"><label>Firma / site adı</label>
+            <input id="nTitle" placeholder="Hurdacı Ali Geri Dönüşüm"></div>
+          <div class="f"><label>Adres (alt alan adı)</label>
+            <input id="nSlug" placeholder="otomatik">
+            <div class="sub" id="slugInfo">Boş bırakırsanız firma adından türetilir.</div></div>
+        </div>
+        <div class="f"><label>Şablon</label><select id="nTpl"></select></div>
+        <div class="row">
+          <div class="f"><label>Müşteri e-postası (panel girişi)</label>
+            <input id="nEmail" type="email" placeholder="musteri@ornek.com"></div>
+          <div class="f"><label>Telefon</label><input id="nPhone" placeholder="0532 111 22 33"></div>
+        </div>
+        <div class="f"><label>Şifre</label><input id="nPass" placeholder="boş bırakırsanız otomatik üretilir"></div>
+        <button class="btn" id="createBtn">Siteyi kur</button>
+      </div>
+    </section>
+
+    <!-- AYARLAR -->
+    <section class="pane" data-pane="ayarlar">
+      <h2>Sistem ayarları</h2>
+      <p class="hint">Anahtarlar sunucudaki settings.json dosyasında tutulur, git'e girmez.</p>
+      <div class="msg" id="setMsg"></div>
+      <div class="card">
+        <h3 style="margin-bottom:14px;font-size:1rem">GitHub</h3>
+        <div class="f"><label>Organizasyon</label><input id="sOrg"></div>
+        <div class="f"><label>Fine-grained token</label><input id="sGhToken" type="password"
+            placeholder="github_pat_...">
+          <div class="sub">İzinler: Administration, Contents, Pages → Read and write.</div></div>
+        <h3 style="margin:22px 0 14px;font-size:1rem">Cloudflare</h3>
+        <div class="f"><label>API token</label><input id="sCfToken" type="password"></div>
+        <div class="f"><label>Zone ID</label><input id="sZone"></div>
+        <div class="row">
+          <div class="f"><label>Kök alan adı</label><input id="sDomain"></div>
+          <div class="f"><label>Proxy (turuncu bulut)</label>
+            <select id="sProxied">
+              <option value="true">Açık — HTTPS anında hazır</option>
+              <option value="false">Kapalı — GitHub sertifikası (5-15 dk)</option>
+            </select></div>
+        </div>
+        <h3 style="margin:22px 0 14px;font-size:1rem">Bildirim (isteğe bağlı)</h3>
+        <div class="row">
+          <div class="f"><label>Telegram bot token</label><input id="sTgToken" type="password"></div>
+          <div class="f"><label>Telegram chat ID</label><input id="sTgChat"></div>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn" id="saveSet">Kaydet</button>
+          <button class="btn ghost" id="checkSet">Anahtarları test et</button>
+        </div>
+        <div id="checkOut" style="margin-top:14px"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+let TOKEN=localStorage.getItem("sitebot_super")||"";
+let SITES=[], META={};
+
+function toast(t){const e=$("#toast");e.textContent=t;e.className="toast on";
+  clearTimeout(toast._t);toast._t=setTimeout(()=>e.className="toast",4000);}
+function msg(id,text,kind){const e=$(id);e.className="msg on "+(kind||"");e.innerHTML=text;}
+function hideMsg(id){$(id).className="msg";}
+async function api(path,opts={}){
+  const r=await fetch(path,{...opts,headers:{...(opts.headers||{}),
+    ...(opts.body?{"Content-Type":"application/json"}:{}),
+    ...(TOKEN?{Authorization:"Bearer "+TOKEN}:{})}});
+  if(r.status===401||r.status===403){ logout(); throw new Error("Oturum gerekli."); }
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.detail||"İşlem başarısız.");
+  return d;
+}
+function logout(){TOKEN="";localStorage.removeItem("sitebot_super");
+  $("#app").classList.remove("on");$("#login").style.display="grid";}
+$("#outBtn").onclick=logout;
+
+$("#loginForm").addEventListener("submit",async e=>{
+  e.preventDefault(); hideMsg("#loginErr");
+  try{
+    const r=await api("/api/super/login",{method:"POST",
+      body:JSON.stringify({username:$("#lu").value.trim(),password:$("#lp").value})});
+    TOKEN=r.token; localStorage.setItem("sitebot_super",TOKEN); await boot();
+  }catch(err){ msg("#loginErr",err.message,"err"); }
+});
+
+$$(".tabs button").forEach(b=>b.onclick=()=>{
+  $$(".tabs button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  $$(".pane").forEach(p=>p.classList.toggle("on",p.dataset.pane===b.dataset.tab));
+  if(b.dataset.tab==="ayarlar") loadSettings();
+});
+
+async function boot(){
+  $("#login").style.display="none"; $("#app").classList.add("on");
+  META=await api("/api/super/status");
+  await loadSites();
+  const sel=$("#nTpl");
+  sel.innerHTML=`<option value="hizmet">Hizmet Firması — nakliye, hurdacı, tamirci</option>
+                 <option value="katalog">Ürün Kataloğu — fiyatlı vitrin</option>
+                 <option value="kurumsal">Kurumsal / Portfolyo — ajans, danışmanlık</option>`;
+  if(!META.anahtarlar_tamam)
+    msg("#listMsg","GitHub ve Cloudflare anahtarları eksik. <b>Ayarlar</b> sekmesinden girin — o zamana kadar site açılamaz.","err");
+}
+if(TOKEN) boot().catch(()=>logout());
+
+/* ---------------- siteler ---------------- */
+function fmtDate(ts){ return ts ? new Date(ts*1000).toLocaleString("tr-TR",{dateStyle:"short",timeStyle:"short"}) : "—"; }
+const STATUS={yayinda:["ok","yayında"],kuruluyor:["warn","kuruluyor"],hata:["err","hata"]};
+
+async function loadSites(){
+  SITES=await api("/api/super/sites");
+  const box=$("#siteList");
+  $("#stats").innerHTML=`
+    <div><b>${SITES.length}</b><span>Toplam site</span></div>
+    <div><b>${SITES.filter(s=>s.status==="yayinda").length}</b><span>Yayında</span></div>
+    <div><b>${SITES.filter(s=>s.locked).length}</b><span>Kilitli</span></div>`;
+  if(!SITES.length){ box.innerHTML=`<div class="card" style="text-align:center;color:var(--muted)">
+    Henüz site yok. <b>Yeni site</b> sekmesinden ilkini açın.</div>`; return; }
+  box.innerHTML="";
+  SITES.forEach(s=>{
+    const st=STATUS[s.status]||["muted",s.status];
+    const el=document.createElement("div"); el.className="site";
+    el.innerHTML=`
+      <div>
+        <h3>${s.title}
+          <span class="pill ${st[0]}">${st[1]}</span>
+          ${s.locked?'<span class="pill err">kilitli</span>':""}
+        </h3>
+        <div class="meta">
+          <a href="https://${s.domain}" target="_blank" rel="noopener">${s.domain}</a>
+          <span>${s.owner_email||"—"}</span>
+          <span>şablon: ${s.template}</span>
+          <span>son yayın: ${fmtDate(s.published_at)}</span>
+        </div>
+      </div>
+      <div class="acts">
+        <a class="btn ghost sm" href="https://${s.domain}/admin/" target="_blank" rel="noopener">Panel</a>
+        <button class="btn ghost sm" data-a="detay">Detay</button>
+        <button class="btn ghost sm" data-a="sifre">Şifre sıfırla</button>
+        <button class="btn ghost sm" data-a="kilit">${s.locked?"Aç":"Kilitle"}</button>
+        ${s.status==="hata"?'<button class="btn sm" data-a="tekrar">Tekrar dene</button>':""}
+        <button class="btn danger sm" data-a="sil">Sil</button>
+      </div>`;
+    el.querySelector('[data-a="detay"]').onclick=()=>showDetail(s.id);
+    el.querySelector('[data-a="sifre"]').onclick=()=>resetPw(s);
+    el.querySelector('[data-a="kilit"]').onclick=()=>toggleLock(s);
+    el.querySelector('[data-a="sil"]').onclick=()=>removeSite(s);
+    const rt=el.querySelector('[data-a="tekrar"]'); if(rt) rt.onclick=()=>retry(s);
+    box.appendChild(el);
+  });
+}
+
+async function showDetail(id){
+  try{
+    const d=await api("/api/super/sites/"+id);
+    const log=(d.provision_log||[]).map(l=>
+      `<div class="${l.ok?"":"bad"}">${new Date(l.t*1000).toLocaleTimeString("tr-TR")} · ${l.step}${l.detail?" — "+l.detail:""}</div>`).join("")
+      || "<div>kayıt yok</div>";
+    $("#modalBox").innerHTML=`
+      <h2>${d.title}</h2>
+      <p class="hint">${d.domain} · repo: ${d.repo} · durum: ${d.status}</p>
+      <div class="f"><label>Abonelik bitiş tarihi</label>
+        <input type="date" id="expDate" value="${d.expires_at?new Date(d.expires_at*1000).toISOString().slice(0,10):""}">
+        <div class="sub">Boş = süresiz. Tarih geçtiğinde paneli elle kilitleyebilirsiniz.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+        <button class="btn sm" id="mSaveExp">Tarihi kaydet</button>
+        <button class="btn ghost sm" id="mPublish">Yeniden yayınla</button>
+        <button class="btn ghost sm" id="mHealth">Durumu kontrol et</button>
+      </div>
+      <div id="mHealthOut" class="hint"></div>
+      <label style="font-size:.78rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+        color:var(--muted);display:block;margin-bottom:7px">Kurulum günlüğü</label>
+      <div class="log">${log}</div>
+      <button class="btn ghost" style="margin-top:18px;width:100%" onclick="closeModal()">Kapat</button>`;
+    $("#modal").classList.add("on");
+    $("#mSaveExp").onclick=async()=>{
+      const v=$("#expDate").value;
+      await api(`/api/super/sites/${id}/expiry`,{method:"POST",
+        body:JSON.stringify({expires_at:v?Math.floor(new Date(v).getTime()/1000):0})});
+      toast("Tarih kaydedildi."); loadSites();
+    };
+    $("#mPublish").onclick=async e=>{
+      e.target.disabled=true; e.target.textContent="Yayınlanıyor…";
+      try{ const r=await api(`/api/super/sites/${id}/publish`,{method:"POST"});
+        toast(`Yayınlandı (${r.files} dosya).`); loadSites(); }
+      catch(err){ toast(err.message); }
+      finally{ e.target.disabled=false; e.target.textContent="Yeniden yayınla"; }
+    };
+    $("#mHealth").onclick=async()=>{
+      $("#mHealthOut").textContent="kontrol ediliyor…";
+      try{ const h=await api(`/api/super/sites/${id}/health`);
+        $("#mHealthOut").textContent=
+          `Pages: ${h.pages?.status||"?"} · sertifika: ${h.pages?.certificate||"—"} · `+
+          `HTTPS zorunlu: ${h.pages?.https_enforced?"evet":"hayır"} · DNS: ${h.dns?.var?"var":"yok"}`;
+      }catch(e){ $("#mHealthOut").textContent=e.message; }
+    };
+  }catch(e){ toast(e.message); }
+}
+function closeModal(){ $("#modal").classList.remove("on"); }
+$("#modal").onclick=e=>{ if(e.target.id==="modal") closeModal(); };
+
+async function resetPw(s){
+  if(!confirm(`${s.title} için yeni şifre üretilsin mi? Müşterinin mevcut oturumu kapanır.`)) return;
+  try{
+    const r=await api(`/api/super/sites/${s.id}/reset-password`,{method:"POST"});
+    $("#modalBox").innerHTML=`<h2>Yeni giriş bilgileri</h2>
+      <p class="hint">Bu şifre bir daha gösterilmez, müşteriye şimdi iletin.</p>
+      <div class="creds"><b>Panel:</b><code>https://${s.domain}/admin/</code>
+        <b style="display:block;margin-top:10px">E-posta:</b><code>${r.email}</code>
+        <b style="display:block;margin-top:10px">Şifre:</b><code>${r.password}</code></div>
+      <button class="btn" style="width:100%" onclick="closeModal()">Tamam</button>`;
+    $("#modal").classList.add("on");
+  }catch(e){ toast(e.message); }
+}
+async function toggleLock(s){
+  try{ await api(`/api/super/sites/${s.id}/lock`,{method:"POST",
+    body:JSON.stringify({locked:!s.locked})});
+    toast(s.locked?"Panel açıldı.":"Panel kilitlendi. Site yayında kalmaya devam ediyor."); loadSites();
+  }catch(e){ toast(e.message); }
+}
+async function retry(s){
+  try{ await api(`/api/super/sites/${s.id}/retry`,{method:"POST"});
+    toast("Kurulum tekrar başlatıldı."); setTimeout(loadSites,4000);
+  }catch(e){ toast(e.message); }
+}
+async function removeSite(s){
+  if(prompt(`DİKKAT: ${s.domain} sitesi, GitHub deposu ve DNS kaydı kalıcı olarak silinecek.\nOnaylamak için site adresini yazın:`)!==s.domain){
+    toast("İşlem iptal edildi."); return;
+  }
+  try{ const r=await api(`/api/super/sites/${s.id}`,{method:"DELETE"});
+    toast(`${r.silinen} silindi.`); loadSites();
+  }catch(e){ toast(e.message); }
+}
+
+/* ---------------- yeni site ---------------- */
+let slugTimer=null;
+$("#nSlug").addEventListener("input",()=>{clearTimeout(slugTimer);slugTimer=setTimeout(checkSlug,400)});
+$("#nTitle").addEventListener("input",()=>{clearTimeout(slugTimer);slugTimer=setTimeout(checkSlug,400)});
+async function checkSlug(){
+  const v=$("#nSlug").value.trim()||$("#nTitle").value.trim();
+  if(!v){ $("#slugInfo").textContent="Boş bırakırsanız firma adından türetilir."; return; }
+  try{
+    const r=await api("/api/super/slug-check",{method:"POST",body:JSON.stringify({value:v})});
+    $("#slugInfo").innerHTML = r.uygun
+      ? `✅ <b>${r.domain}</b> uygun`
+      : `⚠️ ${r.sebep}`;
+  }catch(e){}
+}
+$("#createBtn").onclick=async()=>{
+  const b=$("#createBtn"); hideMsg("#newMsg"); $("#credsBox").innerHTML="";
+  const title=$("#nTitle").value.trim(), email=$("#nEmail").value.trim();
+  if(!title || !email){ msg("#newMsg","Firma adı ve müşteri e-postası zorunlu.","err"); return; }
+  b.disabled=true; b.textContent="Kuruluyor…";
+  try{
+    const r=await api("/api/super/sites",{method:"POST",body:JSON.stringify({
+      title, slug:$("#nSlug").value.trim(), template:$("#nTpl").value,
+      email, phone:$("#nPhone").value.trim(), password:$("#nPass").value.trim()})});
+    $("#credsBox").innerHTML=`<div class="creds">
+      <b>Site kuruluyor — 60 saniye içinde yayında olacak.</b>
+      <b style="display:block;margin-top:12px">Site adresi:</b><code>https://${r.domain}/</code>
+      <b style="display:block;margin-top:10px">Yönetim paneli:</b><code>${r.admin_url}</code>
+      <b style="display:block;margin-top:10px">E-posta:</b><code>${r.email}</code>
+      <b style="display:block;margin-top:10px">Şifre:</b><code>${r.password}</code>
+      <p style="margin-top:12px;font-size:.83rem;color:var(--muted)">
+        Bu şifre bir daha gösterilmez — müşteriye şimdi iletin.</p></div>`;
+    ["nTitle","nSlug","nEmail","nPhone","nPass"].forEach(i=>$("#"+i).value="");
+    $("#slugInfo").textContent="Boş bırakırsanız firma adından türetilir.";
+    setTimeout(loadSites,3000); setTimeout(loadSites,25000); setTimeout(loadSites,60000);
+  }catch(e){ msg("#newMsg",e.message,"err"); }
+  finally{ b.disabled=false; b.textContent="Siteyi kur"; }
+};
+
+/* ---------------- ayarlar ---------------- */
+async function loadSettings(){
+  try{
+    const s=await api("/api/super/settings");
+    $("#sOrg").value=s.github_org||""; $("#sZone").value=s.cloudflare_zone_id||"";
+    $("#sDomain").value=s.root_domain||""; $("#sProxied").value=String(!!s.cloudflare_proxied);
+    $("#sTgChat").value=s.telegram_chat_id||"";
+    $("#sGhToken").placeholder = s.github_token_var ? s.github_token : "github_pat_...";
+    $("#sCfToken").placeholder = s.cloudflare_token_var ? s.cloudflare_token : "Cloudflare API token";
+    $("#sTgToken").placeholder = s.telegram_token_var ? s.telegram_token : "isteğe bağlı";
+    ["sGhToken","sCfToken","sTgToken"].forEach(i=>$("#"+i).value="");
+  }catch(e){ msg("#setMsg",e.message,"err"); }
+}
+$("#saveSet").onclick=async()=>{
+  const body={github_org:$("#sOrg").value.trim(), cloudflare_zone_id:$("#sZone").value.trim(),
+    root_domain:$("#sDomain").value.trim(), cloudflare_proxied:$("#sProxied").value==="true",
+    telegram_chat_id:$("#sTgChat").value.trim()};
+  if($("#sGhToken").value.trim()) body.github_token=$("#sGhToken").value.trim();
+  if($("#sCfToken").value.trim()) body.cloudflare_token=$("#sCfToken").value.trim();
+  if($("#sTgToken").value.trim()) body.telegram_token=$("#sTgToken").value.trim();
+  try{ await api("/api/super/settings",{method:"POST",body:JSON.stringify(body)});
+    msg("#setMsg","Ayarlar kaydedildi.","ok"); loadSettings();
+    META=await api("/api/super/status");
+  }catch(e){ msg("#setMsg",e.message,"err"); }
+};
+$("#checkSet").onclick=async()=>{
+  $("#checkOut").innerHTML="<span class='hint'>test ediliyor…</span>";
+  try{
+    const r=await api("/api/super/check",{method:"POST"});
+    const line=(n,d)=>d.ok
+      ? `<div class="msg ok on">✅ ${n}: bağlantı başarılı${d.org?" — org: "+d.org:""}${d.zone?" — zone: "+d.zone:""}</div>`
+      : `<div class="msg err on">❌ ${n}: ${d.hata}</div>`;
+    $("#checkOut").innerHTML=line("GitHub",r.github)+line("Cloudflare",r.cloudflare);
+  }catch(e){ $("#checkOut").innerHTML=`<div class="msg err on">${e.message}</div>`; }
+};
+</script>
+</body>
+</html>
