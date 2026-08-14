@@ -166,7 +166,10 @@ değil, kalıcı/pratik bilgi (SGK kuralları, haklar, hesaplama mantığı vb.)
   - `POST /api/shorts/send-instagram` — **500 saniyeye kadar sürebilir,
     timeout sonrası ASLA retry etme** (geçmişte bu yüzden 1 video 3 kez
     atıldı — sunucu tarafında iş devam ediyor olabilir, önce log/analytics
-    kontrol et).
+    kontrol et). `tags` alanı artık hem string ("a, b, c") hem liste
+    (["a","b","c"]) kabul ediyor (2026-08-14'te düzeltildi — liste
+    gönderince önceden temiz bir 500 dönüyordu, yayın hiç denenmeden;
+    artık ikisi de çalışıyor, dönüştürmene gerek yok).
   - `POST /api/yt/upload` — form: filename, title, description, tags,
     privacy, channel=tr.
   - `POST /api/upload-raw-video` — **YENİ (Ağustos 2026 ortasında Termux

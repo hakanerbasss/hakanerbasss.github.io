@@ -10394,7 +10394,15 @@ async def shorts_send_instagram(request: Request):
     body = await request.json()
     filename = body.get("filename", "").strip()
     title = body.get("title", "").strip()
-    tags = body.get("tags", "").strip()
+    # tags hem string ("a, b, c") hem liste (["a","b","c"]) olarak gelebilir —
+    # liste JSON'da daha doğal bir temsil, dışarıdan gelen çağrılar (ör.
+    # custom-production/produce.py) bunu kolayca gönderebiliyor. Önceden
+    # sadece string bekleniyordu, liste gelince .strip() 500 patlatıyordu
+    # (yayın hiç denenmeden — zararsızdı ama gereksiz bir hataydı).
+    tags = body.get("tags", "")
+    if isinstance(tags, list):
+        tags = ", ".join(str(t) for t in tags)
+    tags = (tags or "").strip()
     description = body.get("description", "").strip()
     source_text = body.get("source_text", "").strip()
 
