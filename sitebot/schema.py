@@ -8,8 +8,27 @@ Yeni bir alan eklerken üç şablonun da onu kullanabildiğinden emin ol.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 import uuid
 from typing import Any
+
+_TR_MAP = str.maketrans({
+    "ı": "i", "İ": "i", "ş": "s", "Ş": "s", "ğ": "g", "Ğ": "g",
+    "ü": "u", "Ü": "u", "ö": "o", "Ö": "o", "ç": "c", "Ç": "c",
+})
+
+
+def slugify(text: str, limit: int = 40) -> str:
+    """'Hurda Bakır 2.Kalite' → 'hurda-bakir-2-kalite'.
+
+    Hem alan adları hem ürün sayfası adresleri buradan geçiyor; Türkçe
+    karakterler ASCII'ye indirgeniyor.
+    """
+    text = (text or "").translate(_TR_MAP)
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
+    return re.sub(r"-{2,}", "-", text)[:limit].strip("-")
 
 SCHEMA_VERSION = 1
 
@@ -225,9 +244,28 @@ def normalize(data: dict[str, Any], base: dict[str, Any] | None = None) -> dict[
         for s in (d.get("services") or [])[:24] if isinstance(s, dict)
     ]
 
+    # Ürün adresleri (/urun/hurda-bakir/) bir kez üretilip sabit kalıyor:
+    # müşteri ürünün adını sonradan değiştirdiğinde Google'daki bağlantı
+    # kırılmasın. Yalnızca hiç adresi olmayan ürüne yeni adres veriliyor.
+    kullanilan: set[str] = set()
+    urunler = []
+    for p in (d.get("products") or [])[:300]:
+        if not isinstance(p, dict):
+            continue
+        s = _clean_str(p.get("slug"), 60) or slugify(_clean_str(p.get("name"), 160))
+        s = slugify(s) or "urun"
+        temel, sayac = s, 2
+        while s in kullanilan:                  # aynı adlı iki ürün çakışmasın
+            s = f"{temel}-{sayac}"
+            sayac += 1
+        kullanilan.add(s)
+        p = dict(p, slug=s)
+        urunler.append(p)
+
     out["products"] = [
         {
             "id": _clean_str(p.get("id")) or new_id(),
+            "slug": p["slug"],
             "name": _clean_str(p.get("name"), 160),
             "desc": _clean_str(p.get("desc"), 1200),
             "price": _clean_str(p.get("price"), 40),
@@ -237,7 +275,7 @@ def normalize(data: dict[str, Any], base: dict[str, Any] | None = None) -> dict[
             "link": _clean_str(p.get("link"), 400),
             "images": [_clean_str(i, 300) for i in (p.get("images") or [])[:8] if i],
         }
-        for p in (d.get("products") or [])[:300] if isinstance(p, dict)
+        for p in urunler
     ]
 
     out["gallery"] = [

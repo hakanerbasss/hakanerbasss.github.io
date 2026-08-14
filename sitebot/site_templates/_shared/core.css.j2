@@ -208,6 +208,23 @@ p{text-wrap:pretty}
 }
 @keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.6);opacity:0}}
 
+/* ---------- ürün arama ---------- */
+.searchbar{position:relative;margin-bottom:clamp(18px,2.5vw,28px);max-width:520px}
+.searchbar input{
+  width:100%;padding:15px 18px 15px 48px;border-radius:999px;
+  border:1px solid var(--border);background:var(--surface);color:var(--fg);
+  font-size:1rem;transition:border-color .2s,box-shadow .2s;
+}
+.searchbar input:focus{outline:0;border-color:var(--primary);
+  box-shadow:0 0 0 4px rgba(var(--primary-rgb),.16)}
+.searchbar::before{
+  content:"⌕";position:absolute;left:18px;top:50%;transform:translateY(-52%);
+  font-size:1.5rem;color:var(--muted);pointer-events:none;line-height:1;
+}
+.searchbar span{display:block;font-size:.85rem;color:var(--muted);margin:9px 0 0 18px;min-height:1.2em}
+.empty-note{grid-column:1/-1;text-align:center;padding:56px 20px;color:var(--muted)}
+.hide{display:none!important}
+
 /* ---------- görsel büyütme ---------- */
 .lightbox{
   position:fixed;inset:0;z-index:200;display:none;place-items:center;padding:24px;

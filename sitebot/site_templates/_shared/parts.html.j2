@@ -291,6 +291,41 @@
     if(e.key==='ArrowLeft')show(idx-1);
     if(e.key==='ArrowRight')show(idx+1);
   });
+
+  /* Urun arama. Kategori filtresiyle birlikte calisir: gorunur olmak icin
+     urunun hem secili kategoriye hem arama metnine uymasi gerekiyor. */
+  var ara=document.getElementById('urunAra');
+  if(ara){
+    var kartlar=[].slice.call(document.querySelectorAll('[data-ara]')),
+        bos=document.getElementById('araBos'),
+        bilgi=document.getElementById('araSonuc'),zaman;
+
+    /* Turkce harfleri sadelestir: 'sise' yazan 'şişe'yi de bulsun */
+    function sadelestir(t){
+      return (t||'').toLocaleLowerCase('tr')
+        .replace(/ı/g,'i').replace(/ş/g,'s').replace(/ğ/g,'g')
+        .replace(/ü/g,'u').replace(/ö/g,'o').replace(/ç/g,'c');
+    }
+    kartlar.forEach(function(k){k._ara=sadelestir(k.getAttribute('data-ara'))});
+
+    function calistir(){
+      var q=sadelestir(ara.value.trim()),
+          kelimeler=q?q.split(/\s+/):[],gorunen=0;
+      kartlar.forEach(function(k){
+        var uyar=kelimeler.every(function(w){return k._ara.indexOf(w)>-1});
+        k.dataset.aramaUydu=uyar?'1':'0';
+        var kategoriUydu=k.dataset.katGizli!=='1';
+        k.classList.toggle('hide',!(uyar&&kategoriUydu));
+        if(uyar&&kategoriUydu)gorunen++;
+      });
+      if(bos)bos.hidden=gorunen>0;
+      if(bilgi)bilgi.textContent=q?(gorunen+' ürün bulundu'):'';
+    }
+    ara.addEventListener('input',function(){
+      clearTimeout(zaman);zaman=setTimeout(calistir,120);
+    });
+    window.__urunAramaCalistir=calistir;   /* kategori filtresi de tetikleyebilsin */
+  }
 })();
 </script>
 {%- endmacro -%}

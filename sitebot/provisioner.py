@@ -102,6 +102,18 @@ async def publish(site_id: int, message: str = "") -> dict[str, Any]:
         message or f"Site güncellendi — {time.strftime('%d.%m.%Y %H:%M')}",
     )
     db.mark_assets_pushed(site_id, pushed_paths)
+
+    # Silinen ürünlerin sayfaları depoda kalmamalı; kalırsa ürün panelden
+    # kaldırılsa bile Google'da ve doğrudan adresten açılmaya devam eder.
+    if site["live_json"]:
+        try:
+            eski = renderer.product_page_paths(json.loads(site["live_json"]))
+            artik = sorted(eski - renderer.product_page_paths(data))
+            if artik:
+                await gh.delete_paths(site["repo"], artik, "Kaldırılan ürün sayfaları")
+                db.log(site_id, "yayin", f"{len(artik)} ürün sayfası silindi")
+        except (ValueError, gh.GitHubError) as exc:
+            db.log(site_id, "hata", f"eski ürün sayfaları silinemedi: {exc}")
     db.update_site(
         site_id,
         live_json=site["draft_json"],

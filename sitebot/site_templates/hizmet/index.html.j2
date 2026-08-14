@@ -194,19 +194,25 @@
       <span class="eyebrow">Vitrin</span>
       <h2>Ürünlerimiz</h2>
     </div>
-    <div class="plist">
+    {% if products|length >= 8 %}
+    <div class="searchbar rv">
+      <input type="search" id="urunAra" placeholder="Ürün ara…" aria-label="Ürün ara"
+             autocomplete="off" enterkeyhint="search">
+      <span id="araSonuc"></span>
+    </div>
+    {% endif %}
+    <div class="plist" id="plist">
       {% for pr in products %}
-      <article class="card pcard rv">
-        <div class="ph">
+      <article class="card pcard rv" data-ara="{{ (pr.name ~ ' ' ~ pr.desc ~ ' ' ~ pr.category)|lower }}">
+        <a class="ph" href="/urun/{{ pr.slug }}/" aria-label="{{ pr.name }} detayı">
           {% if pr.badge %}<span class="tag">{{ pr.badge }}</span>{% endif %}
           {% if pr.images %}
-          <img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy"
-               data-imgs="{% for im in pr.images %}/{{ im }}{{ '|' if not loop.last }}{% endfor %}">
+          <img src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy">
           {% if pr.images|length > 1 %}<span class="imgcount">📷 {{ pr.images|length }}</span>{% endif %}
           {% else %}<div class="noimg">🖼</div>{% endif %}
-        </div>
+        </a>
         <div class="pb">
-          <h3>{{ pr.name }}</h3>
+          <h3><a href="/urun/{{ pr.slug }}/">{{ pr.name }}</a></h3>
           {% if pr.desc %}<p class="desc">{{ pr.desc }}</p>{% endif %}
           {% if pr.price %}<div class="price">{{ pr.price }} {{ pr.currency }}</div>{% endif %}
           {% set hedef = pr.link or whatsapp or tel %}
@@ -217,6 +223,7 @@
         </div>
       </article>
       {% endfor %}
+      <p class="empty-note" id="araBos" hidden>Aramanıza uyan ürün bulunamadı.</p>
     </div>
   </div>
 </section>

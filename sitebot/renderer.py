@@ -204,6 +204,34 @@ def prepare(data: dict[str, Any], domain: str) -> dict[str, Any]:
 
 # ------------------------------------------------------------------------ üretim
 
+_CURRENCY_CODES = {
+    "₺": "TRY", "tl": "TRY", "try": "TRY",
+    "$": "USD", "usd": "USD", "€": "EUR", "eur": "EUR", "£": "GBP",
+}
+
+
+def _price_parts(urun: dict[str, Any]) -> dict[str, str]:
+    """Google'ın anlayacağı sayısal fiyat ve para birimi kodu.
+
+    Müşteri '1.250,50 TL' ya da '250' yazabiliyor; ayrıştırılamazsa
+    yapısal veriye fiyat hiç konmuyor — yanlış fiyat yazmaktansa
+    hiç yazmamak doğru.
+    """
+    ham = (urun.get("price") or "").strip()
+    sayi = re.sub(r"[^\d,.]", "", ham)
+    if sayi.count(",") == 1 and (sayi.count(".") == 0 or sayi.rfind(",") > sayi.rfind(".")):
+        sayi = sayi.replace(".", "").replace(",", ".")     # 1.250,50 → 1250.50
+    else:
+        sayi = sayi.replace(",", "")
+    try:
+        deger = f"{float(sayi):.2f}" if sayi else ""
+    except ValueError:
+        deger = ""
+    birim = (urun.get("currency") or "").strip().lower()
+    kod = _CURRENCY_CODES.get(birim) or _CURRENCY_CODES.get(birim.split("/")[0], "TRY")
+    return {"price_number": deger, "currency_code": kod}
+
+
 def render_html(data: dict[str, Any], domain: str) -> str:
     key = data.get("theme", {}).get("template", "hizmet")
     if key not in TEMPLATES:
@@ -211,15 +239,48 @@ def render_html(data: dict[str, Any], domain: str) -> str:
     return _env.get_template(f"{key}/index.html.j2").render(**prepare(data, domain))
 
 
-def _sitemap(domain: str) -> str:
+def render_product_pages(data: dict[str, Any], domain: str) -> dict[str, str]:
+    """Her ürün için kendi sayfası: /urun/<slug>/
+
+    Ayrı sayfa olmadan Google ürünleri tek tek dizine alamıyor; tüm
+    katalog tek bir ana sayfanın içinde kalıyordu.
+    """
+    ortak = prepare(data, domain)
+    urunler = data.get("products", [])
+    tpl = _env.get_template("_shared/product.html.j2")
+    sayfalar: dict[str, str] = {}
+    for i, urun in enumerate(urunler):
+        if not urun.get("slug"):
+            continue
+        # Aynı kategoriden başlayıp listenin kalanıyla tamamla — ziyaretçi
+        # ilgisiz ürüne değil, benzerine yönlensin.
+        digerleri = [o for o in urunler if o is not urun and o.get("category") == urun.get("category")]
+        digerleri += [o for o in urunler if o is not urun and o not in digerleri]
+        sayfalar[f"urun/{urun['slug']}/index.html"] = tpl.render(
+            **ortak, urun={**urun, **_price_parts(urun)}, digerleri=digerleri[:4]
+        )
+    return sayfalar
+
+
+def _sitemap(domain: str, data: dict[str, Any]) -> str:
+    """Ana sayfa + her ürün sayfası. Google'ın hepsini bulabilmesi için
+    ürün adresleri de listeye giriyor."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    satirlar = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
         f"  <url><loc>https://{domain}/</loc><lastmod>{today}</lastmod>"
-        "<changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
-        "</urlset>\n"
-    )
+        "<changefreq>weekly</changefreq><priority>1.0</priority></url>",
+    ]
+    for urun in data.get("products", []):
+        if urun.get("slug"):
+            satirlar.append(
+                f"  <url><loc>https://{domain}/urun/{urun['slug']}/</loc>"
+                f"<lastmod>{today}</lastmod><changefreq>weekly</changefreq>"
+                "<priority>0.8</priority></url>"
+            )
+    satirlar.append("</urlset>")
+    return "\n".join(satirlar) + "\n"
 
 
 def _not_found(data: dict[str, Any], domain: str) -> str:
@@ -254,12 +315,25 @@ def render_site(data: dict[str, Any], domain: str,
         "404.html": _not_found(data, domain),
         "CNAME": domain + "\n",
         "robots.txt": f"User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: https://{domain}/sitemap.xml\n",
-        "sitemap.xml": _sitemap(domain),
+        "sitemap.xml": _sitemap(domain, data),
         ".nojekyll": "",   # Pages'in Jekyll işlemesini atla → build daha hızlı
     }
+    files.update(render_product_pages(data, domain))
     if admin_files:
         files.update(admin_files)
     return files
+
+
+def product_page_paths(data: dict[str, Any]) -> set[str]:
+    """Bu içerikten üretilen ürün sayfalarının yolları.
+
+    Yayınlarken eskisiyle karşılaştırılıp silinen ürünlerin sayfaları
+    depodan kaldırılıyor; yoksa silinen ürün Google'da yaşamaya devam eder.
+    """
+    return {
+        f"urun/{u['slug']}/index.html"
+        for u in data.get("products", []) if u.get("slug")
+    }
 
 
 def preview_html(data: dict[str, Any], domain: str) -> str:

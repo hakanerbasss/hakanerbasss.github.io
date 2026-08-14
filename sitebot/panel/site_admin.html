@@ -48,12 +48,6 @@ img{display:block;max-width:100%}
 
 .body{display:grid;grid-template-columns:214px minmax(340px,1fr) minmax(360px,.9fr);
   overflow:hidden}
-@media(max-width:1240px){.body{grid-template-columns:190px 1fr}.preview{display:none}
-  .body.showprev{grid-template-columns:190px 1fr}.body.showprev .edit{display:none}
-  .body.showprev .preview{display:flex}}
-@media(max-width:720px){.body{grid-template-columns:1fr}.side{position:fixed;inset:52px auto 0 0;
-  width:210px;z-index:30;transform:translateX(-100%);transition:transform .25s}
-  .side.open{transform:none;box-shadow:0 0 0 100vw rgba(0,0,0,.5)}}
 
 .side{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px 10px}
 .side b{display:block;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
@@ -92,6 +86,25 @@ img{display:block;max-width:100%}
 /* Tam ekran onizleme */
 .preview.full{position:fixed;inset:0;z-index:150;border-left:0}
 .preview.full .bar{padding:11px 16px}
+
+/* Dar ekranda duzen: bu kural bloklari BILEREK ".preview"in tam tanimindan
+   SONRA duruyor. CSS'te ayni ozguculukteki kurallarda kaynak sirasinda
+   sonra gelen kazanir; ".preview{display:none}" burada olmazsa yukaridaki
+   ".preview{display:flex}" onu ezer ve onizleme telefonda hic gizlenmez —
+   ilk surumdeki hata tam buydu. */
+@media(max-width:1240px){
+  .body{grid-template-columns:190px 1fr}
+  .preview{display:none}
+  .body.showprev{grid-template-columns:190px 1fr}
+  .body.showprev .edit{display:none}
+  .body.showprev .preview{display:flex}
+}
+@media(max-width:720px){
+  .body{grid-template-columns:1fr}
+  .side{position:fixed;inset:52px auto 0 0;width:210px;z-index:30;
+    transform:translateX(-100%);transition:transform .25s}
+  .side.open{transform:none;box-shadow:0 0 0 100vw rgba(0,0,0,.5)}
+}
 
 /* ---------- form ---------- */
 .f{margin-bottom:16px}

@@ -1,0 +1,207 @@
+{# Tek bir ürünün kendi sayfası: /urun/<slug>/
+   Üç şablonda da aynı sayfa kullanılıyor — renkler, yazı tipi ve köşe
+   yuvarlaklığı temadan geldiği için site neyse ürün sayfası da o oluyor. #}
+{% import "_shared/parts.html.j2" as p with context %}
+{% set extra %}
+.pwrap{padding:clamp(96px,12vw,140px) 0 clamp(50px,7vw,90px)}
+.crumb{display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted);
+  margin-bottom:clamp(20px,3vw,34px);flex-wrap:wrap}
+.crumb a:hover{color:var(--accent)}
+.crumb span{opacity:.5}
+
+.pmain{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(26px,4.5vw,64px);align-items:start}
+@media(max-width:880px){.pmain{grid-template-columns:1fr}}
+
+.shots{position:relative}
+.shot-main{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);
+  background:var(--surface-2);aspect-ratio:4/3}
+.shot-main img{width:100%;height:100%;object-fit:cover}
+.shot-main .noimg{font-size:3rem}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:9px;margin-top:11px}
+.thumbs button{aspect-ratio:1;border-radius:var(--r-sm);overflow:hidden;padding:0;cursor:pointer;
+  border:2px solid var(--border);background:var(--surface-2);transition:border-color .2s,transform .15s}
+.thumbs button:hover{transform:translateY(-2px)}
+.thumbs button.on{border-color:var(--primary)}
+.thumbs img{width:100%;height:100%;object-fit:cover}
+
+.pinfo .cat{display:inline-block;font-size:.74rem;font-weight:800;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.pinfo h1{font-size:clamp(1.8rem,4.2vw,3rem);margin-bottom:14px}
+.pinfo .price{font-size:clamp(1.8rem,3.6vw,2.6rem);font-weight:900;letter-spacing:-.04em;
+  color:var(--accent);margin:20px 0}
+.pinfo .price small{font-size:.95rem;font-weight:700;color:var(--muted);
+  display:block;letter-spacing:0;margin-top:2px}
+.pinfo .desc{color:var(--muted);white-space:pre-line;font-size:1.02rem;line-height:1.7}
+.pinfo .acts{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.pinfo .rozet{display:inline-block;font-size:.72rem;font-weight:800;padding:6px 12px;border-radius:999px;
+  background:var(--accent);color:var(--on-accent);text-transform:uppercase;letter-spacing:.08em;
+  margin-left:10px;vertical-align:middle}
+.pmeta{margin-top:30px;border-top:1px solid var(--border);padding-top:22px;display:grid;gap:12px}
+.pmeta div{display:flex;justify-content:space-between;gap:16px;font-size:.94rem}
+.pmeta b{color:var(--muted);font-weight:600}
+
+.others{margin-top:clamp(56px,8vw,110px)}
+.others h2{font-size:clamp(1.3rem,2.6vw,1.9rem);margin-bottom:clamp(20px,3vw,34px)}
+.olist{display:grid;gap:clamp(14px,2vw,22px);
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))}
+.ocard{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);
+  transition:transform .25s,border-color .25s}
+.ocard:hover{transform:translateY(-5px);border-color:rgba(var(--primary-rgb),.55)}
+.ocard .ph{aspect-ratio:1;background:var(--surface-2);overflow:hidden}
+.ocard .ph img{width:100%;height:100%;object-fit:cover}
+.ocard .tx{padding:13px 15px 16px}
+.ocard h3{font-size:.97rem;margin-bottom:5px}
+.ocard .pr{font-weight:800;color:var(--accent);font-size:.95rem}
+{% endset %}
+<!DOCTYPE html>
+<html lang="{{ site.lang or 'tr' }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{ urun.name }}{% if urun.price %} — {{ urun.price }} {{ urun.currency }}{% endif %} | {{ site.title }}</title>
+<meta name="description" content="{{ (urun.desc or urun.name)[:160] }}">
+<meta name="theme-color" content="{{ theme.bg }}">
+<link rel="canonical" href="https://{{ domain }}/urun/{{ urun.slug }}/">
+<meta property="og:type" content="product">
+<meta property="og:title" content="{{ urun.name }}">
+<meta property="og:description" content="{{ (urun.desc or urun.name)[:200] }}">
+<meta property="og:url" content="https://{{ domain }}/urun/{{ urun.slug }}/">
+{% if urun.images %}<meta property="og:image" content="https://{{ domain }}/{{ urun.images[0] }}">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+{% if site.favicon %}<link rel="icon" href="/{{ site.favicon }}">{% endif %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Space+Grotesk:wght@400;600;700&family=Nunito:wght@400;700;900&display=swap">
+{# Google'in urunu tek tek anlamasi icin yapisal veri — asil SEO kazanci burada #}
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org","@type":"Product",
+  "name":{{ urun.name|tojson }},
+  "description":{{ (urun.desc or urun.name)|tojson }},
+  "url":"https://{{ domain }}/urun/{{ urun.slug }}/"
+  {%- if urun.images %},"image":[{% for im in urun.images %}"https://{{ domain }}/{{ im }}"{{ "," if not loop.last }}{% endfor %}]{% endif %}
+  {%- if urun.category %},"category":{{ urun.category|tojson }}{% endif %}
+  ,"brand":{"@type":"Brand","name":{{ site.title|tojson }}}
+  {%- if urun.price_number %},"offers":{"@type":"Offer","price":"{{ urun.price_number }}",
+     "priceCurrency":"{{ urun.currency_code }}","availability":"https://schema.org/InStock",
+     "url":"https://{{ domain }}/urun/{{ urun.slug }}/"}{% endif %}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org","@type":"BreadcrumbList",
+  "itemListElement":[
+    {"@type":"ListItem","position":1,"name":"Ana sayfa","item":"https://{{ domain }}/"},
+    {"@type":"ListItem","position":2,"name":"Ürünler","item":"https://{{ domain }}/#urunler"},
+    {"@type":"ListItem","position":3,"name":{{ urun.name|tojson }},
+     "item":"https://{{ domain }}/urun/{{ urun.slug }}/"}
+  ]
+}
+</script>
+<style>
+{% include "_shared/core.css.j2" %}
+{{ extra }}
+</style>
+</head>
+<body id="top">
+{{ p.nav([('/#urunler','Ürünler'), ('/#hizmetler','Hizmetler'), ('/#iletisim','İletişim')]) }}
+
+<main class="pwrap">
+  <div class="wrap">
+    <nav class="crumb" aria-label="Konum">
+      <a href="/">Ana sayfa</a><span>/</span>
+      <a href="/#urunler">Ürünler</a><span>/</span>
+      {% if urun.category %}<a href="/#urunler">{{ urun.category }}</a><span>/</span>{% endif %}
+      {{ urun.name }}
+    </nav>
+
+    <div class="pmain">
+      <div class="shots rv">
+        <div class="shot-main">
+          {% if urun.images %}
+          <img id="shotMain" class="zoom" src="/{{ urun.images[0] }}" alt="{{ urun.name }}"
+               fetchpriority="high"
+               data-imgs="{% for im in urun.images %}/{{ im }}{{ '|' if not loop.last }}{% endfor %}">
+          {% else %}<div class="noimg">🖼</div>{% endif %}
+        </div>
+        {% if urun.images|length > 1 %}
+        <div class="thumbs" id="thumbs">
+          {% for im in urun.images %}
+          <button type="button" class="{{ 'on' if loop.first }}" data-src="/{{ im }}"
+                  aria-label="{{ loop.index }}. fotoğraf">
+            <img src="/{{ im }}" alt="" loading="lazy">
+          </button>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="pinfo rv">
+        {% if urun.category %}<span class="cat">{{ urun.category }}</span>{% endif %}
+        <h1>{{ urun.name }}{% if urun.badge %}<span class="rozet">{{ urun.badge }}</span>{% endif %}</h1>
+        {% if urun.price %}
+        <div class="price">{{ urun.price }} {{ urun.currency }}</div>
+        {% else %}
+        <div class="price" style="font-size:1.2rem;color:var(--muted)">Fiyat için bize ulaşın</div>
+        {% endif %}
+        {% if urun.desc %}<p class="desc">{{ urun.desc }}</p>{% endif %}
+
+        <div class="acts">
+          {% set hedef = urun.link or whatsapp or tel %}
+          {% if hedef %}
+          <a class="btn btn--lg btn--accent" href="{{ hedef }}"
+             {% if 'http' in hedef %}target="_blank" rel="noopener"{% endif %}>
+            {{ 'Sipariş ver' if urun.link else 'WhatsApp ile sor' }}
+          </a>
+          {% endif %}
+          {% if tel %}<a class="btn btn--lg btn--ghost" href="{{ tel }}">{{ contact.phone }}</a>{% endif %}
+        </div>
+
+        <div class="pmeta">
+          {% if urun.category %}<div><b>Kategori</b><span>{{ urun.category }}</span></div>{% endif %}
+          {% if contact.phone %}<div><b>Bilgi hattı</b><span>{{ contact.phone }}</span></div>{% endif %}
+          {% if contact.address %}<div><b>Adres</b><span>{{ contact.address }}</span></div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if digerleri %}
+    <section class="others">
+      <h2>Diğer ürünler</h2>
+      <div class="olist">
+        {% for o in digerleri %}
+        <a class="ocard rv" href="/urun/{{ o.slug }}/">
+          <div class="ph">
+            {% if o.images %}<img src="/{{ o.images[0] }}" alt="{{ o.name }}" loading="lazy">
+            {% else %}<div class="noimg">🖼</div>{% endif %}
+          </div>
+          <div class="tx">
+            <h3>{{ o.name }}</h3>
+            {% if o.price %}<div class="pr">{{ o.price }} {{ o.currency }}</div>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      <div style="margin-top:26px"><a class="btn btn--ghost" href="/#urunler">Tüm ürünleri gör</a></div>
+    </section>
+    {% endif %}
+  </div>
+</main>
+
+{{ p.footer() }}
+{{ p.whatsapp_float() }}
+{{ p.scripts() }}
+<script>
+(function(){
+  var t=document.getElementById('thumbs'),m=document.getElementById('shotMain');
+  if(!t||!m)return;
+  t.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b)return;
+    m.src=b.dataset.src;
+    [].forEach.call(t.children,function(c){c.classList.toggle('on',c===b)});
+  });
+})();
+</script>
+</body>
+</html>

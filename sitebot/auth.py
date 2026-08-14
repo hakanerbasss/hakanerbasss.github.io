@@ -13,13 +13,13 @@ import hashlib
 import hmac
 import re
 import secrets
-import unicodedata
 from typing import Any
 
 from fastapi import Header, HTTPException
 
 import config
 import db
+from schema import slugify   # tek slug uygulaması — ürün adresleri de bunu kullanıyor
 
 SESSION_TTL = 60 * 60 * 24 * 14      # 14 gün
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 14, 8, 1
@@ -27,12 +27,6 @@ SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 14, 8, 1
 # Şifre uzunluk kuralı tek yerde dursun — panel arayüzleri de bu sayıyı
 # /api/super/status üzerinden okuyor, iki yerde ayrı ayrı yazılmıyor.
 MIN_PASSWORD = 6
-
-_TR_MAP = str.maketrans({
-    "ı": "i", "İ": "i", "ş": "s", "Ş": "s", "ğ": "g", "Ğ": "g",
-    "ü": "u", "Ü": "u", "ö": "o", "Ö": "o", "ç": "c", "Ç": "c",
-})
-
 
 # ------------------------------------------------------------------- şifreler
 
@@ -64,20 +58,6 @@ def random_password(length: int = 12) -> str:
 
 
 # ---------------------------------------------------------------------- slug
-
-def slugify(text: str) -> str:
-    """'Hurdacı Ali' → 'hurdaci-ali'.
-
-    Alan adı olacağı için Türkçe karakterler ASCII'ye indirgeniyor:
-    punycode'a düşen alan adlarında GitHub Pages sertifikası sorun
-    çıkarabiliyor.
-    """
-    text = (text or "").translate(_TR_MAP)
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
-    text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
-    text = re.sub(r"-{2,}", "-", text)
-    return text[:40].strip("-")
-
 
 def validate_slug(slug: str) -> str:
     if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?", slug or ""):

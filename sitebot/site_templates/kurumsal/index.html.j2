@@ -166,18 +166,24 @@ body{--maxw:1180px}
       <span class="k">Katalog</span>
       <h2 class="rv">Ürünler</h2>
     </div>
+    {% if products|length >= 8 %}
+    <div class="searchbar rv">
+      <input type="search" id="urunAra" placeholder="Ürün ara…" aria-label="Ürün ara"
+             autocomplete="off" enterkeyhint="search">
+      <span id="araSonuc"></span>
+    </div>
+    {% endif %}
     <div class="pgrid">
       {% for pr in products %}
-      <article class="pitem rv">
-        <div class="ph">
+      <article class="pitem rv" data-ara="{{ (pr.name ~ ' ' ~ pr.desc ~ ' ' ~ pr.category)|lower }}">
+        <a class="ph" href="/urun/{{ pr.slug }}/" aria-label="{{ pr.name }} detayı">
           {% if pr.images %}
-          <img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy"
-               data-imgs="{% for im in pr.images %}/{{ im }}{{ '|' if not loop.last }}{% endfor %}">
+          <img src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy">
           {% if pr.images|length > 1 %}<span class="imgcount">📷 {{ pr.images|length }}</span>{% endif %}
           {% else %}<div class="noimg">🖼</div>{% endif %}
-        </div>
+        </a>
         <div class="m">
-          <h3>{{ pr.name }}</h3>
+          <h3><a href="/urun/{{ pr.slug }}/">{{ pr.name }}</a></h3>
           {% if pr.price %}<span class="price">{{ pr.price }} {{ pr.currency }}</span>{% endif %}
         </div>
         {% if pr.desc %}<p class="desc">{{ pr.desc }}</p>{% endif %}
@@ -188,6 +194,7 @@ body{--maxw:1180px}
         {% endif %}
       </article>
       {% endfor %}
+      <p class="empty-note" id="araBos" hidden>Aramanıza uyan ürün bulunamadı.</p>
     </div>
   </div>
 </section>

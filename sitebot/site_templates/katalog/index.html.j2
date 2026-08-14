@@ -134,23 +134,30 @@
   </div>
   {% endif %}
   <div class="wrap">
+    {% if products|length >= 8 %}
+    <div class="searchbar rv">
+      <input type="search" id="urunAra" placeholder="Ürün ara…" aria-label="Ürün ara"
+             autocomplete="off" enterkeyhint="search">
+      <span id="araSonuc"></span>
+    </div>
+    {% endif %}
     <div class="pgrid" id="pgrid">
       {% for pr in products %}
-      <article class="card pcard rv" data-cat="{{ pr.category }}">
-        <div class="ph">
+      <article class="card pcard rv" data-cat="{{ pr.category }}"
+               data-ara="{{ (pr.name ~ ' ' ~ pr.desc ~ ' ' ~ pr.category)|lower }}">
+        <a class="ph" href="/urun/{{ pr.slug }}/" aria-label="{{ pr.name }} detayı">
           {% if pr.badge %}<span class="tag">{{ pr.badge }}</span>{% endif %}
           {% if pr.images %}
-          <img class="zoom" src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy"
-               data-imgs="{% for im in pr.images %}/{{ im }}{{ '|' if not loop.last }}{% endfor %}">
+          <img src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy">
           {% if pr.images|length > 1 %}
           <img src="/{{ pr.images[1] }}" alt="" loading="lazy" aria-hidden="true">
           <span class="imgcount">📷 {{ pr.images|length }}</span>
           {% endif %}
           {% else %}<div class="empty">🖼</div>{% endif %}
-        </div>
+        </a>
         <div class="pb">
           {% if pr.category %}<span class="pcat">{{ pr.category }}</span>{% endif %}
-          <h3>{{ pr.name }}</h3>
+          <h3><a href="/urun/{{ pr.slug }}/">{{ pr.name }}</a></h3>
           {% if pr.desc %}<p class="pdesc">{{ pr.desc }}</p>{% endif %}
           <div class="prow">
             {% if pr.price %}<div class="price">{{ pr.price }} {{ pr.currency }}</div>
@@ -164,7 +171,7 @@
         </div>
       </article>
       {% endfor %}
-      <p class="empty-note" id="noRes" hidden>Bu kategoride ürün bulunamadı.</p>
+      <p class="empty-note" id="araBos" hidden>Aramanıza uyan ürün bulunamadı.</p>
     </div>
   </div>
 </section>
@@ -224,19 +231,23 @@
 (function(){
   var chips=document.getElementById('chips');
   if(!chips)return;
-  var cards=[].slice.call(document.querySelectorAll('#pgrid .pcard'));
-  var none=document.getElementById('noRes');
+  var cards=[].slice.call(document.querySelectorAll('#pgrid .pcard')),
+      bos=document.getElementById('araBos');
   chips.addEventListener('click',function(e){
     var b=e.target.closest('.chip');
     if(!b)return;
     [].forEach.call(chips.children,function(c){c.setAttribute('aria-pressed',String(c===b))});
-    var cat=b.dataset.cat,shown=0;
+    var cat=b.dataset.cat,gorunen=0;
     cards.forEach(function(c){
-      var ok=cat==='*'||c.dataset.cat===cat;
-      c.classList.toggle('hide',!ok);
-      if(ok)shown++;
+      var kategoriUydu=cat==='*'||c.dataset.cat===cat;
+      // Kategori kararini isaretle; arama kutusu da ayni isareti okuyor,
+      // ikisi birbirinin sonucunu ezmiyor.
+      c.dataset.katGizli=kategoriUydu?'0':'1';
+      var aramaUydu=c.dataset.aramaUydu!=='0';
+      c.classList.toggle('hide',!(kategoriUydu&&aramaUydu));
+      if(kategoriUydu&&aramaUydu)gorunen++;
     });
-    none.hidden=shown>0;
+    if(bos)bos.hidden=gorunen>0;
   });
 })();
 </script>
