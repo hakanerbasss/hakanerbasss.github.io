@@ -134,8 +134,19 @@ def _karaoke_caption_html(text: str, duration: float, emphasis_word: str, accent
         frac = len(w) / total_chars
         wdur = max(0.10, frac * usable)
         cls = "word word-emph" if is_emph else "word"
+        # animation-duration KENDİ konuşma payı (wdur) kadar — böylece kelime
+        # SIRASI GELDİĞİNDE vurgulu (accent) renkte belirip o rengi kendi
+        # konuşma süresi boyunca KORUYOR, ancak sıradaki kelimeye geçilirken
+        # beyaza dönüyor (bkz. .word keyframes). Önceki halde animation-duration
+        # sabit 0.32sn'ydi — vurgu rengi sadece kısa bir geçiş anında
+        # görünüyordu, "şu an hangi kelime söyleniyor" belli olmuyordu.
+        # 0.18-1.0sn arasında sınırlanıyor: çok kısa kelimede vurgu göz
+        # açıp kapayana kadar geçmesin, çok uzun kelimede de gereksiz
+        # yavaş kalmasın.
+        anim_dur = max(0.18, min(1.0, wdur))
         spans.append(
-            f'<span class="{cls}" style="animation-delay:{t:.2f}s;--accent:{accent_color}">{_esc(w)}</span>'
+            f'<span class="{cls}" style="animation-delay:{t:.2f}s;'
+            f'animation-duration:{anim_dur:.2f}s;--accent:{accent_color}">{_esc(w)}</span>'
         )
         t += wdur
     return " ".join(spans)
@@ -223,20 +234,26 @@ _CARD_TEMPLATE = """<!DOCTYPE html>
     line-height: 1.4; text-align: center;
   }}
   /* Karaoke kelime animasyonu: her kelime konuşma sırası geldiğinde
-     yumuşakça belirir (fade + hafif yükselme) ve renk değiştirir, sonra
-     kalır. ÖNCEDEN scale(0.4)->1.16->1.0 ile "büyüyüp küçülen" bir pop
-     efekti vardı — kullanıcı geri bildirimi: art arda çok sayıda kelimede
-     bu sürekli büyüyüp-küçülme "titreme/bozuk" hissi veriyordu. Scale
-     tamamen kaldırıldı, sadece opacity+translateY+renk kaldı — daha sakin
-     ama hâlâ net bir "konuşma sırası geldi" sinyali veriyor. */
+     yumuşakça belirir (fade + hafif yükselme), SIRASI SÜRESİNCE vurgulu
+     (accent) renkte KALIR, sıradaki kelimeye geçilirken beyaza döner.
+     ÖNCEDEN scale(0.4)->1.16->1.0 ile "büyüyüp küçülen" bir pop efekti
+     vardı (kaldırıldı, "titreme" hissi veriyordu); ONDAN SONRAKİ halde de
+     vurgu rengi sadece 0.32sn'lik kısa bir geçiş anında görünüyordu, hangi
+     kelimenin o an söylendiği belli olmuyordu. animation-duration artık
+     kelimenin kendi konuşma payı (_karaoke_caption_html'de hesaplanan
+     wdur) kadar — yani vurgu, kelime "sırası boyunca" görünür kalıyor. */
   .word {{
     display: inline-block;
     margin: 0 10px 6px 0;
     opacity: 0; transform: translateY(14px);
-    animation: wordpop 0.32s ease-out both;
+    animation-name: wordpop;
+    animation-timing-function: ease-out;
+    animation-fill-mode: both;
   }}
   @keyframes wordpop {{
     0%   {{ opacity: 0; transform: translateY(14px); color: var(--accent); }}
+    25%  {{ opacity: 1; transform: translateY(0);    color: var(--accent); }}
+    80%  {{ opacity: 1; transform: translateY(0);    color: var(--accent); }}
     100% {{ opacity: 1; transform: translateY(0);    color: #f2f5fb; }}
   }}
   .word-emph {{
@@ -244,6 +261,7 @@ _CARD_TEMPLATE = """<!DOCTYPE html>
   }}
   @keyframes wordpop-emph {{
     0%   {{ opacity: 0; transform: translateY(14px); color: var(--accent); }}
+    25%  {{ opacity: 1; transform: translateY(0);    color: var(--accent); }}
     100% {{ opacity: 1; transform: translateY(0);    color: var(--accent); }}
   }}
   .dots {{
@@ -310,12 +328,16 @@ def render_scene_card(
     emphasis_word: str = None,
     lang: str = "tr",
     brand: str = BRAND_DEFAULT,
+    theme_idx: int = None,
 ) -> bool:
     """Bir sahne için 1080x1920 JPEG kart üretir. Başarılıysa True döner.
     Hata durumunda False döner (çağıran taraf koyu-arkaplan fallback'ine
-    düşer — generator.py'deki mevcut davranışla aynı desende)."""
+    düşer — generator.py'deki mevcut davranışla aynı desende).
+    theme_idx verilirse tema seçimi index yerine ondan yapılır — videonun
+    tamamının (açılış kartı dahil) aynı, video'ya özel renk döngüsünden
+    başlaması için (bkz. produce.py _theme_idx_for)."""
     try:
-        theme = THEMES[index % len(THEMES)]
+        theme = THEMES[(theme_idx if theme_idx is not None else index) % len(THEMES)]
         badge = _esc((badge_text or ("BİLGİ" if lang == "tr" else "INFO")).upper()[:40])
         caption_html = _emphasize_html(text, emphasis_word, theme["accent"])
         footer = _esc(brand)
@@ -355,16 +377,19 @@ def render_scene_clip(
     emphasis_word: str = None,
     lang: str = "tr",
     brand: str = BRAND_DEFAULT,
+    theme_idx: int = None,
 ) -> bool:
     """render_scene_card ile AYNI kart, ama tek kare yerine gerçek hareketli
     klip: grid kayması, nefes alan glow, süzülen parçacıklar, giriş animasyonu.
     Playwright'ın kendi video kaydını kullanır (gerçek zamanlı — `duration`
     saniye kadar sürer). Sonuç doğrudan bir .mp4 dosyasıdır, ffmpeg loop/zoom
     adımına gerek kalmaz; produce.py bu klibi olduğu gibi concat listesine
-    ekler. Hata durumunda False döner (çağıran statik karta düşer)."""
+    ekler. Hata durumunda False döner (çağıran statik karta düşer).
+    theme_idx: bkz. render_scene_card — verilirse tema index yerine ondan
+    seçilir (video'ya özel renk döngüsü başlangıcı için)."""
     import time
     try:
-        theme = THEMES[index % len(THEMES)]
+        theme = THEMES[(theme_idx if theme_idx is not None else index) % len(THEMES)]
         badge = _esc((badge_text or ("BİLGİ" if lang == "tr" else "INFO")).upper()[:40])
         caption_html = _karaoke_caption_html(text, duration, emphasis_word, theme["accent"])
         footer = _esc(brand)
@@ -396,8 +421,18 @@ def render_scene_clip(
         # klibin İLK karesi (=Instagram/YouTube'un otomatik kapak seçtiği kare)
         # boş/beyaz çıkıyor — canlı yayında tam olarak bu bug yaşandı.
         lead_in = time.monotonic() - t0
-        # Gerçek zamanlı kayıt — sahne sesinin süresi kadar bekle (+ küçük pay)
-        time.sleep(max(0.6, float(duration)) + 0.15)
+        # skip'i SLEEP'TEN ÖNCE hesaplıyoruz — çünkü taban değer (0.4sn) ölçülen
+        # lead_in'den yüksek çıkabiliyor, o durumda ham kaydın da buna göre UZUN
+        # sürmesi lazım. Aksi halde (bir önceki haliyle test edildi, gerçekten
+        # yaşandı): sleep hep `duration` baz alınarak hesaplanıyordu, taban skip
+        # bunu aştığında -t {duration} kırpması ham görüntüden TAŞIYOR ve klip
+        # istenenden kısa çıkıyordu (2.2sn istenen hook kartı gerçekte 1.3-1.6sn
+        # çıktı — 6 ardışık testte doğrulandı).
+        skip = round(max(lead_in + 0.08, 0.4), 3)
+        # Gerçek zamanlı kayıt — hedef süre + taban skip'in lead_in'i aşan kısmı
+        # + küçük pay kadar bekle, ham kaydın -ss+-t için her zaman yeterli
+        # olmasını garanti eder.
+        time.sleep(max(0.6, float(duration)) + 0.15 + max(0.0, skip - lead_in))
         video = page.video
         page.close()
         context.close()  # dosya ancak context kapanınca diske yazılır
@@ -410,7 +445,6 @@ def render_scene_clip(
         # (3.5 kat fark) çıktı, sistem yüküne göre değişiyor. Bu yüzden sabit
         # bir taban (0.4sn) + ölçülen değer üstüne pay — düşük ölçülse bile
         # yetersiz kalmasın diye.
-        skip = round(max(lead_in + 0.08, 0.4), 3)
         result = subprocess.run([
             "ffmpeg", "-y", "-ss", str(skip), "-i", str(raw_video), "-t", str(duration),
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
@@ -491,13 +525,17 @@ _HOOK_TEMPLATE = """<!DOCTYPE html>
   }}
   .hook em {{ color: {accent}; font-style: normal; }}
   /* Eski sistemdeki kalın "SON DAKİKA/UYARI" bandının karşılığı: parlak
-     renkli, koyu metinli, tam genişlik bir şerit -- kapak/thumbnail
-     otomatik seçilse bile tek başına anında okunur bir "çengel" olsun diye. */
+     renkli, koyu metinli bir şerit -- kapak/thumbnail otomatik seçilse
+     bile tek başına anında okunur bir "çengel" olsun diye. ÖNCEDEN
+     left:0;right:0 ile tam kenardan kenara gidiyordu -- kullanıcı geri
+     bildirimi: bu haliyle "ham/çirkin" duruyordu. Artık badge/hook ile
+     aynı hizada (60px) kenar boşluğu var ve köşeler yuvarlatılmış, hazır
+     bir "rozet/etiket" gibi duruyor, ham bant gibi değil. */
   .ribbon {{
-    position: absolute; left: 0; right: 0; bottom: 30%;
+    position: absolute; left: 60px; right: 60px; bottom: 30%;
     background: {accent}; color: #10131c;
-    font-weight: 900; font-size: 44px; letter-spacing: 1px;
-    padding: 22px 40px; text-align: center;
+    font-weight: 900; font-size: 42px; letter-spacing: 1px;
+    padding: 20px 30px; text-align: center; border-radius: 16px;
     transform: translateY(40px); opacity: 0;
     animation: ribbonin 0.35s ease-out 0.42s both;
     box-shadow: 0 10px 40px rgba(0,0,0,0.4);
@@ -540,15 +578,31 @@ def render_hook_card(
     theme_idx: int = 0,
     ribbon_text: str = None,
 ) -> bool:
-    """Videonun İLK karesi: tüm başlık ANINDA (kelime kelime değil) büyük ve
-    çarpıcı bir 'impact' animasyonuyla belirir, ardından eski sistemdeki kalın
-    renkli "SON DAKİKA/UYARI" bandının karşılığı olan bir 'ribbon' şerit
-    beliriyor — tek bakışta okunan bir çengel versin diye (kendi marka
-    dilimizde: fotoğraf yok, düz gradyan + rozet + parlak renkli şerit).
-    Video kapağı/thumbnail genelde ilk saniyelerden otomatik seçildiği için
-    (hem Instagram hem YouTube) bu kart özellikle önemli — süre bilerek
-    2+ saniyeye çıkarıldı ki otomatik kapak seçici HANGİ kareyi seçerse
-    seçsin hâlâ bu kartın içinde, dolu ve okunur bir karede kalsın."""
+    """Videonun İLK karesi = video kapağı/thumbnail (Instagram ve YouTube
+    otomatik seçiminde). Bu yüzden GÜVENİLİRLİK burada her şeyden önemli.
+
+    ÖNCEKİ YAKLAŞIM (kaldırıldı): Playwright'ın gerçek zamanlı video kaydı
+    (record_video_dir) ile animasyonu "canlı" kaydedip sonra ffmpeg -ss ile
+    başındaki boş kare aralığını kesmeye çalışıyordu. Bu üç ayrı bug'a yol
+    açtı (hepsi canlıda yaşandı): (1) kayıt context açılışı ile sayfanın
+    boyanması arasındaki ~300-450ms boşluk kapağın bomboş/beyaz çıkmasına,
+    (2) bu boşluğun kendisi de ölçümden ölçüme 0.17-0.59sn arası değişip
+    öngörülemez olmasına, (3) bunu düzeltmek için eklenen taban (floor)
+    değeri de kayıt süresini hesaba katmayınca klibin istenenden KISA
+    çıkmasına yol açtı. Kök sorun: GERÇEK ZAMANLI/WALL-CLOCK bir kayıt
+    süreciyle "bu an tam olarak ne gösteriliyor" sorusuna güvenilir cevap
+    vermeye çalışmak — zamanlama sandbox yüküne göre değişken.
+
+    YENİ YAKLAŞIM: eski/güvenilir "Short Üret" sekmesiyle AYNI desen —
+    canlı video kaydı YOK. Sayfa render edilir, animasyonların bitmesi için
+    sabit bir süre beklenir (page.wait_for_timeout — bu bir SAYFA İÇİ
+    zamanlayıcı, kayıt zamanlamasıyla ilgisi yok), SONRA tek bir
+    page.screenshot() ile o anki (tamamen oturmuş, ribbon dahil) hâli JPEG
+    olarak yakalanır, ffmpeg bu SABİT görüntüyü `duration` saniye boyunca
+    -loop ile videoya çevirir (tıpkı render_scene_card'ın fallback yolunda
+    ve eski sistemde olduğu gibi). Artık hiçbir zamanlama ölçümü/tahmini
+    yok — screenshot alındığı anda sayfa kesin olarak o hâldedir, kayıt
+    başlangıcı/boşluk/süre kısalması gibi bir risk kalmadı."""
     try:
         theme = THEMES[theme_idx % len(THEMES)]
         badge = _esc((badge_text or ("BİLGİ" if lang == "tr" else "INFO")).upper()[:40])
@@ -565,45 +619,28 @@ def render_hook_card(
             font_size=_hook_font_size(title or ""),
         )
         out_mp4_path = Path(out_mp4_path)
-        rec_dir = out_mp4_path.parent / (out_mp4_path.stem + "_rec")
-        rec_dir.mkdir(parents=True, exist_ok=True)
 
-        import time
         browser = _get_browser()
-        t0 = time.monotonic()
-        context = browser.new_context(
-            viewport={"width": W, "height": H},
-            record_video_dir=str(rec_dir),
-            record_video_size={"width": W, "height": H},
-        )
-        page = context.new_page()
-        page.set_content(html, wait_until="load")
-        # Bkz. render_scene_clip'teki aynı yorum — bu klip özellikle KRİTİK
-        # çünkü bu kart videonun tam açılışı ve genelde otomatik kapak/thumbnail
-        # buradan seçiliyor. Boş kayıt boşluğunu (context açılışı ile içerik
-        # boyanması arası) mutlaka atlamamız lazım, yoksa kapak bomboş çıkıyor.
-        lead_in = time.monotonic() - t0
-        time.sleep(max(0.6, float(duration)) + 0.15)
-        video = page.video
-        page.close()
-        context.close()
+        page = browser.new_page(viewport={"width": W, "height": H})
+        try:
+            page.set_content(html, wait_until="load")
+            # En geç biten eleman .ribbon: animation-delay 0.42s + duration
+            # 0.35s = 0.77s'de tamamlanıyor. 900ms bekleyip screenshot almak
+            # her elemanın kesin olarak final/durgun halinde olmasını sağlar
+            # — bu bir "tahmin" değil, sayfanın kendi zamanlayıcısı, kayıt
+            # zamanlamasıyla karışmıyor.
+            page.wait_for_timeout(900)
+            tmp_png = out_mp4_path.with_suffix(".hook.png")
+            page.screenshot(path=str(tmp_png))
+        finally:
+            page.close()
 
-        raw_video = Path(video.path())
-        # Bu kartta .ribbon en geç başlayan/biten eleman:
-        # animation-delay:0.42s + duration:0.35s = 0.77sn'de tamamlanıyor.
-        # lead_in'in kendisi de güvenilmez (bkz. render_scene_clip'teki not) —
-        # bu yüzden taban 1.0sn'ye çekildi, hem boş-kare hem de ribbon'un
-        # animasyonu bitmeden alınan yarım/bozuk kare riskini kapatıyor.
-        # Instagram'ın Reels kapağı bu klibin BİRİNCİ karesinden otomatik
-        # seçiliyor (API üzerinden ayrı kapak set etme seçeneği yok), o yüzden
-        # bu ilk kare kesinlikle tam oturmuş olmalı.
-        skip = round(max(lead_in + 0.08, 1.0), 3)
         result = subprocess.run([
-            "ffmpeg", "-y", "-ss", str(skip), "-i", str(raw_video), "-t", str(duration),
+            "ffmpeg", "-y", "-loop", "1", "-i", str(tmp_png), "-t", str(duration),
             "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-an", str(out_mp4_path),
         ], capture_output=True, timeout=60)
-        shutil.rmtree(rec_dir, ignore_errors=True)
+        tmp_png.unlink(missing_ok=True)
         if result.returncode != 0 or not out_mp4_path.exists() or out_mp4_path.stat().st_size == 0:
             return False
         return True

@@ -13,6 +13,7 @@ Kullanım:
   python3 produce.py script.json out/final.mp4 --platform youtube
 """
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -66,6 +67,44 @@ def _synth_edge(text: str, voice: str, out_path: Path) -> float:
     return float(r.headers.get("X-Duration-Seconds", "0"))
 
 
+def _theme_idx_for(script: dict) -> int:
+    """Video'ya özel, DETERMİNİSTİK tema seçimi — aynı script tekrar
+    üretilirse aynı renk çıkar, ama farklı script/video farklı renk alır.
+    ÖNCEDEN açılış kartı hep theme_idx=0'a (lacivert/altın) sabitti — art
+    arda üretilen videolar hep aynı renkte açılıyordu (kullanıcı geri
+    bildirimi). Python'un yerleşik hash()'i string'lerde süreçten
+    sürece rastgele (PYTHONHASHSEED) olduğu için KULLANILMIYOR — md5 gibi
+    kararlı bir hash lazım."""
+    import custom_visuals as cv
+    key = f"{script.get('title','')}|{script.get('badge_text','')}"
+    h = hashlib.md5(key.encode("utf-8")).hexdigest()
+    return int(h, 16) % len(cv.THEMES)
+
+
+def _synth_one(text: str, out_path: Path, voice: str, lang: str):
+    """Tek bir metin için TTS (hook narrasyonu / kapanış CTA cümlesi gibi
+    sahne-dışı parçalar için) — önce Edge dener, olmazsa yerel supertonic'e
+    düşer. _synth_scenes'teki sahne-bazlı fallback ile aynı mantık, tek
+    metin için ayrıca kullanılabilir hale getirildi."""
+    edge_voice = voice if voice.startswith("E-") else "E-Ahmet"
+    try:
+        dur_val = _synth_edge(text, edge_voice, out_path)
+        if dur_val <= 0:
+            raise RuntimeError("süre 0 döndü")
+        return out_path, dur_val
+    except Exception:
+        from supertonic import TTS
+        tts = TTS(auto_download=True)
+        style = tts.get_voice_style(voice_name="M1")
+        wav, dur = tts.synthesize(
+            text=clean_tts_text(text), lang=lang, voice_style=style,
+            total_steps=8, speed=1.0,
+        )
+        dur_val = float(dur[0]) if hasattr(dur, "__getitem__") else float(dur)
+        tts.save_audio(wav, str(out_path))
+        return out_path, dur_val
+
+
 def _synth_scenes(scenes, work: Path, voice: str, lang: str):
     """Her sahne için (audio_path, duration) listesi döner. Önce Edge TTS
     dener (PANEL_COOKIE varsa), sahne bazında başarısız olursa o sahne için
@@ -117,6 +156,8 @@ def produce(script: dict, out_path: Path, platform: str = "youtube", voice: str 
 
     total = len(scenes) + 1  # +1 = kapanış kartı
 
+    theme_idx = _theme_idx_for(script)
+
     if _cache and _cache.get("clip_files"):
         clip_files = list(_cache["clip_files"])
         audio_files = list(_cache["audio_files"])
@@ -124,34 +165,46 @@ def produce(script: dict, out_path: Path, platform: str = "youtube", voice: str 
         audio_files, clip_files = [], []
 
         # Açılış (hook) kartı: başlık ANINDA büyük/çarpıcı belirir + eski
-        # sistemdeki kalın renkli banda karşılık gelen 'ribbon' şerit. Video
-        # kapağı/thumbnail genelde ilk saniyelerden otomatik seçildiği için
-        # (hem IG hem YT) süre bilerek 2.2s'ye çıkarıldı — hangi kare
-        # seçilirse seçilsin hâlâ dolu/okunur bir karede kalsın diye.
+        # sistemdeki kalın renkli banda karşılık gelen 'ribbon' şerit.
         title = script.get("title", scenes[0]["text"][:70] if scenes else "")
+        hook_text = script.get("hook_text") or title
         ribbon_text = script.get("ribbon_text") or badge_text
-        hook_dur = 2.2
-        hook_clip = work / "clip_hook.mp4"
-        hook_ok = cv.render_hook_card(
-            title, hook_clip, badge_text=badge_text, emphasis_word=emphasis_word,
-            duration=hook_dur, lang=lang, brand=brand, ribbon_text=ribbon_text,
-        )
-        if hook_ok:
-            hook_audio = work / "audio_hook.wav"
+
+        # SESLİ açılış: ÖNCEDEN hook kartı süresince (1.35-2.2sn) tamamen
+        # SESSİZDİ (anullsrc), gerçek anlatım ancak sahne 1'de başlıyordu —
+        # kullanıcı geri bildirimi: ilk saniyelerde ölü sessizlik "geçme"
+        # riski yaratıyor. Şimdi başlık/hook cümlesi TTS ile seslendirilip
+        # görsel süre konuşma süresine göre ayarlanıyor (kapak/thumbnail
+        # güvenliği için yine de en az 2.0sn tutuluyor).
+        hook_audio = work / "audio_hook.wav"
+        hook_speech_dur = 0.0
+        try:
+            _, hook_speech_dur = _synth_one(hook_text, hook_audio, voice, lang)
+        except Exception:
+            hook_speech_dur = 0.0
+        if hook_speech_dur > 0 and hook_audio.exists():
+            hook_dur = max(2.0, hook_speech_dur + 0.3)
+        else:
+            hook_dur = 2.2
             run([
                 "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", str(hook_dur),
                 "-c:a", "pcm_s16le", str(hook_audio),
             ], timeout=30)
+
+        hook_clip = work / "clip_hook.mp4"
+        hook_ok = cv.render_hook_card(
+            title, hook_clip, badge_text=badge_text, emphasis_word=emphasis_word,
+            duration=hook_dur, lang=lang, brand=brand, ribbon_text=ribbon_text,
+            theme_idx=theme_idx,
+        )
+        if hook_ok:
             clip_files.append(hook_clip)
             audio_files.append(hook_audio)
             if _cache is not None:
                 # YouTube'un/Instagram'ın otomatik kapak seçimine güvenmek
-                # yerine hook kartının tam oturmuş halinden (1.0s, impact
-                # animasyonu bitmiş + ribbon görünür) sabit bir JPEG kapak
-                # çıkarıyoruz. thumbnail_filename ile /api/yt/upload'a
-                # verilebilir (Instagram tarafında API üzerinden ayrı kapak
-                # set etme seçeneği yok, ama artık ilk kare zaten dolu
-                # olduğundan IG'nin kendi otomatik seçimi de düzeldi).
+                # yerine hook kartının tam oturmuş halinden (1.0s) sabit bir
+                # JPEG kapak çıkarıyoruz. thumbnail_filename ile
+                # /api/yt/upload'a verilebilir.
                 thumb_path = work / "thumb_cover.jpg"
                 try:
                     run([
@@ -167,28 +220,33 @@ def produce(script: dict, out_path: Path, platform: str = "youtube", voice: str 
         for i, (scene, (audio_path, dur_val)) in enumerate(zip(scenes, synth)):
             text = scene["text"]
             audio_files.append(audio_path)
-            clip_path = _render_scene(text, i, total, dur_val, work, badge_text, emphasis_word, lang, brand)
+            clip_path = _render_scene(
+                text, i, total, dur_val, work, badge_text, emphasis_word, lang, brand,
+                theme_idx=(i + theme_idx) % len(cv.THEMES),
+            )
             clip_files.append(clip_path)
         if _cache is not None:
             _cache["clip_files"] = list(clip_files)
             _cache["audio_files"] = list(audio_files)
             _cache["work"] = work  # dosyalar silinmesin diye referans tutuluyor
 
-    return _finish(script, clip_files, audio_files, out_path, platform, work)
+    return _finish(script, clip_files, audio_files, out_path, platform, work, voice=voice, lang=lang, theme_idx=theme_idx)
 
 
-def _render_scene(text, i, total, dur_val, work, badge_text, emphasis_word, lang, brand):
-    clip_path = work / f"clip_{i}.mp4"
+def _render_scene(text, i, total, dur_val, work, badge_text, emphasis_word, lang, brand, theme_idx=None, name=None):
+    clip_path = work / f"{name or f'clip_{i}'}.mp4"
     ok = cv.render_scene_clip(
         text, i, total, dur_val, clip_path,
         badge_text=badge_text, emphasis_word=emphasis_word, lang=lang, brand=brand,
+        theme_idx=theme_idx,
     )
     if not ok:
         # Animasyonlu kayıt başarısızsa statik karta düş, sonra loop'la
-        img_path = work / f"scene_{i}.jpg"
+        img_path = work / f"{name or f'scene_{i}'}.jpg"
         ok2 = cv.render_scene_card(
             text, i, total, img_path,
             badge_text=badge_text, emphasis_word=emphasis_word, lang=lang, brand=brand,
+            theme_idx=theme_idx,
         )
         if not ok2:
             from PIL import Image
@@ -201,12 +259,52 @@ def _render_scene(text, i, total, dur_val, work, badge_text, emphasis_word, lang
     return clip_path
 
 
-def _finish(script, content_clip_files, content_audio_files, out_path: Path, platform: str, work: Path):
-    """İçerik sahneleri hazır (klip+ses) — kapanış kartını platforma göre
-    ekleyip finali mux eder. produce() ve produce_dual() ikisi de burayı
-    çağırır."""
+def _finish(script, content_clip_files, content_audio_files, out_path: Path, platform: str, work: Path,
+            voice: str = "E-Ahmet", lang: str = "tr", theme_idx: int = 0):
+    """İçerik sahneleri hazır (klip+ses) — SESLİ kapanış çağrısı (CTA) +
+    kapanış kartını platforma göre ekleyip finali mux eder. produce() ve
+    produce_dual() ikisi de burayı çağırır. platform'a göre farklı (YouTube:
+    abone ol, Instagram: takip et) çağrı cümlesi kullanıldığı için bu adım
+    PAYLAŞILAN _cache'in DIŞINDA, her platform için ayrı ayrı çalışır."""
     clip_files = list(content_clip_files)
     audio_files = list(content_audio_files)
+    scenes = script.get("scenes", [])
+    total = len(scenes) + 1
+    badge_text = script.get("badge_text", "BİLGİ")
+    brand = script.get("brand", cv.BRAND_DEFAULT)
+
+    # SESLİ kapanış çağrısı: ÖNCEDEN kapanışta sadece SESSİZ statik bir
+    # "Abone Ol/Takip Et" görseli vardı, teşvik edici bir SÖZ yoktu —
+    # kullanıcı geri bildirimi: "bizi takip etmeye devam edin" tarzı bir
+    # bitiş cümlesi olmalı. Platforma göre ayrı metin (YT: abone, IG: takip
+    # + yorum teşviki), script içinden override edilebilir.
+    if platform == "youtube":
+        cta_text = script.get("closing_text_youtube") or (
+            "Bunun gibi daha fazla pratik bilgi için kanalımıza abone olmayı unutmayın."
+        )
+        cta_badge = "ABONE OL"
+    else:
+        cta_text = script.get("closing_text_instagram") or (
+            "Bunun gibi daha fazla pratik bilgi için bizi takip etmeyi unutmayın, "
+            "siz ne düşünüyorsunuz, yorumlarda buluşalım."
+        )
+        cta_badge = "TAKİP ET"
+
+    cta_audio = work / f"audio_cta_{platform}.wav"
+    cta_dur = 0.0
+    try:
+        _, cta_dur = _synth_one(cta_text, cta_audio, voice, lang)
+    except Exception:
+        cta_dur = 0.0
+    if cta_dur > 0 and cta_audio.exists():
+        cta_clip = _render_scene(
+            cta_text, len(scenes), total, cta_dur, work, cta_badge, "", lang, brand,
+            theme_idx=(len(scenes) + theme_idx) % len(cv.THEMES), name=f"clip_cta_{platform}",
+        )
+        clip_files.append(cta_clip)
+        audio_files.append(cta_audio)
+    # cta_dur == 0 ise (TTS iki yöntemde de başarısız oldu) sessizce atlanır
+    # — kapanış kartı yine de eklenir, sadece sesli CTA olmaz.
 
     endcard_src = ENDCARD_YT if platform == "youtube" else ENDCARD_TR
     endcard_dur = 2.0

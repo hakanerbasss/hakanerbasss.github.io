@@ -1,6 +1,83 @@
 # Türkiye Bilgi Merkezi — Devir Notu (Cowork oturumları için)
 
-## GÜNCEL DURUM (2026-08-13, en son değişiklikler — önce burayı oku)
+## GÜNCEL DURUM (2026-08-13 akşam — KRİTİK BUG FIX, önce burayı oku)
+
+**ÖZET: Cron 15:00 UTC'de otomatik çalıştı, YouTube+Instagram'a birer video
+attı, ama kapak/thumbnail KRİTİK bir teknik bug yüzünden bozuk çıktı —
+Instagram'ın kendi seçtiği kapak BOMBOŞ BEYAZ, YouTube'unki de cümle
+ortasından anlamsız bir kırıntıydı. Kullanıcı ekran görüntüsüyle şikayet
+etti ("kapaklar görünmüyor bile"). Kök neden bulundu ve düzeltildi —
+detay ve kanıt aşağıda. Cron şu an yine DEVRE DIŞI, bu fix server'a
+gitmeden tekrar açılmamalı.**
+
+### Bug'ın kök nedeni (kanıtlanmış, frame-by-frame test edildi)
+`custom_visuals.py`'deki `render_scene_clip` ve `render_hook_card`,
+Playwright `record_video_dir` ile context açıp SONRA `page.set_content()`
+çağırıyordu. Chromium'un video kaydı context açılır açılmaz başlıyor —
+ama sayfa o an hâlâ `about:blank` (boş/beyaz). Context açılışı ile
+`set_content()`'in gerçekten boyanması arasında ölçülen gecikme
+**~350-450ms**. ffmpeg trim adımı klibi hep t=0'dan kesiyordu
+(`-t {duration}`, `-ss` YOK) — yani her klibin/hook kartının İLK karesi
+her zaman bu boş/beyaz aralıktan geliyordu. Video kapağı/thumbnail'i
+otomatik seçen algoritmalar (özellikle Instagram) tam olarak bu kareyi
+yakalıyor → bomboş kapak. YouTube'unki farklı bir sezgiyle "az bilgili"
+kareleri atlıyor, bu da onu hook kartının tamamını atlayıp sahne
+altyazısının ortasına düşürüyordu.
+
+### Düzeltme (uygulandı, test edildi, kanıt: frame extraction)
+1. `render_scene_clip` ve `render_hook_card` artık context açılışından
+   `set_content()`'in dönüşüne kadar geçen gerçek süreyi (`lead_in`)
+   `time.monotonic()` ile ölçüyor, ffmpeg trim'e `-ss {lead_in+0.08}`
+   ekleyip bu boş baş kısmını kesin olarak atlıyor. Test: t=0 karesi
+   artık asla blank/beyaz değil.
+2. `render_hook_card` görsel olarak da güçlendirildi: süre 1.35s→**2.2s**
+   (otomatik kapak seçici hangi kareyi seçerse seçsin hâlâ dolu bir
+   karede kalsın diye), eski sistemdeki kalın renkli "SON DAKİKA/UYARI"
+   bandının karşılığı olan **`.ribbon` şeridi** eklendi (parlak renk
+   blok + koyu bold metin, tam genişlik), hafif vignette eklendi (düz
+   gradyanın "yassı" hissini kırmak için). Script JSON'a yeni **opsiyonel
+   `ribbon_text` alanı** eklendi (yoksa `badge_text`'e düşer).
+3. `produce()` artık hook kartının 1.0s'deki (tam oturmuş, ribbon dahil)
+   karesinden ekstra bir **statik JPEG kapak** çıkarıyor
+   (`_cache["thumb_path"]`), `produce_dual()` bunu kopyalayıp 3. dönüş
+   değeri olarak veriyor (`yt_path, ig_path, thumb_path`). Bu, YouTube'un
+   otomatik kapak seçimine hiç güvenmemek için — `/api/yt/upload`'un
+   zaten var olan `thumbnail_filename` parametresine verilecek.
+4. **DÜZELTME (2026-08-13 akşam, Claude Code tarafından): bu endpoint ZATEN
+   VAR, farklı isim ve farklı (doğru) klasörle.** `/api/upload-raw-video`
+   ile aynı desende ama adı `POST /api/upload-raw-thumbnail` ve `image=@...`
+   parametresi alıyor (`video=@...` değil). Ayrıca hedef klasör OUTPUT_DIR
+   DEĞİL — `THUMB_DIR` (`thumbnails/`), çünkü `/api/yt/upload`'un
+   `thumbnail_filename` parametresi dosyayı gerçekte THUMB_DIR'da arıyor
+   (app.py satır ~7946, doğrulandı). OUTPUT_DIR'a atsaydı `thumbnail_filename`
+   dosyayı asla bulamazdı. `upload_thumbnail_patch.py` diye ayrı bir dosya
+   YOK, kod doğrudan app.py'ye eklendi. Dönen JSON `{"ok": true, "filename":
+   "raw_<hex>.jpg"}` (`thumb_xxx.jpg` değil, ama isim önemli değil — sadece
+   dönen filename'i `thumbnail_filename=` olarak kullan).
+5. Instagram tarafında ayrı bir "kapak yükle" API'si yok (Graph API'de
+   sadece videonun içinden bir an seçen `thumb_offset` var, dosya
+   yükleme değil) — o yüzden Instagram için asıl/tek düzeltme zaten
+   yukarıdaki blank-frame fix'i.
+
+### Yeni oturum ne yapmalı (sırayla)
+1. Yukarıdaki fix'in `custom-production/custom_visuals.py` ve
+   `produce.py`'de gerçekten commit edilmiş olduğunu doğrula (frame
+   extraction ile test et — bkz. yöntem: `ffmpeg -i clip.mp4 -vf
+   "select='eq(n\\,0)'" -vsync vfr frame0.png` sonra görüntüyü aç, blank
+   OLMAMALI).
+2. ~~`upload_thumbnail_patch.py`'deki endpoint'in eklenip eklenmediğini
+   kontrol et~~ — GEREKSİZ, zaten `/api/upload-raw-thumbnail` olarak
+   sunucuda canlı (bkz. yukarıdaki düzeltme notu).
+3. Yayın akışına thumbnail adımını ekle: `produce_dual()`'ın 3. dönüş
+   değeri (thumb_path) varsa → `POST /api/upload-raw-thumbnail`'a
+   `image=@thumb_path` ile yükle → dönen filename'i `/api/yt/upload`'a
+   `thumbnail_filename=` olarak ver.
+4. Ancak TÜM bunlar doğrulandıktan sonra cron'u (`trig_01Lm6ja1sfk5ZgTL7QxmDQAj`)
+   yeni bir prompt'la tekrar `enabled: true` yap.
+
+---
+
+## ÖNCEKİ DURUM NOTLARI (2026-08-13 öğlen, hâlâ geçerli)
 
 - `produce.py` artık **gerçek Edge TTS (E-Ahmet)** kullanıyor, `/api/tts-only`
   endpoint'i üzerinden (`PANEL_COOKIE` ortam değişkeni ile — her oturumda
@@ -8,14 +85,8 @@
   (M1) sadece sahne bazlı fallback, artık varsayılan değil.
 - `produce_dual(script, out_youtube, out_instagram, ...)` eklendi: aynı
   senaryoyu TEK SEFER seslendirip render eder, sadece kapanış kartı farklı
-  iki final video üretir (TTS/render maliyeti 2 katına çıkmaz).
-- **YENİ: `render_hook_card` / açılış kartı.** Videonun İLK ~1.35 saniyesi
-  artık başlığın TAMAMININ anında, büyük, çarpıcı bir "impact" animasyonuyla
-  belirdiği bir kart (karaoke değil — kelime kelime değil, hepsi birden).
-  Neden: kullanıcı geri bildirimi — karaoke altyazı tek başına video kapağı/
-  ilk kare için yeterince "scroll durdurucu" değildi (eski sistemin kalın
-  SON DAKİKA/UYARI bandına kıyasla). `produce()` içinde otomatik en başa
-  ekleniyor, ayrıca çağırmaya gerek yok.
+  iki final video üretir (TTS/render maliyeti 2 katına çıkmaz). **GÜNCEL:
+  artık 3 değer döndürüyor, bkz. yukarısı.**
 - Karaoke kelime animasyonunda bir kusur düzeltildi: kelimeler büyürken
   bitişiğe biniyordu ("emeklilereyeni" gibi) — `.word` span'lerine margin
   eklendi, scale tepe değerleri düşürüldü (1.32→1.16, emphasis 1.4→1.22).
@@ -27,13 +98,22 @@
   + Instagram (media_id 18193510315387106), konu: 2026 dijital emekli kartı.
   Bu yayında category_id gönderilmedi (henüz bu düzeltme yokken atıldı) —
   istenirse YouTube Studio'dan manuel düzeltilebilir, kritik değil.
+- İkinci otomatik yayın (cron, 2026-08-13 ~15:45 UTC) kapak bug'ıyla gitti —
+  YouTube video `_BdNCgQga-I`, Instagram media (permalink
+  instagram.com/reel/Db_IuJHDNvh/). **Kullanıcı isterse bu ikisinin
+  kapağını manuel değiştirebilir** (YouTube Studio / Instagram app), ama
+  kritik değil, video içeriği düzgün.
 - **Cron/scheduled task `trig_01Lm6ja1sfk5ZgTL7QxmDQAj` ŞU AN DEVRE DIŞI
-  (`enabled: false`).** Eski haber-tabanlı mantıkla yazılıydı (DeepSeek,
-  eski marka), yeni sisteme uymuyordu — kullanıcı onaylamadan tekrar
-  aktifleştirilmemeli. Yeniden kurulacaksa bu dosyanın tamamını referans
-  alarak sıfırdan, yeni pipeline'a göre yazılmalı.
-- Kullanıcı yayın sıklığını kendisi kontrol etmek istiyor şu an ("5-6 saat
-  sonra atarız") — otomatik/sık yayın YAPMA, açıkça istenmeden yayınlama.
+  (`enabled: false`).** Yukarıdaki kapak bug'ı yüzünden tekrar kapatıldı —
+  fix server'a gidip doğrulanmadan tekrar açılmamalı.
+- Kullanıcı yayın sıklığını kendisi kontrol etmek istiyor şu an — otomatik/
+  sık yayın YAPMA, açıkça istenmeden yayınlama.
+- **Açık soru (kullanıcıya soruldu, henüz cevap yok):** kullanıcı eski
+  sistemdeki GERÇEK FOTOĞRAF arka planlı (Pexels tarzı) tasarımı, yeni
+  düz-gradyan tasarımdan daha güçlü/ilgi çekici buluyor. Şu anki fix
+  (ribbon + daha uzun hook + vignette) bunu kısmen telafi ediyor ama
+  gerçek fotoğraf eklemek (Pexels API key gerekir) sonraki iterasyon
+  olarak masada duruyor — kullanıcı onaylarsa yapılmalı.
 
 
 Bu dosyayı yeni bir Cowork oturumunun BAŞINDA, dosya olarak ekleyip
@@ -97,15 +177,6 @@ değil, kalıcı/pratik bilgi (SGK kuralları, haklar, hesaplama mantığı vb.)
   - `POST /api/tts-only` — **YENİ**: form `text`, `voice` (E-Ahmet/E-Emel),
     `speed` → ham WAV ses + `X-Duration-Seconds` header döner. DeepSeek/
     üretim akışına dokunmadan sadece gerçek Edge TTS sesini almak için.
-  - `POST /api/upload-raw-thumbnail` — **YENİ**: `upload-raw-video` ile aynı
-    desen ama görsel için (`image=@kapak.jpg`, `.jpg/.jpeg/.png`), THUMB_DIR'a
-    kaydeder ve `{"filename": "raw_<hex>.jpg"}` döner. `produce_dual()`'ın 3.
-    dönüş değeri olan `thumb_out` (hook kartının 1.0s'deki sabit karesi) bu
-    endpoint'e yüklenip dönen filename `/api/yt/upload`'a `thumbnail_filename`
-    olarak verilebilir — YouTube'un kendi otomatik kapak seçimine güvenmek
-    yerine sabit, garanti-dolu bir kapak sağlar. Instagram'da API üzerinden
-    ayrı kapak set etme seçeneği yok, ama artık ilk kare zaten dolu olduğundan
-    IG'nin kendi otomatik seçimi de düzeldi (bkz. custom_visuals.py -ss fix'i).
 
 ### B) Kendi bağımsız üretim sistemim (Cowork sandbox'ında, bu oturumda kuruldu)
 Neden: sunucudaki stok fotoğraf görselleri (Pexels/Wikimedia) çoğu zaman
@@ -211,3 +282,52 @@ karşı bilinçli olarak zamanlaması rastgele. Yeni oturumda devam etmek için:
       + 4000 saat İZLENME ya da 10M Shorts görüntülenme/90 gün) 1 Şubat
       2027'den ÖNCE karşılamayı hedefle (mevcut üyeler eski eşiklerde
       kalıyor, sadece yeni başvuranlar yeni/daha yüksek eşiğe tabi).
+
+## 7. 14 Ağustos 2026 — 6 maddelik geri bildirim turu (hepsi kod tarafında uygulandı)
+
+Kullanıcı test videosunu izledikten sonra 6 spesifik ürün/tasarım geri
+bildirimi verdi. 5 tanesi kod ile çözüldü, 1 tanesi (madde 5) cron
+prompt'unda ele alınmalı:
+
+1. **Açılışta sessizlik → scroll riski**: `render_hook_card` artık SESSİZ
+   değil. `produce.py` içinde `_synth_one()` ile hook metni (varsa
+   `script["hook_text"]`, yoksa `title`) seslendiriliyor, hook süresi
+   `max(2.0, konuşma_süresi + 0.3)` olarak ayarlanıyor. TTS başarısız
+   olursa sessiz 2.2s'e fallback var.
+2. **Kapanışta teşvik edici konuşma yok**: `_finish()` içine platform'a
+   özel bir CTA cümlesi eklendi (YouTube: abone ol; Instagram: takip et +
+   yorumlarda buluşalım), `script["closing_text_youtube"/"_instagram"]`
+   ile override edilebilir. Seslendirilip endcard'dan ÖNCE ayrı bir sahne
+   klibi olarak render ediliyor (`_render_scene(..., name=f"clip_cta_{platform}")`).
+3. **Bant rengi her videoda aynı**: `_theme_idx_for(script)` eklendi —
+   `title + badge_text`'in MD5 hash'inden deterministik ama videoya özel
+   bir tema index'i üretiyor (`hashlib.md5`, `hash()` DEĞİL — process'e
+   göre rastgele olurdu). Hook, tüm sahneler ve CTA aynı temayı kullanıyor
+   (video içi tutarlılık), videolar arası farklı (çeşitlilik). Test:
+   SGDP videosu altın/lacivert, kısmi-süreli-çalışma videosu yeşil çıktı.
+4. **Bant boydan boya çirkin**: `.ribbon` CSS'i `left/right: 60px` inset +
+   `border-radius: 16px` ile güncellendi (önce edge-to-edge'di).
+5. **Son 4 video hep emekli/SGK — çeşitlilik lazım**: BU KOD DEĞİL, cron'un
+   sakladığı prompt'taki konu seçim talimatı değiştirilmeli. Öneri konu
+   havuzu: sağlık hakları, e-Devlet hizmetleri, trafik/ehliyet, tüketici
+   hakları, vergi, miras/veraset, iş hukuku/kıdem-ihbar, emeklilik/SGK
+   (artık sadece BİR kategori, hepsi değil). Kullanıcı onaylarsa
+   `update_trigger` ile prompt güncellenecek.
+6. **Kelime vurgusu net değil (rengi çok hızlı beyaza dönüyor)**: `.word`
+   keyframe'leri yeniden yazıldı — kelime artık kendi "sırası" boyunca
+   (0%-80% arası) accent rengini KORUYOR, sadece 80%-100% arasında beyaza
+   geçiyor. Emphasis kelimeler (`.word-emph`) hiç beyaza dönmüyor, kalıcı
+   accent renginde kalıyor. Frame-extraction ile doğrulandı (t=7.6s/7.9s,
+   "kısmi süreli" ifadesi yeşil accent'te tutulurken önceki kelimeler
+   beyaz).
+
+Tüm değişiklikler uçtan uca `produce_dual()` ile test edildi (farklı bir
+konu: "Emeklilikte Kısmi Süreli Çalışma Hakkı Nedir?"), ses varlığı
+`ffmpeg -af volumedetect` ile doğrulandı (hook ve CTA bölümlerinde
+~-20dB ortalama, sessizlik değil), tema farkı ve kelime-tutma davranışı
+frame extraction ile görsel olarak doğrulandı.
+
+**Durum**: Bu round'un kodu (`custom_visuals.py`, `produce.py`) local'de
+tam test edildi ama HENÜZ repoya push edilmedi — kullanıcıya iletilip
+Claude Code'a (Termux) aktarılmayı bekliyor. Madde 5 (konu çeşitliliği)
+ayrıca cron prompt güncellemesi gerektiriyor, kod değişikliği değil.
