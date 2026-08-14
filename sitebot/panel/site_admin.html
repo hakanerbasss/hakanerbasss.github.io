@@ -123,6 +123,18 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   transition:background-color 9999s ease-in-out 0s}
 .f textarea{min-height:110px;resize:vertical}
 .f .sub{font-size:.79rem;color:var(--muted);margin-top:5px}
+
+/* Gorsel alanlarinin altindaki teknik ozet: boyut + sayfada nerede
+   gorunecegi. Kullanicilar "hangi boyut, nereye" bilmeden yukleyip
+   banner'a metinli reklam gorseli koyuyordu — site basligiyla ust uste
+   binip okunmaz oluyordu. */
+.imgspec{display:flex;flex-direction:column;gap:5px;margin-top:8px;padding:11px 13px;
+  border-radius:9px;background:var(--bg);border:1px solid var(--line)}
+.imgspec span{font-size:.81rem;color:var(--muted);line-height:1.5}
+.imgspec b{color:var(--fg);font-weight:700}
+.warn-box{margin-top:9px;padding:12px 14px;border-radius:9px;font-size:.83rem;line-height:1.55;
+  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#fcd9a8}
+.warn-box b{color:#fff}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:560px){.row{grid-template-columns:1fr}}
 
@@ -325,7 +337,12 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
         <div class="f"><label>Kısa açıklama (Google'da görünür)</label>
           <textarea data-path="site.description" style="min-height:80px"></textarea></div>
         <div class="f"><label>Logo</label><div id="logoField"></div>
-          <div class="sub">Şeffaf arka planlı PNG en iyi sonucu verir. Boş bırakırsanız baş harfiniz kullanılır.</div></div>
+          <div class="imgspec">
+            <span>📐 Kare (1:1), en az <b>200×200px</b></span>
+            <span>📍 Üst menüde firma adının solunda, ~38px yükseklikte küçük gösterilir</span>
+            <span>🎨 Şeffaf arka planlı PNG en iyi sonucu verir</span>
+          </div>
+          <div class="sub">Boş bırakırsanız baş harfiniz kullanılır.</div></div>
         <div class="f"><label>Anahtar kelimeler</label>
           <input type="text" data-path="seo.keywords">
           <div class="sub">Virgülle ayırın: hurdacı, bakır alım, istanbul</div></div>
@@ -338,10 +355,20 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
         <div class="f"><label>Büyük başlık</label><input type="text" data-path="banner.headline"></div>
         <div class="f"><label>Alt yazı</label><textarea data-path="banner.subline" style="min-height:80px"></textarea></div>
         <div class="f"><label>Arka plan görseli</label><div id="bannerImgField"></div>
-          <div class="sub">Yatay, geniş bir fotoğraf seçin. Boş bırakırsanız renkli bir arka plan çizilir.</div></div>
+          <div class="imgspec">
+            <span>📐 Yatay/geniş, en az <b>1600×1000px</b> (şablonunuz "Ürün Kataloğu" ise kare, en az 1200×1200px)</span>
+            <span>📍 Sayfanın en üstünde, tam genişlikte arka plan — sağdaki canlı önizlemede anında görürsünüz</span>
+          </div>
+          <div class="warn-box">
+            ⚠️ Bu görselin <b>üzerine</b> başlığınız, sloganınız ve butonlarınız bindirilir.
+            İçinde zaten büyük yazı, fiyat veya reklam metni olan görsel <b>kullanmayın</b> —
+            ikisi üst üste binip okunmaz olur. Sade bir fotoğraf seçin (işyeriniz, aracınız,
+            ürününüz); aşağıdaki "Görsel karartma" yazının okunmasına yardımcı olur ama
+            görseldeki yazıyı gizlemez.
+          </div></div>
         <div class="f"><label>Görsel karartma: <span id="ovVal">55</span>%</label>
           <input type="range" min="0" max="90" data-path="banner.overlay" style="width:100%">
-          <div class="sub">Yazının okunması için görseli koyulaştırır.</div></div>
+          <div class="sub">Yazının okunması için görseli koyulaştırır. 0% = orijinal görsel, 90% = neredeyse tek renk.</div></div>
         <div class="row">
           <div class="f"><label>1. buton yazısı</label><input type="text" data-path="banner.cta_text"></div>
           <div class="f"><label>1. buton bağlantısı</label><input type="text" data-path="banner.cta_link">
@@ -374,6 +401,10 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
       <section class="pane" data-pane="galeri">
         <h2>Galeri</h2>
         <p class="hint">Yaptığınız işlerin fotoğrafları. Birden fazla dosyayı aynı anda seçebilirsiniz.</p>
+        <div class="imgspec" style="margin-bottom:16px">
+          <span>📐 Herhangi bir oran olur, en az <b>1000px</b> genişlik önerilir</span>
+          <span>📍 Sayfada "Galeri" bölümünde ızgara halinde, tıklanınca büyür</span>
+        </div>
         <div class="gal-grid" id="galGrid"></div>
         <p class="hint" id="storeInfo" style="margin-top:14px"></p>
       </section>
@@ -384,7 +415,11 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
         <p class="hint">Kaç yıldır bu işi yaptığınız ve farkınız müşteriye güven verir.</p>
         <div class="f"><label>Başlık</label><input type="text" data-path="about.title"></div>
         <div class="f"><label>Metin</label><textarea data-path="about.text" style="min-height:150px"></textarea></div>
-        <div class="f"><label>Görsel</label><div id="aboutImgField"></div></div>
+        <div class="f"><label>Görsel</label><div id="aboutImgField"></div>
+          <div class="imgspec">
+            <span>📐 Kare veya dikey, en az <b>1200×1200px</b></span>
+            <span>📍 "Hakkımızda" yazınızın yanında — şablona göre kare, dikey ya da geniş kırpılır</span>
+          </div></div>
         <div class="f"><label>Rakamlar</label><div id="statList"></div>
           <button class="btn ghost sm" id="statAdd">+ Rakam ekle</button>
           <div class="sub">Örnek: “10+ Yıllık Tecrübe”, “500+ Mutlu Müşteri”.</div></div>
@@ -735,7 +770,9 @@ function svcRow(s,i,arr){
   d.appendChild(row);
   d.appendChild(fieldEl("Açıklama",s,"text","area"));
   const wrap=document.createElement("div"); wrap.className="f";
-  wrap.innerHTML="<label>Görsel (isteğe bağlı)</label>";
+  wrap.innerHTML=`<label>Görsel (isteğe bağlı)</label>
+    <div class="imgspec"><span>📐 Yatay, en az 800×450px</span>
+    <span>📍 Bu hizmet kartının üstünde küçük resim olarak — boş bırakılırsa simge (${s.icon||"⚡"}) gösterilir</span></div>`;
   const host=document.createElement("div"); wrap.appendChild(host); d.appendChild(wrap);
   imgFieldObj(host,s,"image");
   return d;
@@ -756,7 +793,9 @@ function prdRow(p,i,arr){
   d.appendChild(fieldEl("Sipariş / detay bağlantısı",p,"link","text",
     "boş bırakırsanız WhatsApp'a bağlanır"));
   const f=document.createElement("div"); f.className="f";
-  f.innerHTML="<label>Ürün görselleri</label>";
+  f.innerHTML=`<label>Ürün görselleri</label>
+    <div class="imgspec"><span>📐 Kare (1:1), en az 1000×1000px</span>
+    <span>📍 İlk yüklediğiniz görsel ürün kartında kapak fotoğrafı olur, diğerleri tıklanınca galeri gibi açılır</span></div>`;
   const g=document.createElement("div"); g.className="gal-grid";
   (p.images||[]).forEach((src,gi)=>{
     const c=document.createElement("div"); c.className="gal-cell";
