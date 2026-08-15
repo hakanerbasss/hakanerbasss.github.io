@@ -9865,7 +9865,11 @@ Tarih yazarken "1 Ekim" gibi rakam+ay yaz, "bin Ekim" gibi karıştırma. brand 
         if yt_url and ig_ok:
             save_custom_bilgi_log("success", f"{script['title'][:100]} [{category_label}]", yt_url)
         elif yt_url or ig_ok:
-            save_custom_bilgi_log("success", f"{script['title'][:100]} [{category_label}] — kısmi (biri başarısız: {'IG' if not ig_ok else 'YT'})", yt_url)
+            # Kısmi başarıda hangi platformun neden başarısız olduğu ÖNEMLİ —
+            # önceden ig_err/yt tarafındaki hata hesaplanıyordu ama log'a hiç
+            # yazılmıyordu, "kısmi" sonuçlar hep sebepsiz görünüyordu.
+            fail_detail = f"IG hatası: {ig_err}" if not ig_ok else "YouTube yüklemesi başarısız (yukarıdaki log satırına bak)"
+            save_custom_bilgi_log("success", f"{script['title'][:100]} [{category_label}] — kısmi (biri başarısız: {'IG' if not ig_ok else 'YT'}) — {fail_detail}", yt_url)
         else:
             save_custom_bilgi_log("error", f"Her iki platform da başarısız oldu. IG: {ig_err}")
 
