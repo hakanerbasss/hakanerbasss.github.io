@@ -218,6 +218,10 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 COMEDY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# custom-production/ — Cowork oturumunun Playwright/TTS video pipeline'ı,
+# repo kökünde supertonic-web/ ile kardeş klasör (bkz. custom-production/SISTEM_BILGI.md)
+CUSTOM_PRODUCTION_DIR = Path(__file__).parent.parent / "custom-production"
+
 AVATAR_FILE = UPLOAD_DIR / "avatar_photo.jpg"
 INFO_ENDCARD_FILE = UPLOAD_DIR / "info_endcard.jpg"
 LONGCAT_SPACE = "https://victor-longcat-video-avatar-1-5.hf.space"
@@ -9585,6 +9589,311 @@ async def run_ig_only_tr_now_telegram():
     """Test için: switch'in kayıtlı durumuna dokunmadan, sadece bu çalıştırmada
     Telegram'dan konu seçimini zorlar. Saat ayarlamaya gerek kalmadan denemek için."""
     asyncio.create_task(auto_ig_only_tr_job(force_telegram_pick=True))
+    return {"ok": True}
+
+
+CUSTOM_BILGI_SCHED_LOG = Path("custom_bilgi_sched_log.json")
+CUSTOM_BILGI_CONFIG    = Path("custom_bilgi_config.json")
+CUSTOM_BILGI_HISTORY   = Path("custom_bilgi_history.json")
+
+CUSTOM_BILGI_CATEGORIES = {
+    "emeklilik_sgk":  {"label": "Emeklilik / SGK / Maaş",
+                        "queries": ["SGK emekli maaş when:3d", "emekli aylık zam when:3d"]},
+    "saglik":         {"label": "Sağlık Hakları",
+                        "queries": ["SGK sağlık hizmeti when:3d", "engelli hakları maaş when:3d"]},
+    "edevlet":        {"label": "e-Devlet Hizmetleri",
+                        "queries": ["e-Devlet yeni hizmet when:3d", "e-Devlet kapıda when:3d"]},
+    "trafik":         {"label": "Trafik / Ehliyet",
+                        "queries": ["ehliyet yenileme when:3d", "trafik cezası zam when:3d"]},
+    "tuketici":       {"label": "Tüketici Hakları",
+                        "queries": ["tüketici hakları when:3d", "tüketici şikayeti iade when:3d"]},
+    "vergi":          {"label": "Vergi",
+                        "queries": ["emlak vergisi when:3d", "gelir vergisi dilimi when:3d"]},
+    "miras":          {"label": "Miras / Veraset",
+                        "queries": ["miras veraset when:3d", "veraset ilamı when:3d"]},
+    "is_hukuku":      {"label": "İş Hukuku",
+                        "queries": ["kıdem tazminatı when:3d", "ihbar tazminatı işçi hakları when:3d"]},
+    "bankacilik":     {"label": "Bankacılık / Finans",
+                        "queries": ["mevduat faiz oranı when:3d", "kredi kartı asgari ödeme when:3d"]},
+}
+
+_CUSTOM_BILGI_MODEL_CHOICES = ["deepseek-v4-flash", "deepseek-v4-pro"]  # panel dropdown seçenekleri
+
+
+def load_custom_bilgi_config() -> dict:
+    if CUSTOM_BILGI_CONFIG.exists():
+        cfg = json.loads(CUSTOM_BILGI_CONFIG.read_text())
+        cfg.setdefault("model", "deepseek-v4-flash")
+        return cfg
+    return {"model": "deepseek-v4-flash"}
+
+
+def save_custom_bilgi_log(status: str, message: str, url: str = ""):
+    CUSTOM_BILGI_SCHED_LOG.write_text(json.dumps(
+        {"status": status, "message": message, "url": url, "ts": time.time()},
+        ensure_ascii=False,
+    ))
+    if status == "error":
+        _fire_telegram("Custom Bilgi", message)
+
+
+def _custom_bilgi_recent_categories(n: int = 4) -> list[str]:
+    if not CUSTOM_BILGI_HISTORY.exists():
+        return []
+    try:
+        hist = json.loads(CUSTOM_BILGI_HISTORY.read_text())
+    except Exception:
+        return []
+    return [h["category"] for h in hist[-n:]]
+
+
+def _custom_bilgi_pick_category() -> str:
+    recent = set(_custom_bilgi_recent_categories(4))
+    candidates = [c for c in CUSTOM_BILGI_CATEGORIES if c not in recent]
+    if not candidates:
+        candidates = list(CUSTOM_BILGI_CATEGORIES)  # hepsi son 4'te ise (9 kategori var, olmamalı ama garanti)
+    return random.choice(candidates)
+
+
+def _custom_bilgi_add_history(category: str, title: str):
+    hist = []
+    if CUSTOM_BILGI_HISTORY.exists():
+        try:
+            hist = json.loads(CUSTOM_BILGI_HISTORY.read_text())
+        except Exception:
+            hist = []
+    hist.append({"ts": time.time(), "category": category, "title": title[:150]})
+    hist = hist[-20:]  # son 20 kayıt yeter
+    CUSTOM_BILGI_HISTORY.write_text(json.dumps(hist, ensure_ascii=False))
+
+
+async def _custom_bilgi_fetch_headlines(category_key: str, max_items: int = 6) -> list[dict]:
+    """Google News RSS'ten kategoriye özel gerçek başlık+özet çeker.
+    Aynen app.py'deki 'gurbetçi trend' fonksiyonunun deseni — yeni bir dış
+    API/anahtar gerektirmiyor."""
+    import xml.etree.ElementTree as ET
+    from urllib.parse import quote
+    from trends import _clean_rss_desc
+
+    queries = CUSTOM_BILGI_CATEGORIES[category_key]["queries"]
+    out = []
+    async with httpx.AsyncClient(timeout=20) as client:
+        for q in queries:
+            url = f"https://news.google.com/rss/search?q={quote(q)}&hl=tr&gl=TR&ceid=TR:tr"
+            try:
+                r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code != 200:
+                    continue
+                root = ET.fromstring(r.text)
+                channel = root.find("channel")
+                if channel is None:
+                    continue
+                for item in channel.findall("item")[:max_items]:
+                    t = (item.findtext("title") or "").strip()
+                    d = _clean_rss_desc(item.findtext("description") or "", title=t)
+                    if t:
+                        out.append({"title": t, "desc": d})
+            except Exception as e:
+                print(f"[CUSTOM-BILGI-RSS] '{q}' hata: {e}", flush=True)
+    # aynı başlığı iki kere ekleme
+    seen = set()
+    dedup = []
+    for h in out:
+        if h["title"] not in seen:
+            seen.add(h["title"])
+            dedup.append(h)
+    return dedup[:max_items]
+
+
+async def auto_custom_bilgi_job():
+    lock = _get_gen_lock()
+    if lock.locked():
+        save_custom_bilgi_log("running", "⏳ Üretim kuyruğa alındı, bekleniyor...")
+    await lock.acquire()
+    try:
+        api_key = get_deepseek_key()
+        if not api_key:
+            save_custom_bilgi_log("error", "DeepSeek API key sunucuda kayıtlı değil")
+            return
+        if not TOKEN_FILE.exists():
+            save_custom_bilgi_log("error", "YouTube hesabı bağlı değil")
+            return
+        ig_cfg = get_ig_config()
+        if not ig_cfg.get("ig_user_id") or not ig_cfg.get("access_token"):
+            save_custom_bilgi_log("error", "Instagram yapılandırılmamış")
+            return
+
+        cfg = load_custom_bilgi_config()
+        model = cfg.get("model", "deepseek-v4-flash")
+
+        # 1) Kategori seç (son 4 videoda kullanılmayanlardan)
+        category_key = _custom_bilgi_pick_category()
+        category_label = CUSTOM_BILGI_CATEGORIES[category_key]["label"]
+        save_custom_bilgi_log("running", f"Kategori seçildi: {category_label} — gerçek haberler taranıyor...")
+
+        # 2) Gerçek başlıkları çek (fact-check zemini)
+        headlines = await _custom_bilgi_fetch_headlines(category_key)
+        if not headlines:
+            save_custom_bilgi_log("error", f"'{category_label}' için güncel haber bulunamadı, tekrar dene")
+            return
+
+        headlines_block = "\n".join(f"- {h['title']}: {h['desc']}" for h in headlines)
+        save_custom_bilgi_log("running", f"Senaryo yazılıyor ({model})...")
+
+        # 3) DeepSeek'e SADECE bu başlıklardan senaryo yazdır
+        from openai import OpenAI
+        ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        prompt = f"""Sen "TÜRKİYE BİLGİ MERKEZİ" (YouTube) ve "HB Bot" (Instagram) için pratik bilgi videosu senaryosu yazıyorsun. Hedef kitle 45-65 yaş.
+
+Kategori: {category_label}
+
+Aşağıda bu kategoriyle ilgili GERÇEK, GÜNCEL haber başlıkları ve özetleri var. SENARYODA SADECE BURADA GEÇEN BİLGİLERİ KULLAN. Rakam, tarih, oran gibi hiçbir detayı UYDURMA — kaynakta yoksa yazma, daha genel/güvenli bir ifade kullan. Kaynakta net olmayan bir şeyi kesin gerçekmiş gibi sunma ("gündemde", "tartışılıyor" gibi ifadelerle belirt).
+
+GERÇEK HABERLER:
+{headlines_block}
+
+Şimdi TAM OLARAK şu JSON şemasında bir senaryo yaz (başka hiçbir şey yazma, sadece JSON):
+{{
+  "title": "video başlığı, dikkat çekici ama abartısız, max 80 karakter",
+  "badge_text": "kısa etiket, örn BİLİYOR MUYDUNUZ? veya GÜNDEMDE, max 15 karakter",
+  "ribbon_text": "açılış kartındaki kısa vurgu ifadesi, max 20 karakter",
+  "emphasis_word": "videoda vurgulanacak anahtar kelime/ifade, kaynaktan",
+  "hook_text": "açılışta seslendirilecek 1 cümlelik çarpıcı soru/ifade",
+  "scenes": [
+    {{"text": "1-2 cümlelik doğal Türkçe sahne metni, sadece kaynaktaki bilgilerden"}},
+    ... (toplam 5-7 sahne, kaynaktaki bilgiyi mantıklı sırayla anlat, son sahnede net bir özet/tavsiye ver)
+  ]
+}}
+
+Tarih yazarken "1 Ekim" gibi rakam+ay yaz, "bin Ekim" gibi karıştırma. brand alanı ekleme, otomatik ekleniyor."""
+
+        resp = ds.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+        )
+        script = _parse_llm_json(resp.choices[0].message.content)
+        if not script.get("title") or not script.get("scenes"):
+            save_custom_bilgi_log("error", "DeepSeek geçerli senaryo JSON'u döndürmedi")
+            return
+        script["brand"] = "TÜRKİYE BİLGİ MERKEZİ"
+
+        save_custom_bilgi_log("running", f"Video üretiliyor: {script['title'][:80]}")
+
+        # 4) custom-production/produce.py ile üret (senkron/blocking — thread'e at)
+        sys.path.insert(0, str(CUSTOM_PRODUCTION_DIR))
+        import produce as custom_produce  # lazy import — chromium/ffmpeg eksikse burada patlar
+
+        # GÜVENLİK NOTU: orijinal patch burada produce.py'nin TTS için kendi
+        # sunucusuna (PANEL_COOKIE ile) HTTP isteği atmasını sağlamak üzere
+        # programatik bir /login çağrısı yapıp bunun için sabit-kodlanmış bir
+        # ŞİFRE ("413856") içeriyordu — bu, PUBLIC bir repoya gerçek/olası bir
+        # parola commitlemek anlamına gelirdi, kabul edilemez. Çözüm: zaten AYNI
+        # process içindeyiz, hiçbir ağ turuna veya kimlik bilgisine gerek yok —
+        # produce.py'nin _synth_edge'ini, gerçek/yerel _synth_edge() fonksiyonunu
+        # doğrudan çağıran bir sürümle değiştiriyoruz (monkey-patch). Ayrıca
+        # produce.py'nin PANEL_COOKIE/PANEL_BASE'i import anında (modül seviyesinde)
+        # bir kere okunuyor — sonradan os.environ'a yazmanın zaten etkisi olmazdı.
+        def _custom_bilgi_synth_edge(text, voice, out_path):
+            return asyncio.run(_synth_edge(text, voice, 1.0, out_path))
+        custom_produce._synth_edge = _custom_bilgi_synth_edge
+
+        yt_out = OUTPUT_DIR / f"raw_{uuid.uuid4().hex}.mp4"
+        ig_out = OUTPUT_DIR / f"raw_{uuid.uuid4().hex}.mp4"
+        try:
+            yt_path, ig_path, thumb_path = await asyncio.to_thread(
+                custom_produce.produce_dual, script, yt_out, ig_out
+            )
+        except Exception as pe:
+            save_custom_bilgi_log("error", f"Video üretim hatası: {pe}")
+            return
+
+        thumb_dest = None
+        if thumb_path:
+            try:
+                thumb_dest = THUMB_DIR / f"raw_{uuid.uuid4().hex}.jpg"
+                thumb_dest.write_bytes(Path(thumb_path).read_bytes())
+            except Exception:
+                thumb_dest = None
+
+        save_custom_bilgi_log("running", f"Üretildi, yayınlanıyor: {script['title'][:80]}")
+
+        sources_str = " | ".join(h["title"] for h in headlines)
+        tags_str = f"{category_label}, bilgi, türkiye, gündem"
+
+        # 5) YouTube — mevcut /api/yt/upload'a iç HTTP çağrısı (diğer job'larla aynı desen —
+        #    localhost'tan gelen istekler auth_middleware'de zaten muaf, cookie gerekmiyor)
+        yt_url = ""
+        try:
+            async with httpx.AsyncClient(timeout=650) as client:
+                r = await client.post(
+                    "http://localhost:8001/api/yt/upload",
+                    data={
+                        "filename": Path(yt_path).name,
+                        "title": script["title"],
+                        "description": f"{script['title']}\n\nKaynak haberler: {sources_str}",
+                        "tags": tags_str,
+                        "privacy": "public",
+                        "category_id": "27",  # Eğitim — 25 (Haberler) YANLIŞ, bu ders çıkarılmıştı
+                        "channel": "tr",
+                        "thumbnail_filename": thumb_dest.name if thumb_dest else "",
+                    },
+                )
+            if r.status_code == 200:
+                yt_url = r.json().get("url", "")
+            else:
+                save_custom_bilgi_log("error", f"YouTube yüklenemedi: {r.text[:300]}")
+        except Exception as ye:
+            save_custom_bilgi_log("error", f"YouTube yükleme hatası: {ye}")
+
+        # 6) Instagram — mevcut _post_to_instagram_bg fonksiyonunu DOĞRUDAN çağır
+        #    (aynı process içindeyiz, IG-Only-TR job'unun yaptığı gibi)
+        ig_ok, ig_err = await _post_to_instagram_bg(
+            filename=Path(ig_path).name,
+            title=script["title"],
+            suggested_tags=tags_str,
+            ig_cfg=ig_cfg,
+            description=f"{script['title']}\n\n{script.get('hook_text','')}",
+            thumbnail=thumb_dest.name if thumb_dest else "",
+            source="CustomBilgi",
+            source_text=sources_str,
+            body=json.dumps(script, ensure_ascii=False),
+        )
+
+        _custom_bilgi_add_history(category_key, script["title"])
+
+        if yt_url and ig_ok:
+            save_custom_bilgi_log("success", f"{script['title'][:100]} [{category_label}]", yt_url)
+        elif yt_url or ig_ok:
+            save_custom_bilgi_log("success", f"{script['title'][:100]} [{category_label}] — kısmi (biri başarısız: {'IG' if not ig_ok else 'YT'})", yt_url)
+        else:
+            save_custom_bilgi_log("error", f"Her iki platform da başarısız oldu. IG: {ig_err}")
+
+    except Exception as e:
+        save_custom_bilgi_log("error", str(e))
+    finally:
+        lock.release()
+
+
+@app.get("/api/custom-bilgi/config")
+async def get_custom_bilgi_config():
+    cfg = load_custom_bilgi_config()
+    log = {}
+    if CUSTOM_BILGI_SCHED_LOG.exists():
+        log = json.loads(CUSTOM_BILGI_SCHED_LOG.read_text())
+    recent = _custom_bilgi_recent_categories(4)
+    return {**cfg, "log": log, "recent_categories": recent, "model_choices": _CUSTOM_BILGI_MODEL_CHOICES}
+
+
+@app.post("/api/custom-bilgi/config")
+async def save_custom_bilgi_config_endpoint(model: str = Form("deepseek-v4-flash")):
+    CUSTOM_BILGI_CONFIG.write_text(json.dumps({"model": model.strip() or "deepseek-v4-flash"}))
+    return {"ok": True}
+
+
+@app.post("/api/custom-bilgi/run-now")
+async def run_custom_bilgi_now():
+    asyncio.create_task(auto_custom_bilgi_job())
     return {"ok": True}
 
 

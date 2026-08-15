@@ -53,7 +53,10 @@ altyazısının ortasına düşürüyordu.
    dosyayı asla bulamazdı. `upload_thumbnail_patch.py` diye ayrı bir dosya
    YOK, kod doğrudan app.py'ye eklendi. Dönen JSON `{"ok": true, "filename":
    "raw_<hex>.jpg"}` (`thumb_xxx.jpg` değil, ama isim önemli değil — sadece
-   dönen filename'i `thumbnail_filename=` olarak kullan).
+   dönen filename'i `thumbnail_filename=` olarak kullan). NOT: "Bilgi
+   Merkezi" panel butonu (bkz. bölüm 8) bu endpoint'i bile kullanmıyor —
+   aynı process içinde çalıştığı için THUMB_DIR'a doğrudan dosya kopyalıyor,
+   HTTP'ye hiç gerek yok.
 5. Instagram tarafında ayrı bir "kapak yükle" API'si yok (Graph API'de
    sadece videonun içinden bir an seçen `thumb_offset` var, dosya
    yükleme değil) — o yüzden Instagram için asıl/tek düzeltme zaten
@@ -166,10 +169,7 @@ değil, kalıcı/pratik bilgi (SGK kuralları, haklar, hesaplama mantığı vb.)
   - `POST /api/shorts/send-instagram` — **500 saniyeye kadar sürebilir,
     timeout sonrası ASLA retry etme** (geçmişte bu yüzden 1 video 3 kez
     atıldı — sunucu tarafında iş devam ediyor olabilir, önce log/analytics
-    kontrol et). `tags` alanı artık hem string ("a, b, c") hem liste
-    (["a","b","c"]) kabul ediyor (2026-08-14'te düzeltildi — liste
-    gönderince önceden temiz bir 500 dönüyordu, yayın hiç denenmeden;
-    artık ikisi de çalışıyor, dönüştürmene gerek yok).
+    kontrol et).
   - `POST /api/yt/upload` — form: filename, title, description, tags,
     privacy, channel=tr.
   - `POST /api/upload-raw-video` — **YENİ (Ağustos 2026 ortasında Termux
@@ -310,12 +310,16 @@ prompt'unda ele alınmalı:
    SGDP videosu altın/lacivert, kısmi-süreli-çalışma videosu yeşil çıktı.
 4. **Bant boydan boya çirkin**: `.ribbon` CSS'i `left/right: 60px` inset +
    `border-radius: 16px` ile güncellendi (önce edge-to-edge'di).
-5. **Son 4 video hep emekli/SGK — çeşitlilik lazım**: BU KOD DEĞİL, cron'un
-   sakladığı prompt'taki konu seçim talimatı değiştirilmeli. Öneri konu
-   havuzu: sağlık hakları, e-Devlet hizmetleri, trafik/ehliyet, tüketici
-   hakları, vergi, miras/veraset, iş hukuku/kıdem-ihbar, emeklilik/SGK
-   (artık sadece BİR kategori, hepsi değil). Kullanıcı onaylarsa
-   `update_trigger` ile prompt güncellenecek.
+5. **Son 4 video hep emekli/SGK — çeşitlilik lazım**: ÇÖZÜLDÜ — cron'un
+   (trig_01Lm6ja1sfk5ZgTL7QxmDQAj) prompt'u `update_trigger` ile
+   güncellendi (14 Ağustos 2026). Artık 9 kategorilik bir havuz var
+   (emeklilik/SGK, sağlık hakları, e-Devlet, trafik/ehliyet, tüketici
+   hakları, vergi, miras/veraset, iş hukuku, bankacılık/finans) ve
+   talimat açıkça "son 4 videoda kullanılan kategorileri tespit et,
+   art arda aynı kategoriden üretme" diyor. Fresh session her seferinde
+   SISTEM_BILGI.md'deki "Son üretilen konular" listesine (bkz. altta,
+   ADIM 8 ile her üretimde eklenmesi isteniyor) veya panel geçmişine
+   bakıp karar veriyor.
 6. **Kelime vurgusu net değil (rengi çok hızlı beyaza dönüyor)**: `.word`
    keyframe'leri yeniden yazıldı — kelime artık kendi "sırası" boyunca
    (0%-80% arası) accent rengini KORUYOR, sadece 80%-100% arasında beyaza
@@ -334,3 +338,110 @@ frame extraction ile görsel olarak doğrulandı.
 tam test edildi ama HENÜZ repoya push edilmedi — kullanıcıya iletilip
 Claude Code'a (Termux) aktarılmayı bekliyor. Madde 5 (konu çeşitliliği)
 ayrıca cron prompt güncellemesi gerektiriyor, kod değişikliği değil.
+
+## 8. 14 Ağustos 2026 (akşam) — Panel içi manuel "Şimdi Üret" butonu
+
+Cron bugün 15:00 UTC'de tetiklendi (last_fired_at kaydedildi) ama
+sonrasında NE YouTube'a NE Instagram'a video düşmedi — muhtemelen bir
+hatayla sessizce yarıda kaldı (Claude Code'un o oturumunun logu Cowork'ten
+görülemiyor, tek bilinen: sonuç yok). Cowork bunu manuel `fire_trigger`
+ile tekrar tetikledi ama kullanıcı bunun yerine kalıcı bir çözüm istedi:
+**Claude Code cron'una bağımlı olmadan, panelin kendi içinden tek tıkla
+üretim+yayın.**
+
+### Ne yapıldı
+Cowork, gerçek `app.py`'yi (public repo, salt-okunur clone ile) inceleyip
+mevcut "IG-Only-TR" otomatiğinin (`auto_ig_only_tr_job`, ~satır 9163)
+BİREBİR aynı desenini kopyalayan yeni bir özellik tasarladı:
+
+- **Yeni panel sekmesi "📰 Bilgi Merkezi"**: "▶ Şimdi Üret ve Yayınla"
+  butonu — basınca ~3-6 dakikada kategori seçer, gerçek haber tarar,
+  senaryo yazar, video üretir, YouTube+Instagram'a yayınlar.
+- **Kategori rotasyonu**: 9 kategori (bkz. bölüm 7 madde 5), son 4
+  videoda kullanılmayanlardan rastgele seçiliyor — `custom_bilgi_history.json`.
+- **Fact-check zemini — ÖNEMLİ mimari karar**: DeepSeek V4 Flash kendi
+  başına canlı internet taraması YAPAMIYOR (resmi dokümandan doğrulandı).
+  Yeni bir ücretli arama API'si (Serper/Bing) BAĞLAMADIK — bunun yerine
+  app.py'de ZATEN kanıtlanmış, ücretsiz bir yöntem var: Google News RSS
+  (`news.google.com/rss/search?q=...&hl=tr&gl=TR`, aynı desen "gurbetçi
+  trends" fonksiyonunda ~satır 1891'de kullanılıyor). Yeni fonksiyon
+  `_custom_bilgi_fetch_headlines()` kategoriye özel sorgularla gerçek
+  başlık+özet çekiyor, DeepSeek'e SADECE bu metinlerden senaryo yazdırıyor
+  ("kaynakta yoksa rakam/tarih uydurma" talimatı prompt'ta açık şekilde
+  var). Sıfır yeni API key/maliyet.
+- **Model değiştirilebilir**: `custom_bilgi_config.json` → `model` alanı,
+  panelde dropdown (deepseek-v4-flash / deepseek-v4-pro). Bu SADECE bu
+  yeni özelliği etkiliyor — app.py'nin geri kalanındaki ~15 hardcode
+  edilmiş `"deepseek-v4-flash"` çağrısına dokunulmadı (istenirse ayrı bir
+  iş olarak genişletilebilir).
+- **Video üretimi**: mevcut `custom-production/produce.py` (bu oturumun
+  geliştirdiği görsel motor — karaoke altyazı, seslendirilmiş hook/CTA,
+  tema rotasyonu) `sys.path` ile import edilip `produce_dual()` doğrudan
+  çağrılıyor, `asyncio.to_thread` ile event loop bloklanmıyor.
+- **Yayın**: YouTube için mevcut `/api/yt/upload`'a iç HTTP çağrısı
+  (`category_id=27` — Eğitim, diğer job'larla aynı kural), Instagram için
+  mevcut `_post_to_instagram_bg()` fonksiyonu DOĞRUDAN çağrılıyor (aynı
+  process içinde olduğumuz için HTTP'ye gerek yok, IG-Only-TR job'unun
+  yaptığı gibi).
+
+### Teslim edilen dosyalar (kullanıcıya SendUserFile ile iletildi)
+- `custom_bilgi_backend_patch.py` — app.py'ye eklenecek Python kodu +
+  TAM olarak nereye ekleneceğinin açıklaması (auto_ig_only_tr_job'un
+  bittiği yer ile /api/ig/failed-uploads arası, ~satır 9600 civarı).
+- `custom_bilgi_frontend_patch.html` — index.html'e eklenecek nav
+  butonu + panel + JS, 3 ayrı yapıştırma noktası açıkça işaretli.
+
+### KURULUM UYARISI — Claude Code MUTLAKA kontrol etmeli
+`custom-production/produce.py` şu ana kadar SADECE Claude Code'un kendi
+geçici cron oturumu sandbox'ında çalıştı, GERÇEK panel sunucusunda HİÇ
+ÇALIŞMADI. Bu yamanın çalışması için sunucuda Playwright+Chromium
+(`playwright install chromium --with-deps`, `CUSTOM_CARD_CHROMIUM_PATH`
+env var), ffmpeg ve edge-tts/supertonic erişimi olmalı — bunlardan biri
+eksikse üretim adımı hata verir (panel çökmez, sadece log'a "error"
+yazılır, buton tekrar denenebilir hale döner) ama özellik çalışmaz.
+Claude Code bu patch'i uygulamadan önce sunucuda bu bağımlılıkları
+doğrulamalı/kurmalı ve BİR test çalıştırması yapıp sonucu (video gerçekten
+üretildi mi, YouTube+Instagram'a gerçekten gitti mi) doğrulamalı.
+
+### DÜZELTME (2026-08-14, Claude Code tarafından uygulandı)
+
+**Kritik güvenlik düzeltmesi — hardcoded şifre kaldırıldı.** Backend
+patch'inde `os.environ.get("PANEL_PASSWORD", "413856")` ile bir fallback
+şifre PUBLIC repoya commitlenmek üzereydi — bu yapılmadı. Bunun yerine:
+zaten AYNI process içinde çalıştığımız için hiçbir ağ turuna/kimlik
+bilgisine gerek yok. `custom_produce._synth_edge`, gerçek/yerel
+`_synth_edge()` fonksiyonunu doğrudan çağıran bir sürümle monkey-patch
+edildi (`asyncio.run(_synth_edge(text, voice, 1.0, out_path))`). Ayrıca
+bu, produce.py'nin `PANEL_COOKIE`'yi import ANINDA (modül seviyesinde,
+bir daha okumadan) sabitlediği bir zamanlama hatasını da (env var'ı
+import'tan SONRA set etmenin etkisi olmazdı) baştan ortadan kaldırdı.
+Thumbnail için de aynı mantık zaten patch'te vardı (THUMB_DIR'a doğrudan
+dosya kopyalama, HTTP yok) — sadece TTS tarafı tutarlı hale getirildi.
+
+**Frontend — patch'teki 2 varsayım gerçek koda uymuyordu, düzeltildi:**
+- Yeni sekme bottom-nav'a 6. doğrudan ikon olarak DEĞİL, mevcut "Daha
+  Fazla" taşma menüsüne eklendi (`more-item-custombilgi` + `MORE_TABS`
+  dizisine ekleme) — bottom-nav zaten 5 öğeyle tasarlanmıştı, 6.
+  ikon sığmazdı/düzeni bozardı.
+- `loadIGOnlyTRStatus()` sayfa yüklenince (DOMContentLoaded) DEĞİL,
+  `switchTab('instagram')` çağrılınca (`loadInstagramTab()` üzerinden)
+  tembel yükleniyormuş — gerçek koda bakıp doğrulandı. `loadCustomBilgiConfig()`
+  de aynı desende, sadece `switchTab()`'a `if (name==='custombilgi')` satırı
+  eklendi, ayrı bir init hook'a gerek kalmadı.
+
+**Hâlâ doğrulanmadı (sunucu erişimim yok, sadece git push yetkim var):**
+Playwright/Chromium/ffmpeg'in sunucuda kurulu olup olmadığını BEN test
+edemedim. `supertonic-web/requirements.txt`'e `playwright==1.47.0` eklendi
+(kod tarafı hazır) ama şunlar kullanıcının/sunucudaki birinin elle
+yapması gereken adımlar: venv'e kurulum (`supertonic-web/.venv/bin/pip
+install -r requirements.txt`), `playwright install chromium --with-deps`,
+`ffmpeg` PATH kontrolü, gerekiyorsa `CUSTOM_CARD_CHROMIUM_PATH` env var'ı.
+Bunlar tamamlanmadan "Şimdi Üret ve Yayınla" butonu hata verir (panel
+çökmez, log'a "error" yazar, buton tekrar denenebilir).
+
+### Not
+Bu özellik Claude Code'un günlük cron'unu İPTAL ETMİYOR — ona ek, daha
+hızlı/güvenilir bir manuel alternatif. Cron'un neden bugün sessizce
+yarım kaldığı hâlâ bilinmiyor (Cowork'ün o oturumun loguna erişimi yok);
+tekrarlarsa Claude Code'un kendi tarafında (Termux/cron ortamı) bir
+inceleme gerekebilir.

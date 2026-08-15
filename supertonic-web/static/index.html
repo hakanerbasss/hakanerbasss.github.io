@@ -869,6 +869,7 @@
   <div class="more-item" id="more-item-text" onclick="selectMoreTab('text')">Metin → Ses</div>
   <div class="more-item" id="more-item-iganalytics" onclick="selectMoreTab('iganalytics')">📸 Instagram Analitik</div>
   <div class="more-item" id="more-item-prompt" onclick="selectMoreTab('prompt')">🤖 Prompt</div>
+  <div class="more-item" id="more-item-custombilgi" onclick="selectMoreTab('custombilgi')">📰 Bilgi Merkezi</div>
 </div>
 
 <!-- Alt navigasyon -->
@@ -1811,7 +1812,7 @@ async function loadMeta() {
 }
 
 // Alt navigasyonda doğrudan görünen sekmeler; geri kalanı "Daha Fazla" menüsüne toplanır.
-const MORE_TABS = ['text', 'iganalytics', 'prompt'];
+const MORE_TABS = ['text', 'iganalytics', 'prompt', 'custombilgi'];
 const BNAV_DIRECT = { shorts: 'bnav-shorts', instagram: 'bnav-instagram', live: 'bnav-live', analytics: 'bnav-analytics' };
 
 // ── Instagram sekmesi ───────────────────────────────────────────────────
@@ -1831,6 +1832,63 @@ function loadInstagramTab() {
   loadIGFailedUploads();
 }
 
+// ── Bilgi Merkezi sekmesi (custom-production pipeline, manuel tetikleme) ──
+let _customBilgiPolling = null;
+
+async function loadCustomBilgiConfig() {
+  try {
+    const r = await fetch('/api/custom-bilgi/config');
+    const d = await r.json();
+    if (d.model) document.getElementById('custombilgi-model').value = d.model;
+
+    const recentEl = document.getElementById('custombilgi-recent');
+    if (d.recent_categories && d.recent_categories.length) {
+      recentEl.textContent = `Son kullanılan kategoriler: ${d.recent_categories.join(', ')}`;
+    }
+
+    const st = document.getElementById('custombilgi-status');
+    const log = d.log || {};
+    if (log.ts) {
+      st.style.display = 'block';
+      const statusEl = document.getElementById('custombilgi-last-status');
+      const LABELS = { running: 'Üretiliyor / Yayınlanıyor', success: 'Tamamlandı', error: 'Hata' };
+      let statusText = log.status ? `Durum: ${LABELS[log.status] || log.status}` : '';
+      const startTime = new Date(log.ts * 1000).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+      statusText += ` — ${startTime}`;
+      statusEl.textContent = statusText;
+      statusEl.style.color = log.status === 'success' ? 'var(--c-4ade80)' : log.status === 'error' ? 'var(--c-f87171)' : 'var(--c-fbbf24)';
+      const msgEl = document.getElementById('custombilgi-last-msg');
+      msgEl.textContent = log.message || '';
+      if (log.url) {
+        msgEl.innerHTML += ` — <a href="${log.url}" target="_blank" style="color:var(--c-7fa3ff);">${log.url}</a>`;
+      }
+
+      if (log.status === 'running') {
+        if (!_customBilgiPolling) _customBilgiPolling = setInterval(loadCustomBilgiConfig, 8000);
+      } else {
+        if (_customBilgiPolling) { clearInterval(_customBilgiPolling); _customBilgiPolling = null; }
+        const btn = document.getElementById('btn-custombilgi-run-now');
+        const spin = document.getElementById('spin-custombilgi-run-now');
+        if (btn) btn.disabled = false;
+        if (spin) spin.style.display = 'none';
+      }
+    }
+  } catch(e) {}
+}
+
+async function saveCustomBilgiConfig() {
+  const fd = new FormData();
+  fd.append('model', document.getElementById('custombilgi-model').value);
+  await fetch('/api/custom-bilgi/config', { method: 'POST', body: fd });
+}
+
+async function runCustomBilgiNow() {
+  document.getElementById('spin-custombilgi-run-now').style.display = 'inline-block';
+  document.getElementById('btn-custombilgi-run-now').disabled = true;
+  await fetch('/api/custom-bilgi/run-now', { method: 'POST' });
+  setTimeout(loadCustomBilgiConfig, 2000);
+}
+
 function switchTab(name) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
@@ -1840,6 +1898,7 @@ function switchTab(name) {
   if (name === 'instagram') loadInstagramTab();
   if (name === 'live') loadLiveTab();
   if (name === 'prompt') loadPromptPreview();
+  if (name === 'custombilgi') loadCustomBilgiConfig();
 }
 
 function updateNavActiveState(name) {
@@ -4668,6 +4727,38 @@ function _buildFullAnalyticsHTML(d) {
           <div style="color:var(--c-e1306c);font-size:12px;font-weight:600;margin-bottom:8px;">⚠️ Bekleyen Yüklemeler</div>
           <div id="ig-failed-list"></div>
         </div>
+</div>
+
+<div class="panel" id="tab-custombilgi">
+  <h2 style="font-size:18px;margin-bottom:4px;">📰 Türkiye Bilgi Merkezi — Manuel Üret</h2>
+  <p style="color:var(--c-666666);font-size:12px;margin-bottom:18px;">
+    Butona basınca: 9 kategoriden birini (son 4 videoda kullanılmayanlardan)
+    seçer, o kategoriyle ilgili gerçek güncel haberleri tarar, DeepSeek'e
+    SADECE bu gerçek haberlerden senaryo yazdırır, özel görsel motoruyla
+    (karaoke altyazı, seslendirilmiş açılış/kapanış) videoyu üretir ve
+    hem YouTube'a hem Instagram'a yayınlar. Tek tıkla, ~3-6 dakikada biter.
+  </p>
+
+  <div class="field" style="margin-bottom:14px;">
+    <label>DeepSeek Modeli <span style="color:var(--c-555555);font-size:11px;">(değiştirilebilir)</span></label>
+    <select id="custombilgi-model" style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;width:100%;" onchange="saveCustomBilgiConfig()">
+      <option value="deepseek-v4-flash">DeepSeek V4 Flash (hızlı, ucuz — önerilen)</option>
+      <option value="deepseek-v4-pro">DeepSeek V4 Pro (daha güçlü, daha yavaş/pahalı)</option>
+    </select>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button onclick="runCustomBilgiNow()" id="btn-custombilgi-run-now" style="background:var(--c-1a1a3a);font-size:13px;padding:10px 20px;">
+      <div class="spinner" id="spin-custombilgi-run-now"></div>▶ Şimdi Üret ve Yayınla
+    </button>
+  </div>
+
+  <div id="custombilgi-recent" style="font-size:11px;color:var(--c-666666);margin-bottom:10px;"></div>
+
+  <div id="custombilgi-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
+    <div id="custombilgi-last-status"></div>
+    <div id="custombilgi-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
+  </div>
 </div>
 
 <div class="panel" id="tab-iganalytics">
