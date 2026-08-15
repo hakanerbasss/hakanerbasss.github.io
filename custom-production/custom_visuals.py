@@ -64,7 +64,12 @@ def _get_browser():
             chromium_path = os.environ.get("CUSTOM_CARD_CHROMIUM_PATH")
             if chromium_path:
                 launch_kwargs["executable_path"] = chromium_path
-            _browser = _pw.chromium.launch(headless=True, **launch_kwargs)
+            # Sunucu root olarak çalışıyor — Chromium'un kendi sandbox'ı root
+            # altında --no-sandbox olmadan başlamayı reddediyor (Docker/root
+            # sunucularda çok bilinen bir sorun). İçerik tamamen kendi
+            # ürettiğimiz sabit HTML/CSS olduğu için (dış/güvenilmez sayfa
+            # açılmıyor) sandbox'sız çalışmanın burada güvenlik riski yok.
+            _browser = _pw.chromium.launch(headless=True, args=["--no-sandbox"], **launch_kwargs)
         return _browser
 
 
