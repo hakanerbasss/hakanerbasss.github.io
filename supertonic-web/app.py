@@ -9722,6 +9722,13 @@ async def auto_custom_bilgi_job():
         if not ig_cfg.get("ig_user_id") or not ig_cfg.get("access_token"):
             save_custom_bilgi_log("error", "Instagram yapılandırılmamış")
             return
+        # Kayıtlı ig_config.json'da post_reels false ise _post_to_instagram_bg
+        # hiçbir şey yapmadan sessizce (False, "") döner — hiçbir yere log
+        # yazmaz (ilk gerçek testte bu yaşandı, ig_log.json/ig_failed_uploads.json
+        # boş kaldı, journalctl'de hiç iz yoktu). auto_ig_only_tr_job aynı
+        # sorunu zaten bu şekilde çözüyor (satır ~9478) — bu, Reels'e adanmış
+        # bir otomasyon, kullanıcının paylaşım tercihinden bağımsız hep denemeli.
+        ig_cfg["post_reels"] = True
 
         cfg = load_custom_bilgi_config()
         model = cfg.get("model", "deepseek-v4-flash")
