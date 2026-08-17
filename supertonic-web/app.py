@@ -4073,11 +4073,20 @@ _BANNER_SCHEME_AVOID_LAST = 3
 
 
 def _pick_banner_scheme() -> str:
-    """Son N videoda kullanılmayan bir renk paleti seç.
+    """Ayarlar → 🎨 Video Görünümü'nden açılıp kapatılabilir (banner_colorful,
+    ig_config.json). KAPALI (varsayılan): her zaman sabit sarı/kırmızı döner —
+    17.08.2026'da IG analitiğinde 06.08'de eklenen renk döngüsünün (bu fonksiyon)
+    TÜM haber kategorilerinde eşit oranda (~2,4-4,6x) izlenme düşüşüyle
+    örtüştüğü görüldü. AÇIK: son N videoda kullanılmayan bir renk paleti seçer
+    (aşağıdaki eski davranış) — hem cron (auto_shorts_job) hem Short Üret
+    sekmesi aynı _generate_shorts_core() üzerinden buraya düşer, ikisini de
+    kapsar.
 
     Eskiden palet sabit sarı/kırmızıydı ve her post aynı görünüyordu.
     Rastgele seçim de arka arkaya aynı rengi verebildiği için son
     kullanılanlar dosyada tutulup eleniyor."""
+    if not get_ig_config().get("banner_colorful", False):
+        return _DEFAULT_BANNER_SCHEME
     names = list(_BANNER_COLOR_SCHEMES.keys())
     recent = []
     try:
@@ -4095,11 +4104,16 @@ def _pick_banner_scheme() -> str:
         pass
     return choice
 
-# Her iki platformda da eski (sabit) renk davranışı korunuyor — kitle bu stile
-# alıştı, çeşitlilik/bot-algısı ihtiyacı zaten "Özel Açılış Kapağı" özelliğiyle
-# (manuel yükleme + yapay zeka etiketi) karşılanıyor. color_scheme artık hiç
-# verilmiyor (bkz. çağrı noktası), bu yüzden bu anahtar kelime tespiti her zaman
-# devreye giriyor — sadece bant rengi/kategori etiketi başlığa göre değişir.
+# DÜZELTME (17.08.2026): buradaki eski yorum "color_scheme artık hiç
+# verilmiyor" diyordu ama bu YANLIŞTI — tek çağrı noktası (_generate_shorts_core,
+# satır ~2864) color_scheme'i HER ZAMAN _pick_banner_scheme()'den geliyor
+# şekilde gönderiyor. Yani aşağıdaki cat_text/_cat_color tespiti hâlâ çalışır
+# (rozet üstündeki kategori etiketi için) ama _cat_color'ın bant rengine
+# uygulanması yalnızca color_scheme boş/None geldiğinde devreye giren
+# overlay_first_scene_banner()'daki else dalında olur — bugünkü tek çağrı
+# noktasından bu dal hiç tetiklenmiyor (color_scheme her zaman dolu geliyor).
+# Asıl renk açık/kapa switch'i artık _pick_banner_scheme()'in içinde
+# (banner_colorful ayarı, bkz. o fonksiyonun docstring'i).
 _LEGACY_BANNER_CATS = [
     (["ekonomi", "borsa", "döviz", "faiz", "enflasyon", "dolar", "euro", "piyasa", "merkez ban", "bütçe", "liret"],
      (30, 130, 220), "EKONOMİ"),
@@ -4118,10 +4132,13 @@ def overlay_first_scene_banner(
     photo_path: Path, title: str, lang: str = "tr",
     badge_text: str = None, emphasis_word: str = None, color_scheme: str = None,
 ) -> None:
-    """İlk sahne fotoğrafına haber overlay. Renk şeması her platformda sabit
-    (eski sarı/kırmızı) — çağıran taraf artık color_scheme'i hiç göndermiyor,
-    parametre sadece geriye dönük uyumluluk/manuel test için duruyor. Rozet
-    metni (badge_text) ve vurgu kelimesi (emphasis_word) YouTube'da AI'den
+    """İlk sahne fotoğrafına haber overlay. color_scheme, tek çağrı noktasından
+    (_generate_shorts_core) HER ZAMAN _pick_banner_scheme()'in döndürdüğü
+    değerle dolu gelir — orası "banner_colorful" ayarına göre ya hep sabit
+    sarı/kırmızı ("sari_kirmizi") ya da dönen bir palet döndürür (bkz. o
+    fonksiyonun docstring'i). color_scheme=None ile çağrılırsa (şu an hiçbir
+    yerden çağrılmıyor) aşağıdaki else dalı devreye girer. Rozet metni
+    (badge_text) ve vurgu kelimesi (emphasis_word) YouTube'da AI'den
     serbest/değişken geliyor, Instagram'da boş kalıp sabit "SON DAKİKA"ya
     düşüyor. Alanlardan biri boş/geçersiz gelirse güvenli varsayılana düşer,
     hiçbir zaman görseli bozmaz."""
@@ -4209,9 +4226,12 @@ def overlay_first_scene_banner(
             _BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME],
         ))
     else:
-        # Eski sabit davranış: sarı/kırmızı taban, bant rengi kategoriden.
+        # Yalnızca color_scheme=None ile çağrılırsa buraya düşülür (şu an hiçbir
+        # çağrı noktası bunu yapmıyor — asıl switch _pick_banner_scheme()'de,
+        # UI: Ayarlar → "🎨 Video Görünümü"). Burada da aynı ayarı okuyoruz ki
+        # ileride biri color_scheme=None ile çağırırsa davranış tutarlı kalsın.
         scheme = dict(_BANNER_COLOR_SCHEMES[_DEFAULT_BANNER_SCHEME])
-        if _cat_color:
+        if _cat_color and get_ig_config().get("banner_colorful", False):
             scheme["band"] = _cat_color
             scheme["band_txt"] = (255, 255, 255)
         else:
@@ -10895,6 +10915,27 @@ async def tts_toggle_edge(enabled: bool = Form(...)):
     cfg["use_edge_tts"] = enabled
     IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
     return {"use_edge_tts": enabled}
+
+
+@app.get("/api/banner-style")
+async def banner_style_status():
+    """Açılış bandı sabit sarı/kırmızı mı yoksa kategoriye göre renkli mi.
+    17.08.2026: IG analitiğinde renkli bandın tüm kategorilerde izlenmeyi
+    düşürdüğü görüldü, varsayılan bu yüzden kapalı (sabit)."""
+    return {"banner_colorful": get_ig_config().get("banner_colorful", False)}
+
+
+@app.post("/api/banner-style/toggle")
+async def banner_style_toggle(enabled: bool = Form(...)):
+    """Açılış bandı renk paletini aç/kapat (bkz. _pick_banner_scheme()).
+    Kapalı: her zaman sabit sarı/kırmızı. Açık: 7 paletten dönen renkli.
+    Hem cron (auto_shorts_job) hem Short Üret sekmesi aynı
+    _generate_shorts_core() üzerinden geçtiği için ikisini birden, hem IG
+    hem YouTube videolarını birden etkiler."""
+    cfg = get_ig_config()
+    cfg["banner_colorful"] = enabled
+    IG_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
+    return {"banner_colorful": enabled}
 
 
 @app.post("/api/tts/test-clone")

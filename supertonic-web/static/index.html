@@ -1480,6 +1480,31 @@
          Yayın kontrolü, havuz durumu, gece roundup'ı ve "Uzun Video Üret"
          hepsi orada. -->
 
+    <!-- 7c. Video Görünümü -->
+    <div class="acc-item" id="acc-banner-style">
+      <div class="acc-header" onclick="toggleAcc('banner-style')">
+        <span class="acc-title">🎨 Video Görünümü</span>
+        <span class="acc-right"><span class="acc-chevron" id="acc-chev-banner-style">›</span></span>
+      </div>
+      <div class="acc-body" id="acc-body-banner-style">
+        <div style="background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;padding:12px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--c-e0e0e0);cursor:pointer;">
+            <input type="checkbox" id="banner-colorful-toggle" onchange="toggleBannerColorful()">
+            <span>Açılış bandında renkli palet döngüsü kullan</span>
+          </label>
+          <p style="color:var(--c-666666);font-size:11px;margin:8px 0 0;">
+            Kapalı: her video sabit sarı/kırmızı bant (17.08.2026 öncesi stil).
+            Açık: 7 renk paletinden (mavi, mor, yeşil, turuncu, turkuaz...) dönerek
+            her video farklı görünür. 17.08.2026'da IG analitiğinde renkli
+            döngünün TÜM haber kategorilerinde izlenmeyi eşit oranda düşürdüğü
+            görüldüğü için varsayılan kapalı. Hem cron ile otomatik atılan hem
+            Short Üret sekmesinden elle üretilen videoları, hem Instagram hem
+            YouTube'u birlikte etkiler (ikisi aynı üretim hattını paylaşıyor).
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- 8. API Bağlantıları -->
     <div class="acc-item" id="acc-api-keys">
       <div class="acc-header" onclick="toggleAcc('api-keys')">
@@ -2100,6 +2125,7 @@ async function openSettings() {
   loadInstagramLog();
   loadBannedTopics();
   loadCloneStatus();
+  loadBannerStyleStatus();
 }
 
 // ── Canlı Yayın (YouTube) ─────────────────────────────────────────────────
@@ -3391,6 +3417,26 @@ async function toggleEdgeTts() {
     await fetch('/api/tts/toggle-edge', { method: 'POST', body: fd });
   } catch(e) {
     console.error('toggle edge:', e);
+    el.checked = !el.checked;
+  }
+}
+
+async function loadBannerStyleStatus() {
+  try {
+    const d = await fetch('/api/banner-style').then(r => r.json());
+    const el = document.getElementById('banner-colorful-toggle');
+    if (el) el.checked = !!d.banner_colorful;
+  } catch(e) { console.error('banner style:', e); }
+}
+
+async function toggleBannerColorful() {
+  const el = document.getElementById('banner-colorful-toggle');
+  try {
+    const fd = new FormData();
+    fd.append('enabled', el.checked ? 'true' : 'false');
+    await fetch('/api/banner-style/toggle', { method: 'POST', body: fd });
+  } catch(e) {
+    console.error('toggle banner style:', e);
     el.checked = !el.checked;
   }
 }
