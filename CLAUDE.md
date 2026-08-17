@@ -2,6 +2,30 @@
 
 Ana proje: `supertonic-web/` klasörü.
 
+## ⚠️ Oturum çakışmaları — HER OTURUMUN İLK OKUYACAĞI BÖLÜM
+
+Farklı Claude oturumları aynı depoda çalışıyor ve birbirinin işini eziyordu.
+Sebebi: her oturum kendi `claude/*` dalına push ediyor, o dal main'e
+alınmadan kalıyor; bir sonraki oturum **eski main'den** başlayıp aynı
+dosyaları baştan yazıyor.
+
+**Tek kural: main tek doğru kaynaktır. main'e girmeyen iş yok sayılır.**
+(Sunucu `git pull` ile sadece main'i çeker — dalda kalan kod hiç yayına girmez.)
+
+Her oturumun sırası:
+
+1. **Başlarken** (kod okumadan önce):
+   `git fetch origin main && git reset --hard origin/main`
+   Oturum açılışında bu otomatik kontrol ediliyor
+   (`.claude/hooks/session-start.sh`) — "bu kopya eski" uyarısı çıkarsa
+   **hiçbir dosyaya dokunmadan** önce bu komutu çalıştır.
+2. **Ne yapıldığını öğrenmek için:** `instube/DEGISIKLIK-GUNLUGU.md`
+   dosyasının en üstteki kaydına bak. Kod okuyup tahmin etme.
+3. **İş biterken:** günlüğe en üste kayıt ekle (şablon dosyanın içinde),
+   commit et, **main'e al**, kullanılan `claude/*` dalını sil.
+
+Durumu istediğin an elle görmek için: `bash .claude/hooks/session-start.sh`
+
 ## Özet
 
 - **Sunucu:** Hetzner CX23 — IP: `77.42.45.229` (Helsinki)
