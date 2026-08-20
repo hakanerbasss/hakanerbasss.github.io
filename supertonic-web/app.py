@@ -4199,14 +4199,42 @@ def overlay_first_scene_banner(
             draw.text((x, y), w, font=font, fill=fill)
             x += int(ww + space_w)
 
-    def fit_font(text, start_sz, max_w):
+    def fit_font(text, start_sz, max_w, min_sz=32):
+        """start_sz'den min_sz'e kadar 10'ar küçülterek max_w'ye sığan en büyük
+        boyutu bulur. DÜZELTME (19.08.2026): eski hâli sz<=40 olunca son
+        küçültmeyi UYGULAMADAN döndürüyordu (off-by-one) — yani gerçekte hiç
+        test edilmemiş bir boyut dönebiliyordu, ekrandan taşan metinlerin bir
+        sebebi buydu. Artık her döngüde f/sz birlikte güncelleniyor ve min_sz
+        de 40'tan 32'ye indirildi (uzun başlıklarda biraz daha küçülüp
+        sığabilsin diye)."""
         sz = start_sz
-        while sz > 40:
-            f = lf(sz)
-            if tw(text, f) <= max_w:
-                return f, sz
+        f = lf(sz)
+        while sz > min_sz and tw(text, f) > max_w:
             sz -= 10
-        return lf(sz), sz
+            f = lf(sz)
+        return f, sz
+
+    def wrap_two_lines(text, font, max_w):
+        """Tek satıra sığmayan (genelde 5+ kelimelik) part_b metnini iki satıra
+        böler — kelime sınırında, iki satır genişliği birbirine en yakın olacak
+        şekilde. Hiçbir kombinasyon max_w'ye sığmıyorsa yine de en dengeli
+        ikiye böler (taşma kalsa da minimuma iner)."""
+        words = text.split()
+        if len(words) <= 1:
+            return [text]
+        best = None
+        for cut in range(1, len(words)):
+            line1 = " ".join(words[:cut])
+            line2 = " ".join(words[cut:])
+            w1, w2 = tw(line1, font), tw(line2, font)
+            if w1 <= max_w and w2 <= max_w:
+                score = abs(w1 - w2)
+                if best is None or score < best[0]:
+                    best = (score, [line1, line2])
+        if best:
+            return best[1]
+        m = len(words) // 2
+        return [" ".join(words[:m]), " ".join(words[m:])]
 
     # Kategori etiketi (EKONOMİ/AFET/SPOR/DÜNYA/TEKNOLOJİ) her zaman başlıktan
     # tespit edilir — palet döndürülse bile izleyici haberin türünü görsün.
@@ -4268,9 +4296,21 @@ def overlay_first_scene_banner(
         part_b = " ".join(words[m:])
         part_c = ""
     else:
+        # DÜZELTME (19.08.2026): part_a/part_c hep 2 kelimede sabit kalıyordu,
+        # kalan HER şey part_b'ye (tek satır) gidiyordu — 9-10+ kelimelik
+        # başlıklarda part_b 6+ kelimeye çıkıp ekrandan taşıyordu (gerçek örnek:
+        # "MİLLETVEKİLİ MELİH MERİÇ'İ BIÇAKLAYAN ZANLI VE" tek satırda taşmıştı).
+        # part_b artık en fazla 4 kelime taşıyor, fazlası (varsa) part_c'ye
+        # ekleniyor — part_b hâlâ uzunsa aşağıda 2 satıra bölünüyor (güvenlik ağı).
         part_a = " ".join(words[:2])
-        part_b = " ".join(words[2:-2])
-        part_c = " ".join(words[-2:])
+        rest = words[2:]
+        part_c = " ".join(rest[-2:])
+        mid = rest[:-2]
+        if len(mid) > 4:
+            overflow = mid[4:]
+            mid = mid[:4]
+            part_c = " ".join(overflow + rest[-2:])
+        part_b = " ".join(mid)
 
     # ① Üst kategori bandı — renk şemaya göre değişir
     y1, h1 = 150, 120
@@ -4289,22 +4329,40 @@ def overlay_first_scene_banner(
         shadow_text_emphasized(CX, 330, part_a, a_font, HEADLINE, EMPHASIS, emphasis_words)
 
     # ③ part_b — koyu eğik arka plan + başlık yazısı (bant değil)
+    part_b_bottom = 600  # part_b yoksa part_c'nin varsayılan y'si (eski davranış)
     if part_b:
-        b_font, b_sz = fit_font(part_b, 88, W - 100)
-        b_w = int(tw(part_b, b_font))
+        max_line_w = W - 100
+        b_font, b_sz = fit_font(part_b, 88, max_line_w)
+        if tw(part_b, b_font) <= max_line_w:
+            b_lines = [part_b]
+        else:
+            # DÜZELTME (19.08.2026): min boyutta (32px) bile sığmıyorsa artık
+            # taşıp ekrandan çıkmak yerine 2 satıra bölünüyor — bu ekranın asıl
+            # sebebi olan gerçek taşma raporu buradan geliyordu. Bölme kelime
+            # sınırında ve en dengeli iki satırı bulmaya çalışır; sonra font
+            # boyutu bu (artık daha kısa) satırlara göre yeniden hesaplanır,
+            # tek satırdaki minimumdan genelde daha büyük çıkar.
+            ref_font = lf(88)
+            b_lines = wrap_two_lines(part_b, ref_font, max_line_w)
+            longest = max(b_lines, key=lambda ln: tw(ln, ref_font))
+            b_font, b_sz = fit_font(longest, 88, max_line_w)
+        line_gap = b_sz + 20
+        b_w = max(int(tw(ln, b_font)) for ln in b_lines)
         bx1 = CX - b_w // 2 - 50; bx2 = CX + b_w // 2 + 50
-        by  = 580; bh = b_sz + 40; sk = 20
+        by  = 580; bh = line_gap * len(b_lines) + 20; sk = 20
         poly = [(bx1 + sk, by), (bx2 + sk, by), (bx2 - sk, by + bh), (bx1 - sk, by + bh)]
         acc = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         ImageDraw.Draw(acc).polygon(poly, fill=(10, 10, 10, 185))
         img = Image.alpha_composite(img.convert("RGBA"), acc).convert("RGB")
         draw = ImageDraw.Draw(img)
-        shadow_text_emphasized(CX, by + 18, part_b, b_font, HEADLINE, EMPHASIS, emphasis_words)
+        for i, ln in enumerate(b_lines):
+            shadow_text_emphasized(CX, by + 18 + i * line_gap, ln, b_font, HEADLINE, EMPHASIS, emphasis_words)
+        part_b_bottom = by + bh
 
     # ④ part_c — bantsız büyük başlık yazısı, vurgu kelimesi ayrı renkte
     if part_c:
         c_font, c_sz = fit_font(part_c, 190, W - 120)
-        y_c = 750 if part_b else 600
+        y_c = part_b_bottom + 42 if part_b else 600
         shadow_text_emphasized(CX, y_c, part_c, c_font, HEADLINE, EMPHASIS, emphasis_words)
 
     # ⑤ Rozet — dar eğik badge (tam genişlik değil), renk şemaya göre
