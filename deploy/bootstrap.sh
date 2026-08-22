@@ -29,11 +29,45 @@ NEWS_DOMAIN="${NEWS_DOMAIN:-hakanerbas.wizaicorp.com}"
 PANEL_DOMAIN="${PANEL_DOMAIN:-panel.wizaicorp.com}"
 SSL="${SSL:-0}"
 SSL_EMAIL="${SSL_EMAIL:-wizaicorp@gmail.com}"
+FORCE="${FORCE:-0}"
 
 say() { echo ""; echo "==> $*"; }
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "HATA: root olarak çalıştır (sudo bash bootstrap.sh)." >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 0) Çalışan kurulumun üzerine yazma koruması
+# ---------------------------------------------------------------------------
+# Bu script BOŞ sunucular için. Çalışan bir sunucuda çalıştırmak üç şeyi
+# bozabilir ve bu sunucuda tts/InsTube dışında başka siteler de var:
+#   - nginx: buradaki yapılandırma "default_server" kullanıyor. Sunucuda zaten
+#     default_server tanımlayan bir site varsa "nginx -t" düşer ve nginx bir
+#     daha kalkmaz — bathonea, WhatsApp, haber sitesi hepsi birden gider.
+#     Ayrıca certbot'un ürettiği HTTPS blokları bu HTTP bloklarıyla çakışabilir.
+#   - systemd: /etc/systemd/system/tts.service üzerine yazılır; oradaki (bu
+#     depoda kayıtlı olmayan) ek ayarlar kaybolur.
+#   - venv: çalışan .venv'e paket kurar/sürüm oynatır. Bu depoda tam olarak
+#     böyle bir kaza geçmişi var (httpx düşünce firebase-admin kırılmıştı).
+if [ "$FORCE" != "1" ] && [ -f /etc/systemd/system/tts.service ]; then
+  cat >&2 <<'UYARI'
+HATA: Bu sunucuda zaten bir kurulum var
+      (/etc/systemd/system/tts.service mevcut).
+
+Bu script boş sunucular içindir. Çalışan bir sunucuda devam etmek nginx'i
+tamamen düşürebilir (aynı sunucudaki DİĞER siteler dâhil), systemd ayarlarını
+ve çalışan venv'deki paket sürümlerini bozabilir.
+
+Sadece kod güncellemek istiyorsan bunu kullan:
+    cd /root/hakanerbasss.github.io && git pull && systemctl restart tts instube
+
+Gerçekten sıfırdan kurmak istiyorsan önce yedek al, sonra FORCE=1 ver:
+    cp /etc/systemd/system/tts.service ~/tts.service.bak
+    cp -r /etc/nginx/sites-available ~/nginx-yedek
+    FORCE=1 bash bootstrap.sh
+UYARI
   exit 1
 fi
 

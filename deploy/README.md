@@ -30,6 +30,29 @@ SSL=1 bash bootstrap.sh
 Script **tekrar çalıştırılabilir** — yarım kalan kurulumu tamamlamak veya
 bozulan bir şeyi onarmak için yeniden çalıştırmak güvenlidir.
 
+## Çalışan sunucuda çalıştırma koruması
+
+Script, `/etc/systemd/system/tts.service` zaten varsa **durur**. Bu koruma
+önemli, çünkü bu sunucuda tts/InsTube dışında başka siteler de var
+(bathonea, WhatsApp API) ve çalışan bir sunucuda devam etmek şunları bozabilir:
+
+- **nginx'i komple düşürebilir.** Buradaki yapılandırma `default_server`
+  kullanıyor; sunucuda zaten `default_server` tanımlayan bir site varsa
+  `nginx -t` düşer ve nginx bir daha kalkmaz — o sunucudaki **bütün siteler**
+  gider. Ayrıca certbot'un ürettiği HTTPS blokları bu HTTP bloklarıyla
+  çakışabilir.
+- **systemd ayarlarını siler.** Sunucudaki birim dosyasında bu depoda
+  kayıtlı olmayan ek ayarlar olabilir.
+- **Çalışan venv'i oynatır.** Bu depoda tam olarak böyle bir kaza geçmişi
+  var: httpx sürümü düşünce firebase-admin kırılmıştı.
+
+Sadece kod güncellemek için bu yeter:
+```bash
+cd /root/hakanerbasss.github.io && git pull && systemctl restart tts instube
+```
+
+Gerçekten sıfırdan kurmak gerekiyorsa önce yedek al, sonra `FORCE=1 bash bootstrap.sh`.
+
 ## Ne kuruyor
 
 | Adım | İçerik |
