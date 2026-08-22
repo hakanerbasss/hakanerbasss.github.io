@@ -5888,9 +5888,27 @@ def _meta_error_type(text: str) -> str:
     return m.group(1) if m else "bilinmeyen tür"
 
 
+IG_REELS_MAX_SECONDS = 90  # Graph API'nin Reels süre tavanı
+
+
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
     """Instagram Reels yükle (resumable upload — HTTPS gerekmez). (media_id, error) döner."""
     graph = "https://graph.facebook.com/v21.0"
+
+    # Süre ön kontrolü (22.08.2026). Süre tavanı aşıldığında Meta upload'ı kabul
+    # ediyor ama transcode aşamasında "Video Transcoding Error: both HD and SD
+    # progressive failed to transcode" diye ANLAMSIZ bir hata döndürüyor — sebep
+    # hiçbir yerde yazmıyor. Bilgi Merkezi videoları 104-107 saniye çıkıp tam
+    # olarak buna takıldı; teşhis ancak dosyalar elle ffprobe'lanarak konabildi.
+    # Burada erken durmak hem sebebi açıkça söylüyor hem de 4 boşuna yükleme
+    # denemesini + 5 dakikalık durum sorgusunu tamamen atlıyor.
+    _dur = await _probe_duration(video_path)
+    if _dur > IG_REELS_MAX_SECONDS:
+        return None, (
+            f"süre sınırı: video {_dur:.0f} saniye, Instagram Reels üst sınırı "
+            f"{IG_REELS_MAX_SECONDS} saniye. Yükleme denenmedi — senaryoyu kısalt."
+        )
+
     try:
         video_bytes = video_path.read_bytes()
         video_size = len(video_bytes)
@@ -9884,9 +9902,14 @@ GERÇEK HABERLER:
   "hook_text": "açılışta seslendirilecek 1 cümlelik çarpıcı soru/ifade",
   "scenes": [
     {{"text": "1-2 cümlelik doğal Türkçe sahne metni, sadece kaynaktaki bilgilerden"}},
-    ... (toplam 5-7 sahne, kaynaktaki bilgiyi mantıklı sırayla anlat, son sahnede net bir özet/tavsiye ver)
+    ... (toplam 5-6 sahne, kaynaktaki bilgiyi mantıklı sırayla anlat, son sahnede net bir özet/tavsiye ver)
   ]
 }}
+
+SÜRE SINIRI — ZORUNLU: Tüm sahnelerin seslendirmesi TOPLAM 70 SANİYEYİ GEÇMEMELİ
+(yaklaşık 170 kelime). Bu estetik bir tercih değil, teknik bir zorunluluk:
+Instagram Reels 90 saniyeden uzun videoyu reddediyor. Sahne başına en fazla
+2 kısa cümle yaz; bilgi çoksa en önemlilerini seç, hepsini sığdırmaya çalışma.
 
 Tarih yazarken "1 Ekim" gibi rakam+ay yaz, "bin Ekim" gibi karıştırma. brand alanı ekleme, otomatik ekleniyor."""
 
