@@ -9823,6 +9823,12 @@ async def auto_custom_bilgi_job():
             return
 
         headlines_block = "\n".join(f"- {h['title']}: {h['desc']}" for h in headlines)
+        # DÜZELTME (22.08.2026): DeepSeek'e giden kaynak başlık+özetler hiçbir
+        # yere loglanmıyordu — üretilen videolar "belli şartlar var" gibi
+        # yüzeysel kalınca (kullanıcı raporu) kaynağın kendisinin mi sığ
+        # olduğunu, yoksa DeepSeek'in mi elindeki bilgiyi kullanmadığını ayırt
+        # edecek hiçbir kayıt yoktu. journalctl'de görünür hâle getirildi.
+        print(f"[CUSTOM-BILGI-KAYNAK] kategori={category_label}\n{headlines_block}", flush=True)
         save_custom_bilgi_log("running", f"Senaryo yazılıyor ({model})...")
 
         # 3) DeepSeek'e SADECE bu başlıklardan senaryo yazdır
