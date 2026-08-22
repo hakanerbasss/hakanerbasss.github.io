@@ -5888,27 +5888,50 @@ def _meta_error_type(text: str) -> str:
     return m.group(1) if m else "bilinmeyen tür"
 
 
-IG_REELS_MAX_SECONDS = 90  # Graph API'nin Reels süre tavanı
+def _is_transcode_failure(err: str) -> bool:
+    """Meta'nın "video işlenemedi" ailesinden bir hata mı? Bu hatalar container'a
+    özel ve GEÇİCİ: aynı dosya yeni bir container'la sorunsuz yüklenebiliyor."""
+    e = (err or "").lower()
+    return "transcode" in e or "processingfailederror" in e
 
 
 async def post_reel_to_instagram(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
-    """Instagram Reels yükle (resumable upload — HTTPS gerekmez). (media_id, error) döner."""
+    """Instagram Reels yükle. Transcode hatasında YENİ bir upload oturumu açarak
+    tekrar dener.
+
+    (23.08.2026) Kök neden buymuş: içerideki 4'lü retry döngüsü hep AYNI
+    container'ın upload_uri'sine POST atıyor. Meta bir container'ı "transcode
+    failed" işaretledikten sonra o container ölüdür — aynı adrese 4 kez denemek
+    asla geçmez, dosyada bir sorun olmasa bile. Paneldeki "Yeniden Dene" düğmesi
+    bu fonksiyonu sıfırdan çağırıp YENİ container açtığı için hemen çalışıyordu.
+    Otomatiğin patlayıp elle basınca yüklenmesinin tek sebebi buydu.
+
+    Ayrıca: süreye göre ön eleme YAPMA. Bir ara 90 saniyelik bir kapı konmuştu,
+    yanlıştı ve 107-113 saniyelik (daha önce sorunsuz yüklenen) videoları hiç
+    denemeden reddetti. Reels 3 dakikaya kadar kabul ediyor; kararı Meta versin.
+    """
+    last_err = ""
+    for session_attempt in range(3):
+        media_id, err = await _post_reel_once(video_path, caption, ig_user_id, access_token)
+        if media_id:
+            if session_attempt:
+                print(f"[IG] {session_attempt + 1}. oturumda yüklendi", flush=True)
+            return media_id, ""
+        last_err = err
+        # Sadece transcode/işleme hatasında yeni oturum aç. Token, yetki, kota
+        # gibi hatalarda yeni container açmak da işe yaramaz, boşuna beklemeyelim.
+        if not _is_transcode_failure(err):
+            return None, err
+        if session_attempt < 2:
+            print(f"[IG] transcode hatası, yeni oturumla tekrar deneniyor "
+                  f"({session_attempt + 1}/3): {err[:120]}", flush=True)
+            await asyncio.sleep(30 * (session_attempt + 1))  # 30s, 60s
+    return None, f"{last_err} [3 ayrı oturumda denendi]"
+
+
+async def _post_reel_once(video_path: Path, caption: str, ig_user_id: str, access_token: str) -> tuple[str | None, str]:
+    """Tek bir upload oturumu: container aç → bytes yükle → işlenmeyi bekle → yayınla."""
     graph = "https://graph.facebook.com/v21.0"
-
-    # Süre ön kontrolü (22.08.2026). Süre tavanı aşıldığında Meta upload'ı kabul
-    # ediyor ama transcode aşamasında "Video Transcoding Error: both HD and SD
-    # progressive failed to transcode" diye ANLAMSIZ bir hata döndürüyor — sebep
-    # hiçbir yerde yazmıyor. Bilgi Merkezi videoları 104-107 saniye çıkıp tam
-    # olarak buna takıldı; teşhis ancak dosyalar elle ffprobe'lanarak konabildi.
-    # Burada erken durmak hem sebebi açıkça söylüyor hem de 4 boşuna yükleme
-    # denemesini + 5 dakikalık durum sorgusunu tamamen atlıyor.
-    _dur = await _probe_duration(video_path)
-    if _dur > IG_REELS_MAX_SECONDS:
-        return None, (
-            f"süre sınırı: video {_dur:.0f} saniye, Instagram Reels üst sınırı "
-            f"{IG_REELS_MAX_SECONDS} saniye. Yükleme denenmedi — senaryoyu kısalt."
-        )
-
     try:
         video_bytes = video_path.read_bytes()
         video_size = len(video_bytes)
@@ -9902,14 +9925,9 @@ GERÇEK HABERLER:
   "hook_text": "açılışta seslendirilecek 1 cümlelik çarpıcı soru/ifade",
   "scenes": [
     {{"text": "1-2 cümlelik doğal Türkçe sahne metni, sadece kaynaktaki bilgilerden"}},
-    ... (toplam 5-6 sahne, kaynaktaki bilgiyi mantıklı sırayla anlat, son sahnede net bir özet/tavsiye ver)
+    ... (toplam 5-7 sahne, kaynaktaki bilgiyi mantıklı sırayla anlat, son sahnede net bir özet/tavsiye ver)
   ]
 }}
-
-SÜRE SINIRI — ZORUNLU: Tüm sahnelerin seslendirmesi TOPLAM 70 SANİYEYİ GEÇMEMELİ
-(yaklaşık 170 kelime). Bu estetik bir tercih değil, teknik bir zorunluluk:
-Instagram Reels 90 saniyeden uzun videoyu reddediyor. Sahne başına en fazla
-2 kısa cümle yaz; bilgi çoksa en önemlilerini seç, hepsini sığdırmaya çalışma.
 
 Tarih yazarken "1 Ekim" gibi rakam+ay yaz, "bin Ekim" gibi karıştırma. brand alanı ekleme, otomatik ekleniyor."""
 
