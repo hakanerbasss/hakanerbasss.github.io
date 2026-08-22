@@ -2142,6 +2142,10 @@ async def _overlay_avatar_on_video(main_video: Path, avatar_video: Path, output:
             "-map", "0:a",
             "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
             "-pix_fmt", "yuv420p", "-r", "30", "-bf", "0", "-g", "30",
+            # Ana mux'takiyle aynı tavan — burası da Instagram'a giden son
+            # dosyayı üretiyor ve aynı hız denetimi eksikliğine sahipti
+            # (bkz. "ses+video mux" adımındaki ayrıntılı not).
+            "-crf", "23", "-maxrate", "5M", "-bufsize", "10M",
             "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
             "-movflags", "+faststart",
             "-shortest",
@@ -3052,10 +3056,38 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
         "-c:v", "libx264", "-profile:v", "high", "-level", "4.0",
         "-pix_fmt", "yuv420p", "-r", "30", "-vsync", "cfr",
         "-bf", "0", "-g", "30",
+        # Bit hızı tavanı (22.08.2026). Buraya kadar HİÇBİR hız denetimi yoktu:
+        # libx264 varsayılan CRF 23'e düşüyordu ve bu, üstteki uyumluluk
+        # ayarlarıyla (-bf 0 = B-frame yok, -g 30 = her saniye keyframe) birleşince
+        # gerçek video klipli sahnelerde dosyayı şişiriyordu. Instagram bunu
+        # "Video Transcoding Error: both HD and SD progressive failed to transcode"
+        # ile reddetti — 50 saniyelik bir Reels 71,7 MB, yani ~11,5 Mbps çıkmıştı;
+        # Instagram'ın 1080p için önerdiği üst sınır ~5 Mbps. Sadece video-klip
+        # modunda patlamasının sebebi de bu: fotoğraf sahneleri zaten küçük
+        # sıkışıyor, tavana hiç değmiyor.
+        #
+        # "Capped CRF": kalite hedefi CRF 23 olarak kalır, yalnızca tavanı aşacağı
+        # anlarda sınırlanır. Yani hâlihazırda sorunsuz üretilen fotoğraf
+        # videolarının kalitesi/boyutu değişmez, sadece kaçak durum kısılır.
+        "-crf", "23", "-maxrate", "5M", "-bufsize", "10M",
         "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         "-shortest", str(output_file.absolute())
     ], timeout=600, retries=1, step="ses+video mux")
+
+    # Üretilen dosyanın ölçüleri (22.08.2026). Instagram bir yüklemeyi
+    # reddettiğinde tek ipucu hata mesajındaki dosya boyutuydu; süre ve gerçek
+    # bit hızı hiçbir yerde kayıtlı değildi, bu yüzden "boyut mu, süre mi,
+    # başka bir şey mi" sorusu ancak tahminle cevaplanabiliyordu.
+    try:
+        _out_mb = output_file.stat().st_size / 1024 / 1024
+        _out_sec = await _probe_duration(output_file)
+        _mbps = (_out_mb * 8 / _out_sec) if _out_sec else 0
+        print(f"[VIDEO-OLCU] {output_file.name}: {_out_mb:.1f}MB, "
+              f"{_out_sec:.1f}sn, ~{_mbps:.1f}Mbps, mod="
+              f"{'video-klip' if use_video_mode else 'fotoğraf'}", flush=True)
+    except Exception as _me:
+        print(f"[VIDEO-OLCU] ölçülemedi: {_me}", flush=True)
 
     full_script = " ".join(s["text"] for s in scenes)
     generated_title = data.get("title", topic or scenes[0]["text"][:60])
