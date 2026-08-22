@@ -1,0 +1,20 @@
+[Unit]
+Description=InsTube — sade yayın paneli
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=__REPO_DIR__/instube
+# instube/instube.service (depoda duran eski kopya) sistem Python'unu
+# çalıştırıyor. Yeni kurulumlarda kendi venv'i veriliyor: aynı sunucudaki
+# başka bir proje sistem paketlerini düşürdüğünde InsTube'un kırılmaması
+# için (supertonic-web'de 05.08.2026'da tam olarak bu yaşandı — httpx
+# düşünce firebase-admin kırıldı).
+ExecStart=__REPO_DIR__/instube/.venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8002
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

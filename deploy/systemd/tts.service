@@ -1,0 +1,18 @@
+[Unit]
+Description=Supertonic TTS Web (bot paneli + haber sitesi)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=__REPO_DIR__/supertonic-web
+# "python -m uvicorn" biçimi bilinçli: doğrudan .venv/bin/uvicorn yazmak,
+# konsol script'i bir sebeple oluşmadığında systemd'de 203/EXEC hatası
+# veriyordu (bkz. supertonic-web/setup-venv.sh içindeki aynı not).
+ExecStart=__REPO_DIR__/supertonic-web/.venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8001
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

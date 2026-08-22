@@ -26,6 +26,25 @@ Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ## Kayıtlar
 
+### 22.08.2026 — Sıfırdan sunucu kurulumu (deploy/) — InsTube artık kendi venv'inde
+**Commit:** `bu commit` · **Dal:** `main` · **Durum:** sunucuda ÇALIŞTIRILMADI (yeni sunucu için hazırlandı)
+
+- Yeni: `deploy/bootstrap.sh` — boş bir Ubuntu'yu tek komutla çalışır hâle
+  getirir (sistem paketleri, swap, venv'ler, Playwright, TTS modelleri,
+  systemd, nginx, opsiyonel HTTPS). Token/API key gerekmez.
+- Yeni: `deploy/systemd/instube.service` — **InsTube artık sistem Python'u
+  değil, kendi `.venv`'ini kullanıyor** (`instube/.venv/bin/python`).
+  Sebep: aynı sunucudaki başka bir proje sistem paketlerini düşürdüğünde
+  InsTube kırılıyordu (supertonic-web'de 05.08'de httpx yüzünden yaşandı).
+- Depodaki eski `instube/instube.service` (sistem Python'lu) DURUYOR ve
+  **mevcut sunucuda hâlâ o çalışıyor** — bootstrap yalnızca yeni kurulumda
+  yenisini yazıyor. Mevcut sunucuyu venv'e geçirmek istersen:
+  `bash deploy/bootstrap.sh` tekrar çalıştırılabilir (idempotent).
+- **Dikkat:** InsTube bağımlılıkları boş bir venv'de test edildi, sorunsuz
+  kuruldu (`supertonic 1.3.1` dahil — torch değil, onnxruntime çekiyor) ve
+  `app.py` ayar dosyası olmadan import edilebiliyor. Ama bootstrap'ın TAMAMI
+  gerçek bir sunucuda hiç çalıştırılmadı; ilk çalıştıran sonucu buraya yazsın.
+
 ### 17.08.2026 — Oturumların birbirini ezmesini önleyen düzen kuruldu
 **Commit:** `bu commit` · **Dal:** `claude/instube-session-conflicts-6kwi9r` · **Durum:** sunucu gerektirmez (sadece depo düzeni)
 

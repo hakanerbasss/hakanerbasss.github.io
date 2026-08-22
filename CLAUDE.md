@@ -26,6 +26,20 @@ Her oturumun sırası:
 
 Durumu istediğin an elle görmek için: `bash .claude/hooks/session-start.sh`
 
+## Yeni sunucuya taşıma / sıfırdan kurulum
+
+Sunucu kaybedilirse (fatura, çökme, taşıma) her şey **tek komutla** boş bir
+Ubuntu'ya kurulur — eski sunucuya hiçbir bağımlılık yok, token/API key
+gerekmez (panel açılır, anahtarlar sonradan arayüzden girilir):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hakanerbasss/hakanerbasss.github.io/main/deploy/bootstrap.sh -o bootstrap.sh
+bash bootstrap.sh
+```
+
+Ayrıntı, elle yapılacaklar (DNS, OAuth URI'leri, GitHub secret'ları) ve
+kurulumdaki bilinen tuzaklar: `deploy/README.md`.
+
 ## Özet
 
 - **Sunucu:** Hetzner CX23 — IP: `77.42.45.229` (Helsinki)
