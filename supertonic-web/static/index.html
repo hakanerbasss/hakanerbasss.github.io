@@ -360,17 +360,43 @@
   }
   .more-menu.open { display: block; }
 
-  .more-item {
-    padding: 15px 20px;
-    font-size: 14px;
-    color: var(--c-cccccc);
-    border-bottom: 1px solid var(--c-1e1e1e);
-    cursor: pointer;
-    transition: background 0.12s;
+  /* Kartlı menü (23.08.2026): eskiden düz bir liste (alt alta satırlar)
+     vardı. Telefonda her satır ince bir dokunma hedefiydi ve hepsi
+     birbirinin aynısı görünüyordu. Artık 2 sütunlu, ikonu büyük kartlar —
+     hem hedef alanı büyüdü hem hangi sekme olduğu bir bakışta anlaşılıyor. */
+  .more-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 14px;
   }
-  .more-item:last-child { border-bottom: none; }
-  .more-item:hover, .more-item:active { background: var(--c-1f1f1f); }
-  .more-item.active { color: var(--c-a78bfa); font-weight: 600; }
+
+  .more-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 18px 10px;
+    min-height: 92px;
+    font-size: 13px;
+    line-height: 1.25;
+    text-align: center;
+    color: var(--c-cccccc);
+    background: var(--c-1f1f1f);
+    border: 1px solid var(--c-2a2a2a);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  }
+  .more-item:hover { background: var(--c-262626); }
+  .more-item:active { transform: scale(0.97); }
+  .more-item .mi-icon { font-size: 26px; line-height: 1; }
+  .more-item.active {
+    color: var(--c-a78bfa);
+    font-weight: 600;
+    border-color: var(--c-7c3aed);
+  }
 
   .panel { display: none; padding: 32px; max-width: 800px; }
   .panel.active { display: block; }
@@ -753,6 +779,23 @@
   color: var(--c-e0e0e0);
 }
 
+/* 2b) DÜZELTME (23.08.2026): yukarıdaki kuralın yorumu "kendi satır içi
+   color'u olan doygun zeminli butonlar etkilenmez" diyor ama bu VARSAYIM
+   YANLIŞTI — "YouTube'a Yükle" ve "Instagram'da Paylaş" butonlarında satır
+   içi color YOK, sadece background var. Dolayısıyla üstteki kural onları da
+   yakalayıp yazıyı --c-e0e0e0'ya çeviriyordu; o değişken aydınlık temada
+   #16181d (neredeyse siyah) oluyor. Sonuç: kırmızı/pembe zemin üzerinde
+   siyah yazı — kullanıcı "aydınlık modda butonlar belli olmuyor" diye
+   bildirdi. Doygun marka zeminlerinde yazı BEYAZ kalmalı.
+   Aynı seçici gücünde ama SONRA geldiği için bu kural kazanır. */
+:root[data-theme="light"] button[style*="background:var(--c-cc0000)"],
+:root[data-theme="light"] button[style*="background:var(--c-dc2626)"],
+:root[data-theme="light"] button[style*="background:var(--c-7c3aed)"],
+:root[data-theme="light"] button[style*="background:var(--c-e1306c)"],
+:root[data-theme="light"] button[style*="background:linear-gradient"] {
+  color: #ffffff;
+}
+
 /* 3) Aynı sorun, buton olmayan öğelerde: koyu-renkli zeminler üstündeki
       beyaz yazı. Satır içi color tanımı olmayanlar gövde rengini alır. */
 :root[data-theme="light"] .spinner { border-top-color: currentColor; }
@@ -836,6 +879,17 @@
   background: #ffffff !important;
   border: 1px solid #888b93 !important;
 }
+
+/* Kartlı "Daha Fazla" menüsü, aydınlık tema. Değişkenlerin kendi eşlemeleri
+   burada işe yaramıyor: kart zemini #f1f2f4, menü zemini #f8f9fa, kenarlık
+   #e4e6ea çıkıyor — üçü de birbirine o kadar yakın ki kartlar görünmez
+   oluyordu. Diğer kart bileşenleriyle (.opt-card) aynı muamele. */
+:root[data-theme="light"] .more-item {
+  background: #ffffff !important;
+  border: 1px solid #888b93 !important;
+}
+:root[data-theme="light"] .more-item:hover { background: #eef0f3 !important; }
+:root[data-theme="light"] .more-item.active { border-color: var(--c-7c3aed) !important; }
 </style>
 
 <script>
@@ -866,10 +920,20 @@
 <!-- Daha Fazla menüsü (diğer sekmeler burada toplanır) -->
 <div class="more-backdrop" id="more-backdrop" onclick="closeMoreMenu()"></div>
 <div class="more-menu" id="more-menu">
-  <div class="more-item" id="more-item-text" onclick="selectMoreTab('text')">Metin → Ses</div>
-  <div class="more-item" id="more-item-iganalytics" onclick="selectMoreTab('iganalytics')">📸 Instagram Analitik</div>
-  <div class="more-item" id="more-item-prompt" onclick="selectMoreTab('prompt')">🤖 Prompt</div>
-  <div class="more-item" id="more-item-custombilgi" onclick="selectMoreTab('custombilgi')">📰 Bilgi Merkezi</div>
+  <div class="more-grid">
+    <div class="more-item" id="more-item-text" onclick="selectMoreTab('text')">
+      <span class="mi-icon">🔊</span><span>Metin → Ses</span>
+    </div>
+    <div class="more-item" id="more-item-iganalytics" onclick="selectMoreTab('iganalytics')">
+      <span class="mi-icon">📸</span><span>Instagram Analitik</span>
+    </div>
+    <div class="more-item" id="more-item-prompt" onclick="selectMoreTab('prompt')">
+      <span class="mi-icon">🤖</span><span>Prompt</span>
+    </div>
+    <div class="more-item" id="more-item-custombilgi" onclick="selectMoreTab('custombilgi')">
+      <span class="mi-icon">📰</span><span>Bilgi Merkezi</span>
+    </div>
+  </div>
 </div>
 
 <!-- Alt navigasyon -->
