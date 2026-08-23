@@ -7322,6 +7322,22 @@ async def get_live_status_endpoint():
     return state
 
 
+def _set_live_enabled(enabled: bool) -> None:
+    """live_stream_config.json'daki "enabled" bayrağını günceller.
+
+    (23.08.2026) Başlat/Durdur düğmeleri eskiden SADECE bellekteki
+    _live_stream_stop_flag'i değiştiriyordu; config dosyasına dokunmuyorlardı.
+    Servis her açılışta bu dosyaya bakıp enabled ise yayını otomatik
+    başlattığı için (startup_event), "Durdur"a basıldıktan sonra ilk
+    `systemctl restart tts` yayını geri açıyordu. Kullanıcı açısından
+    "durdurdum ama kendi kendine başlamış" olarak görünüyordu — sebebi
+    yayının kendini toparlaması değil, durdurmanın kalıcı olmamasıydı.
+    """
+    cfg = load_live_config()
+    cfg["enabled"] = enabled
+    LIVE_CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False))
+
+
 @app.post("/api/live/start")
 async def start_live_stream_endpoint():
     global _live_stream_task, _live_stream_stop_flag
@@ -7330,6 +7346,7 @@ async def start_live_stream_endpoint():
     if not TOKEN_FILE.exists():
         raise HTTPException(400, "Önce YouTube hesabını bağla (/auth/youtube)")
     _live_stream_stop_flag = False
+    _set_live_enabled(True)  # yeniden başlatmadan sonra da açık kalsın
     _live_stream_task = asyncio.create_task(_live_stream_supervisor())
     return {"ok": True}
 
@@ -7338,6 +7355,7 @@ async def start_live_stream_endpoint():
 async def stop_live_stream_endpoint():
     global _live_stream_stop_flag
     _live_stream_stop_flag = True
+    _set_live_enabled(False)  # kalıcı olsun — restart yayını geri açmasın
     if _live_stream_proc:
         try:
             _live_stream_proc.terminate()
