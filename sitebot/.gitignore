@@ -1,0 +1,7 @@
+settings.json
+sitebot.db
+sitebot.db-wal
+sitebot.db-shm
+uploads/
+.venv/
+__pycache__/

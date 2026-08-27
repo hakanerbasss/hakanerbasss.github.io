@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>SiteBot — İlk Kurulum</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}*{margin:0;padding:0}
+body{min-height:100svh;display:grid;place-items:center;padding:24px;
+  background:#0c1018 radial-gradient(70% 60% at 50% 0%,rgba(91,140,255,.17),transparent 65%);
+  color:#e9edf6;font:15px/1.6 'Inter',-apple-system,Segoe UI,system-ui,sans-serif}
+form{width:min(440px,100%);background:#141a26;border:1px solid #2a3446;border-radius:18px;padding:34px}
+h1{font-size:1.4rem;letter-spacing:-.02em;margin-bottom:8px}
+p.sub{color:#8e9ab1;font-size:.9rem;margin-bottom:26px}
+label{display:block;font-size:.79rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:#8e9ab1;margin-bottom:6px}
+input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #2a3446;
+  background:#0c1018;color:inherit;font:inherit;margin-bottom:16px}
+input:focus{outline:0;border-color:#5b8cff;box-shadow:0 0 0 3px rgba(91,140,255,.18)}
+button{width:100%;padding:13px;border:0;border-radius:10px;background:#5b8cff;color:#06101f;
+  font:inherit;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.msg{border-radius:10px;padding:11px 13px;font-size:.87rem;margin-bottom:18px;display:none}
+.msg.err{display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#fca5a5}
+.msg.ok{display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+.note{font-size:.8rem;color:#8e9ab1;margin-top:14px;line-height:1.6}
+</style>
+</head>
+<body>
+<form id="f">
+  <h1>SiteBot ilk kurulum</h1>
+  <p class="sub">Yönetici hesabınızı bir kez oluşturun. Bu ekran kurulumdan sonra kapanır.</p>
+  <div class="msg" id="m"></div>
+  <label for="u">Kullanıcı adı</label>
+  <input id="u" value="hakan" autocomplete="username" required>
+  <label for="p">Şifre</label>
+  <input id="p" type="password" autocomplete="new-password" required minlength="6">
+  <label for="p2">Şifre (tekrar)</label>
+  <input id="p2" type="password" autocomplete="new-password" required minlength="6">
+  <button id="b">Kurulumu tamamla</button>
+  <p class="note">Şifreniz sunucuda scrypt ile saklanır, düz metin olarak hiçbir yere yazılmaz.
+    Kaybederseniz sunucudaki <code>sitebot/settings.json</code> dosyasından
+    <code>superadmin_password_hash</code> satırını silip bu sayfayı tekrar açın.</p>
+</form>
+<script>
+const m=document.getElementById("m");
+document.getElementById("f").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const b=document.getElementById("b");
+  if(document.getElementById("p").value!==document.getElementById("p2").value){
+    m.className="msg err"; m.textContent="Şifreler aynı değil."; return;
+  }
+  b.disabled=true; b.textContent="Kuruluyor…";
+  try{
+    const r=await fetch("/api/super/setup",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:document.getElementById("u").value.trim(),
+                           password:document.getElementById("p").value})});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.detail||"Kurulum başarısız.");
+    localStorage.setItem("sitebot_super", d.token);
+    m.className="msg ok"; m.textContent="Tamam! Panele yönlendiriliyorsunuz…";
+    setTimeout(()=>location.href="/",900);
+  }catch(err){
+    m.className="msg err"; m.textContent=err.message;
+    b.disabled=false; b.textContent="Kurulumu tamamla";
+  }
+});
+</script>
+</body>
+</html>

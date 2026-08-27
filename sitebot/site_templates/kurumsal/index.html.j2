@@ -1,0 +1,236 @@
+{% import "_shared/parts.html.j2" as p with context %}
+{% set extra %}
+body{--maxw:1180px}
+.hero{min-height:min(100svh,900px);display:grid;align-items:end;position:relative;
+  padding:150px 0 clamp(50px,7vw,90px);overflow:hidden}
+.hero-media{position:absolute;inset:0;z-index:-2;overflow:hidden}
+.hero-media img{width:100%;height:100%;object-fit:cover;
+  animation:kb 26s ease-out forwards;transform-origin:center}
+@keyframes kb{from{transform:scale(1.14)}to{transform:scale(1)}}
+.hero-media::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(to top,
+    color-mix(in srgb,var(--bg) 96%,transparent) 0%,
+    color-mix(in srgb,var(--bg) {{ banner.overlay }}%,transparent) 48%,
+    color-mix(in srgb,var(--bg) {{ [banner.overlay - 20, 5]|max }}%,transparent) 100%)}
+.hero:not(:has(.hero-media))::before{content:"";position:absolute;inset:0;z-index:-2;
+  background:radial-gradient(80% 60% at 20% 100%,rgba(var(--primary-rgb),.2),transparent 65%)}
+.hero-in{display:grid;grid-template-columns:1.25fr .75fr;gap:clamp(24px,4vw,60px);align-items:end}
+@media(max-width:900px){.hero-in{grid-template-columns:1fr}}
+.hero h1{font-size:clamp(2.6rem,7.6vw,6rem);font-weight:900;letter-spacing:-.045em;margin-bottom:0}
+.hero h1 em{font-style:italic;font-weight:400;color:var(--accent)}
+.hero .sub{color:var(--muted);font-size:clamp(1rem,1.4vw,1.16rem);margin-bottom:26px}
+.rule{height:1px;background:var(--border);margin:clamp(30px,4vw,52px) 0}
+.scroll-hint{display:inline-flex;align-items:center;gap:10px;font-size:.78rem;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:38px}
+.scroll-hint::after{content:"";width:44px;height:1px;background:currentColor;
+  animation:stretch 1.9s ease-in-out infinite}
+@keyframes stretch{50%{transform:scaleX(.4)}}
+
+.two{display:grid;grid-template-columns:minmax(0,.38fr) minmax(0,1fr);gap:clamp(24px,5vw,72px)}
+@media(max-width:860px){.two{grid-template-columns:1fr}}
+.two .k{font-size:.76rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);padding-top:9px;border-top:2px solid var(--accent);align-self:start}
+
+.svc-list{border-top:1px solid var(--border)}
+.svc-item{display:grid;grid-template-columns:auto 1fr auto;gap:clamp(16px,3vw,42px);
+  align-items:baseline;padding:clamp(26px,3.6vw,44px) 0;border-bottom:1px solid var(--border);
+  transition:padding-inline .35s cubic-bezier(.2,.8,.2,1),background .35s;position:relative}
+.svc-item:hover{background:var(--surface);padding-inline:clamp(12px,2vw,26px)}
+.svc-item .no{font-size:.78rem;font-weight:800;color:var(--accent);letter-spacing:.1em}
+.svc-item h3{font-size:clamp(1.25rem,2.6vw,2rem);font-weight:800;letter-spacing:-.03em}
+.svc-item p{color:var(--muted);max-width:52ch;margin-top:8px;font-size:.97rem}
+.svc-item .ic{font-size:1.7rem;opacity:.75}
+
+.figure-wide{position:relative;border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-lg)}
+.figure-wide img{width:100%;aspect-ratio:16/8;object-fit:cover}
+.quote{font-size:clamp(1.35rem,3.4vw,2.5rem);font-weight:700;letter-spacing:-.035em;
+  line-height:1.28;max-width:22ch}
+.quote::before{content:"“";color:var(--accent);font-size:1.4em;line-height:0;vertical-align:-.28em;margin-right:.06em}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:clamp(20px,3vw,44px)}
+.stats div{border-top:1px solid var(--border);padding-top:18px}
+.stats b{display:block;font-size:clamp(2.2rem,5vw,3.6rem);font-weight:900;letter-spacing:-.05em;line-height:1}
+.stats span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.13em;font-weight:700}
+
+.work{display:grid;gap:clamp(14px,2.4vw,28px);grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.work figure{position:relative;overflow:hidden;border-radius:var(--r);aspect-ratio:4/3;
+  border:1px solid var(--border)}
+.work figure:nth-child(6n+1){grid-column:span 2;aspect-ratio:16/9}
+@media(max-width:700px){.work figure:nth-child(6n+1){grid-column:span 1;aspect-ratio:4/3}}
+.work img{width:100%;height:100%;object-fit:cover;transition:transform .7s cubic-bezier(.2,.8,.2,1)}
+.work figure:hover img{transform:scale(1.05)}
+.work figcaption{position:absolute;inset:auto 0 0 0;padding:34px 20px 18px;color:#fff;
+  font-weight:700;letter-spacing:-.02em;background:linear-gradient(transparent,rgba(0,0,0,.85))}
+
+.pgrid{display:grid;gap:clamp(16px,2.4vw,30px);
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))}
+.pitem{position:relative}
+.pitem .ph{position:relative;aspect-ratio:3/4;overflow:hidden;border-radius:var(--r);background:var(--surface-2);
+  border:1px solid var(--border);margin-bottom:14px}
+.pitem img{width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.pitem:hover img{transform:scale(1.05)}
+.pitem h3{font-size:1.05rem;margin-bottom:4px}
+.pitem .m{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
+.pitem .price{font-weight:800;color:var(--accent);white-space:nowrap}
+.pitem .desc{color:var(--muted);font-size:.9rem;margin-top:6px}
+.pitem .pmore{display:inline-block;margin-top:10px;font-size:.88rem;font-weight:700;
+  color:var(--accent);border-bottom:1px solid transparent;transition:border-color .2s}
+.pitem .pmore:hover{border-bottom-color:currentColor}
+
+.cta-final{text-align:center;padding:clamp(70px,11vw,150px) 0}
+.cta-final h2{font-size:clamp(2rem,6vw,4.4rem);margin-bottom:22px}
+.cta-final .btn{margin-top:10px}
+{% endset %}
+<!DOCTYPE html>
+<html lang="{{ site.lang or 'tr' }}">
+<head>
+{{ p.head(extra) }}
+</head>
+<body id="top">
+{% set links = [] %}
+{% if 'about' in sections %}{% set _ = links.append(('#hakkimizda','Hakkımızda')) %}{% endif %}
+{% if 'services' in sections %}{% set _ = links.append(('#hizmetler','Hizmetler')) %}{% endif %}
+{% if 'products' in sections %}{% set _ = links.append(('#urunler','Ürünler')) %}{% endif %}
+{% if 'gallery' in sections %}{% set _ = links.append(('#calismalar','Çalışmalar')) %}{% endif %}
+{% set _ = links.append(('#iletisim','İletişim')) %}
+{{ p.nav(links) }}
+
+{% for s in sections %}
+{% if s == 'banner' %}
+<section class="hero">
+  {% if banner.image %}<div class="hero-media"><img src="/{{ banner.image }}" alt="" fetchpriority="high"></div>{% endif %}
+  <div class="wrap">
+    <div class="hero-in">
+      <div class="rv">
+        {% if site.slogan %}<span class="eyebrow">{{ site.slogan }}</span>{% endif %}
+        <h1>{{ banner.headline }}</h1>
+      </div>
+      <div class="rv">
+        <p class="sub">{{ banner.subline }}</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          {% if banner.cta_text %}<a class="btn" href="{{ banner.cta_link }}">{{ banner.cta_text }}</a>{% endif %}
+          {% if banner.cta2_text %}<a class="btn btn--ghost" href="{{ banner.cta2_link }}" {% if 'http' in banner.cta2_link %}target="_blank" rel="noopener"{% endif %}>{{ banner.cta2_text }}</a>{% endif %}
+        </div>
+      </div>
+    </div>
+    <span class="scroll-hint">Aşağı kaydırın</span>
+  </div>
+</section>
+
+{% elif s == 'about' %}
+<section class="sec" id="hakkimizda">
+  <div class="wrap">
+    <div class="two rv">
+      <span class="k">{{ about.title }}</span>
+      <div>
+        <p class="quote">{{ site.slogan or site.description }}</p>
+        <p class="lead" style="margin-top:26px;white-space:pre-line">{{ about.text }}</p>
+      </div>
+    </div>
+    {% if about.image %}
+    <div class="figure-wide rv" style="margin-top:clamp(34px,5vw,68px)">
+      <img src="/{{ about.image }}" alt="{{ about.title }}" loading="lazy">
+    </div>
+    {% endif %}
+    {% if about.stats %}
+    <div class="stats rv" style="margin-top:clamp(36px,5vw,70px)">
+      {% for st in about.stats %}<div><b>{{ st.value }}</b><span>{{ st.label }}</span></div>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{% elif s == 'services' %}
+<section class="sec" id="hizmetler" style="padding-top:0">
+  <div class="wrap">
+    <div class="two" style="margin-bottom:clamp(24px,3.5vw,48px)">
+      <span class="k">Hizmetler</span>
+      <h2 class="rv">Yaptığımız işler</h2>
+    </div>
+    <div class="svc-list">
+      {% for sv in services %}
+      <article class="svc-item rv">
+        <span class="no">{{ '%02d'|format(loop.index) }}</span>
+        <div><h3>{{ sv.title }}</h3><p>{{ sv.text }}</p></div>
+        {% if sv.icon %}<span class="ic">{{ sv.icon }}</span>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% elif s == 'products' %}
+<section class="sec" id="urunler">
+  <div class="wrap">
+    <div class="two" style="margin-bottom:clamp(24px,3.5vw,48px)">
+      <span class="k">Katalog</span>
+      <h2 class="rv">Ürünler</h2>
+    </div>
+    {% if products|length >= 8 %}
+    <div class="searchbar rv">
+      <input type="search" id="urunAra" placeholder="Ürün ara…" aria-label="Ürün ara"
+             autocomplete="off" enterkeyhint="search">
+      <span id="araSonuc"></span>
+    </div>
+    {% endif %}
+    <div class="pgrid">
+      {% for pr in products %}
+      <article class="pitem rv" data-ara="{{ (pr.name ~ ' ' ~ pr.desc ~ ' ' ~ pr.category)|lower }}">
+        <a class="ph" href="/urun/{{ pr.slug }}/" aria-label="{{ pr.name }} detayı">
+          {% if pr.images %}
+          <img src="/{{ pr.images[0] }}" alt="{{ pr.name }}" loading="lazy">
+          {% if pr.images|length > 1 %}<span class="imgcount">📷 {{ pr.images|length }}</span>{% endif %}
+          {% else %}<div class="noimg">🖼</div>{% endif %}
+        </a>
+        <div class="m">
+          <h3><a href="/urun/{{ pr.slug }}/">{{ pr.name }}</a></h3>
+          {% if pr.price %}<span class="price">{{ pr.price }} {{ pr.currency }}</span>{% endif %}
+        </div>
+        {% if pr.desc %}<p class="desc">{{ pr.desc }}</p>{% endif %}
+        {% set hedef = pr.link or whatsapp or tel %}
+        {% if hedef %}
+        <a class="pmore" href="{{ hedef }}"
+           {% if 'http' in hedef %}target="_blank" rel="noopener"{% endif %}>Bilgi al →</a>
+        {% endif %}
+      </article>
+      {% endfor %}
+      <p class="empty-note" id="araBos" hidden>Aramanıza uyan ürün bulunamadı.</p>
+    </div>
+  </div>
+</section>
+
+{% elif s == 'gallery' %}
+<section class="sec" id="calismalar">
+  <div class="wrap">
+    <div class="two" style="margin-bottom:clamp(24px,3.5vw,48px)">
+      <span class="k">Portfolyo</span>
+      <h2 class="rv">Seçilmiş çalışmalar</h2>
+    </div>
+    <div class="work">
+      {% for g in gallery %}
+      <figure class="rv">
+        <img class="zoom" src="/{{ g.image }}" alt="{{ g.caption or 'Çalışma görseli' }}" loading="lazy">
+        {% if g.caption %}<figcaption>{{ g.caption }}</figcaption>{% endif %}
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% elif s == 'contact' %}
+<section class="cta-final">
+  <div class="wrap rv">
+    <h2>Birlikte çalışalım.</h2>
+    <p class="lead" style="margin:0 auto">Projenizi konuşmak için bir mesaj yeterli.</p>
+    {% if tel %}<a class="btn btn--lg" href="{{ tel }}">{{ contact.phone }}</a>{% endif %}
+  </div>
+</section>
+{{ p.contact_section() }}
+{% endif %}
+{% endfor %}
+
+{{ p.footer() }}
+{{ p.whatsapp_float() }}
+{{ p.scripts() }}
+</body>
+</html>

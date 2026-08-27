@@ -103,6 +103,39 @@ Instagram/YouTube yayın paneli. **v1 — scheduler yok, her şey elle/manuel**
 
 Detaylı kod yapısı ve ilk kurulum adımları: `instube/README.md`.
 
+## SiteBot — müşteriye satılık web sitesi kurma paneli
+
+`sitebot/` klasörü. Bilgileri girince ~60 saniyede müşteriye kendi alan adında,
+sertifikalı, kendi yönetim panelli bir site kuran sistem. supertonic-web ve
+instube'den **tamamen bağımsız**.
+
+- **Sunucu:** Aynı sunucu (77.42.45.229), port **`8003`**
+  (8001 supertonic-web, 8002 instube, 8000 whatsapp, 5057 atık-toplama,
+  5001 bathonea, 5000 kripto-bot ile çakışmaz)
+- **Erişim:** **https://kur.wizaicorp.com/** — nginx `8003`'e yönlendirir
+  (`panel.wizaicorp.com` instube'de olduğu için ayrı subdomain)
+- **Servis:** `systemctl status sitebot`
+- **Deploy:** `cd /root/hakanerbasss.github.io && git pull && systemctl restart sitebot`
+- **Python ortamı:** `sitebot/.venv` (kendi venv'i, supertonic-web gibi).
+  Sistem Python'una **asla** `pip install` yapma. İlk kurulum: `bash sitebot/setup-venv.sh`
+- **Ana dosya:** `sitebot/app.py` — ince router modülü. Gerçek mantık:
+  `provisioner.py` (kurulum/yayın akışı), `renderer.py` (Jinja2 statik HTML),
+  `github_api.py`, `cloudflare_api.py`, `schema.py` (ortak veri şeması),
+  `images.py` (WebP dönüştürme), `db.py` (SQLite), `auth.py`
+- **Üretilen siteler sunucuda DEĞİL** — GitHub org `wizaicorp` altında ayrı
+  birer public repo, GitHub Pages'te yayında. Sunucu kapansa siteler ayakta kalır.
+- **Şablonlar:** `site_templates/hizmet|katalog|kurumsal` — üçü de aynı veri
+  şemasını okur, müşteri şablon değiştirince içeriği kaybolmaz
+- **Ayarlar/secrets (git'e dahil değil):** `sitebot/settings.json` (GitHub
+  fine-grained token, Cloudflare token + zone ID), `sitebot/sitebot.db`,
+  `sitebot/uploads/`. Yedek alırken bu üçünü al.
+- **Test:** `cd sitebot && .venv/bin/python test_smoke.py` (GitHub/Cloudflare
+  taklit edilir, anahtar gerekmez)
+- **Dikkat:** Yeni bir subdomain servisi eklersen `config.py` içindeki
+  `RESERVED_SUBDOMAINS` listesine de ekle — yoksa bir müşteriye satılabilir.
+
+Detay: `sitebot/README.md`.
+
 ## Diğer Klasörler
 
 - `custom-production/` — supertonic-web'e bağımsız, Cowork oturumlarının (Playwright ile
