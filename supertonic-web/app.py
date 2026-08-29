@@ -5539,13 +5539,24 @@ def make_llm(provider: str, deepseek_key: str):
     # yoksa "name 'OpenAI' is not defined" ile patlıyor (29.08.2026'da oldu).
     from openai import OpenAI
 
+    # Zaman aşımı ZORUNLU (29.08.2026): openai SDK'sının varsayılanı 600 saniye
+    # ve kendi içinde 2 kez daha deniyor. Üstüne çağıran koddaki 3'lü tekrar
+    # döngüsü binince tek bir asılı istek saatlerce sürebiliyor — NVIDIA'nın
+    # ücretsiz katmanında ilk denemede tam olarak bu yaşandı (üretim 10 dakika
+    # boyunca "devam ediyor" göründü). max_retries=1: tekrar mantığı zaten
+    # çağıran tarafta var, SDK'nın ayrıca 3 katına çıkarmasına gerek yok.
+    _ZAMAN_ASIMI = 180.0
     if provider and provider.startswith("nvidia:"):
         model = provider.split(":", 1)[1].strip()
         key = get_nvidia_key()
         if key and model:
-            return OpenAI(api_key=key, base_url=NVIDIA_BASE_URL), model, f"nvidia/{model}"
+            return (OpenAI(api_key=key, base_url=NVIDIA_BASE_URL,
+                           timeout=_ZAMAN_ASIMI, max_retries=1),
+                    model, f"nvidia/{model}")
         print("[AI] NVIDIA seçildi ama anahtar/model yok — DeepSeek'e düşülüyor", flush=True)
-    return OpenAI(api_key=deepseek_key, base_url=DEEPSEEK_BASE_URL), DEEPSEEK_MODEL, "deepseek"
+    return (OpenAI(api_key=deepseek_key, base_url=DEEPSEEK_BASE_URL,
+                   timeout=_ZAMAN_ASIMI, max_retries=1),
+            DEEPSEEK_MODEL, "deepseek")
 
 
 def _log_llm_usage(resp, etiket: str, nerede: str) -> None:
