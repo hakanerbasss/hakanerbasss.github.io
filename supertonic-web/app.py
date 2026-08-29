@@ -5533,6 +5533,12 @@ def make_llm(provider: str, deepseek_key: str):
 
     NVIDIA anahtarı yoksa sessizce DeepSeek'e düşer — üretim yarıda kalmasın.
     """
+    # OpenAI bu dosyada modül seviyesinde DEĞİL, her fonksiyonun içinde import
+    # ediliyor (13 ayrı yerde "from openai import OpenAI"). make_llm modül
+    # seviyesinde tanımlı olduğu için burada da kendi import'unu yapmalı —
+    # yoksa "name 'OpenAI' is not defined" ile patlıyor (29.08.2026'da oldu).
+    from openai import OpenAI
+
     if provider and provider.startswith("nvidia:"):
         model = provider.split(":", 1)[1].strip()
         key = get_nvidia_key()
