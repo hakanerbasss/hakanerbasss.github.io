@@ -1092,6 +1092,16 @@
       <label>Ses</label>
       <select id="shorts-voice"></select>
     </div>
+    <div class="field" id="ai-provider-field">
+      <label>AI Modeli</label>
+      <select id="shorts-ai-provider">
+        <option value="">DeepSeek (ücretli — varsayılan)</option>
+      </select>
+      <p style="color:var(--c-666666);font-size:11px;margin-top:6px;" id="ai-provider-hint">
+        NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller burada listelenir.
+        Kaliteyi karşılaştırmak için aynı haberi iki modelle üretip sonuçlara bakabilirsin.
+      </p>
+    </div>
     <div class="field">
       <label>Hız: <span id="speed-val-4">1.0</span>x</label>
       <div class="speed-row">
@@ -1620,6 +1630,22 @@
         <div id="ds-input-state">
           <input type="password" id="cfg-ds-key" placeholder="sk-..." style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
           <button onclick="saveDSConfig()">Kaydet</button>
+        </div>
+
+        <hr style="border-color:var(--c-222222);margin:16px 0;">
+        <div style="font-size:12px;font-weight:600;color:var(--c-888888);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🟢 NVIDIA NIM (ücretsiz katman)</div>
+        <p style="color:var(--c-555555);font-size:11px;margin-bottom:10px;">
+          build.nvidia.com → hesap aç → API key al (<code>nvapi-...</code>). Kaydedince
+          <b>Short Üret</b> sekmesinde model seçimi açılır. Ücretsiz katman ~40 istek/dk.
+          Anahtar girilmezse her şey eskisi gibi DeepSeek ile çalışır.
+        </p>
+        <div id="nvidia-saved-state" style="display:none;background:var(--c-0d1f0d);border:1px solid var(--c-1a4a1a);border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="color:var(--c-4ade80);font-size:13px;margin-bottom:8px;">✓ NVIDIA key kayıtlı</div>
+          <button onclick="resetNvidiaConfig()" style="background:var(--c-2a1a1a);font-size:12px;padding:6px 12px;">Değiştir</button>
+        </div>
+        <div id="nvidia-input-state">
+          <input type="password" id="cfg-nvidia-key" placeholder="nvapi-..." style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
+          <button onclick="saveNvidiaConfig()">Kaydet</button>
         </div>
 
         <hr style="border-color:var(--c-222222);margin:16px 0;">
@@ -2190,6 +2216,7 @@ async function openSettings() {
   loadBannedTopics();
   loadCloneStatus();
   loadBannerStyleStatus();
+  loadAiProviders();
 }
 
 // ── Canlı Yayın (YouTube) ─────────────────────────────────────────────────
@@ -3037,6 +3064,9 @@ async function generateShorts(allowEmpty = false) {
     fd.append('api_key', apiKey);
     fd.append('lang', document.getElementById('shorts-lang').value);
     fd.append('voice', document.getElementById('shorts-voice').value);
+    // AI sağlayıcı: "" → DeepSeek, "nvidia:<model>" → NVIDIA ücretsiz katman
+    const _aiProv = document.getElementById('shorts-ai-provider');
+    if (_aiProv) fd.append('ai_provider', _aiProv.value || '');
     fd.append('speed', document.getElementById('shorts-speed').value);
     fd.append('use_video', document.getElementById('use-video-mode').checked ? 'true' : 'false');
     // Seçilen platforma göre kapanış CTA metni, kapanış görseli (endcard) ve
@@ -3819,6 +3849,60 @@ async function saveDSConfig() {
 function resetDSConfig() {
   document.getElementById('ds-saved-state').style.display = 'none';
   document.getElementById('ds-input-state').style.display = 'block';
+}
+
+// ── NVIDIA NIM (ücretsiz katman) ──────────────────────────────────────────────
+async function saveNvidiaConfig() {
+  const key = document.getElementById('cfg-nvidia-key').value.trim();
+  if (!key) return showError('err-cfg', 'NVIDIA API key girin.');
+  const fd = new FormData(); fd.append('api_key', key);
+  const r = await fetch('/api/nvidia/config', { method: 'POST', body: fd });
+  if (r.ok) {
+    document.getElementById('nvidia-saved-state').style.display = 'block';
+    document.getElementById('nvidia-input-state').style.display = 'none';
+    document.getElementById('cfg-nvidia-key').value = '';
+    showError('err-cfg', '');
+    loadAiProviders();   // model listesi hemen dolsun, sayfa yenilemeye gerek yok
+  } else {
+    showError('err-cfg', 'Kaydedilemedi.');
+  }
+}
+
+function resetNvidiaConfig() {
+  document.getElementById('nvidia-saved-state').style.display = 'none';
+  document.getElementById('nvidia-input-state').style.display = 'block';
+}
+
+// Short Üret'teki model listesini doldurur. Anahtar yoksa yalnız DeepSeek kalır.
+async function loadAiProviders() {
+  const sel = document.getElementById('shorts-ai-provider');
+  if (!sel) return;
+  try {
+    const d = await fetch('/api/nvidia/config').then(r => r.json());
+    const saved = document.getElementById('nvidia-saved-state');
+    const input = document.getElementById('nvidia-input-state');
+    if (saved && input) {
+      saved.style.display = d.configured ? 'block' : 'none';
+      input.style.display = d.configured ? 'none' : 'block';
+    }
+    const secili = sel.value;
+    sel.innerHTML = '<option value="">DeepSeek (ücretli — varsayılan)</option>';
+    if (d.configured && d.models) {
+      for (const [id, ad] of Object.entries(d.models)) {
+        const o = document.createElement('option');
+        o.value = 'nvidia:' + id;
+        o.textContent = ad + ' — ücretsiz';
+        sel.appendChild(o);
+      }
+    }
+    sel.value = secili || '';
+    const hint = document.getElementById('ai-provider-hint');
+    if (hint) {
+      hint.textContent = d.configured
+        ? 'Ücretsiz modeller listede. Bazı NVIDIA modelleri ücretsiz katmanda açılmayabilir — hata alırsan başka bir model dene.'
+        : "NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller burada listelenir.";
+    }
+  } catch (e) { console.error('ai providers:', e); }
 }
 
 // ── OpenAI DALL-E config ──────────────────────────────────────────────────────

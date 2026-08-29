@@ -2357,6 +2357,7 @@ async def _generate_shorts_core(
     manual_link: str = "",
     manual_content: str = "",
     use_ai_images: bool = False,
+    ai_provider: str = "",
 ):
     import json
     import httpx
@@ -2369,7 +2370,11 @@ async def _generate_shorts_core(
     pexels_key = get_pexels_key()
     pollinations_key = get_pollinations_key() if use_ai_images else ""
 
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    # Sağlayıcı seçimi (29.08.2026): Short Üret sekmesinden DeepSeek yerine
+    # NVIDIA'nın ücretsiz modelleri seçilebiliyor. Kalite karşılaştırılabilsin
+    # diye hangi modelin kullanıldığı ve kaç token yakıldığı loglanıyor.
+    client, ai_model, ai_etiket = make_llm(ai_provider, api_key)
+    print(f"[AI] Short üretimi · sağlayıcı={ai_etiket}", flush=True)
     lang_name = LANG_MAP.get(lang, "Turkish")
     data = None
     scenes = []
@@ -2431,10 +2436,11 @@ Rules:
         for attempt in range(3):
             _resp = await asyncio.to_thread(
                 client.chat.completions.create,
-                model="deepseek-v4-flash",
+                model=ai_model,
                 messages=[{"role": "user", "content": info_prompt}],
                 temperature=0.7,
             )
+            _log_llm_usage(_resp, ai_etiket, "bilgi-senaryo")
             try:
                 data = _parse_llm_json(_resp.choices[0].message.content)
                 break
@@ -2687,10 +2693,11 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
         for attempt in range(3):
             response = await asyncio.to_thread(
                 client.chat.completions.create,
-                model="deepseek-v4-flash",
+                model=ai_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
             )
+            _log_llm_usage(response, ai_etiket, "haber-senaryo")
             try:
                 data = _parse_llm_json(response.choices[0].message.content)
                 break
@@ -3219,7 +3226,7 @@ Kurallar:
             )
         cap_resp = await asyncio.to_thread(
             client.chat.completions.create,
-            model="deepseek-v4-flash",
+            model=ai_model,
             messages=[{"role": "user", "content": cap_prompt}],
             temperature=0.4,
             # 700 çoğu zaman 900-1400 karakterlik hedefe yetmiyordu, cümle
@@ -3227,6 +3234,7 @@ Kurallar:
             # yüksek) — güvenli pay için yükseltildi.
             max_tokens=1400,
         )
+        _log_llm_usage(cap_resp, ai_etiket, "instagram-açıklama")
         ig_caption_desc = cap_resp.choices[0].message.content.strip()
         # Yine de token sınırında kesilirse (cümle ortasında biterse) son tam
         # cümleye kırp — yarım kelimeyle bitmesin.
@@ -3338,13 +3346,13 @@ def _save_manual_lv_log(status: str, result: dict = None, error: str = "", start
     MANUAL_LV_LOG.write_text(json.dumps(entry, ensure_ascii=False))
 
 
-async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content="", use_ai_images=False, pasted_content=None):
+async def _shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths=None, spiker_mode=False, avatar_path=None, info_format=None, cover_image_path=None, intro_cover_path=None, topic_link="", manual_link="", manual_content="", use_ai_images=False, pasted_content=None, ai_provider=""):
     global _manual_shorts_lock
     try:
         # info_format (Bilgi Shorts) haber değil — kaynak/olgu zorunluluğu uygulanmaz.
         # Haber shorts'ta doğrulama artık burada da açık: elle üretilen videolarda
         # halüsinasyon ağı kapalıydı, uydurma kurum/rakam buradan geçiyordu.
-        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, require_verified_source=not info_format, use_ai_images=use_ai_images, pasted_content=pasted_content)
+        result = await _generate_shorts_core(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=spiker_mode, avatar_path=avatar_path, info_format=info_format, cover_image_path=cover_image_path, intro_cover_path=intro_cover_path, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, require_verified_source=not info_format, use_ai_images=use_ai_images, pasted_content=pasted_content, ai_provider=ai_provider)
         _save_manual_shorts_log("done", result=result)
         video_file = OUTPUT_DIR / result["video"].split("/")[-1]
         await send_telegram_video(
@@ -3394,6 +3402,9 @@ async def generate_shorts_async_endpoint(
     manual_content: str = Form(""),
     use_ai_images: str = Form("false"),
     pasted_content: str = Form(""),
+    # "" / "deepseek" → DeepSeek (ücretli, varsayılan)
+    # "nvidia:<model>" → NVIDIA NIM ücretsiz katmanı
+    ai_provider: str = Form(""),
 ):
     global _manual_shorts_lock
     if not api_key.strip():
@@ -3441,7 +3452,7 @@ async def generate_shorts_async_endpoint(
     started_at = time.time()
     _save_manual_shorts_log("running", started_at=started_at)
     ai_images_on = use_ai_images.lower() in ("true", "1", "yes")
-    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, use_ai_images=ai_images_on, pasted_content=parsed_pasted_content))
+    asyncio.create_task(_shorts_job_runner(topic, api_key, lang, voice, speed, exclude_topics, region, use_video, platform, custom_image_paths, spiker_mode=use_spiker, avatar_path=saved_avatar_path, intro_cover_path=saved_intro_cover, topic_link=topic_link, manual_link=manual_link, manual_content=manual_content, use_ai_images=ai_images_on, pasted_content=parsed_pasted_content, ai_provider=ai_provider))
     return {"ok": True}
 
 
@@ -5491,7 +5502,60 @@ TOKEN_FILE_EN = Path("yt_token_en.json")
 PEXELS_CONFIG = Path("pexels_config.json")
 POLLINATIONS_CONFIG = Path("pollinations_config.json")
 DS_CONFIG = Path("deepseek_config.json")
+NVIDIA_CONFIG = Path("nvidia_config.json")
 OPENAI_CONFIG = Path("openai_config.json")
+
+# ── AI sağlayıcı seçimi ───────────────────────────────────────────────────────
+# NVIDIA NIM, OpenAI uyumlu tek endpoint (integrate.api.nvidia.com) üzerinden
+# ücretsiz katmanda model veriyor; SDK aynı, yalnız base_url + model adı değişir.
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-v4-flash"
+
+# Panelde gösterilen NVIDIA modelleri. Katalogda 100'den fazla model var ama
+# hepsi ücretsiz katmanda gerçekten çalışmıyor (kullanıcı testinde NVIDIA
+# üzerindeki deepseek-v4-pro açılmadı, Kimi/MiniMax çalıştı). Burası çalıştığı
+# görülenlerin listesi — yenisini denemek için tek satır eklemek yeterli.
+NVIDIA_MODELS = {
+    "moonshotai/kimi-k3": "Kimi K3 (ajan/genel)",
+    "minimaxai/minimax-m3": "MiniMax M3 (kodlama/genel)",
+    "deepseek-ai/deepseek-v4-flash-0731": "DeepSeek V4 Flash (NVIDIA üzerinden)",
+    "meta/llama-3.2-90b-vision-instruct": "Llama 3.2 90B",
+}
+
+
+def make_llm(provider: str, deepseek_key: str):
+    """(client, model_adı, etiket) döner.
+
+    provider:
+      ""/"deepseek"        → DeepSeek (varsayılan, ücretli)
+      "nvidia:<model_id>"  → NVIDIA NIM ücretsiz katmanı
+
+    NVIDIA anahtarı yoksa sessizce DeepSeek'e düşer — üretim yarıda kalmasın.
+    """
+    if provider and provider.startswith("nvidia:"):
+        model = provider.split(":", 1)[1].strip()
+        key = get_nvidia_key()
+        if key and model:
+            return OpenAI(api_key=key, base_url=NVIDIA_BASE_URL), model, f"nvidia/{model}"
+        print("[AI] NVIDIA seçildi ama anahtar/model yok — DeepSeek'e düşülüyor", flush=True)
+    return OpenAI(api_key=deepseek_key, base_url=DEEPSEEK_BASE_URL), DEEPSEEK_MODEL, "deepseek"
+
+
+def _log_llm_usage(resp, etiket: str, nerede: str) -> None:
+    """Çağrı başına token tüketimini journalctl'e yazar.
+
+    Fatura haftada ~5 dolara çıktığında hangi adımın ne kadar token yaktığına
+    dair hiçbir kayıt yoktu; "link verince çok harcıyor" gözlemi ölçülemiyordu.
+    Bu satır sayesinde maliyet tahmin değil, veri.
+    """
+    try:
+        u = getattr(resp, "usage", None)
+        if u:
+            print(f"[AI-TOKEN] {nerede} · {etiket} · giriş={u.prompt_tokens} "
+                  f"çıkış={u.completion_tokens} toplam={u.total_tokens}", flush=True)
+    except Exception:
+        pass
 IG_CONFIG = Path("ig_config.json")
 IG_LOG = Path("ig_log.json")
 IG_RECENT_FILE = Path("ig_recent_posts.json")  # duplicate prevention
@@ -8235,6 +8299,28 @@ async def save_deepseek_config(api_key: str = Form(...)):
 @app.get("/api/deepseek/config")
 async def get_deepseek_config():
     return {"configured": bool(get_deepseek_key())}
+
+
+# ── NVIDIA NIM (ücretsiz katman) ──────────────────────────────────────────────
+# DeepSeek faturası haftada ~5 dolara çıktı (fiyatlar 4 kat arttı, link/kaynak
+# verilen tek bir haber üretimi 0,22 dolara kadar gidebiliyor). NVIDIA NIM
+# OpenAI uyumlu tek bir endpoint üzerinden ücretsiz katmanda model sunuyor —
+# sadece base_url ve model adı değişiyor, SDK aynı.
+def get_nvidia_key():
+    if NVIDIA_CONFIG.exists():
+        return json.loads(NVIDIA_CONFIG.read_text()).get("api_key", "")
+    return ""
+
+
+@app.post("/api/nvidia/config")
+async def save_nvidia_config(api_key: str = Form(...)):
+    NVIDIA_CONFIG.write_text(json.dumps({"api_key": api_key.strip()}))
+    return {"ok": True}
+
+
+@app.get("/api/nvidia/config")
+async def get_nvidia_config():
+    return {"configured": bool(get_nvidia_key()), "models": NVIDIA_MODELS}
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
