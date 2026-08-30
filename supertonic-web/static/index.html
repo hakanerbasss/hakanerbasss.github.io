@@ -1095,11 +1095,13 @@
     <div class="field" id="ai-provider-field">
       <label>AI Modeli</label>
       <select id="shorts-ai-provider">
-        <option value="">DeepSeek (ücretli — varsayılan)</option>
+        <option value="">Otomatik — müsait olanı kullan (önerilen)</option>
       </select>
       <p style="color:var(--c-666666);font-size:11px;margin-top:6px;" id="ai-provider-hint">
-        NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller burada listelenir.
-        Kaliteyi karşılaştırmak için aynı haberi iki modelle üretip sonuçlara bakabilirsin.
+        Otomatik'te sistem modelleri sırayla dener ve ilk cevap vereni kullanır:
+        önce ücretsiz NVIDIA modelleri, hiçbiri müsait değilse en son ücretli DeepSeek.
+        Belirli bir modeli denemek istersen listeden seç — o da cevap vermezse
+        sistem yine sıradakine geçer, üretim durmaz.
       </p>
     </div>
     <div class="field">
@@ -3886,21 +3888,25 @@ async function loadAiProviders() {
       input.style.display = d.configured ? 'none' : 'block';
     }
     const secili = sel.value;
-    sel.innerHTML = '<option value="">DeepSeek (ücretli — varsayılan)</option>';
+    sel.innerHTML = '<option value="">Otomatik — müsait olanı kullan (önerilen)</option>';
     if (d.configured && d.models) {
       for (const [id, ad] of Object.entries(d.models)) {
         const o = document.createElement('option');
         o.value = 'nvidia:' + id;
-        o.textContent = ad + ' — ücretsiz';
+        o.textContent = 'Önce dene: ' + ad + ' (ücretsiz)';
         sel.appendChild(o);
       }
     }
+    const ds = document.createElement('option');
+    ds.value = 'deepseek';
+    ds.textContent = 'Sadece DeepSeek (ücretli)';
+    sel.appendChild(ds);
     sel.value = secili || '';
     const hint = document.getElementById('ai-provider-hint');
     if (hint) {
       hint.textContent = d.configured
-        ? 'Ücretsiz modeller listede. Bazı NVIDIA modelleri ücretsiz katmanda açılmayabilir — hata alırsan başka bir model dene.'
-        : "NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller burada listelenir.";
+        ? 'Otomatik: önce ücretsiz NVIDIA modelleri, hiçbiri müsait değilse DeepSeek. Bir model yoğunsa veya ücretsiz katmanda açılmıyorsa sistem kendiliğinden sıradakine geçer.'
+        : "NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller de sıraya girer. Şu an sadece DeepSeek kullanılıyor.";
     }
   } catch (e) { console.error('ai providers:', e); }
 }

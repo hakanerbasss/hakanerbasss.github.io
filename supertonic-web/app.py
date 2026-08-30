@@ -2370,11 +2370,13 @@ async def _generate_shorts_core(
     pexels_key = get_pexels_key()
     pollinations_key = get_pollinations_key() if use_ai_images else ""
 
-    # Sağlayıcı seçimi (29.08.2026): Short Üret sekmesinden DeepSeek yerine
-    # NVIDIA'nın ücretsiz modelleri seçilebiliyor. Kalite karşılaştırılabilsin
-    # diye hangi modelin kullanıldığı ve kaç token yakıldığı loglanıyor.
-    client, ai_model, ai_etiket = make_llm(ai_provider, api_key)
-    print(f"[AI] Short üretimi · sağlayıcı={ai_etiket}", flush=True)
+    # Sağlayıcı zinciri (29.08.2026): sabit tek model yerine sırayla deneme.
+    # Varsayılan "auto" → önce ücretsiz NVIDIA modelleri, hiçbiri cevap vermezse
+    # en sonda ücretli DeepSeek. Böylece bir sağlayıcı yoğunken üretim durmuyor
+    # ve kullanıcının hangisinin müsait olduğunu bilmesi gerekmiyor.
+    ai_zincir = make_llm_chain(ai_provider, api_key)
+    print(f"[AI] Short üretimi · deneme sırası: "
+          f"{' → '.join(e for _, _, e in ai_zincir)}", flush=True)
     lang_name = LANG_MAP.get(lang, "Turkish")
     data = None
     scenes = []
@@ -2434,13 +2436,11 @@ Rules:
 - hashtags: 10-15 tags. Always include "bilgi", "öğrendim", "keşfet", "viral", "Shorts". No # symbol, NO spaces within a tag.
 - keyword: English, 2-3 words, visual and specific"""
         for attempt in range(3):
-            _resp = await asyncio.to_thread(
-                client.chat.completions.create,
-                model=ai_model,
+            _resp, _ = await llm_create(
+                ai_zincir, "bilgi-senaryo",
                 messages=[{"role": "user", "content": info_prompt}],
                 temperature=0.7,
             )
-            _log_llm_usage(_resp, ai_etiket, "bilgi-senaryo")
             try:
                 data = _parse_llm_json(_resp.choices[0].message.content)
                 break
@@ -2691,13 +2691,11 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 {_custom_block}"""
 
         for attempt in range(3):
-            response = await asyncio.to_thread(
-                client.chat.completions.create,
-                model=ai_model,
+            response, _ = await llm_create(
+                ai_zincir, "haber-senaryo",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
             )
-            _log_llm_usage(response, ai_etiket, "haber-senaryo")
             try:
                 data = _parse_llm_json(response.choices[0].message.content)
                 break
@@ -3224,9 +3222,8 @@ Kurallar:
 - Sadece açıklama paragraflarını döndür
 """
             )
-        cap_resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model=ai_model,
+        cap_resp, _ = await llm_create(
+            ai_zincir, "instagram-açıklama",
             messages=[{"role": "user", "content": cap_prompt}],
             temperature=0.4,
             # 700 çoğu zaman 900-1400 karakterlik hedefe yetmiyordu, cümle
@@ -3234,7 +3231,6 @@ Kurallar:
             # yüksek) — güvenli pay için yükseltildi.
             max_tokens=1400,
         )
-        _log_llm_usage(cap_resp, ai_etiket, "instagram-açıklama")
         ig_caption_desc = cap_resp.choices[0].message.content.strip()
         # Yine de token sınırında kesilirse (cümle ortasında biterse) son tam
         # cümleye kırp — yarım kelimeyle bitmesin.
@@ -5524,39 +5520,94 @@ NVIDIA_MODELS = {
 }
 
 
-def make_llm(provider: str, deepseek_key: str):
-    """(client, model_adı, etiket) döner.
+# Zaman aşımı ZORUNLU: openai SDK'sının varsayılanı 600 saniye ve kendi içinde
+# 2 kez daha deniyor. Üstüne çağıran koddaki 3'lü tekrar döngüsü binince tek bir
+# asılı istek saatlerce sürebiliyor ve kullanıcıya sadece "üretiliyor" görünüyor.
+# NVIDIA'nın ücretsiz katmanında ilk denemede tam olarak bu yaşandı.
+_LLM_ZAMAN_ASIMI = 90.0
+
+
+def make_llm_chain(provider: str, deepseek_key: str) -> list:
+    """Sırayla denenecek [(client, model, etiket)] listesi döner.
+
+    Sabit tek model seçmek yanlış tasarımdı: DeepSeek yoğun olduğunda cevap
+    vermiyor, NVIDIA'da da bazı modeller ücretsiz katmanda açılmıyor ve
+    kullanıcı hangisinin müsait olduğunu göremiyor. Artık sistem sırayla
+    deniyor, ilk cevap vereni kullanıyor.
 
     provider:
-      ""/"deepseek"        → DeepSeek (varsayılan, ücretli)
-      "nvidia:<model_id>"  → NVIDIA NIM ücretsiz katmanı
-
-    NVIDIA anahtarı yoksa sessizce DeepSeek'e düşer — üretim yarıda kalmasın.
+      ""/"auto"           → önce ücretsiz NVIDIA modelleri, en son DeepSeek
+      "deepseek"          → sadece DeepSeek
+      "nvidia:<model_id>" → önce o model, olmazsa diğer ücretsizler, sonra DeepSeek
     """
     # OpenAI bu dosyada modül seviyesinde DEĞİL, her fonksiyonun içinde import
-    # ediliyor (13 ayrı yerde "from openai import OpenAI"). make_llm modül
-    # seviyesinde tanımlı olduğu için burada da kendi import'unu yapmalı —
-    # yoksa "name 'OpenAI' is not defined" ile patlıyor (29.08.2026'da oldu).
+    # ediliyor. Bu fonksiyon modül seviyesinde olduğu için kendi import'unu
+    # yapmalı — yoksa "name 'OpenAI' is not defined" ile patlıyor.
     from openai import OpenAI
 
-    # Zaman aşımı ZORUNLU (29.08.2026): openai SDK'sının varsayılanı 600 saniye
-    # ve kendi içinde 2 kez daha deniyor. Üstüne çağıran koddaki 3'lü tekrar
-    # döngüsü binince tek bir asılı istek saatlerce sürebiliyor — NVIDIA'nın
-    # ücretsiz katmanında ilk denemede tam olarak bu yaşandı (üretim 10 dakika
-    # boyunca "devam ediyor" göründü). max_retries=1: tekrar mantığı zaten
-    # çağıran tarafta var, SDK'nın ayrıca 3 katına çıkarmasına gerek yok.
-    _ZAMAN_ASIMI = 180.0
-    if provider and provider.startswith("nvidia:"):
-        model = provider.split(":", 1)[1].strip()
-        key = get_nvidia_key()
-        if key and model:
-            return (OpenAI(api_key=key, base_url=NVIDIA_BASE_URL,
-                           timeout=_ZAMAN_ASIMI, max_retries=1),
-                    model, f"nvidia/{model}")
-        print("[AI] NVIDIA seçildi ama anahtar/model yok — DeepSeek'e düşülüyor", flush=True)
-    return (OpenAI(api_key=deepseek_key, base_url=DEEPSEEK_BASE_URL,
-                   timeout=_ZAMAN_ASIMI, max_retries=1),
-            DEEPSEEK_MODEL, "deepseek")
+    def _nv(model):
+        return (OpenAI(api_key=nv_key, base_url=NVIDIA_BASE_URL,
+                       timeout=_LLM_ZAMAN_ASIMI, max_retries=1),
+                model, f"nvidia/{model}")
+
+    def _ds():
+        return (OpenAI(api_key=deepseek_key, base_url=DEEPSEEK_BASE_URL,
+                       timeout=_LLM_ZAMAN_ASIMI, max_retries=1),
+                DEEPSEEK_MODEL, "deepseek")
+
+    nv_key = get_nvidia_key()
+    provider = (provider or "").strip()
+
+    if provider == "deepseek":
+        return [_ds()]
+
+    zincir = []
+    if nv_key:
+        tercih = provider.split(":", 1)[1].strip() if provider.startswith("nvidia:") else ""
+        if tercih:
+            zincir.append(_nv(tercih))
+        # Kalan ücretsiz modeller yedek olarak sıraya girer — biri yoğunsa
+        # veya o model ücretsiz katmanda açılmıyorsa diğerine geçilir.
+        for m in NVIDIA_MODELS:
+            if m != tercih:
+                zincir.append(_nv(m))
+    # DeepSeek her zaman EN SONDA: ücretli olan, ücretsizlerin hiçbiri
+    # cevap vermezse devreye girsin.
+    zincir.append(_ds())
+    return zincir
+
+
+async def llm_create(zincir: list, nerede: str, **kwargs):
+    """Zincirdeki modelleri sırayla dener, ilk cevap vereni kullanır.
+
+    (response, etiket) döner. Hiçbiri cevap vermezse son hatayı yükseltir —
+    böylece çağıran taraf eskisi gibi hata yönetimini sürdürebilir.
+    """
+    son_hata = None
+    nvidia_atla = False
+    for client, model, etiket in zincir:
+        if nvidia_atla and etiket.startswith("nvidia/"):
+            continue
+        try:
+            resp = await asyncio.to_thread(
+                client.chat.completions.create, model=model, **kwargs)
+            _log_llm_usage(resp, etiket, nerede)
+            return resp, etiket
+        except Exception as e:
+            son_hata = e
+            _metin = str(e).lower()
+            # 429 = kota/hız sınırı. NVIDIA'nın ücretsiz katmanındaki sınır
+            # HESAP bazlı (~40 istek/dk), model bazlı değil — biri 429 verdiyse
+            # diğer NVIDIA modelleri de aynı duvara toslar. Onları tek tek
+            # denemek boşuna zaman kaybı, doğrudan DeepSeek'e geçilir.
+            if etiket.startswith("nvidia/") and ("429" in _metin or "too many requests" in _metin):
+                nvidia_atla = True
+                print(f"[AI] {nerede} · NVIDIA kota sınırı (429) — kalan ücretsiz "
+                      f"modeller atlanıp DeepSeek'e geçiliyor", flush=True)
+                continue
+            print(f"[AI] {nerede} · {etiket} cevap vermedi ({type(e).__name__}) "
+                  f"— sıradaki modele geçiliyor", flush=True)
+    raise son_hata if son_hata else RuntimeError("AI zinciri boş")
 
 
 def _log_llm_usage(resp, etiket: str, nerede: str) -> None:
