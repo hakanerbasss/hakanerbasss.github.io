@@ -42,6 +42,28 @@ NVIDIA_MODELS = {
     "meta/llama-3.2-90b-vision-instruct": "Llama 3.2 90B",
 }
 
+# Otomatik yarışa SADECE bunlar girer. Yukarıdaki liste panelden elle
+# seçilebilenlerin tamamı; yarışa hepsini sokmak kotayı boşa yakıyor.
+#
+# Sebep (30.08.2026 canlı hatası): ücretsiz kota ~40 istek/DAKİKA ve HESAP
+# bazlı. Yarış her LLM çağrısında liste kadar istek atıyor — 5 model demek,
+# tek bir video üretiminde 15 çağrı × 5 = 75 istek demek. Üstüne haber jürisi
+# 4 parçayı paralel işliyor (4 × 5 = 20 istek tek seferde). Sonuç: kota
+# saniyeler içinde doluyor ve HER model 429 veriyor.
+#
+# Listedeki ikisi canlıda gerçekten cevap veren modeller. Diğer üçü aynı
+# hatada 90 saniye boyunca cevap vermeyip zaman aşımına düştü — yani kotadan
+# yiyor ama üretime katkısı yok. Yeni bir model ücretsiz katmanda hızlı cevap
+# veriyorsa buraya eklenebilir.
+NVIDIA_RACE_MODELS = [
+    "moonshotai/kimi-k3",
+    "minimaxai/minimax-m3",
+]
+
+# Hepsi başarısız olduğunda kotanın yenilenmesi için beklenecek süre.
+# 429 dakika bazlı bir sınır olduğu için kısa bir bekleme çoğu zaman yetiyor.
+KOTA_BEKLEME = 25.0
+
 
 def get_nvidia_key() -> str:
     if NVIDIA_CONFIG.exists():
@@ -142,14 +164,33 @@ def make_llm_chain(provider: str, deepseek_key: str) -> list:
         if model:
             return [_nv(model)]
 
-    yaris = [_nv(m) for m in NVIDIA_MODELS]
+    yaris = [_nv(m) for m in NVIDIA_RACE_MODELS]
     if get_deepseek_in_race():
         yaris.append(_ds())
     return yaris
 
 
 async def llm_create(zincir: list, nerede: str, **kwargs):
-    """Tüm modellere aynı anda istek atar, ilk cevap vereni kullanır (async)."""
+    """Tüm modellere aynı anda istek atar, ilk cevap vereni kullanır (async).
+
+    Hepsi başarısız olursa KOTA_BEKLEME kadar bekleyip bir kez daha dener:
+    429 dakika bazlı bir sınır olduğu için kısa bir bekleme çoğu zaman
+    yetiyor. Beklemeden tekrar denemek (çağıran taraftaki döngülerin yaptığı
+    gibi) aynı duvara toslamaktan başka işe yaramıyordu.
+    """
+    try:
+        return await _llm_create_bir_tur(zincir, nerede, **kwargs)
+    except RuntimeError as ilk:
+        if "kota dolu" not in str(ilk):
+            raise
+        print(f"[AI] {nerede} · tüm modeller kota dolu — {KOTA_BEKLEME:.0f}sn "
+              f"beklenip bir kez daha denenecek", flush=True)
+        await asyncio.sleep(KOTA_BEKLEME)
+        return await _llm_create_bir_tur(zincir, nerede, **kwargs)
+
+
+async def _llm_create_bir_tur(zincir: list, nerede: str, **kwargs):
+    """Tek turluk yarış — llm_create bunu (gerekirse iki kez) çağırır."""
     async def _dene(client, model, etiket):
         resp = await asyncio.to_thread(
             client.chat.completions.create, model=model, **kwargs)
@@ -184,7 +225,20 @@ async def llm_create(zincir: list, nerede: str, **kwargs):
 
 
 def llm_create_sync(zincir: list, nerede: str, **kwargs):
-    """llm_create'in senkron sürümü.
+    """llm_create'in senkron sürümü (kota dolarsa bir kez daha dener)."""
+    try:
+        return _llm_create_sync_bir_tur(zincir, nerede, **kwargs)
+    except RuntimeError as ilk:
+        if "kota dolu" not in str(ilk):
+            raise
+        print(f"[AI] {nerede} · tüm modeller kota dolu — {KOTA_BEKLEME:.0f}sn "
+              f"beklenip bir kez daha denenecek", flush=True)
+        time.sleep(KOTA_BEKLEME)
+        return _llm_create_sync_bir_tur(zincir, nerede, **kwargs)
+
+
+def _llm_create_sync_bir_tur(zincir: list, nerede: str, **kwargs):
+    """Tek turluk senkron yarış.
 
     news_ranker'ın AI jürisi ThreadPoolExecutor içinde senkron çalışıyor;
     orayı async'e çevirmek geniş bir değişiklik olurdu. Aynı yarış mantığı,
