@@ -1677,7 +1677,7 @@ async def fetch_gnews_article_by_link(link: str, title: str = "", source: str = 
     }
 
 
-async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -> dict:
+async def _extract_verified_facts(zincir, article_text: str, lang: str = "tr") -> dict:
     """Ham makale metninden SADECE kaynakta yazan olguları çıkarır (ayrı ajan — yorum/tahmin katmaz).
 
     Senaryo yazan ajandan bilerek ayrı tutulur: aynı model hem serbest metni yorumlayıp hem de
@@ -1715,9 +1715,8 @@ async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -
         "material for a natural ~45-55 second news narration without padding."
     )
     try:
-        resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model="deepseek-v4-flash",
+        resp, _ = await llm_create(
+            zincir, "olgu-çıkarımı",
             messages=[{"role": "user", "content": extract_prompt}],
             temperature=0.1,
         )
@@ -1730,7 +1729,7 @@ async def _extract_verified_facts(client, article_text: str, lang: str = "tr") -
         return {"facts": [], "sufficient": False}
 
 
-async def _verify_narration_facts(client, narration: str, facts_data: dict) -> list:
+async def _verify_narration_facts(zincir, narration: str, facts_data: dict) -> list:
     """Üretilen senaryodaki iddiaları olgu listesiyle karşılaştırır — desteklenmeyenleri döner.
 
     Yazan ajandan ayrı bir üçüncü ajan: sadece karşılaştırma yapar, senaryo yazmaz.
@@ -1782,9 +1781,8 @@ async def _verify_narration_facts(client, narration: str, facts_data: dict) -> l
         "costs nothing. If nothing is fabricated, return an empty list."
     )
     try:
-        resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model="deepseek-v4-flash",
+        resp, _ = await llm_create(
+            zincir, "olgu-doğrulama",
             messages=[{"role": "user", "content": verify_prompt}],
             temperature=0.0,
         )
@@ -2560,7 +2558,7 @@ Rules:
         # kurum/rakam/isim iddialarını sonradan yakalayıp engelliyor).
         facts_data = {}
         if gnews_data.get("found") and gnews_data.get("context_text"):
-            facts_data = await _extract_verified_facts(client, gnews_data["context_text"], lang)
+            facts_data = await _extract_verified_facts(ai_zincir, gnews_data["context_text"], lang)
 
         news_context_instruction = ""
         if facts_data.get("facts"):
@@ -2713,7 +2711,7 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
         if require_verified_source and facts_data.get("facts"):
             try:
                 _narration_text = " ".join(s.get("text", "") for s in scenes)
-                _unsupported = await _verify_narration_facts(client, _narration_text, facts_data)
+                _unsupported = await _verify_narration_facts(ai_zincir, _narration_text, facts_data)
                 if _unsupported:
                     _claims_str = " | ".join(c["claim"] for c in _unsupported[:3])
                     print(f"[verify] bilgi amaçlı uyarı ({len(_unsupported)} adet, iptal yok): "
@@ -7579,7 +7577,14 @@ async def _roundup_title_and_tags(api_key: str, used_titles: list, date_label: s
     fallback_title = f"Günün Öne Çıkan Haberleri — {date_label}"
     fallback_tags = ", ".join(["haberler", "gündem", "son dakika", "türkiye haberleri", "dünya haberleri", "güncel haberler"])
     try:
-        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        # OpenAI bu dosyada modül seviyesinde import EDİLMİYOR; her fonksiyon
+        # kendi import'unu yapıyor. Burada eksikti: fonksiyon "OpenAI is not
+        # defined" ile patlıyor, ama gövde try/except içinde olduğu için hata
+        # yutuluyor ve roundup videosu HER ZAMAN yedek başlıkla çıkıyordu.
+        # Sessiz bir kusurdu — 29.08.2026'da pyflakes taramasıyla bulundu.
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com",
+                        timeout=_LLM_ZAMAN_ASIMI, max_retries=1)
         headlines_block = "\n".join(f"- {t}" for t in used_titles)
         prompt = f"""Aşağıda bugün üretilen {len(used_titles)} haber başlığı var. Bunlardan tek bir YouTube video başlığı ve etiket listesi üret.
 
