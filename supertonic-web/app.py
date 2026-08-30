@@ -2332,6 +2332,69 @@ def _parse_chatgpt_news_block(raw_text: str) -> dict:
     }
 
 
+# ── Anlatı uzunluğu: saniye yerine KELİME bütçesi ────────────────────────────
+# Sorun: prompt "toplam 45-55 saniye" diyordu ama bir dil modeli saniye
+# ölçemez — metnin ne kadar süreceğini bilmiyor. Sonuç: videolar hedefin iki
+# katına çıkıyordu (ölçülen gerçek örnek: 88,8 sn). Bu hem izlenmeyi düşürüyor
+# hem de faturanın %72'sini oluşturan ÇIKIŞ token'ını boşuna yakıyor.
+#
+# Çözüm: modele sayabileceği bir şey ver — kelime sayısı. Kaç kelimenin kaç
+# saniye ettiği ise TAHMİN EDİLMİYOR, her üretimden sonra ölçülüp buraya
+# yazılıyor (kelime/saniye). Yani bütçe kendi kendini kalibre ediyor; ses
+# motoru, spiker veya hız ayarı değişirse birkaç video sonra kendini düzeltir.
+TTS_HIZ_DOSYA = Path("tts_hiz.json")
+TTS_HIZ_VARSAYILAN = 2.0     # kelime/sn — ilk ölçüm gelene kadarki başlangıç
+TTS_HEDEF_SANIYE = 50        # 45-55 sn aralığının ortası
+TTS_HIZ_PENCERE = 10         # kaç üretimin ortalaması tutulsun
+
+
+def _tts_kelime_hizi() -> float:
+    """Ölçülmüş ortalama kelime/saniye. Hiç ölçüm yoksa varsayılan."""
+    try:
+        d = json.loads(TTS_HIZ_DOSYA.read_text())
+        ol = d.get("olcumler") or []
+        if ol:
+            # 1,0-3,5 dışı değerler ölçüm hatasıdır (ses üretilememiş, sahne
+            # atlanmış vb.) — ortalamayı bozmasın diye elenir.
+            gecerli = [x for x in ol if 1.0 <= x <= 3.5]
+            if gecerli:
+                return sum(gecerli) / len(gecerli)
+    except Exception:
+        pass
+    return TTS_HIZ_VARSAYILAN
+
+
+def _tts_hiz_kaydet(kelime: int, saniye: float) -> None:
+    """Biten üretimin gerçek hızını ölçüp son N ölçümün ortalamasına ekler."""
+    if kelime < 20 or saniye < 5:
+        return
+    hiz = kelime / saniye
+    print(f"[SURE-OLCU] {kelime} kelime → {saniye:.1f} sn "
+          f"({hiz:.2f} kelime/sn, bütçe {_tts_kelime_hizi():.2f} varsayıyordu)",
+          flush=True)
+    if not (1.0 <= hiz <= 3.5):
+        return
+    try:
+        d = json.loads(TTS_HIZ_DOSYA.read_text()) if TTS_HIZ_DOSYA.exists() else {}
+    except Exception:
+        d = {}
+    ol = (d.get("olcumler") or [])[-(TTS_HIZ_PENCERE - 1):]
+    ol.append(round(hiz, 3))
+    try:
+        TTS_HIZ_DOSYA.write_text(json.dumps(
+            {"olcumler": ol, "guncel": round(sum(ol) / len(ol), 3)},
+            ensure_ascii=False))
+    except Exception:
+        pass
+
+
+def _kelime_butcesi() -> tuple[int, int, int]:
+    """(toplam_alt, toplam_ust, sahne_basi_ust) kelime sınırları."""
+    hiz = _tts_kelime_hizi()
+    hedef = TTS_HEDEF_SANIYE * hiz
+    return round(hedef * 0.9), round(hedef * 1.1), round(hedef * 1.1 / 5)
+
+
 async def _generate_shorts_core(
     topic: str,
     api_key: str,
@@ -2408,6 +2471,8 @@ async def _generate_shorts_core(
             "cogusinsan": "FIRST scene MUST start with 'Çoğu insan bunu bilmiyor' — revelation format, viewer feels they're learning an insider secret.",
         }
         format_rule = _format_hooks.get(info_format, _format_hooks["biliyormuydunuz"])
+        # Haber akışıyla aynı ölçülmüş kelime bütçesi (bkz. _tts_kelime_hizi).
+        _kb_alt, _kb_ust, _kb_sahne = _kelime_butcesi()
         info_prompt = f"""Create a YouTube Shorts informational/educational video in {lang_name}.
 
 Topic: {topic}
@@ -2418,14 +2483,15 @@ Return ONLY valid JSON, no markdown:
   "hashtags": ["Shorts", "bilgi", "keşfet", "topic", "tags"],
   "scenes": [
     {{
-      "text": "narration text (1-2 short punchy sentences)",
+      "text": "narration text (1-2 short punchy sentences, max {_kb_sahne} words)",
       "keyword": "english search keyword for stock photo (2-3 words)"
     }}
   ]
 }}
 
 Rules:
-- 5 to 7 scenes, total narration under 55 seconds
+- 5 to 7 scenes
+- LENGTH — HARD LIMIT, COUNT THE WORDS BEFORE YOU RETURN: the "text" fields of ALL scenes added together must be between {_kb_alt} and {_kb_ust} words, and no single scene may exceed {_kb_sahne} words. Count them; do not estimate. This is what makes the finished video land around {TTS_HEDEF_SANIYE} seconds.
 - {format_rule}
 - NEVER use abbreviations; write full names for text-to-speech
 - Turkish number format ONLY: comma (,) is the decimal separator, dot (.) is the thousands separator — NEVER write numbers in English format (e.g. "1,287" meaning one thousand two hundred eighty-seven). Write "1.287" or spell it out "bin iki yüz seksen yedi" instead — English-style thousands-commas break the TTS reading.
@@ -2572,7 +2638,8 @@ Rules:
             dates_block = ", ".join(facts_data.get("dates", [])) or "yok"
             thin_note = (
                 "\nNOT: Kaynak metni kısa, az olgu var. BU DURUMDA aşağıdaki "
-                "'45 saniyeden kısa olmasın' kuralı GEÇERSİZDİR — video 30-40 saniye olabilir. "
+                "alt kelime sınırı GEÇERSİZDİR — anlatı daha kısa olabilir; "
+                "üst sınır yine de aşılamaz. "
                 "Listede olmayan HİÇBİR bilgi, rakam, kurum adı ekleme. "
                 "Eksik bilgiyi doldurmaya çalışma; var olan olgularla kısa ve net bir anlatı yap.\n"
                 if not facts_data.get("sufficient") else ""
@@ -2628,6 +2695,11 @@ Rules:
         _cr = get_custom_prompt_rules()
         _custom_block = ("- CUSTOM RULES (highest priority — always follow these):\n" +
                          "\n".join("  " + ln for ln in _cr.splitlines())) if _cr else ""
+        # Kelime bütçesi ölçülmüş TTS hızından geliyor (bkz. _tts_kelime_hizi).
+        _kb_alt, _kb_ust, _kb_sahne = _kelime_butcesi()
+        print(f"[SURE-BUTCE] hedef {TTS_HEDEF_SANIYE} sn → {_kb_alt}-{_kb_ust} kelime "
+              f"(sahne başına en fazla {_kb_sahne}), ölçülen hız "
+              f"{_tts_kelime_hizi():.2f} kelime/sn", flush=True)
         prompt = f"""Create a YouTube Shorts video.
 Narration language: {lang_name}
 Target audience: Turkish viewers 45+ (many 60+), majority women, watching on Instagram/YouTube Shorts. Use plain, direct, reassuring language — short sentences, no slang or internet jargon, no unexplained technical/bureaucratic terms (spell them out in plain words if unavoidable), no rushed pacing.
@@ -2644,7 +2716,7 @@ Return ONLY valid JSON, no markdown, no explanation:
   "certainty_level": "A, B, or C — see CERTAINTY LEVEL rules below, be honest",
   "scenes": [
     {{
-      "text": "narration for this scene (1-2 short sentences)",
+      "text": "narration for this scene (1-2 short sentences, max {_kb_sahne} words)",
       "keyword": "english search keyword for stock photo (2-3 words, specific and visual)",
       "image_prompt": "one detailed English sentence describing exactly what should be depicted for an AI image generator — concrete people/objects/setting/action/mood specific to THIS scene, not a generic stock category"
     }}
@@ -2684,7 +2756,8 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
 - emphasis_word: exactly one word or short phrase (max 2 words) copied VERBATIM from the title, representing the core subject the story is actually about — this word will be visually highlighted in the opening banner.
 - keyword: English, 2-3 words, visual and specific (e.g. "mountain sunset", "busy city street")
 - image_prompt: English, one full sentence, written for an AI image generator (not a search engine) — describe the actual concrete scene (who/what/where/doing what), photorealistic documentary style, never mention text/logos/watermarks/charts/numbers appearing in the image
-- Total narration between 45 and 55 seconds — NEVER shorter than 45 seconds. If the facts feel thin, elaborate naturally on the facts you have (implications, who it affects, timing) instead of cutting the video short or inventing new details.
+- LENGTH — THIS IS A HARD LIMIT, COUNT THE WORDS BEFORE YOU RETURN: the "text" fields of ALL scenes added together must be between {_kb_alt} and {_kb_ust} words, and no single scene may exceed {_kb_sahne} words. Count them; do not estimate. This budget is what makes the finished video land around {TTS_HEDEF_SANIYE} seconds — going over does not make the video richer, it makes viewers leave before the end.
+- If you are under the lower bound, do NOT pad with filler, restatement, or a summary scene: elaborate on a fact you already have (who it affects, from when, what changes in practice). If you are over the upper bound, cut the weakest scene entirely rather than trimming every scene into stubs.
 - hashtags: 10-15 tags — ALL of them must be specific to THIS video's actual topic/people/places/institutions (e.g. if the video is about the Instagram algorithm: "instagram", "algoritma", "mosseri", "reels", "sosyalmedya", "erişim", "keşfetsayfası"...). Do NOT pad the list with generic filler tags like "sondakika", "gündem", "haberler", "güncel", "viral" — only ONE fixed/generic tag is allowed in the entire list: "Shorts" (always last). Every other tag must be traceable to something specific in this exact story.
 {_custom_block}"""
 
@@ -2855,6 +2928,14 @@ Put your honest determination in "certainty_level" (A, B, or C — if the materi
                 )
 
         png_files.append(png_path)
+
+    # Kelime bütçesini bir sonraki üretim için kalibre et: bu videonun gerçek
+    # kelime/saniye oranını ölç. Böylece bütçe tahmine değil ölçüme dayanır ve
+    # ses motoru/spiker/hız değişince kendini birkaç video içinde düzeltir.
+    _tts_hiz_kaydet(
+        sum(len(s.get("text", "").split()) for s in scenes),
+        sum(durations),
+    )
 
     # İlk sahneye haber overlay ekle — Bilgi Shorts modunda ve özel açılış kapağı
     # kullanılıyorsa atla (kapak zaten kendi tasarımıyla açılış görevini görüyor,
