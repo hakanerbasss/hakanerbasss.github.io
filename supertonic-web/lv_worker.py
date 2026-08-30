@@ -398,7 +398,8 @@ def generate_long_video(job: dict) -> dict:
             "scenes": scenes,
         }
     else:
-        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        from ai_provider import make_llm_chain, llm_create_sync
+        _zincir = make_llm_chain("", api_key)
         scene_count = max(6, duration_min * 2)
 
         prompt = f"""Create a detailed educational/documentary YouTube video about: {topic}
@@ -428,8 +429,8 @@ Rules:
 - hashtags: 8-12 relevant tags, ALWAYS include "belgesel", "eğitim", "keşfet". No # symbol, NO spaces within a tag.
 - keyword: English, specific and visual"""
 
-        response = client.chat.completions.create(
-            model="deepseek-v4-flash",
+        response, _ = llm_create_sync(
+            _zincir, "uzun-video-senaryo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=4000,

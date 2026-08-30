@@ -1097,6 +1097,7 @@
       <select id="shorts-ai-provider">
         <option value="">Otomatik — müsait olanı kullan (önerilen)</option>
       </select>
+      <div id="ai-last-used" style="font-size:12px;color:var(--c-4ade80);margin-top:8px;display:none;"></div>
       <p style="color:var(--c-666666);font-size:11px;margin-top:6px;" id="ai-provider-hint">
         Otomatik'te tüm ücretsiz NVIDIA modellerine aynı anda istek gider,
         ilk cevap veren üretimi yapar. Hangisinin müsait olduğunu bilmene gerek yok.
@@ -3925,6 +3926,20 @@ async function loadAiProviders() {
     ds.textContent = 'Sadece DeepSeek (ücretli)';
     sel.appendChild(ds);
     sel.value = secili || '';
+    const sonKutu = document.getElementById('ai-last-used');
+    if (sonKutu) {
+      const su = d.last_used || {};
+      if (su.model) {
+        const dk = su.ts ? Math.round((Date.now() / 1000 - su.ts) / 60) : null;
+        const ne = dk === null ? '' : (dk < 1 ? ' · az önce'
+                  : dk < 60 ? ` · ${dk} dk önce`
+                  : ` · ${Math.round(dk / 60)} saat önce`);
+        sonKutu.textContent = `Son üretim: ${su.model}${su.nerede ? ' (' + su.nerede + ')' : ''}${ne}`;
+        sonKutu.style.display = 'block';
+      } else {
+        sonKutu.style.display = 'none';
+      }
+    }
     const hint = document.getElementById('ai-provider-hint');
     if (hint) {
       hint.textContent = d.configured

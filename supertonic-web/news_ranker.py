@@ -2213,9 +2213,9 @@ def _ai_jury_call_stage2_chunk(
 
     for attempt in range(2):
         try:
-            client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=timeout_seconds, max_retries=0)
-            resp = client.chat.completions.create(
-                model="deepseek-v4-flash",
+            from ai_provider import make_llm_chain, llm_create_sync
+            resp, _ = llm_create_sync(
+                make_llm_chain("", api_key), "haber-jürisi",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=1500,
@@ -2332,9 +2332,9 @@ def _ai_jury_call_stage3(
 
     for attempt in range(2):
         try:
-            client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=timeout_seconds, max_retries=0)
-            resp = client.chat.completions.create(
-                model="deepseek-v4-flash",
+            from ai_provider import make_llm_chain, llm_create_sync
+            resp, _ = llm_create_sync(
+                make_llm_chain("", api_key), "haber-jürisi",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=1200,

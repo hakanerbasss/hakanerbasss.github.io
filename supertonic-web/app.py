@@ -4698,7 +4698,7 @@ async def _generate_long_video_core(topic: str, api_key: str, lang: str, voice: 
 
     use_video_mode = use_video == "true"
     pexels_key = get_pexels_key()
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    _zincir = make_llm_chain("", api_key)
     lang_name = LANG_MAP.get(lang, "Turkish")
     scene_count = max(6, duration_min * 2)
 
@@ -4731,9 +4731,8 @@ Rules:
 - hashtags: 8-12 relevant tags mixing {lang_name} and English terms, ALWAYS include "Shorts", "belgesel", "eğitim", "keşfet" — then add topic-specific tags. No # symbol, NO spaces within a tag (e.g. "yapayZeka" not "yapay zeka")
 - keyword: English, specific and visual"""
 
-    response = await asyncio.to_thread(
-        client.chat.completions.create,
-        model="deepseek-v4-flash",
+    response, _ = await llm_create(
+        _zincir, "üretim",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=4000,
@@ -5049,7 +5048,7 @@ async def generate_long_video_from_script(
             pass
 
     from openai import OpenAI
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    _zincir = make_llm_chain("", api_key)
     lang_name = LANG_MAP.get(lang, "Turkish")
 
     parse_prompt = f"""Below is a script text in {lang_name}. Parse it into scenes for a YouTube video narration.
@@ -5078,9 +5077,8 @@ Rules:
 - NEVER use abbreviations in scene text; always write the full name for text-to-speech
 - If the uploaded script contains numbers in English format (comma as thousands separator, e.g. "1,287"), convert them to Turkish format ("1.287") or spell them out — Turkish uses comma ONLY as the decimal separator, English-style thousands-commas break the TTS reading"""
 
-    response = await asyncio.to_thread(
-        client.chat.completions.create,
-        model="deepseek-v4-flash",
+    response, _ = await llm_create(
+        _zincir, "üretim",
         messages=[{"role": "user", "content": parse_prompt}],
         temperature=0.3,
         max_tokens=8000,
@@ -5199,7 +5197,7 @@ async def info_shorts_trend(
         "cogusinsan": "Çoğu insan bilmiyor (insider secret)",
     }
     fmt_label = format_labels.get(info_format, format_labels["biliyormuydunuz"])
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    _zincir = make_llm_chain("", api_key)
     prompt = f"""Today is {today}. You are helping create a YouTube Shorts informational video in {lang_name}.
 
 Category: {category}
@@ -5214,9 +5212,8 @@ Suggest ONE compelling short video topic (45-60 seconds) that:
 Return ONLY a JSON object, no markdown:
 {{"topic": "the specific topic in {lang_name}", "hook": "one sentence that captures the hook in {lang_name}"}}"""
     try:
-        resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model="deepseek-v4-flash",
+        resp, _ = await llm_create(
+            _zincir, "üretim",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.9,
             max_tokens=200,
@@ -5242,7 +5239,7 @@ async def lv_category_trend(
         raise HTTPException(400, "Kategori boş olamaz")
     lang_name = LANG_MAP.get(lang, "Turkish")
     today = datetime.now().strftime("%d.%m.%Y")
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    _zincir = make_llm_chain("", api_key)
     prompt = f"""Today is {today}. You are helping create a YouTube documentary video in {lang_name}.
 
 Category: {category}
@@ -5256,9 +5253,8 @@ Suggest ONE compelling documentary topic in this category that:
 Return ONLY a JSON object, no markdown:
 {{"topic": "the specific topic in {lang_name}", "hook": "one sentence curiosity-gap description in {lang_name}"}}"""
     try:
-        resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model="deepseek-v4-flash",
+        resp, _ = await llm_create(
+            _zincir, "üretim",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.9,
             max_tokens=200,
@@ -5284,7 +5280,7 @@ async def generate_trend_long_video(
         raise HTTPException(400, "API key eksik")
 
     pexels_key = get_pexels_key()
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    _zincir = make_llm_chain("", api_key)
     lang_name = LANG_MAP.get(lang, "Turkish")
 
     trend_data = get_trends(region_code=region, lang=lang)
@@ -5333,9 +5329,8 @@ Rules:
 - hashtags: 10-15 tags mixing {lang_name} and English, ALWAYS include "Shorts", "sondakika", "gündem", "keşfet", "haberler", "güncel" — then add topic-specific tags. No # symbol, NO spaces within a tag (e.g. "sondakika" not "son dakika")
 - keyword: English, 2-3 words, visual and specific"""
 
-    response = await asyncio.to_thread(
-        client.chat.completions.create,
-        model="deepseek-v4-flash",
+    response, _ = await llm_create(
+        _zincir, "üretim",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=4000,
@@ -5496,164 +5491,19 @@ TOKEN_FILE_EN = Path("yt_token_en.json")
 PEXELS_CONFIG = Path("pexels_config.json")
 POLLINATIONS_CONFIG = Path("pollinations_config.json")
 DS_CONFIG = Path("deepseek_config.json")
-NVIDIA_CONFIG = Path("nvidia_config.json")
-AI_RACE_CONFIG = Path("ai_race_config.json")   # DeepSeek yarışa katılsın mı
+from ai_provider import NVIDIA_CONFIG, AI_RACE_CONFIG  # noqa: E402
 OPENAI_CONFIG = Path("openai_config.json")
 
-# ── AI sağlayıcı seçimi ───────────────────────────────────────────────────────
-# NVIDIA NIM, OpenAI uyumlu tek endpoint (integrate.api.nvidia.com) üzerinden
-# ücretsiz katmanda model veriyor; SDK aynı, yalnız base_url + model adı değişir.
-NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEEPSEEK_MODEL = "deepseek-v4-flash"
-
-# Panelde gösterilen NVIDIA modelleri. Katalogda 100'den fazla model var ama
-# hepsi ücretsiz katmanda gerçekten çalışmıyor (kullanıcı testinde NVIDIA
-# üzerindeki deepseek-v4-pro açılmadı, Kimi/MiniMax çalıştı). Burası çalıştığı
-# görülenlerin listesi — yenisini denemek için tek satır eklemek yeterli.
-NVIDIA_MODELS = {
-    "moonshotai/kimi-k3": "Kimi K3",
-    "minimaxai/minimax-m3": "MiniMax M3",
-    "deepseek-ai/deepseek-v4-flash-0731": "DeepSeek V4 Flash",
-    "deepseek-ai/deepseek-v4-pro-0813": "DeepSeek V4 Pro",
-    "meta/llama-3.2-90b-vision-instruct": "Llama 3.2 90B",
-}
+# ── AI sağlayıcı katmanı ──────────────────────────────────────────────────────
+# Tüm mantık ai_provider.py'de: app.py, news_ranker.py ve lv_worker.py aynı
+# modülü kullanıyor, böylece sağlayıcı davranışı TEK yerden kontrol ediliyor.
+from ai_provider import (  # noqa: E402
+    LLM_TIMEOUT,
+    NVIDIA_MODELS, get_nvidia_key, get_deepseek_in_race, son_kullanilan,
+    make_llm_chain, llm_create,
+)
 
 
-# Zaman aşımı ZORUNLU: openai SDK'sının varsayılanı 600 saniye ve kendi içinde
-# 2 kez daha deniyor. Üstüne çağıran koddaki 3'lü tekrar döngüsü binince tek bir
-# asılı istek saatlerce sürebiliyor ve kullanıcıya sadece "üretiliyor" görünüyor.
-# NVIDIA'nın ücretsiz katmanında ilk denemede tam olarak bu yaşandı.
-_LLM_ZAMAN_ASIMI = 90.0
-
-
-def make_llm_chain(provider: str, deepseek_key: str) -> list:
-    """Paralel yarışa girecek [(client, model, etiket)] listesi döner.
-
-    Tek model seçmek de sırayla denemek de yanlıştı: DeepSeek yoğunken cevap
-    vermiyor, NVIDIA'da kimi model kotaya takılıyor, kullanıcı hangisinin
-    müsait olduğunu göremiyor. Artık hepsine AYNI ANDA istek atılıyor, ilk
-    cevap veren kazanıyor (bkz. llm_create).
-
-    Yarışa yalnız ÜCRETSİZ NVIDIA modelleri girer — ücretli DeepSeek yarışa
-    sokulmaz, çünkü yarışı kaybetse bile isteği faturaya yazılabilir. DeepSeek
-    sadece iki durumda kullanılır: NVIDIA anahtarı yoksa, ya da kullanıcı
-    listeden açıkça "Sadece DeepSeek" seçtiyse.
-
-    provider:
-      ""/"auto"           → tüm ücretsiz NVIDIA modelleri yarışır
-      "deepseek"          → sadece DeepSeek
-      "nvidia:<model_id>" → sadece o model (tek model denemek isteyenler için)
-    """
-    # OpenAI bu dosyada modül seviyesinde import EDİLMİYOR; her fonksiyon
-    # kendi import'unu yapıyor.
-    from openai import OpenAI
-
-    def _nv(model):
-        return (OpenAI(api_key=nv_key, base_url=NVIDIA_BASE_URL,
-                       timeout=_LLM_ZAMAN_ASIMI, max_retries=1),
-                model, f"nvidia/{model}")
-
-    def _ds():
-        return (OpenAI(api_key=deepseek_key, base_url=DEEPSEEK_BASE_URL,
-                       timeout=_LLM_ZAMAN_ASIMI, max_retries=1),
-                DEEPSEEK_MODEL, "deepseek")
-
-    nv_key = get_nvidia_key()
-    provider = (provider or "").strip()
-
-    if provider == "deepseek" or not nv_key:
-        return [_ds()]
-    if provider.startswith("nvidia:"):
-        model = provider.split(":", 1)[1].strip()
-        if model:
-            return [_nv(model)]
-
-    yaris = [_nv(m) for m in NVIDIA_MODELS]
-    # DeepSeek'in yarışa katılıp katılmayacağı AYARDAN geliyor, koda gömülü
-    # değil — bakiye yüklenince paneldeki kutuyu işaretlemek yeterli, kod
-    # değişikliği gerekmiyor. Varsayılan kapalı, çünkü yarışı kaybettiğinde
-    # bile isteği faturaya yazılabilir; ücretsizler yeterken para harcamasın.
-    if get_deepseek_in_race():
-        yaris.append(_ds())
-    return yaris
-
-
-def _ai_hata_ozeti(hata: Exception) -> str:
-    """Sağlayıcı hatasını tek kelimeyle sınıflandırır — log ve kullanıcı mesajı için."""
-    m = str(hata).lower()
-    if "429" in m or "too many requests" in m:
-        return "kota dolu (429)"
-    if "402" in m or "insufficient balance" in m:
-        return "BAKİYE YOK (402)"
-    if "404" in m or "not found" in m:
-        return "model yok (404)"
-    if "401" in m or "403" in m or "unauthorized" in m:
-        return "anahtar geçersiz"
-    if "timeout" in m or "timed out" in m:
-        return "zaman aşımı"
-    return type(hata).__name__
-
-
-async def llm_create(zincir: list, nerede: str, **kwargs):
-    """Tüm modellere AYNI ANDA istek atar, ilk cevap vereni kullanır.
-
-    Sırayla denemek yavaştı: kotaya takılan/yanıt vermeyen her model için
-    zaman aşımı kadar bekleniyordu. Paralel atınca hangisinin müsait olduğunu
-    bilmek gerekmiyor — yarışı kim kazanırsa onunla üretiliyor, kalan istekler
-    iptal ediliyor.
-
-    (response, etiket) döner. Hiçbiri cevap vermezse hangisinin neden
-    başarısız olduğunu özetleyen tek bir hata yükseltir.
-    """
-    async def _dene(client, model, etiket):
-        resp = await asyncio.to_thread(
-            client.chat.completions.create, model=model, **kwargs)
-        return resp, etiket
-
-    isler = {asyncio.create_task(_dene(c, m, e)): e for c, m, e in zincir}
-    hatalar = []
-    bekleyen = set(isler)
-    try:
-        while bekleyen:
-            biten, bekleyen = await asyncio.wait(
-                bekleyen, return_when=asyncio.FIRST_COMPLETED)
-            for is_ in biten:
-                etiket = isler[is_]
-                try:
-                    resp, etiket = is_.result()
-                except Exception as e:
-                    hatalar.append(f"{etiket}: {_ai_hata_ozeti(e)}")
-                    continue
-                _log_llm_usage(resp, etiket, nerede)
-                print(f"[AI] {nerede} · yarışı '{etiket}' kazandı", flush=True)
-                return resp, etiket
-    finally:
-        # Kazanan belli olunca kalan istekleri boşuna bekletme.
-        for is_ in isler:
-            if not is_.done():
-                is_.cancel()
-
-    raise RuntimeError(
-        f"Hiçbir AI modeli cevap vermedi ({nerede}). Denenenler → "
-        + " | ".join(hatalar)
-    )
-
-
-def _log_llm_usage(resp, etiket: str, nerede: str) -> None:
-    """Çağrı başına token tüketimini journalctl'e yazar.
-
-    Fatura haftada ~5 dolara çıktığında hangi adımın ne kadar token yaktığına
-    dair hiçbir kayıt yoktu; "link verince çok harcıyor" gözlemi ölçülemiyordu.
-    Bu satır sayesinde maliyet tahmin değil, veri.
-    """
-    try:
-        u = getattr(resp, "usage", None)
-        if u:
-            print(f"[AI-TOKEN] {nerede} · {etiket} · giriş={u.prompt_tokens} "
-                  f"çıkış={u.completion_tokens} toplam={u.total_tokens}", flush=True)
-    except Exception:
-        pass
 IG_CONFIG = Path("ig_config.json")
 IG_LOG = Path("ig_log.json")
 IG_RECENT_FILE = Path("ig_recent_posts.json")  # duplicate prevention
@@ -7609,14 +7459,12 @@ async def _roundup_title_and_tags(api_key: str, used_titles: list, date_label: s
     fallback_title = f"Günün Öne Çıkan Haberleri — {date_label}"
     fallback_tags = ", ".join(["haberler", "gündem", "son dakika", "türkiye haberleri", "dünya haberleri", "güncel haberler"])
     try:
-        # OpenAI bu dosyada modül seviyesinde import EDİLMİYOR; her fonksiyon
-        # kendi import'unu yapıyor. Burada eksikti: fonksiyon "OpenAI is not
-        # defined" ile patlıyor, ama gövde try/except içinde olduğu için hata
-        # yutuluyor ve roundup videosu HER ZAMAN yedek başlıkla çıkıyordu.
-        # Sessiz bir kusurdu — 29.08.2026'da pyflakes taramasıyla bulundu.
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com",
-                        timeout=_LLM_ZAMAN_ASIMI, max_retries=1)
+        # NOT: burada eskiden OpenAI import edilmemişti; fonksiyon "OpenAI is
+        # not defined" ile patlıyor ama gövde try/except içinde olduğu için
+        # hata yutuluyordu — roundup videosu HER ZAMAN yedek başlıkla
+        # çıkıyordu. Sessiz bir kusurdu, pyflakes taramasıyla bulundu.
+        # Artık ortak zinciri kullanıyor, ayrı istemci kurmuyor.
+        _zincir = make_llm_chain("", api_key)
         headlines_block = "\n".join(f"- {t}" for t in used_titles)
         prompt = f"""Aşağıda bugün üretilen {len(used_titles)} haber başlığı var. Bunlardan tek bir YouTube video başlığı ve etiket listesi üret.
 
@@ -7631,9 +7479,8 @@ Kurallar:
 
 Yanıtı SADECE şu JSON formatında ver, başka hiçbir açıklama yazma:
 {{"title": "...", "tags": "etiket1, etiket2, etiket3"}}"""
-        resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model="deepseek-v4-flash",
+        resp, _ = await llm_create(
+            _zincir, "roundup-başlık",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7, max_tokens=300,
         )
@@ -8411,22 +8258,6 @@ async def get_deepseek_config():
 # verilen tek bir haber üretimi 0,22 dolara kadar gidebiliyor). NVIDIA NIM
 # OpenAI uyumlu tek bir endpoint üzerinden ücretsiz katmanda model sunuyor —
 # sadece base_url ve model adı değişiyor, SDK aynı.
-def get_nvidia_key():
-    if NVIDIA_CONFIG.exists():
-        return json.loads(NVIDIA_CONFIG.read_text()).get("api_key", "")
-    return ""
-
-
-def get_deepseek_in_race() -> bool:
-    """DeepSeek ücretsiz modellerle birlikte yarışsın mı? (varsayılan: hayır)"""
-    if AI_RACE_CONFIG.exists():
-        try:
-            return bool(json.loads(AI_RACE_CONFIG.read_text()).get("deepseek_in_race"))
-        except Exception:
-            pass
-    return False
-
-
 @app.post("/api/nvidia/config")
 async def save_nvidia_config(api_key: str = Form(...)):
     NVIDIA_CONFIG.write_text(json.dumps({"api_key": api_key.strip()}))
@@ -8436,7 +8267,8 @@ async def save_nvidia_config(api_key: str = Form(...)):
 @app.get("/api/nvidia/config")
 async def get_nvidia_config():
     return {"configured": bool(get_nvidia_key()), "models": NVIDIA_MODELS,
-            "deepseek_in_race": get_deepseek_in_race()}
+            "deepseek_in_race": get_deepseek_in_race(),
+            "last_used": son_kullanilan()}
 
 
 @app.post("/api/ai/deepseek-race")
@@ -8778,9 +8610,9 @@ async def auto_long_video_job():
 
         # 1. DeepSeek'e konu seçtir
         from openai import OpenAI
-        ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
-        topic_resp = ds.chat.completions.create(
-            model="deepseek-v4-flash",
+        _zincir = make_llm_chain("", api_key)
+        topic_resp, _ = await llm_create(
+            _zincir, "konu-seçimi",
             messages=[{"role": "user", "content": f"""Pick ONE specific, interesting and educational documentary topic in {lang_name}.
 Categories to choose from: {categories}
 Return ONLY valid JSON: {{"topic": "specific topic in {lang_name}"}}
@@ -8907,13 +8739,13 @@ async def auto_lv_en_job():
         voice = cfg.get("voice", "M1")
 
         from openai import OpenAI
-        ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        _zincir = make_llm_chain("", api_key)
         used_topics = get_lv_en_used_topics()
         exclude_block = (
             f"\nDo NOT pick any of these already-covered topics:\n" + "\n".join(f"- {t}" for t in used_topics) + "\n"
         ) if used_topics else ""
-        topic_resp = ds.chat.completions.create(
-            model="deepseek-v4-flash",
+        topic_resp, _ = await llm_create(
+            _zincir, "konu-seçimi",
             messages=[{"role": "user", "content": f"""Pick ONE specific, fascinating and educational documentary topic in English.
 Categories to choose from: {categories}
 {exclude_block}Return ONLY valid JSON: {{"topic": "specific topic in English"}}
@@ -10136,7 +9968,7 @@ async def auto_custom_bilgi_job():
 
         # 3) DeepSeek'e SADECE bu başlıklardan senaryo yazdır
         from openai import OpenAI
-        ds = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        _zincir = make_llm_chain("", api_key)
         prompt = f"""Sen "TÜRKİYE BİLGİ MERKEZİ" (YouTube) ve "HB Bot" (Instagram) için pratik bilgi videosu senaryosu yazıyorsun. Hedef kitle 45-65 yaş.
 
 Kategori: {category_label}
@@ -10161,8 +9993,8 @@ GERÇEK HABERLER:
 
 Tarih yazarken "1 Ekim" gibi rakam+ay yaz, "bin Ekim" gibi karıştırma. brand alanı ekleme, otomatik ekleniyor."""
 
-        resp = ds.chat.completions.create(
-            model=model,
+        resp, _ = await llm_create(
+            _zincir, "bilgi-merkezi-senaryo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
         )
