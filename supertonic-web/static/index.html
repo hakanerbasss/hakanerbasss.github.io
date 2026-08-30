@@ -1647,6 +1647,16 @@
           <input type="password" id="cfg-nvidia-key" placeholder="nvapi-..." style="width:100%;background:var(--c-111111);border:1px solid var(--c-333333);border-radius:8px;color:var(--c-e0e0e0);font-size:13px;padding:10px;outline:none;margin-bottom:10px;">
           <button onclick="saveNvidiaConfig()">Kaydet</button>
         </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--c-e0e0e0);cursor:pointer;margin-top:12px;">
+          <input type="checkbox" id="deepseek-race-toggle" onchange="toggleDeepseekRace()">
+          <span>DeepSeek de yarışa katılsın</span>
+        </label>
+        <p style="color:var(--c-666666);font-size:11px;margin:6px 0 0;">
+          Kapalıyken üretim yalnız ücretsiz modellerle yapılır, DeepSeek'e hiç istek
+          gitmez. Bakiye yüklediğinde bunu aç — DeepSeek de yarışır ve en hızlı
+          cevap veren üretir. Not: yarışı kaybetse bile isteği faturaya yazılabilir,
+          o yüzden ücretsizler yeterken kapalı tutmak daha ekonomik.
+        </p>
 
         <hr style="border-color:var(--c-222222);margin:16px 0;">
         <div style="font-size:12px;font-weight:600;color:var(--c-888888);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🌻 Pollinations AI (Opsiyonel, ücretsiz)</div>
@@ -3868,6 +3878,19 @@ async function saveNvidiaConfig() {
   }
 }
 
+async function toggleDeepseekRace() {
+  const el = document.getElementById('deepseek-race-toggle');
+  try {
+    const fd = new FormData();
+    fd.append('enabled', el.checked ? 'true' : 'false');
+    await fetch('/api/ai/deepseek-race', { method: 'POST', body: fd });
+    loadAiProviders();
+  } catch (e) {
+    console.error('deepseek race:', e);
+    el.checked = !el.checked;
+  }
+}
+
 function resetNvidiaConfig() {
   document.getElementById('nvidia-saved-state').style.display = 'none';
   document.getElementById('nvidia-input-state').style.display = 'block';
@@ -3885,6 +3908,8 @@ async function loadAiProviders() {
       saved.style.display = d.configured ? 'block' : 'none';
       input.style.display = d.configured ? 'none' : 'block';
     }
+    const yarisKutu = document.getElementById('deepseek-race-toggle');
+    if (yarisKutu) yarisKutu.checked = !!d.deepseek_in_race;
     const secili = sel.value;
     sel.innerHTML = '<option value="">Otomatik — müsait olanı kullan (önerilen)</option>';
     if (d.configured && d.models) {
@@ -3903,7 +3928,7 @@ async function loadAiProviders() {
     const hint = document.getElementById('ai-provider-hint');
     if (hint) {
       hint.textContent = d.configured
-        ? 'Otomatik: tüm ücretsiz modellere aynı anda istek gider, ilk cevap veren üretir. Kotaya takılan veya açılmayan modeller yarışı kaybeder, üretim durmaz.'
+        ? ('Otomatik: ' + (d.deepseek_in_race ? 'ücretsiz modeller + DeepSeek' : 'tüm ücretsiz modeller') + ' aynı anda yarışır, ilk cevap veren üretir. Kotaya takılan veya açılmayan modeller yarışı kaybeder, üretim durmaz.')
         : "NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller yarışa girer. Şu an sadece DeepSeek kullanılıyor.";
     }
   } catch (e) { console.error('ai providers:', e); }

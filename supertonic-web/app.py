@@ -5497,6 +5497,7 @@ PEXELS_CONFIG = Path("pexels_config.json")
 POLLINATIONS_CONFIG = Path("pollinations_config.json")
 DS_CONFIG = Path("deepseek_config.json")
 NVIDIA_CONFIG = Path("nvidia_config.json")
+AI_RACE_CONFIG = Path("ai_race_config.json")   # DeepSeek yarışa katılsın mı
 OPENAI_CONFIG = Path("openai_config.json")
 
 # ── AI sağlayıcı seçimi ───────────────────────────────────────────────────────
@@ -5567,7 +5568,15 @@ def make_llm_chain(provider: str, deepseek_key: str) -> list:
         model = provider.split(":", 1)[1].strip()
         if model:
             return [_nv(model)]
-    return [_nv(m) for m in NVIDIA_MODELS]
+
+    yaris = [_nv(m) for m in NVIDIA_MODELS]
+    # DeepSeek'in yarışa katılıp katılmayacağı AYARDAN geliyor, koda gömülü
+    # değil — bakiye yüklenince paneldeki kutuyu işaretlemek yeterli, kod
+    # değişikliği gerekmiyor. Varsayılan kapalı, çünkü yarışı kaybettiğinde
+    # bile isteği faturaya yazılabilir; ücretsizler yeterken para harcamasın.
+    if get_deepseek_in_race():
+        yaris.append(_ds())
+    return yaris
 
 
 def _ai_hata_ozeti(hata: Exception) -> str:
@@ -8408,6 +8417,16 @@ def get_nvidia_key():
     return ""
 
 
+def get_deepseek_in_race() -> bool:
+    """DeepSeek ücretsiz modellerle birlikte yarışsın mı? (varsayılan: hayır)"""
+    if AI_RACE_CONFIG.exists():
+        try:
+            return bool(json.loads(AI_RACE_CONFIG.read_text()).get("deepseek_in_race"))
+        except Exception:
+            pass
+    return False
+
+
 @app.post("/api/nvidia/config")
 async def save_nvidia_config(api_key: str = Form(...)):
     NVIDIA_CONFIG.write_text(json.dumps({"api_key": api_key.strip()}))
@@ -8416,7 +8435,18 @@ async def save_nvidia_config(api_key: str = Form(...)):
 
 @app.get("/api/nvidia/config")
 async def get_nvidia_config():
-    return {"configured": bool(get_nvidia_key()), "models": NVIDIA_MODELS}
+    return {"configured": bool(get_nvidia_key()), "models": NVIDIA_MODELS,
+            "deepseek_in_race": get_deepseek_in_race()}
+
+
+@app.post("/api/ai/deepseek-race")
+async def set_deepseek_race(enabled: bool = Form(...)):
+    """DeepSeek de ücretsizlerle birlikte yarışsın mı?
+
+    Bakiye bittiğinde kapatılır, yüklendiğinde açılır — kod değişikliği yok.
+    """
+    AI_RACE_CONFIG.write_text(json.dumps({"deepseek_in_race": bool(enabled)}))
+    return {"deepseek_in_race": bool(enabled)}
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
