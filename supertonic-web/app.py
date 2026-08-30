@@ -5575,17 +5575,33 @@ def make_llm_chain(provider: str, deepseek_key: str) -> list:
     return zincir
 
 
+def _ai_hata_ozeti(hata: Exception) -> str:
+    """Sağlayıcı hatasını tek kelimeyle sınıflandırır — log ve kullanıcı mesajı için."""
+    m = str(hata).lower()
+    if "429" in m or "too many requests" in m:
+        return "kota dolu (429)"
+    if "402" in m or "insufficient balance" in m:
+        return "BAKİYE YOK (402)"
+    if "404" in m or "not found" in m:
+        return "model yok (404)"
+    if "401" in m or "403" in m or "unauthorized" in m:
+        return "anahtar geçersiz"
+    if "timeout" in m or "timed out" in m:
+        return "zaman aşımı"
+    return type(hata).__name__
+
+
 async def llm_create(zincir: list, nerede: str, **kwargs):
     """Zincirdeki modelleri sırayla dener, ilk cevap vereni kullanır.
 
-    (response, etiket) döner. Hiçbiri cevap vermezse son hatayı yükseltir —
-    böylece çağıran taraf eskisi gibi hata yönetimini sürdürebilir.
+    (response, etiket) döner. Hiçbiri cevap vermezse, HANGİSİNİN NEDEN
+    başarısız olduğunu tek satırda özetleyen bir hata yükseltir — panelde
+    "429" ya da "Insufficient Balance" gibi tek bir sağlayıcının ham mesajını
+    görüp sebebi yanlış yere bağlamak yerine tablonun tamamı görünsün.
     """
     son_hata = None
-    nvidia_atla = False
-    for client, model, etiket in zincir:
-        if nvidia_atla and etiket.startswith("nvidia/"):
-            continue
+    hatalar = []
+    for i, (client, model, etiket) in enumerate(zincir):
         try:
             resp = await asyncio.to_thread(
                 client.chat.completions.create, model=model, **kwargs)
@@ -5593,19 +5609,22 @@ async def llm_create(zincir: list, nerede: str, **kwargs):
             return resp, etiket
         except Exception as e:
             son_hata = e
-            _metin = str(e).lower()
-            # 429 = kota/hız sınırı. NVIDIA'nın ücretsiz katmanındaki sınır
-            # HESAP bazlı (~40 istek/dk), model bazlı değil — biri 429 verdiyse
-            # diğer NVIDIA modelleri de aynı duvara toslar. Onları tek tek
-            # denemek boşuna zaman kaybı, doğrudan DeepSeek'e geçilir.
-            if etiket.startswith("nvidia/") and ("429" in _metin or "too many requests" in _metin):
-                nvidia_atla = True
-                print(f"[AI] {nerede} · NVIDIA kota sınırı (429) — kalan ücretsiz "
-                      f"modeller atlanıp DeepSeek'e geçiliyor", flush=True)
-                continue
-            print(f"[AI] {nerede} · {etiket} cevap vermedi ({type(e).__name__}) "
-                  f"— sıradaki modele geçiliyor", flush=True)
-    raise son_hata if son_hata else RuntimeError("AI zinciri boş")
+            ozet = _ai_hata_ozeti(e)
+            hatalar.append(f"{etiket}: {ozet}")
+            print(f"[AI] {nerede} · {etiket} → {ozet} — sıradaki modele geçiliyor",
+                  flush=True)
+            # 429'da kısa bir nefes: NVIDIA ücretsiz katmanı dakika bazlı
+            # (~40 istek/dk), birkaç saniye beklemek sıradaki modelin geçmesini
+            # sağlayabiliyor. ÖNCEDEN burada "429 görürsen kalan ücretsizleri
+            # atla, DeepSeek'e geç" kısa devresi vardı — DeepSeek bakiyesi
+            # bitince (402) o mantık üretimi tamamen öldürdü. Artık ücretsiz
+            # modellerin hepsi deneniyor.
+            if "429" in ozet and i + 1 < len(zincir):
+                await asyncio.sleep(3)
+    raise RuntimeError(
+        f"Hiçbir AI modeli cevap vermedi ({nerede}). Denenenler → "
+        + " | ".join(hatalar)
+    ) from son_hata
 
 
 def _log_llm_usage(resp, etiket: str, nerede: str) -> None:
