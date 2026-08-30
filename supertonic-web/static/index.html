@@ -1098,10 +1098,8 @@
         <option value="">Otomatik — müsait olanı kullan (önerilen)</option>
       </select>
       <p style="color:var(--c-666666);font-size:11px;margin-top:6px;" id="ai-provider-hint">
-        Otomatik'te sistem modelleri sırayla dener ve ilk cevap vereni kullanır:
-        önce ücretsiz NVIDIA modelleri, hiçbiri müsait değilse en son ücretli DeepSeek.
-        Belirli bir modeli denemek istersen listeden seç — o da cevap vermezse
-        sistem yine sıradakine geçer, üretim durmaz.
+        Otomatik'te tüm ücretsiz NVIDIA modellerine aynı anda istek gider,
+        ilk cevap veren üretimi yapar. Hangisinin müsait olduğunu bilmene gerek yok.
       </p>
     </div>
     <div class="field">
@@ -3893,7 +3891,7 @@ async function loadAiProviders() {
       for (const [id, ad] of Object.entries(d.models)) {
         const o = document.createElement('option');
         o.value = 'nvidia:' + id;
-        o.textContent = 'Önce dene: ' + ad + ' (ücretsiz)';
+        o.textContent = 'Sadece ' + ad + ' (ücretsiz)';
         sel.appendChild(o);
       }
     }
@@ -3905,8 +3903,8 @@ async function loadAiProviders() {
     const hint = document.getElementById('ai-provider-hint');
     if (hint) {
       hint.textContent = d.configured
-        ? 'Otomatik: önce ücretsiz NVIDIA modelleri, hiçbiri müsait değilse DeepSeek. Bir model yoğunsa veya ücretsiz katmanda açılmıyorsa sistem kendiliğinden sıradakine geçer.'
-        : "NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller de sıraya girer. Şu an sadece DeepSeek kullanılıyor.";
+        ? 'Otomatik: tüm ücretsiz modellere aynı anda istek gider, ilk cevap veren üretir. Kotaya takılan veya açılmayan modeller yarışı kaybeder, üretim durmaz.'
+        : "NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller yarışa girer. Şu an sadece DeepSeek kullanılıyor.";
     }
   } catch (e) { console.error('ai providers:', e); }
 }

@@ -5511,9 +5511,10 @@ DEEPSEEK_MODEL = "deepseek-v4-flash"
 # üzerindeki deepseek-v4-pro açılmadı, Kimi/MiniMax çalıştı). Burası çalıştığı
 # görülenlerin listesi — yenisini denemek için tek satır eklemek yeterli.
 NVIDIA_MODELS = {
-    "moonshotai/kimi-k3": "Kimi K3 (ajan/genel)",
-    "minimaxai/minimax-m3": "MiniMax M3 (kodlama/genel)",
-    "deepseek-ai/deepseek-v4-flash-0731": "DeepSeek V4 Flash (NVIDIA üzerinden)",
+    "moonshotai/kimi-k3": "Kimi K3",
+    "minimaxai/minimax-m3": "MiniMax M3",
+    "deepseek-ai/deepseek-v4-flash-0731": "DeepSeek V4 Flash",
+    "deepseek-ai/deepseek-v4-pro-0813": "DeepSeek V4 Pro",
     "meta/llama-3.2-90b-vision-instruct": "Llama 3.2 90B",
 }
 
@@ -5526,21 +5527,25 @@ _LLM_ZAMAN_ASIMI = 90.0
 
 
 def make_llm_chain(provider: str, deepseek_key: str) -> list:
-    """Sırayla denenecek [(client, model, etiket)] listesi döner.
+    """Paralel yarışa girecek [(client, model, etiket)] listesi döner.
 
-    Sabit tek model seçmek yanlış tasarımdı: DeepSeek yoğun olduğunda cevap
-    vermiyor, NVIDIA'da da bazı modeller ücretsiz katmanda açılmıyor ve
-    kullanıcı hangisinin müsait olduğunu göremiyor. Artık sistem sırayla
-    deniyor, ilk cevap vereni kullanıyor.
+    Tek model seçmek de sırayla denemek de yanlıştı: DeepSeek yoğunken cevap
+    vermiyor, NVIDIA'da kimi model kotaya takılıyor, kullanıcı hangisinin
+    müsait olduğunu göremiyor. Artık hepsine AYNI ANDA istek atılıyor, ilk
+    cevap veren kazanıyor (bkz. llm_create).
+
+    Yarışa yalnız ÜCRETSİZ NVIDIA modelleri girer — ücretli DeepSeek yarışa
+    sokulmaz, çünkü yarışı kaybetse bile isteği faturaya yazılabilir. DeepSeek
+    sadece iki durumda kullanılır: NVIDIA anahtarı yoksa, ya da kullanıcı
+    listeden açıkça "Sadece DeepSeek" seçtiyse.
 
     provider:
-      ""/"auto"           → önce ücretsiz NVIDIA modelleri, en son DeepSeek
+      ""/"auto"           → tüm ücretsiz NVIDIA modelleri yarışır
       "deepseek"          → sadece DeepSeek
-      "nvidia:<model_id>" → önce o model, olmazsa diğer ücretsizler, sonra DeepSeek
+      "nvidia:<model_id>" → sadece o model (tek model denemek isteyenler için)
     """
-    # OpenAI bu dosyada modül seviyesinde DEĞİL, her fonksiyonun içinde import
-    # ediliyor. Bu fonksiyon modül seviyesinde olduğu için kendi import'unu
-    # yapmalı — yoksa "name 'OpenAI' is not defined" ile patlıyor.
+    # OpenAI bu dosyada modül seviyesinde import EDİLMİYOR; her fonksiyon
+    # kendi import'unu yapıyor.
     from openai import OpenAI
 
     def _nv(model):
@@ -5556,23 +5561,13 @@ def make_llm_chain(provider: str, deepseek_key: str) -> list:
     nv_key = get_nvidia_key()
     provider = (provider or "").strip()
 
-    if provider == "deepseek":
+    if provider == "deepseek" or not nv_key:
         return [_ds()]
-
-    zincir = []
-    if nv_key:
-        tercih = provider.split(":", 1)[1].strip() if provider.startswith("nvidia:") else ""
-        if tercih:
-            zincir.append(_nv(tercih))
-        # Kalan ücretsiz modeller yedek olarak sıraya girer — biri yoğunsa
-        # veya o model ücretsiz katmanda açılmıyorsa diğerine geçilir.
-        for m in NVIDIA_MODELS:
-            if m != tercih:
-                zincir.append(_nv(m))
-    # DeepSeek her zaman EN SONDA: ücretli olan, ücretsizlerin hiçbiri
-    # cevap vermezse devreye girsin.
-    zincir.append(_ds())
-    return zincir
+    if provider.startswith("nvidia:"):
+        model = provider.split(":", 1)[1].strip()
+        if model:
+            return [_nv(model)]
+    return [_nv(m) for m in NVIDIA_MODELS]
 
 
 def _ai_hata_ozeti(hata: Exception) -> str:
@@ -5592,39 +5587,48 @@ def _ai_hata_ozeti(hata: Exception) -> str:
 
 
 async def llm_create(zincir: list, nerede: str, **kwargs):
-    """Zincirdeki modelleri sırayla dener, ilk cevap vereni kullanır.
+    """Tüm modellere AYNI ANDA istek atar, ilk cevap vereni kullanır.
 
-    (response, etiket) döner. Hiçbiri cevap vermezse, HANGİSİNİN NEDEN
-    başarısız olduğunu tek satırda özetleyen bir hata yükseltir — panelde
-    "429" ya da "Insufficient Balance" gibi tek bir sağlayıcının ham mesajını
-    görüp sebebi yanlış yere bağlamak yerine tablonun tamamı görünsün.
+    Sırayla denemek yavaştı: kotaya takılan/yanıt vermeyen her model için
+    zaman aşımı kadar bekleniyordu. Paralel atınca hangisinin müsait olduğunu
+    bilmek gerekmiyor — yarışı kim kazanırsa onunla üretiliyor, kalan istekler
+    iptal ediliyor.
+
+    (response, etiket) döner. Hiçbiri cevap vermezse hangisinin neden
+    başarısız olduğunu özetleyen tek bir hata yükseltir.
     """
-    son_hata = None
+    async def _dene(client, model, etiket):
+        resp = await asyncio.to_thread(
+            client.chat.completions.create, model=model, **kwargs)
+        return resp, etiket
+
+    isler = {asyncio.create_task(_dene(c, m, e)): e for c, m, e in zincir}
     hatalar = []
-    for i, (client, model, etiket) in enumerate(zincir):
-        try:
-            resp = await asyncio.to_thread(
-                client.chat.completions.create, model=model, **kwargs)
-            _log_llm_usage(resp, etiket, nerede)
-            return resp, etiket
-        except Exception as e:
-            son_hata = e
-            ozet = _ai_hata_ozeti(e)
-            hatalar.append(f"{etiket}: {ozet}")
-            print(f"[AI] {nerede} · {etiket} → {ozet} — sıradaki modele geçiliyor",
-                  flush=True)
-            # 429'da kısa bir nefes: NVIDIA ücretsiz katmanı dakika bazlı
-            # (~40 istek/dk), birkaç saniye beklemek sıradaki modelin geçmesini
-            # sağlayabiliyor. ÖNCEDEN burada "429 görürsen kalan ücretsizleri
-            # atla, DeepSeek'e geç" kısa devresi vardı — DeepSeek bakiyesi
-            # bitince (402) o mantık üretimi tamamen öldürdü. Artık ücretsiz
-            # modellerin hepsi deneniyor.
-            if "429" in ozet and i + 1 < len(zincir):
-                await asyncio.sleep(3)
+    bekleyen = set(isler)
+    try:
+        while bekleyen:
+            biten, bekleyen = await asyncio.wait(
+                bekleyen, return_when=asyncio.FIRST_COMPLETED)
+            for is_ in biten:
+                etiket = isler[is_]
+                try:
+                    resp, etiket = is_.result()
+                except Exception as e:
+                    hatalar.append(f"{etiket}: {_ai_hata_ozeti(e)}")
+                    continue
+                _log_llm_usage(resp, etiket, nerede)
+                print(f"[AI] {nerede} · yarışı '{etiket}' kazandı", flush=True)
+                return resp, etiket
+    finally:
+        # Kazanan belli olunca kalan istekleri boşuna bekletme.
+        for is_ in isler:
+            if not is_.done():
+                is_.cancel()
+
     raise RuntimeError(
         f"Hiçbir AI modeli cevap vermedi ({nerede}). Denenenler → "
         + " | ".join(hatalar)
-    ) from son_hata
+    )
 
 
 def _log_llm_usage(resp, etiket: str, nerede: str) -> None:
