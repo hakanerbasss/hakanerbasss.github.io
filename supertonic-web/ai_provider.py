@@ -89,22 +89,66 @@ def get_deepseek_in_race() -> bool:
 
 
 def kaydet_son_kullanilan(etiket: str, nerede: str) -> None:
-    """Yarışı kazanan modeli diske yazar — panel bunu gösteriyor."""
+    """Yarışı kazanan modeli diske yazar — panel bunu gösteriyor.
+
+    ADIM BAZLI tutuluyor: tek bir videoda 15 ayrı LLM çağrısı var (senaryo,
+    haber jürisi, başlık, etiketler…) ve yarışı her adımda başka bir model
+    kazanabiliyor. Sadece "en son çağrı" saklansaydı, panelde çoğu zaman
+    başlık/etiket adımının modeli görünürdü — videoyu yazan model değil.
+    """
     try:
+        d = son_kullanilan_hepsi()
+        adimlar = d.get("adimlar") or {}
+        adimlar[nerede] = {"model": etiket, "ts": time.time()}
+        if len(adimlar) > 40:   # dosya sınırsız büyümesin
+            adimlar = dict(sorted(adimlar.items(),
+                                  key=lambda kv: kv[1].get("ts", 0))[-40:])
         AI_LAST_USED.write_text(json.dumps(
-            {"model": etiket, "nerede": nerede, "ts": time.time()},
+            {"model": etiket, "nerede": nerede, "ts": time.time(),
+             "adimlar": adimlar},
             ensure_ascii=False))
     except Exception:
         pass
 
 
-def son_kullanilan() -> dict:
+def son_kullanilan_hepsi() -> dict:
     if AI_LAST_USED.exists():
         try:
             return json.loads(AI_LAST_USED.read_text())
         except Exception:
             pass
     return {}
+
+
+def son_kullanilan() -> dict:
+    return son_kullanilan_hepsi()
+
+
+def son_kullanilan_adim(nerede: str, en_fazla_saniye: float = 3600.0) -> str:
+    """Belirli bir adımı (ör. 'haber-senaryo') en son hangi model yaptı.
+
+    en_fazla_saniye: bundan eski kayıt "bu üretime ait değil" sayılıp boş
+    dönülür — eski bir kaydı yeni videonun modeliymiş gibi göstermek,
+    hiç göstermemekten daha kötü.
+    """
+    kayit = (son_kullanilan_hepsi().get("adimlar") or {}).get(nerede) or {}
+    if not kayit.get("model"):
+        return ""
+    if time.time() - kayit.get("ts", 0) > en_fazla_saniye:
+        return ""
+    return kayit["model"]
+
+
+def model_adi(etiket: str) -> str:
+    """'nvidia/moonshotai/kimi-k3' → 'Kimi K3 (NVIDIA · ücretsiz)'"""
+    if not etiket:
+        return ""
+    if etiket == "deepseek":
+        return "DeepSeek V4 Flash (ücretli)"
+    if etiket.startswith("nvidia/"):
+        model = etiket.split("/", 1)[1]
+        return f"{NVIDIA_MODELS.get(model, model)} (NVIDIA · ücretsiz)"
+    return etiket
 
 
 def hata_ozeti(hata: Exception) -> str:

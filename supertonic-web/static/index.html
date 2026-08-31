@@ -3336,6 +3336,12 @@ async function loadIGOnlyTRStatus() {
       }
       statusEl.textContent = statusText;
       statusEl.style.color = log.status === 'success' ? 'var(--c-4ade80)' : log.status === 'error' ? 'var(--c-f87171)' : 'var(--c-fbbf24)';
+      // Senaryoyu hangi model yazdı — ücretsiz mi ücretli mi görünsün
+      const modelEl = document.getElementById('ig-only-tr-model');
+      if (modelEl) {
+        modelEl.textContent = log.model ? `Üreten model: ${log.model}` : '';
+        modelEl.style.display = log.model ? 'block' : 'none';
+      }
       _setMsg('ig-only-tr-last-msg', log, '/api/ig-only-tr/run-now', 'loadIGOnlyTRStatus');
 
       if (log.status === 'running' || log.status === 'waiting_telegram') {
@@ -4013,7 +4019,10 @@ async function loadAiProviders() {
         const ne = dk === null ? '' : (dk < 1 ? ' · az önce'
                   : dk < 60 ? ` · ${dk} dk önce`
                   : ` · ${Math.round(dk / 60)} saat önce`);
-        sonKutu.textContent = `Son üretim: ${su.model}${su.nerede ? ' (' + su.nerede + ')' : ''}${ne}`;
+        const senaryo = d.senaryo_model;
+        sonKutu.textContent = senaryo
+          ? `Son senaryoyu yazan model: ${senaryo}${ne}`
+          : `Son üretim: ${su.ad || su.model}${su.nerede ? ' (' + su.nerede + ')' : ''}${ne}`;
         sonKutu.style.display = 'block';
       } else {
         sonKutu.style.display = 'none';
@@ -5045,6 +5054,7 @@ function _buildFullAnalyticsHTML(d) {
         <div id="ig-only-tr-status" style="font-size:12px;background:var(--c-111111);border:1px solid var(--c-222222);border-radius:8px;padding:12px;line-height:1.7;display:none;">
           <div id="ig-only-tr-next" style="color:var(--c-888888);"></div>
           <div id="ig-only-tr-last-status"></div>
+          <div id="ig-only-tr-model" style="color:var(--c-60a5fa);display:none;"></div>
           <div id="ig-only-tr-last-msg" style="color:var(--c-888888);word-break:break-all;"></div>
         </div>
 

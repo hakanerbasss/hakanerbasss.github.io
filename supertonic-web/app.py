@@ -5581,6 +5581,7 @@ OPENAI_CONFIG = Path("openai_config.json")
 from ai_provider import (  # noqa: E402
     LLM_TIMEOUT,
     NVIDIA_MODELS, get_nvidia_key, get_deepseek_in_race, son_kullanilan,
+    son_kullanilan_adim, model_adi,
     make_llm_chain, llm_create,
 )
 
@@ -8347,9 +8348,14 @@ async def save_nvidia_config(api_key: str = Form(...)):
 
 @app.get("/api/nvidia/config")
 async def get_nvidia_config():
+    _su = son_kullanilan()
+    # Panelde ham etiket ("nvidia/moonshotai/kimi-k3") değil okunur ad gösterilsin.
+    # Ayrıca senaryo adımı ayrıca dönüyor: videonun metnini yazan çağrı o, en son
+    # çağrı çoğu zaman başlık/etiket adımı oluyor.
     return {"configured": bool(get_nvidia_key()), "models": NVIDIA_MODELS,
             "deepseek_in_race": get_deepseek_in_race(),
-            "last_used": son_kullanilan()}
+            "last_used": {**_su, "ad": model_adi(_su.get("model", ""))},
+            "senaryo_model": model_adi(son_kullanilan_adim("haber-senaryo"))}
 
 
 @app.post("/api/ai/deepseek-race")
@@ -9504,9 +9510,9 @@ def load_ig_only_tr_config():
     return {"enabled": False, "voice": "F1", "weekly": _IG_WEEKLY_SCHEDULE, "sched_v": _IG_SCHED_VERSION}
 
 
-def save_ig_only_tr_log(status: str, message: str):
+def save_ig_only_tr_log(status: str, message: str, model: str = ""):
     IG_ONLY_TR_SCHED_LOG.write_text(json.dumps(
-        {"status": status, "message": message, "ts": time.time()},
+        {"status": status, "message": message, "model": model, "ts": time.time()},
         ensure_ascii=False,
     ))
     if status == "error":
@@ -9857,7 +9863,9 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
                 body=d.get("script", ""),
             )
             if ig_ok:
-                save_ig_only_tr_log("success", log_title)
+                save_ig_only_tr_log(
+                    "success", log_title,
+                    model=model_adi(son_kullanilan_adim("haber-senaryo")))
             else:
                 save_ig_only_tr_log("error", f"Instagram gönderilemedi: {ig_err}")
         finally:
