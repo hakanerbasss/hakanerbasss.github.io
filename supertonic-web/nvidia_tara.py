@@ -44,12 +44,21 @@ HIZLI_SINIR = 8.0       # bu sürenin altı "listeye alınabilir"
 
 # Kataloğu tararken bakılacak aileler. Katalogda embedding/rerank/görüntü
 # modelleri de var; hepsini denemek hem kotayı yakar hem anlamsız olur.
-AILELER = ("kimi", "minimax", "deepseek", "qwen", "llama", "nemotron",
-           "gpt-oss", "glm", "mistral", "gemma", "phi")
+#
+# SIRA ÖNEMLİ — adaylar bu öncelikle seçiliyor. İlk tarama (31.08.2026)
+# adayları ALFABETİK seçiyordu ve 20 slotun 14'ü ölü/eski modele gitti
+# (codegemma, gemma-2b, llama2-70b, mistral-7b… hepsi 404). qwen, nemotron,
+# gpt-oss gibi güncel aileler sıraya hiç giremedi. Öncelikli liste bunu çözer.
+AILELER = ("qwen", "nemotron", "gpt-oss", "glm", "kimi", "minimax",
+           "llama-3.3", "llama-4", "deepseek", "mistral-large", "phi-4",
+           "gemma-3", "gemma-4", "llama-3.1", "mistral")
 
-# Bu kelimeleri içeren modeller sohbet modeli değil, atlanır.
+# Bu kelimeleri içeren modeller ya sohbet modeli değil ya da bizim işimize
+# yaramaz (kod/matematik modelleri haber metni yazmaz), atlanır.
 ATLA = ("embed", "rerank", "guard", "ocr", "speech", "tts", "asr",
-        "vision", "vila", "clip", "diffusion", "riva", "parakeet")
+        "vision", "vila", "clip", "diffusion", "riva", "parakeet",
+        "coder", "codegemma", "codellama", "codestral", "math",
+        "-2b", "-4b", "-7b", "-8b", "llama2", "llama-2")
 
 
 def anahtar() -> str:
@@ -97,15 +106,21 @@ def katalog(key: str) -> list[str]:
 
 
 def adaylar(hepsi: list[str]) -> list[str]:
+    """Denenecek modeller, ÖNCELİK sırasıyla (alfabetik değil — bkz. AILELER)."""
     from ai_provider import NVIDIA_MODELS          # panelde duranlar hep denensin
     secili = list(NVIDIA_MODELS)
+
+    puanli = []
     for mid in hepsi:
         dusuk = mid.lower()
-        if any(a in dusuk for a in ATLA):
+        if mid in secili or any(a in dusuk for a in ATLA):
             continue
-        if any(a in dusuk for a in AILELER) and mid not in secili:
-            secili.append(mid)
-    return secili
+        for sira, aile in enumerate(AILELER):
+            if aile in dusuk:
+                puanli.append((sira, mid))
+                break
+    puanli.sort()                                  # önce öncelik, sonra ad
+    return secili + [mid for _, mid in puanli]
 
 
 def dene(model: str, key: str) -> tuple[str, float]:
