@@ -2626,6 +2626,54 @@ Rules:
         if gnews_data.get("found") and gnews_data.get("context_text"):
             facts_data = await _extract_verified_facts(ai_zincir, gnews_data["context_text"], lang)
 
+        # ── Kullanıcı kaynak verdiyse ve olgu çıkmadıysa ÜRETME ────────────────────
+        # 31.08.2026: Short Üret'e Google News linki yapıştırılan bir haberde
+        # tamamen içi boş bir metin üretildi ("yeni maaş tablosu belli oldu, bu
+        # tablo zam hesabını gösteriyor, emekliler maaşını bu tabloda bulacak").
+        # Sebep: Google News'in YENİ format yönlendirme linkleri
+        # (news.google.com/rss/articles/CBMi...) çözülemiyor — token'ın base64
+        # gövdesinde artık gerçek URL gömülü değil. Metin çekilemeyince
+        # facts_data boş kalıyor, news_context_instruction boş gidiyor ve model
+        # elinde SADECE başlıkla kalıyor. Başlığı farklı cümlelerle tekrar
+        # etmekten başka yapabileceği bir şey yok.
+        #
+        # Eskiden burada üretim devam ediyordu. İçi boş bir video yayınlamak
+        # hiç yayınlamamaktan kötü — takipçi kaybettiriyor. Kullanıcı AÇIKÇA
+        # kaynak verdiyse artık sessizce devam etmiyoruz, ne yapması gerektiğini
+        # söyleyip duruyoruz. Otomatik akış (link verilmeyen) etkilenmiyor.
+        _kullanici_kaynak_verdi = bool(
+            (manual_content or "").strip() or (manual_link or "").strip()
+            or (topic_link or "").strip())
+        if _kullanici_kaynak_verdi and not facts_data.get("facts"):
+            _link = (manual_link or topic_link or "").strip()
+            if gnews_data.get("context_text"):
+                # Metin ÇEKİLDİ ama olgu çıkarma adımı çalışmadı (canlıda görülen
+                # sebep: tüm AI modelleri kotada). Kaynak sağlam, sorun geçici —
+                # kullanıcıya linki değiştirtmek yanlış yönlendirme olur.
+                _neden = (
+                    "Haber metni okundu ama olgu çıkarma adımı çalışmadı "
+                    "(muhtemelen AI modelleri geçici olarak yoğun). "
+                    "\n\nÇÖZÜM: Birkaç dakika sonra tekrar dene. Sürekli "
+                    "oluyorsa Ayarlar'dan DeepSeek yedeğinin açık olduğunu "
+                    "kontrol et.")
+            elif "news.google.com" in _link:
+                _neden = (
+                    "Verdiğin adres bir Google News yönlendirme linki "
+                    "(news.google.com/rss/articles/...). Google bu linklerin "
+                    "içindeki gerçek adresi artık gizliyor, haber metni çekilemiyor."
+                    "\n\nÇÖZÜM: Google News'te habere tıklayıp açılan GERÇEK "
+                    "site adresini (ör. hurriyet.com.tr/...) yapıştır — ya da "
+                    "'Kaynak Linki / Metni Elle Gir' bölümüne haberin metnini "
+                    "kopyalayıp yapıştır.")
+            else:
+                _neden = (
+                    f"Verdiğin adresten haber metni çekilemedi: {_link[:120]}"
+                    "\n\nÇÖZÜM: Sayfa giriş/çerez duvarı arkasında olabilir. "
+                    "Haberin metnini 'Kaynak Linki / Metni Elle Gir' bölümüne "
+                    "kopyalayıp yapıştır.")
+            print(f"[gnews] KAYNAK ÇEKİLEMEDİ, üretim durduruldu: {_link}", flush=True)
+            raise HTTPException(422, f"Kaynaktan hiçbir bilgi çıkarılamadı. {_neden}")
+
         news_context_instruction = ""
         if facts_data.get("facts"):
             facts_list = "\n".join(f"- {f}" for f in facts_data["facts"])
