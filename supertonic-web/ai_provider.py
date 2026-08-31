@@ -4,11 +4,11 @@ Neden ayrı dosya: aynı mantık app.py, news_ranker.py ve lv_worker.py'de
 gerekiyor. app.py zaten news_ranker'ı import ettiği için tersi döngüsel import
 olurdu; ortak modül bunu çözüyor ve "tek yerden kontrol" isteğini karşılıyor.
 
-Çalışma mantığı: sabit model seçmek yerine uygun modellerin HEPSİNE aynı anda
-istek atılır, ilk cevap veren üretimi yapar, kalanlar iptal edilir. Böylece
-hangi sağlayıcının müsait olduğunu bilmek gerekmez — kotaya takılan (429),
-açılmayan (404) veya bakiyesi biten (402) modeller yarışı kaybeder, üretim
-durmaz.
+Çalışma mantığı: sabit model seçmek yerine GECİKMELİ YARIŞ. Önce tek modele
+istek gider; HEDGE_GECIKME kadar cevap gelmezse sıradaki model de devreye
+girer ve ilk cevap veren üretimi yapar. Hızlı hata verenler (429/402/404)
+beklenmez, sıradaki hemen başlar. Böylece hangi sağlayıcının müsait olduğunu
+bilmek gerekmez, ama normal durumda çağrı başına tek istek harcanır.
 """
 
 import asyncio
@@ -26,8 +26,9 @@ AI_RACE_CONFIG = Path("ai_race_config.json")     # DeepSeek yarışa katılsın 
 AI_LAST_USED = Path("ai_last_used.json")         # en son hangi model üretti
 
 # Zaman aşımı: openai SDK'sının varsayılanı 600 saniye ve kendi içinde 2 kez
-# daha deniyor. Yarışta bunun anlamı yok — cevap vermeyen model beklemesin,
-# hızlı olan zaten kazanır.
+# daha deniyor — cevap vermeyen bir model üretimi 10 dakika asılı bırakıyordu.
+# 90 sn bilerek yüksek: uzun JSON üreten çağrılar kesilmesin. Takılan modelin
+# yol açtığı gecikmeyi HEDGE_GECIKME çözüyor, bu değeri düşürmek değil.
 LLM_TIMEOUT = 90.0
 
 # Panelde gösterilen ve yarışa giren ücretsiz modeller. NVIDIA kataloğunda
@@ -42,19 +43,24 @@ NVIDIA_MODELS = {
     "meta/llama-3.2-90b-vision-instruct": "Llama 3.2 90B",
 }
 
-# Otomatik yarışa SADECE bunlar girer. Yukarıdaki liste panelden elle
-# seçilebilenlerin tamamı; yarışa hepsini sokmak kotayı boşa yakıyor.
+# Otomatik akışa SADECE bunlar girer, YAZILDIĞI SIRAYLA: ilk sıradaki asıl
+# model, ikincisi yalnızca o takılırsa (HEDGE_GECIKME) veya hata verirse
+# devreye giren yedek. Yukarıdaki NVIDIA_MODELS listesi panelden elle
+# seçilebilenlerin tamamı; oradaki her modeli otomatik akışa sokmak kotayı
+# boşa yakıyor.
 #
-# Sebep (30.08.2026 canlı hatası): ücretsiz kota ~40 istek/DAKİKA ve HESAP
-# bazlı. Yarış her LLM çağrısında liste kadar istek atıyor — 5 model demek,
-# tek bir video üretiminde 15 çağrı × 5 = 75 istek demek. Üstüne haber jürisi
-# 4 parçayı paralel işliyor (4 × 5 = 20 istek tek seferde). Sonuç: kota
-# saniyeler içinde doluyor ve HER model 429 veriyor.
+# Sebep (30-31.08.2026 canlı hataları): ücretsiz kota ~40 istek/DAKİKA, hesap
+# bazlı ve NVIDIA'nın açıklamasına göre o an modele gelen genel trafiğe göre
+# daralıyor. Eskiden liste 5 modeldi ve HEPSİNE aynı anda istek atılıyordu:
+# tek videoda 15 çağrı × 5 = 75 istek, üstüne haber jürisi 4 parçayı paralel
+# işlerken tek seferde 20 istek. Kota saniyeler içinde doluyor, sonrasında HER
+# model 429 veriyordu.
 #
-# Listedeki ikisi canlıda gerçekten cevap veren modeller. Diğer üçü aynı
-# hatada 90 saniye boyunca cevap vermeyip zaman aşımına düştü — yani kotadan
-# yiyor ama üretime katkısı yok. Yeni bir model ücretsiz katmanda hızlı cevap
-# veriyorsa buraya eklenebilir.
+# Listedeki ikisi canlıda gerçekten cevap veren modeller. Elenen üçü aynı
+# hatada 90 saniye boyunca susup zaman aşımına düştü — kotadan yiyor ama
+# üretime katkısı yok. Yeni bir model ücretsiz katmanda hızlı cevap veriyorsa
+# buraya eklenebilir; sıraya EKLEMEK istek sayısını artırmaz, çünkü sıradakiler
+# ancak öncekiler takıldığında/hata verdiğinde başlar.
 NVIDIA_RACE_MODELS = [
     "moonshotai/kimi-k3",
     "minimaxai/minimax-m3",
@@ -63,6 +69,24 @@ NVIDIA_RACE_MODELS = [
 # Hepsi başarısız olduğunda kotanın yenilenmesi için beklenecek süre.
 # 429 dakika bazlı bir sınır olduğu için kısa bir bekleme çoğu zaman yetiyor.
 KOTA_BEKLEME = 25.0
+
+# GECİKMELİ YARIŞ: ilk modelden bu kadar saniye cevap gelmezse ikinci model de
+# devreye sokulur. Amaç istek sayısını yarıya indirmek.
+#
+# Neden (31.08.2026): NVIDIA'nın ücretsiz katmanı dakikada ~40 istek veriyor ve
+# NVIDIA'nın kendi açıklamasına göre bu sınır sabit değil, o an modele gelen
+# genel trafiğe göre daralıyor. Her çağrıyı iki modele birden atmak — yani
+# istek sayısını ikiye katlamak — tam da kaçınmak istediğimiz 429'u üretiyordu.
+#
+# Düz sıralı denemenin sorunu şu olurdu: ilk model cevap vermeden asılı kalırsa
+# (canlıda 90 saniye boyunca susan modeller görüldü) ikinciye sıra gelmesi çok
+# gecikirdi. Gecikmeli yarış ikisinin ortası: normal durumda tek istek gider,
+# ilk model takılırsa yarış kendiliğinden başlar.
+#
+# 20 sn seçildi çünkü çalışan çağrılar tipik olarak bunun altında dönüyor;
+# LLM_TIMEOUT'u (90 sn) düşürmek yerine bu eklendi — zaman aşımını kısaltmak
+# uzun JSON üreten çağrıları kesme riski taşıyordu.
+HEDGE_GECIKME = 20.0
 
 
 def get_nvidia_key() -> str:
@@ -234,19 +258,31 @@ async def llm_create(zincir: list, nerede: str, **kwargs):
 
 
 async def _llm_create_bir_tur(zincir: list, nerede: str, **kwargs):
-    """Tek turluk yarış — llm_create bunu (gerekirse iki kez) çağırır."""
+    """Tek turluk GECİKMELİ yarış — llm_create bunu (gerekirse iki kez) çağırır.
+
+    Önce sadece ilk model çağrılır. HEDGE_GECIKME kadar cevap gelmezse ikinci
+    model de devreye sokulur ve oradan sonrası gerçek yarıştır: ilk cevap veren
+    kazanır. Model hızlı hata verirse (429/402) beklenmez, sıradaki hemen başlar.
+    """
     async def _dene(client, model, etiket):
         resp = await asyncio.to_thread(
             client.chat.completions.create, model=model, **kwargs)
         return resp, etiket
 
-    isler = {asyncio.create_task(_dene(c, m, e)): e for c, m, e in zincir}
-    hatalar = []
-    bekleyen = set(isler)
+    isler, hatalar, bekleyen = {}, [], set()
+    kalan = list(zincir)
     try:
-        while bekleyen:
+        while kalan or bekleyen:
+            if kalan:
+                c, m, e = kalan.pop(0)
+                gorev = asyncio.create_task(_dene(c, m, e))
+                isler[gorev] = e
+                bekleyen.add(gorev)
+            # Sırada model varsa en fazla HEDGE_GECIKME bekle, sonra onu da başlat.
+            # Sıra bittiyse süresiz bekle (SDK'nın kendi timeout'u zaten var).
             biten, bekleyen = await asyncio.wait(
-                bekleyen, return_when=asyncio.FIRST_COMPLETED)
+                bekleyen, timeout=(HEDGE_GECIKME if kalan else None),
+                return_when=asyncio.FIRST_COMPLETED)
             for is_ in biten:
                 etiket = isler[is_]
                 try:
@@ -256,7 +292,7 @@ async def _llm_create_bir_tur(zincir: list, nerede: str, **kwargs):
                     continue
                 log_kullanim(resp, etiket, nerede)
                 kaydet_son_kullanilan(etiket, nerede)
-                print(f"[AI] {nerede} · yarışı '{etiket}' kazandı", flush=True)
+                print(f"[AI] {nerede} · '{etiket}' cevap verdi", flush=True)
                 return resp, etiket
     finally:
         for is_ in isler:
@@ -291,17 +327,20 @@ def _llm_create_sync_bir_tur(zincir: list, nerede: str, **kwargs):
     hatalar = []
     # "with ThreadPoolExecutor(...)" KULLANILMIYOR: with çıkışında shutdown(wait=True)
     # çağrılıyor ve kazanan bulunsa bile en yavaş modelin bitmesi bekleniyordu
-    # (testte 0,2 sn'lik kazanan için 1,5 sn beklendi). Jüri 4 parçayı paralel
-    # işlediği için bu gecikme katlanarak büyürdü.
+    # (testte 0,2 sn'lik kazanan için 1,5 sn beklendi).
     ex = ThreadPoolExecutor(max_workers=max(1, len(zincir)))
+    isler, bekleyen = {}, set()
+    kalan = list(zincir)
     try:
-        isler = {
-            ex.submit(c.chat.completions.create, model=m, **kwargs): e
-            for c, m, e in zincir
-        }
-        bekleyen = set(isler)
-        while bekleyen:
-            biten, bekleyen = wait(bekleyen, return_when=FIRST_COMPLETED)
+        while kalan or bekleyen:
+            if kalan:
+                c, m, e = kalan.pop(0)
+                is_yeni = ex.submit(c.chat.completions.create, model=m, **kwargs)
+                isler[is_yeni] = e
+                bekleyen.add(is_yeni)
+            biten, bekleyen = wait(
+                bekleyen, timeout=(HEDGE_GECIKME if kalan else None),
+                return_when=FIRST_COMPLETED)
             for is_ in biten:
                 etiket = isler[is_]
                 try:
@@ -311,7 +350,7 @@ def _llm_create_sync_bir_tur(zincir: list, nerede: str, **kwargs):
                     continue
                 log_kullanim(resp, etiket, nerede)
                 kaydet_son_kullanilan(etiket, nerede)
-                print(f"[AI] {nerede} · yarışı '{etiket}' kazandı", flush=True)
+                print(f"[AI] {nerede} · '{etiket}' cevap verdi", flush=True)
                 return resp, etiket
     finally:
         # Kazanan belli olunca kalanları bekleme; henüz başlamamışları iptal et.

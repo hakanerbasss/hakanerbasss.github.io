@@ -2240,10 +2240,18 @@ def _ai_jury_call_stage2(
     api_key: str,
     timeout_seconds: float = 20.0,
 ) -> list | None:
-    """batch'i _AI_JURY_STAGE2_CHUNK_SIZE'lık parçalara bölüp paralel olarak
+    """batch'i _AI_JURY_STAGE2_CHUNK_SIZE'lık parçalara bölüp SIRAYLA
     değerlendirir, sonuçları (global index'e çevrilmiş olarak) birleştirir.
     Bir parça başarısız olursa sadece o parçanın haberleri değerlendirmesiz
-    kalır — tüm aşama çökmez."""
+    kalır — tüm aşama çökmez.
+
+    NEDEN SIRAYLA (31.08.2026): parçalar eskiden 4'lü paralel çalışıyordu ve
+    her parça 2 modelle yarıştığı için ~1 saniyede 8 istek gidiyordu. NVIDIA'nın
+    ücretsiz katmanı dakikada ~40 istek veriyor (saniyede 0,67) — yani bu tek
+    başına dakikalık hakkın çoğunu yakıp sıradaki senaryo çağrısına 429
+    aldırıyordu. Sırayla çalışınca haber seçimi birkaç saniye uzuyor, karşılığında
+    üretim ayakta kalıyor. ThreadPoolExecutor duruyor: as_completed/hata yalıtımı
+    aynı kalsın, değişiklik tek satırla geri alınabilsin diye."""
     chunks = [
         (i, batch[i:i + _AI_JURY_STAGE2_CHUNK_SIZE], cluster_ids[i:i + _AI_JURY_STAGE2_CHUNK_SIZE])
         for i in range(0, len(batch), _AI_JURY_STAGE2_CHUNK_SIZE)
@@ -2254,7 +2262,7 @@ def _ai_jury_call_stage2(
 
     all_evaluations: list = []
 
-    with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         future_map = {
             executor.submit(_ai_jury_call_stage2_chunk, chunk, chunk_clusters, api_key, timeout_seconds): (offset, len(chunk))
             for offset, chunk, chunk_clusters in chunks
@@ -2414,7 +2422,7 @@ def clean_display_title(title: str) -> str:
 def run_ai_jury(
     candidates: list[dict],
     api_key: str,
-    max_input: int = 25,
+    max_input: int = 16,   # 25 idi → 8'erlik 2 parça (eskiden 4)
     max_output: int = 12,
 ) -> list[dict]:
     """Kural tabanlı sıralamanın (candidates, zaten puana göre sıralı)
