@@ -8376,7 +8376,9 @@ def load_lv_sched_config():
         return json.loads(LV_SCHED_CONFIG.read_text())
     return {
         "enabled": False,
-        "time": "10:00",
+        # 10:00 idi → DeepSeek'in PAHALI penceresindeydi (hafta içi 09:00-13:00,
+        # bkz. _TR_SHORTS_WEEKLY_SCHEDULE üstündeki not). 13:50 ilk ucuz saat.
+        "time": "13:50",
         "categories": "teknoloji, bilim, tarih, uzay, doğa, yapay zeka",
         "duration_min": 5,
         "lang": "tr",
@@ -8435,15 +8437,57 @@ def add_shorts_used_topic(title: str):
     SHORTS_DAILY_TOPICS.write_text(json.dumps({"date": today, "topics": topics}, ensure_ascii=False))
 
 
+# ⚠️ DEEPSEEK PAHALI SAATLER — zamanlayıcı saatlerini değiştirmeden ÖNCE OKU
+#
+# DeepSeek 16.08.2026'dan beri saate göre fiyatlandırıyor: yoğun saatlerde
+# token ücreti İKİ KATI. Yoğun pencere Pekin saatiyle hafta içi 09:00-12:00 ve
+# 14:00-18:00 (yani Çin mesai saatleri). Bizim saatimizle (Europe/Istanbul,
+# UTC+3 — scheduler bu saat diliminde çalışıyor):
+#
+#     PAHALI (2× ücret) : Pazartesi-Cuma  04:00-07:00  ve  09:00-13:00
+#     UCUZ   (yarı ücret): geri kalan HER saat + Cumartesi/Pazar TÜM GÜN
+#
+# Hafta sonu indirimi 23.08.2026'da eklendi (DeepSeek panelindeki duyuru).
+# Hafta sonu Pekin saatine göre tanımlı; bizde Cuma 19:00 → Pazar 19:00'a denk
+# geliyor ama Pazar 19:00-24:00 zaten yoğun pencerenin dışında, sorun olmuyor.
+#
+# Bu yüzden aşağıdaki zamanlayıcıların HİÇBİRİ 04:00-07:00 ve 09:00-13:00
+# aralığına konmuyor. LLM çağırmayan bakım işleri (medya temizliği 04:30,
+# analytics yenileme 05:15) bu pencerede kalabilir — onların maliyeti yok.
 _TR_SHORTS_WEEKLY_SCHEDULE = {
-    "mon": ["09:22", "14:38", "20:07"],
-    "tue": ["09:15", "14:45", "20:15"],
-    "wed": ["09:28", "14:32", "20:22"],
-    "thu": ["09:18", "14:40", "20:35"],
-    "fri": ["09:12", "14:35", "20:28"],
-    "sat": ["10:45", "19:15"],
-    "sun": ["11:30", "20:00"],
+    # GÜNDE 1 PAYLAŞIM (7/hafta). Bu zamanlayıcı YouTube'a da yüklüyor ve
+    # kullanıcının bildirdiğine göre YouTube günde 2 videoda kanalı hızla
+    # kısıtlıyor (bir kanal bu yüzden 2. günde kapanmıştı). Bu yüzden IG'den
+    # (2/gün) daha düşük tutuldu.
+    #
+    # Saat 20:xx: DeepSeek'in pahalı penceresi dışında (yukarıdaki nota bak) ve
+    # akşam izlenme en yüksek. Eski program günde 3'tü ve sabah slotu
+    # (09:1x-09:2x) tam pahalı pencerenin içindeydi.
+    "mon": ["20:07"],
+    "tue": ["20:15"],
+    "wed": ["20:22"],
+    "thu": ["20:35"],
+    "fri": ["20:28"],
+    "sat": ["19:15"],
+    "sun": ["20:00"],
 }
+
+# Yukarıdaki notun makine tarafından okunabilir hâli — panel bunu kullanıp
+# kullanıcının girdiği saatlerden hangisinin pahalı olduğunu işaretliyor.
+DEEPSEEK_PAHALI_ARALIK = [(4 * 60, 7 * 60), (9 * 60, 13 * 60)]  # TSİ, dakika
+DEEPSEEK_HAFTA_ICI = ("mon", "tue", "wed", "thu", "fri")
+
+
+def _deepseek_pahali_mi(gun: str, saat: str) -> bool:
+    """'14:45' gibi bir saat DeepSeek'in 2× ücretli penceresine düşüyor mu?"""
+    if gun not in DEEPSEEK_HAFTA_ICI:
+        return False           # hafta sonu tüm gün ucuz
+    try:
+        hh, mm = (int(x) for x in saat.strip().split(":"))
+    except (ValueError, TypeError):
+        return False
+    d = hh * 60 + mm
+    return any(a <= d < b for a, b in DEEPSEEK_PAHALI_ARALIK)
 
 
 def load_sched_config():
@@ -8760,7 +8804,7 @@ def _rebuild_lv_scheduler():
     cfg = load_lv_sched_config()
     if not cfg.get("enabled"):
         return
-    t = cfg.get("time", "10:00")
+    t = cfg.get("time", "13:50")  # pahalı pencere dışı, bkz. load_lv_sched_config
     try:
         hour, minute = t.strip().split(":")
         scheduler.add_job(
@@ -8915,13 +8959,16 @@ EN_SHORTS_DAILY_TOPICS  = Path("en_shorts_daily_topics.json")
 
 
 _EN_SHORTS_WEEKLY_SCHEDULE = {
-    "mon": ["10:22", "15:38", "21:07"],
-    "tue": ["10:15", "15:45", "21:15"],
-    "wed": ["10:28", "15:32", "21:22"],
-    "thu": ["10:18", "15:40", "21:35"],
-    "fri": ["10:12", "15:25", "21:28"],
-    "sat": ["11:45", "20:15"],
-    "sun": ["12:30", "21:00"],
+    # GÜNDE 1 PAYLAŞIM — TR Shorts ile aynı gerekçe (YouTube 2/gün'de kısıtlıyor).
+    # 21:xx TSİ = 14:xx New York: ABD öğle sonrası, hem ucuz saat hem makul
+    # izlenme. Eski program günde 3'tü ve sabah slotu (10:1x) pahalı penceredeydi.
+    "mon": ["21:07"],
+    "tue": ["21:15"],
+    "wed": ["21:22"],
+    "thu": ["21:35"],
+    "fri": ["21:28"],
+    "sat": ["20:15"],
+    "sun": ["21:00"],
 }
 
 
@@ -9802,11 +9849,22 @@ async def auto_ig_only_tr_job(force_telegram_pick: bool = False):
 # Slotlar sabah yerine öğlen penceresine yığıldı; 18:40 tek akşam + 22:00 korundu.
 _IG_SCHED_VERSION = 4
 _IG_WEEKLY_SCHEDULE = {
-    "mon": ["10:27", "14:34", "20:41"],
-    "tue": ["10:36", "14:22", "20:33"],
-    "wed": ["10:18", "14:41", "20:26"],
-    "thu": ["10:32", "14:17", "20:44"],
-    "fri": ["10:24", "14:38", "20:29"],
+    # GÜNDE 2 PAYLAŞIM (14/hafta). Kullanıcı isteği (31.08.2026): panelde elle
+    # 9 slot/gün ayarlıydı; proje gelir getirmediği için "paylaşım durmasın ama
+    # API'yi de yakmasın" denildi. Video başına 15 LLM çağrısı × yarıştaki 2
+    # model = 30 istek; 9/gün 270 isteğe çıkıyordu ve NVIDIA'nın ücretsiz
+    # dakikalık kotasını (bkz. ai_provider.NVIDIA_RACE_MODELS notu) tek başına
+    # dolduruyordu. 2/gün Instagram için sağlıklı bir tempo, kota da yetiyor.
+    #
+    # Saatler DeepSeek'in pahalı penceresi dışında (yukarıdaki nota bak):
+    # sabah 08:xx (kahvaltı) ve akşam 20:xx (Türkiye'de Instagram'ın en yoğun
+    # saati). Dakikalar günden güne kaydırılmış — sabit dakika robotik duruyor.
+    "mon": ["08:27", "20:41"],
+    "tue": ["08:36", "20:33"],
+    "wed": ["08:18", "20:26"],
+    "thu": ["08:32", "20:44"],
+    "fri": ["08:24", "20:29"],
+    # Hafta sonu sabahı daha geç — hem uyanma saati geç hem tüm gün ucuz.
     "sat": ["11:13", "20:37"],
     "sun": ["11:26", "20:18"],
 }
@@ -9832,6 +9890,45 @@ def _rebuild_ig_only_tr_scheduler():
                 )
             except Exception:
                 pass
+
+
+@app.get("/api/sched-defaults")
+async def get_sched_defaults():
+    """Zamanlayıcıların KOD varsayılanları + DeepSeek'in pahalı saat penceresi.
+
+    Panelde "Varsayılana Dön" düğmesi bunu okuyor. Kayıtlı ayarlara HİÇ
+    dokunmuyor — sadece varsayılanın ne olduğunu gösteriyor; uygulamak
+    kullanıcının Kaydet'e basmasına bağlı. (Kod varsayılanını sunucudaki
+    kayıtlı programın üzerine sessizce yazmak, elle ayarlanmış saatleri
+    silerdi.)
+    """
+    def paket(ad: str, weekly: dict) -> dict:
+        gunluk = {g: len(s) for g, s in weekly.items()}
+        return {
+            "ad": ad,
+            "weekly": weekly,
+            "gunluk_adet": gunluk,
+            "haftalik_adet": sum(gunluk.values()),
+            "pahali_saatler": [f"{g} {t}" for g, s in weekly.items()
+                               for t in s if _deepseek_pahali_mi(g, t)],
+        }
+
+    return {
+        "pahali_pencere": {
+            "araliklar": [f"{a // 60:02d}:{a % 60:02d}-{b // 60:02d}:{b % 60:02d}"
+                          for a, b in DEEPSEEK_PAHALI_ARALIK],
+            "gunler": "Pazartesi-Cuma",
+            "not": ("DeepSeek bu saatlerde token ücretini 2 katına çıkarıyor "
+                    "(Pekin mesai saatleri). Hafta sonu tüm gün yarı fiyat. "
+                    "Saatler TSİ. Ücretsiz NVIDIA modelleri kullanılırken "
+                    "bu pencerenin maliyete etkisi yok."),
+        },
+        "programlar": {
+            "ig_only_tr": paket("Instagram Otomatik Paylaşım", _IG_WEEKLY_SCHEDULE),
+            "tr_shorts": paket("TR Shorts (YouTube+IG)", _TR_SHORTS_WEEKLY_SCHEDULE),
+            "en_shorts": paket("EN Shorts", _EN_SHORTS_WEEKLY_SCHEDULE),
+        },
+    }
 
 
 @app.get("/api/ig-only-tr/config")
