@@ -36,35 +36,51 @@ LLM_TIMEOUT = 90.0
 # çalıştığı görülenlerin listesi. Yeni model denemek için tek satır eklemek
 # yeterli — açılmazsa yarışı kaybeder, başka bir şeyi bozmaz.
 NVIDIA_MODELS = {
+    "nvidia/nemotron-3-super-120b-a12b": "Nemotron 3 Super 120B",
+    "nvidia/nemotron-3-ultra-550b-a55b": "Nemotron 3 Ultra 550B",
     "moonshotai/kimi-k3": "Kimi K3",
     "minimaxai/minimax-m3": "MiniMax M3",
-    "deepseek-ai/deepseek-v4-flash-0731": "DeepSeek V4 Flash",
+    "nvidia/nemotron-3.5-lightning-30b-a3b": "Nemotron 3.5 Lightning 30B",
+    "nvidia/nemotron-3-nano-30b-a3b": "Nemotron 3 Nano 30B",
+    "openai/gpt-oss-120b": "GPT-OSS 120B (yavaş)",
+    "meta/llama-3.2-90b-vision-instruct": "Llama 3.2 90B (yavaş)",
+    "deepseek-ai/deepseek-v4-flash-0731": "DeepSeek V4 Flash (susuyor)",
     "deepseek-ai/deepseek-v4-pro-0813": "DeepSeek V4 Pro",
-    "meta/llama-3.2-90b-vision-instruct": "Llama 3.2 90B",
 }
 
 # Otomatik akışa SADECE bunlar girer, YAZILDIĞI SIRAYLA: ilk sıradaki asıl
-# model, ikincisi yalnızca o takılırsa (HEDGE_GECIKME) veya hata verirse
-# devreye giren yedek. Yukarıdaki NVIDIA_MODELS listesi panelden elle
-# seçilebilenlerin tamamı; oradaki her modeli otomatik akışa sokmak kotayı
-# boşa yakıyor.
+# model, sonrakiler yalnızca o hata verirse veya HEDGE_GECIKME kadar susarsa
+# devreye giren yedekler. Yukarıdaki NVIDIA_MODELS panelden elle
+# seçilebilenlerin tamamı — ikisi aynı liste değil.
 #
-# Sebep (30-31.08.2026 canlı hataları): ücretsiz kota ~40 istek/DAKİKA, hesap
-# bazlı ve NVIDIA'nın açıklamasına göre o an modele gelen genel trafiğe göre
-# daralıyor. Eskiden liste 5 modeldi ve HEPSİNE aynı anda istek atılıyordu:
-# tek videoda 15 çağrı × 5 = 75 istek, üstüne haber jürisi 4 parçayı paralel
-# işlerken tek seferde 20 istek. Kota saniyeler içinde doluyor, sonrasında HER
-# model 429 veriyordu.
+# Sıraya model EKLEMEK istek sayısını artırmaz (sıradakiler ancak öncekiler
+# düşerse çalışır), ama SUSAN bir model eklemek her çağrıya HEDGE_GECIKME
+# kadar gecikme bindirir. O yüzden buraya sadece nvidia_tara.py ile ölçülmüş,
+# gerçekten hızlı cevap veren modeller alınır.
 #
-# Listedeki ikisi canlıda gerçekten cevap veren modeller. Elenen üçü aynı
-# hatada 90 saniye boyunca susup zaman aşımına düştü — kotadan yiyor ama
-# üretime katkısı yok. Yeni bir model ücretsiz katmanda hızlı cevap veriyorsa
-# buraya eklenebilir; sıraya EKLEMEK istek sayısını artırmaz, çünkü sıradakiler
-# ancak öncekiler takıldığında/hata verdiğinde başlar.
+# Liste 31.08.2026 canlı ölçümüyle kuruldu. SIRA HIZA GÖRE DEĞİL: zincirin ilk
+# modeli işin neredeyse tamamını yaptığı için başa en hızlı değil, kalitesi
+# yeterli olan konuyor. Küçük modeller (nano/lightning/30B) daha hızlı ama
+# Türkçe haber metninde büyükler kadar iyi değil — onlar alt sırada.
 NVIDIA_RACE_MODELS = [
-    "moonshotai/kimi-k3",
-    "minimaxai/minimax-m3",
+    "nvidia/nemotron-3-super-120b-a12b",      # 5,1sn · büyük, kotada değil
+    "nvidia/nemotron-3-ultra-550b-a55b",      # 6,6sn · en büyük yedek
+    "moonshotai/kimi-k3",                     # kanıtlanmış, ama şu an 429
+    "minimaxai/minimax-m3",                   # kanıtlanmış, ama şu an 429
+    "nvidia/nemotron-3.5-lightning-30b-a3b",  # 0,7sn · küçük, son çare
 ]
+
+# ── Ölçümden çıkan, listeye ALINMAYANLAR ve sebepleri ──────────────────────
+# nvidia/nemotron-3.5-content-safety   0,2sn "ok" ama SOHBET MODELİ DEĞİL —
+#     içerik güvenliği sınıflandırıcısı. Hata vermediği için en tehlikelisi:
+#     zincire girse üretim "başarılı" görünüp çöp JSON dönerdi.
+# nvidia/nemotron-parse                HTTP 400 — belge ayrıştırma modeli.
+# nvidia/nemotron-3-nano-omni-30b...-reasoning  1,6sn ok, ama "reasoning"
+#     modelleri düşünce metni ekleyip katı JSON çıktısını bozabiliyor.
+# openai/gpt-oss-120b                  25,5sn — çalışıyor ama çok yavaş.
+# meta/llama-3.2-90b-vision-instruct   12,5sn — aynı sebep.
+# deepseek-ai/deepseek-v4-flash-0731   30sn+ SUSTU (iki taramada da).
+# nvidia/llama-3.1-nemotron-*          404 — katalogda görünüyor, servis yok.
 
 # Hepsi başarısız olduğunda kotanın yenilenmesi için beklenecek süre.
 # 429 dakika bazlı bir sınır olduğu için kısa bir bekleme çoğu zaman yetiyor.

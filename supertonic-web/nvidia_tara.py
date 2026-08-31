@@ -55,7 +55,13 @@ AILELER = ("qwen", "nemotron", "gpt-oss", "glm", "kimi", "minimax",
 
 # Bu kelimeleri içeren modeller ya sohbet modeli değil ya da bizim işimize
 # yaramaz (kod/matematik modelleri haber metni yazmaz), atlanır.
-ATLA = ("embed", "rerank", "guard", "ocr", "speech", "tts", "asr",
+# DİKKAT "safety"/"reward"/"parse": bunlar 200 OK ve ÇOK HIZLI cevap verir
+# ama sohbet modeli değildir — güvenlik etiketi / puan / belge ayrıştırması
+# döndürürler. İlk taramada nemotron-3.5-content-safety 0,2 sn ile listenin
+# BAŞINA yerleşmişti; öyle kullanılsaydı her üretim "başarılı" görünüp çöp
+# JSON döndürürdü. Hata vermedikleri için en tehlikeli tür bunlar.
+ATLA = ("embed", "rerank", "guard", "safety", "reward", "parse",
+        "ocr", "speech", "tts", "asr",
         "vision", "vila", "clip", "diffusion", "riva", "parakeet",
         "coder", "codegemma", "codellama", "codestral", "math",
         "-2b", "-4b", "-7b", "-8b", "llama2", "llama-2")
@@ -183,7 +189,11 @@ def main() -> int:
     print(f"SUSAN (>{ZAMAN_ASIMI:.0f}sn): {len(susan)} — bunlar listeye ALINMAMALI, "
           f"her biri zinciri {20} sn bekletir")
 
-    print("\nai_provider.py'ye yapıştır (en hızlıdan yavaşa sıralı):\n")
+    print("\nai_provider.py için aday liste (hızdan sıralı):\n")
+    print("# UYARI: bu sıra yalnız HIZA göre. Zincirin İLK modeli işin çoğunu\n"
+          "# yapar, o yüzden ilk sıraya en hızlıyı değil KALİTESİ yeterli olanı\n"
+          "# koy. Küçük (nano/lightning/30B) modeller hızlıdır ama Türkçe haber\n"
+          "# metninde büyük modeller kadar iyi değildir — onları alt sıralara al.")
     if hizli:
         print("NVIDIA_RACE_MODELS = [")
         for m, _, sn in calisan:
