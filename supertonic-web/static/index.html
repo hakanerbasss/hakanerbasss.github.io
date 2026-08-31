@@ -1650,13 +1650,20 @@
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--c-e0e0e0);cursor:pointer;margin-top:12px;">
           <input type="checkbox" id="deepseek-race-toggle" onchange="toggleDeepseekRace()">
-          <span>DeepSeek de yarışa katılsın</span>
+          <span>NVIDIA tıkanırsa DeepSeek devreye girsin (yedek)</span>
         </label>
         <p style="color:var(--c-666666);font-size:11px;margin:6px 0 0;">
-          Kapalıyken üretim yalnız ücretsiz modellerle yapılır, DeepSeek'e hiç istek
-          gitmez. Bakiye yüklediğinde bunu aç — DeepSeek de yarışır ve en hızlı
-          cevap veren üretir. Not: yarışı kaybetse bile isteği faturaya yazılabilir,
-          o yüzden ücretsizler yeterken kapalı tutmak daha ekonomik.
+          <b>Açık tutman önerilir.</b> DeepSeek sıranın <b>en sonunda</b> bekler:
+          önce ücretsiz NVIDIA modelleri denenir, yalnız onlar hata verirse (429
+          kota) veya cevap vermezse DeepSeek çağrılır. Yani ücretsizler çalıştığı
+          sürece kuruş harcamaz.
+          <br><br>
+          Kapalıyken NVIDIA kotaya takıldığı anda devreye girecek hiçbir şey
+          kalmaz ve <b>video hiç üretilmez</b> — 31.08'de yaşanan buydu.
+          <br><br>
+          (Not: bu ayar eskiden farklı çalışıyordu — DeepSeek her çağrıda NVIDIA
+          ile aynı anda çağrılıyor ve kaybetse bile faturalanıyordu. Artık öyle
+          değil.)
         </p>
 
         <hr style="border-color:var(--c-222222);margin:16px 0;">
@@ -4031,7 +4038,8 @@ async function loadAiProviders() {
     const hint = document.getElementById('ai-provider-hint');
     if (hint) {
       hint.textContent = d.configured
-        ? ('Otomatik: ' + (d.deepseek_in_race ? 'ücretsiz modeller + DeepSeek' : 'tüm ücretsiz modeller') + ' aynı anda yarışır, ilk cevap veren üretir. Kotaya takılan veya açılmayan modeller yarışı kaybeder, üretim durmaz.')
+        ? ('Otomatik: önce ücretsiz NVIDIA modeli denenir; hata verirse veya 20 sn cevap vermezse sıradaki devreye girer'
+           + (d.deepseek_in_race ? ', en sonda yedek olarak DeepSeek (ücretli).' : '. DeepSeek YEDEK DEĞİL — ücretsizler tıkanırsa üretim durur.'))
         : "NVIDIA anahtarını Ayarlar'dan girince ücretsiz modeller yarışa girer. Şu an sadece DeepSeek kullanılıyor.";
     }
   } catch (e) { console.error('ai providers:', e); }

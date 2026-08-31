@@ -99,17 +99,29 @@ def get_nvidia_key() -> str:
 
 
 def get_deepseek_in_race() -> bool:
-    """DeepSeek ücretsiz modellerle birlikte yarışsın mı? (varsayılan: hayır)
+    """NVIDIA tıkanırsa DeepSeek yedek olarak devreye girsin mi? (varsayılan: EVET)
 
-    Bakiye bittiğinde kapatılır, yüklendiğinde panelden açılır — kod
-    değişikliği gerekmesin diye ayar olarak duruyor.
+    ANLAMI 31.08.2026'da DEĞİŞTİ. Eskiden yarış eş zamanlıydı: bu ayar açıkken
+    DeepSeek HER çağrıda NVIDIA ile birlikte çağrılıyordu ve yarışı kaybetse
+    bile isteği faturalanıyordu — o yüzden varsayılanı kapalıydı.
+
+    Gecikmeli yarışta (bkz. HEDGE_GECIKME) DeepSeek zincirin SONUNDA duruyor:
+    yalnızca NVIDIA modelleri hata verirse veya susarsa çağrılıyor. Yani artık
+    "her seferinde para" değil, "ücretsizler tıkanınca kurtarıcı".
+
+    Varsayılan bu yüzden açık: kapalıyken NVIDIA 429 verdiği anda üretimin
+    devam edecek hiçbir yolu kalmıyor ve video hiç üretilmiyor (31.08 canlı
+    hatası tam olarak buydu). Bakiye bitse bile açık kalması zarar vermez —
+    DeepSeek 402 döner, zincir zaten başka bir şey denemiş olur.
     """
     if AI_RACE_CONFIG.exists():
         try:
-            return bool(json.loads(AI_RACE_CONFIG.read_text()).get("deepseek_in_race"))
+            d = json.loads(AI_RACE_CONFIG.read_text())
+            if "deepseek_in_race" in d:
+                return bool(d["deepseek_in_race"])
         except Exception:
             pass
-    return False
+    return True
 
 
 def kaydet_son_kullanilan(etiket: str, nerede: str) -> None:
