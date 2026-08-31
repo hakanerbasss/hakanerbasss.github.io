@@ -8490,6 +8490,30 @@ def _deepseek_pahali_mi(gun: str, saat: str) -> bool:
     return any(a <= d < b for a, b in DEEPSEEK_PAHALI_ARALIK)
 
 
+def _pahali_saatleri_ayikla(weekly: dict) -> tuple[dict, list[str]]:
+    """Pahalı pencereye düşen saatleri programdan çıkarır.
+
+    Kullanıcı kararı (31.08.2026): "pahalı saatleri dahil etme". Ayıklama
+    KAYDETME anında yapılıyor, çalışma anında değil — böylece panelde görünen
+    liste ile gerçekten çalışan liste aynı oluyor. Çalışma anında sessizce
+    atlansaydı, kullanıcı 11:00'i ekranda görüp neden paylaşım olmadığını
+    anlayamazdı.
+
+    Kuralı kaldırmak isteyen: bu fonksiyonu çağıran 3 kaydetme ucundaki
+    çağrıyı silmek yeterli, başka hiçbir yeri etkilemiyor.
+    """
+    temiz, atilan = {}, []
+    for gun, saatler in weekly.items():
+        kalan = []
+        for t in saatler:
+            if _deepseek_pahali_mi(gun, t):
+                atilan.append(f"{gun} {t}")
+            else:
+                kalan.append(t)
+        temiz[gun] = kalan
+    return temiz, atilan
+
+
 def load_sched_config():
     if SCHED_CONFIG.exists():
         cfg = json.loads(SCHED_CONFIG.read_text())
@@ -9960,13 +9984,15 @@ async def save_ig_only_tr_sched_config(
     for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
         weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
     # sched_v damgalanır ki kullanıcının elle kaydettiği saatler migration'da ezilmesin
+    # Pahalı saatler programa hiç girmiyor (bkz. _pahali_saatleri_ayikla)
+    weekly, _pahali_atilan = _pahali_saatleri_ayikla(weekly)
     cfg = {"enabled": enabled == "true", "voice": voice,
            "video_mode": video_mode if video_mode in ("off", "random") else "off",
            "telegram_topic_pick": telegram_topic_pick == "true",
            "weekly": weekly, "sched_v": _IG_SCHED_VERSION}
     IG_ONLY_TR_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_ig_only_tr_scheduler()
-    return {"ok": True}
+    return {"ok": True, "pahali_atilan": _pahali_atilan}
 
 
 @app.post("/api/ig-only-tr/run-now")
@@ -10633,10 +10659,12 @@ async def save_scheduler_config(
     weekly = {}
     for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
         weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
+    # Pahalı saatler programa hiç girmiyor (bkz. _pahali_saatleri_ayikla)
+    weekly, _pahali_atilan = _pahali_saatleri_ayikla(weekly)
     cfg = {"enabled": enabled == "true", "lang": lang, "voice": voice, "weekly": weekly}
     SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_scheduler()
-    return cfg
+    return {**cfg, "pahali_atilan": _pahali_atilan}
 
 
 @app.post("/api/scheduler/run-now")
@@ -10756,10 +10784,12 @@ async def save_en_shorts_scheduler_config(
     weekly = {}
     for day, val in [("mon",mon),("tue",tue),("wed",wed),("thu",thu),("fri",fri),("sat",sat),("sun",sun)]:
         weekly[day] = [t.strip() for t in val.split(",") if t.strip()]
+    # Pahalı saatler programa hiç girmiyor (bkz. _pahali_saatleri_ayikla)
+    weekly, _pahali_atilan = _pahali_saatleri_ayikla(weekly)
     cfg = {"enabled": enabled == "true", "voice": voice, "ig_enabled": ig_enabled == "true", "weekly": weekly}
     EN_SHORTS_SCHED_CONFIG.write_text(json.dumps(cfg))
     _rebuild_en_shorts_scheduler()
-    return cfg
+    return {**cfg, "pahali_atilan": _pahali_atilan}
 
 
 @app.post("/api/en-shorts-scheduler/run-now")

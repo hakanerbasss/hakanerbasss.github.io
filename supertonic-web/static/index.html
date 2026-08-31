@@ -3408,11 +3408,11 @@ async function igSaatOzeti() {
     `<div style="color:var(--c-cccccc);">Haftada <b>${toplam}</b> paylaşım` +
     ` &nbsp;·&nbsp; <span style="color:var(--c-666666);">varsayılan: ${varsayilan.haftalik_adet} (günde 2)</span></div>` +
     (pahali.length
-      ? `<div style="color:var(--c-f59e0b);margin-top:5px;">⚠ DeepSeek pahalı saatinde ${pahali.length} slot:` +
-        ` ${pahali.join(', ')} <span style="color:var(--c-666666);">— bu saatlerde token ücreti 2 katı</span></div>`
-      : `<div style="color:var(--c-22c55e);margin-top:5px;">✓ Hiçbir slot DeepSeek'in pahalı saatinde değil</div>`) +
+      ? `<div style="color:var(--c-f59e0b);margin-top:5px;">⛔ ${pahali.length} slot pahalı saatte —` +
+        ` <b>Kaydet'e basınca programa alınmayacak</b>: ${pahali.join(', ')}</div>`
+      : `<div style="color:var(--c-22c55e);margin-top:5px;">✓ Hiçbir slot pahalı saatte değil</div>`) +
     `<div style="color:var(--c-666666);margin-top:5px;">Pahalı pencere (TSİ): ${p.araliklar.join(' ve ')} · ${p.gunler}.` +
-    ` Hafta sonu tüm gün yarı fiyat. Ücretsiz NVIDIA modelleri kullanılırken maliyet etkisi yok.</div>`;
+    ` Hafta sonu tüm gün yarı fiyat. Bu saatlere yazılan slotlar kaydedilirken otomatik çıkarılır.</div>`;
 }
 
 async function igVarsayilanaDon() {
@@ -3439,9 +3439,16 @@ async function saveIGOnlyTRScheduler() {
   ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
     fd.append(day, document.getElementById(`ig-times-${day}`).value);
   });
-  await fetch('/api/ig-only-tr/config', { method: 'POST', body: fd });
+  const r = await fetch('/api/ig-only-tr/config', { method: 'POST', body: fd });
+  let atilan = [];
+  try { atilan = (await r.json()).pahali_atilan || []; } catch(e) {}
   const not = document.getElementById('ig-varsayilan-not');
-  if (not) not.textContent = '';
+  if (not) {
+    not.innerHTML = atilan.length
+      ? `<span style="color:var(--c-f59e0b);">${atilan.length} saat pahalı pencerede olduğu için programa alınmadı: ` +
+        `${atilan.map(x => { const [g,t] = x.split(' '); return (_GUN_AD[g]||g) + ' ' + t; }).join(', ')}</span>`
+      : '';
+  }
   await loadIGOnlyTRStatus();
 }
 
