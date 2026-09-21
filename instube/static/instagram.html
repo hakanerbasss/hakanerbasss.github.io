@@ -19,7 +19,7 @@
     <input id="topic" placeholder="örn. yapay zeka, deprem, ekonomi…">
     <div class="row">
       <div><label>Dil</label>
-        <select id="lang">
+        <select id="lang" autocomplete="off">
           <option value="tr">Türkçe</option><option value="en">English</option>
           <option value="de">Deutsch</option><option value="fr">Français</option>
           <option value="es">Español</option><option value="ar">العربية</option>
@@ -60,6 +60,11 @@
 <script src="/common.js"></script>
 <script>
 renderNav('ig'); renderBadges(); setInterval(renderBadges, 30000);
+// Bazı tarayıcılar/WebView'ler <select>'in son seçili değerini sayfa
+// yeniden açılınca kendiliğinden geri getiriyor (autocomplete="off" bunu
+// çoğu yerde engeller ama garanti değil) — varsayılan HER ZAMAN Türkçe
+// olsun diye burada açıkça sıfırlıyoruz.
+document.getElementById('lang').value = 'tr';
 resumeActiveJob();
 
 async function publishInstagram() {

@@ -19,7 +19,7 @@
     <input id="topic" placeholder="örn. yapay zeka, deprem, ekonomi…">
     <div class="row">
       <div><label>Dil</label>
-        <select id="lang">
+        <select id="lang" autocomplete="off">
           <option value="tr">Türkçe</option><option value="en">English</option>
           <option value="de">Deutsch</option><option value="fr">Français</option>
           <option value="es">Español</option><option value="ar">العربية</option>
@@ -76,6 +76,7 @@
 <script src="/common.js"></script>
 <script>
 renderNav('yt'); renderBadges(); setInterval(renderBadges, 30000);
+document.getElementById('lang').value = 'tr';
 resumeActiveJob();
 
 async function publishYoutube() {
