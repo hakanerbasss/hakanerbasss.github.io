@@ -533,6 +533,39 @@ def _parse_llm_json(text: str) -> dict:
         return json.loads(t2)
 
 
+# JSON isteyen çağrılarda _parse_llm_json'ın {...} arasını kesmesi, modelin
+# JSON'dan ÖNCE sızdırdığı düşünce metnini kazayla zaten atıyordu — bu yüzden
+# sızıntı hiç fark edilmemişti. Ama SERBEST METİN isteyen çağrılarda (örn.
+# Instagram açıklaması) böyle bir sınır yok; cevabın TAMAMI düşünce metni
+# olarak gelebiliyor (canlıda görüldü: NVIDIA yarışındaki büyük modellerden
+# biri "We need to write an Instagram caption..." diye planını olduğu gibi
+# yayınladı). Bu iki fonksiyon serbest metin çağrılarının hepsinde kullanılmalı.
+_DUSUNCE_ETIKETI_RE = re.compile(
+    r'<(think|thinking|reasoning|analysis)>.*?</\1>', re.IGNORECASE | re.DOTALL)
+# Modelin "son cevap yerine planını anlattığını" gösteren, ingilizce
+# planlama diliyle başlayan tipik kalıplar. Tam cümle eşleşmesi değil,
+# baştaki birkaç kelime yeterli — hedef DİL Türkçe olduğu için meşru bir
+# Türkçe cevabın bu kalıplarla başlaması pratikte imkansız.
+_DUSUNCE_SIZINTISI_BASLANGIC = (
+    'we need', "let's", 'okay,', 'okay so', 'i need to', 'the user wants',
+    'the user is asking', 'first, i', "i'll write", 'must follow rules',
+)
+
+
+def _llm_serbest_metin_temizle(text: str) -> str:
+    """Serbest metin (JSON olmayan) bir LLM cevabından olası düşünce
+    sızıntısını temizler/tespit eder. Sızıntı varsa boş string döner —
+    çağıran taraf bunu mevcut 'boşsa yedeğe düş' mantığıyla ele alır."""
+    t = (text or '').strip()
+    t = _DUSUNCE_ETIKETI_RE.sub('', t).strip()
+    if not t:
+        return ''
+    basi = t.lower()[:32]
+    if any(basi.startswith(k) for k in _DUSUNCE_SIZINTISI_BASLANGIC):
+        return ''
+    return t
+
+
 def get_tts():
     global tts_model
     if tts_model is None:
@@ -3316,7 +3349,7 @@ Kurallar:
 - Emoji yok, hashtag yok, başlık tekrarlama
 - Son cümle: "Beğenin ve abone olun, her hafta yeni bilgiler paylaşıyorum!"
 - ÖNEMLİ BİÇİM KURALI: Her paragraf arasına gerçek bir BOŞ SATIR (iki alt satır karakteri, \\n\\n) koy — tek bir uzun blok halinde YAZMA, mutlaka paragraflar görsel olarak ayrı satırlarda dursun
-- Sadece açıklama paragraflarını döndür
+- SADECE nihai açıklama metnini yaz. Planını, düşünme sürecini, kuralları tekrar etmeni veya "Tamam, şunu yazacağım" gibi bir giriş cümlesi YAZMA — cevabın İLK KARAKTERİNDEN itibaren doğrudan açıklama metninin kendisi olsun.
 """
             )
         else:
@@ -3346,7 +3379,7 @@ Kurallar:
 - "..." ile KESME — her cümle tam bitişin
 - Emoji yok, hashtag yok, başlık tekrarlama
 - ÖNEMLİ BİÇİM KURALI: Her paragraf arasına gerçek bir BOŞ SATIR (iki alt satır karakteri, \\n\\n) koy — tek bir uzun blok halinde YAZMA, mutlaka paragraflar görsel olarak ayrı satırlarda dursun
-- Sadece açıklama paragraflarını döndür
+- SADECE nihai açıklama metnini yaz. Planını, düşünme sürecini, kuralları tekrar etmeni veya "Tamam, şunu yazacağım" gibi bir giriş cümlesi YAZMA — cevabın İLK KARAKTERİNDEN itibaren doğrudan açıklama metninin kendisi olsun.
 """
             )
         cap_resp, _ = await llm_create(
@@ -3358,7 +3391,22 @@ Kurallar:
             # yüksek) — güvenli pay için yükseltildi.
             max_tokens=1400,
         )
-        ig_caption_desc = cap_resp.choices[0].message.content.strip()
+        ig_caption_desc = _llm_serbest_metin_temizle(cap_resp.choices[0].message.content)
+        # Sızıntı tespit edilip temizlendiyse (boş döndüyse) BİR KEZ daha,
+        # daha da sert bir uyarıyla dene — büyük modeller genelde ikinci
+        # denemede uyarıyı dikkate alıyor. Yine sızarsa aşağıdaki "boşsa
+        # yedeğe düş" mantığı devreye girer.
+        if not ig_caption_desc:
+            print("[CAPTION-GEN] Düşünce sızıntısı tespit edildi, tekrar deneniyor", flush=True)
+            cap_resp2, _ = await llm_create(
+                ai_zincir, "instagram-açıklama-tekrar",
+                messages=[{"role": "user", "content": cap_prompt
+                           + "\n\nUYARI: Önceki cevabın düşünce/plan metniydi, açıklama değildi. "
+                             "Bu sefer SADECE ve DOĞRUDAN açıklama metnini yaz, başka hiçbir şey yazma."}],
+                temperature=0.2,
+                max_tokens=1400,
+            )
+            ig_caption_desc = _llm_serbest_metin_temizle(cap_resp2.choices[0].message.content)
         # Yine de token sınırında kesilirse (cümle ortasında biterse) son tam
         # cümleye kırp — yarım kelimeyle bitmesin.
         if ig_caption_desc and ig_caption_desc[-1] not in ".!?":
