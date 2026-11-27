@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — uygulamalarim/ sayfası eklendi (Play linkleri + TİS Asistanı web butonu)
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `uygulamalarim/index.html`: kartlar, Google Play ve tis.wizaicorp.com butonları. Başka klasöre dokunulmadı.
+
 ### 27.11.2026 — cv/ klasörü eklendi (Hakan Erbaş CV, statik sayfa + PDF)
 **Dal:** main · **Durum:** yalnızca statik dosya, sunucuya etkisi yok
 
