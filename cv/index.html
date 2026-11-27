@@ -14,7 +14,22 @@ body{margin:0;background:#e9edf0}
 .topnav a.on{background:#0f6a8e;color:#fff}
 .topnav a.dl{background:#fff;color:#12354a}
 @media print{.topnav{display:none}}
+</style><style id="edu-css">
+.edu{width:794px;margin:16px auto 0;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.15);padding:16px 22px;box-sizing:border-box;font-family:'Inter',system-ui,sans-serif;border-left:6px solid #0f6a8e}
+.edu h2{margin:0 0 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#0f6a8e;font-weight:700}
+.edu .row{display:flex;gap:10px;align-items:baseline;justify-content:space-between;padding:6px 0;border-top:1px solid #e3eaef}
+.edu .row:first-of-type{border-top:0}
+.edu .t{font-size:13.5px;line-height:1.4;color:#1b2430}
+.edu .t b{color:#12354a}
+.edu .t.main b{font-size:16px}
+.edu .y{font-size:12px;color:#56626e;white-space:nowrap}
+@media print{.edu{display:none}}
 </style></head><body><nav class="topnav"><span class="brand">Hakan Erbaş</span><a href="/cv/" class="on">CV</a><a href="/uygulamalarim/">Uygulamalarım</a><a href="https://github.com/hakanerbasss">GitHub</a><a href="https://www.youtube.com/results?search_query=Hakan+Erbas+3S">YouTube</a><a class="dl" href="/cv/Hakan-Erbas-CV.pdf" download>PDF indir</a></nav>
+<div class="edu" id="edu"><h2>Eğitim</h2>
+<div class="row"><div class="t main"><b>Biyomedikal Mühendisliği (Lisans)</b><br>Namık Kemal Üniversitesi, Çorlu Mühendislik Fakültesi · Diploma notu 3,04/4,00</div><div class="y">2010 – Tem 2014</div></div>
+<div class="row"><div class="t"><b>Sağlık Kurumları İşletmeciliği (Önlisans)</b><br>Anadolu Üniversitesi AÖF · Diploma notu 3,10/4,00</div><div class="y">2011 – Haz 2017</div></div>
+<div class="row"><div class="t"><b>TED Karabük Koleji Özel Anadolu Lisesi</b><br>Fen Bilimleri, yabancı dil İngilizce · Diploma puanı 90,96</div><div class="y">2006 – Haz 2010</div></div>
+</div>
 <div class="page">
 
 <div style="width: 794px; height: 1123px; box-sizing: border-box; display: flex; font-family: 'Inter', system-ui, sans-serif; color: #1b2430; background: #ffffff; overflow: hidden">
@@ -264,6 +279,6 @@ body{margin:0;background:#e9edf0}
 </div>
 </div>
 <script>
-function fit(){var z=Math.min(1,(window.innerWidth-16)/794);document.querySelectorAll('.page').forEach(function(p){p.style.zoom=z})}
+function fit(){var z=Math.min(1,(window.innerWidth-16)/794);document.querySelectorAll('.page,.edu').forEach(function(p){p.style.zoom=z})}
 fit();addEventListener('resize',fit);
 </script></body></html>
