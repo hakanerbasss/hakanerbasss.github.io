@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — cv/ ve uygulamalarim/ PWA yapıldı (ana ekrana eklenebilir)
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `cv/manifest.json`, `cv/sw.js` (ağ öncelikli, CACHE sürüm artırmaya gerek yok), `cv/pwa.js`, `cv/icons/`: PWA dosyaları; menüye "Ana ekrana ekle" butonu eklendi, ilk açılışta bir kez hatırlatır. Kapsam "/", başlangıç /cv/.
+
 ### 27.11.2026 — cv/index.html değişince PDF otomatik yenilenir (GitHub Actions)
 **Dal:** main · **Durum:** Actions çalışması izlenmeli
 

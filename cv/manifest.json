@@ -1,0 +1,16 @@
+{
+  "name": "Hakan Erbaş – CV ve Uygulamalar",
+  "short_name": "Hakan Erbaş",
+  "description": "Biyomedikal mühendisi Hakan Erbaş'ın CV'si ve uygulamaları",
+  "start_url": "/cv/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#12354a",
+  "theme_color": "#12354a",
+  "orientation": "portrait",
+  "lang": "tr",
+  "icons": [
+    {"src": "/cv/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/cv/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
