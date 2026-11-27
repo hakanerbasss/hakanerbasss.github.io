@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — cv/ ve uygulamalarim/: menü ve kartın telefonda tam genişlik olması için düzeltme
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `cv/index.html`, `uygulamalarim/index.html`: taşan içerik yüzünden menü yarım kalıyordu; içerik overflow:hidden sarmalayıcıya alındı.
+
 ### 27.11.2026 — cv/ sayfasının en üstüne Eğitim kartı eklendi
 **Dal:** main · **Durum:** yalnızca statik dosya
 
