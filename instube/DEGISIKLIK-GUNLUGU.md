@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — cv/ klasörü eklendi (Hakan Erbaş CV, statik sayfa + PDF)
+**Dal:** main · **Durum:** yalnızca statik dosya, sunucuya etkisi yok
+
+- `cv/index.html`, `cv/foto.jpg`, `cv/Hakan-Erbas-CV.pdf`: GitHub Pages üzerinde yayınlanır. Başka klasöre dokunulmadı.
+
 ### GG.AA.YYYY — <tek cümlelik özet>
 **Commit:** `<hash>` · **Dal:** `<dal adı veya main>` · **Durum:** sunucuda test edildi / edilmedi
 
