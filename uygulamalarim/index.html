@@ -20,7 +20,14 @@ a.b{display:inline-block;padding:9px 14px;border-radius:9px;background:#0f6a8e;c
 a.b.alt{background:#e8f1f6;color:#12354a}
 .more{text-align:center;margin-top:26px;font-size:14px}
 .more a{color:#0f6a8e;font-weight:600}
-</style></head><body>
+</style><style id="nav-css">
+.topnav{position:sticky;top:0;z-index:10;background:#12354a;display:flex;align-items:center;gap:4px;padding:8px 12px;flex-wrap:wrap;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.topnav .brand{color:#fff;font-weight:800;margin-right:auto;font-size:16px;padding:6px 8px}
+.topnav a{color:#c9dbe6;text-decoration:none;font-size:14px;font-weight:600;padding:7px 11px;border-radius:8px}
+.topnav a.on{background:#0f6a8e;color:#fff}
+.topnav a.dl{background:#fff;color:#12354a}
+@media print{.topnav{display:none}}
+</style></head><body><nav class="topnav"><span class="brand">Hakan Erbaş</span><a href="/cv/">CV</a><a href="/uygulamalarim/" class="on">Uygulamalarım</a><a href="https://github.com/hakanerbasss">GitHub</a><a href="https://www.youtube.com/results?search_query=Hakan+Erbas+3S">YouTube</a><a class="dl" href="/cv/Hakan-Erbas-CV.pdf" download>PDF indir</a></nav>
 <header><h1>Hakan Erbaş</h1><p>Wizaicorp · Android uygulamaları ve web projeleri</p></header>
 <main><div class="grid">
 <div class="card feat"><div class="tag">İş</div><h2>TİS Asistanı</h2><p>Toplu iş sözleşmesi okuma, haklar, taban ücretler, çalışma takvimi, maaş ve bordro analizi, bülten ve topluluk.</p><div class="btns"><a class="b" href="https://play.google.com/store/apps/details?id=com.wizaicorp.tisasistani" target="_blank" rel="noopener">Google Play</a><a class="b alt" href="https://tis.wizaicorp.com" target="_blank" rel="noopener">Web sitesine git</a></div></div>
@@ -30,5 +37,5 @@ a.b.alt{background:#e8f1f6;color:#12354a}
 <div class="card"><div class="tag">Araçlar</div><h2>Dosya Dönüştürücü: PDF, Video</h2><p>PDF ve video dönüştürme aracı.</p><div class="btns"><a class="b" href="https://play.google.com/store/search?q=pub%3AWizaicorp&c=apps" target="_blank" rel="noopener">Google Play'de ara</a></div></div>
 <div class="card"><div class="tag">Strateji</div><h2>Top Atış Oyunu</h2><p>Tank temalı top atış oyunu.</p><div class="btns"><a class="b" href="https://play.google.com/store/search?q=pub%3AWizaicorp&c=apps" target="_blank" rel="noopener">Google Play'de ara</a></div></div>
 </div>
-<div class="more"><a href="https://play.google.com/store/search?q=pub%3AWizaicorp&c=apps" target="_blank" rel="noopener">Tüm uygulamalarım (Google Play)</a> · <a href="https://github.com/hakanerbasss" target="_blank" rel="noopener">GitHub</a> · <a href="../cv/">CV</a></div>
+<div class="more"><a href="https://play.google.com/store/search?q=pub%3AWizaicorp&c=apps" target="_blank" rel="noopener">Tüm uygulamalarım (Google Play)</a> · <a href="https://github.com/hakanerbasss" target="_blank" rel="noopener">GitHub</a> · <a href="/cv/">CV</a></div>
 </main></body></html>

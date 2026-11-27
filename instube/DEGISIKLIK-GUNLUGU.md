@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — cv/ ve uygulamalarim/ sayfalarına üst menü ve PDF indir butonu eklendi
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `cv/index.html`, `uygulamalarim/index.html`: ortak üst menü (CV, Uygulamalarım, GitHub, YouTube, PDF indir); CV sayfası telefonda ekrana sığacak şekilde ölçekleniyor.
+
 ### 27.11.2026 — uygulamalarim/ sayfası eklendi (Play linkleri + TİS Asistanı web butonu)
 **Dal:** main · **Durum:** yalnızca statik dosya
 
