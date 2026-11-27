@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — cv/index.html değişince PDF otomatik yenilenir (GitHub Actions)
+**Dal:** main · **Durum:** Actions çalışması izlenmeli
+
+- `.github/workflows/cv-pdf.yml`: yalnızca `cv/index.html` ve `cv/foto.jpg` değişince çalışır, `cv/Hakan-Erbas-CV.pdf` dosyasını yeniden üretip main'e commit eder. Sunucu akışına dokunmaz.
+
 ### 27.11.2026 — cv/: YouTube yazısı @hakanerbasss, "Yapay Zekâ ile Çalışma" kartı, PDF yenilendi
 **Dal:** main · **Durum:** yalnızca statik dosya
 

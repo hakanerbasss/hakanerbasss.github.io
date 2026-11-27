@@ -1,0 +1,34 @@
+name: CV PDF güncelle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cv/index.html'
+      - 'cv/foto.jpg'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cv-pdf
+  cancel-in-progress: true
+
+jobs:
+  pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PDF üret
+        run: |
+          CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --virtual-time-budget=10000 \
+            --no-pdf-header-footer --print-to-pdf=cv/Hakan-Erbas-CV.pdf "file://$PWD/cv/index.html"
+          test -s cv/Hakan-Erbas-CV.pdf
+      - name: Değiştiyse commit et
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cv/Hakan-Erbas-CV.pdf
+          git diff --cached --quiet || (git commit -m "cv: PDF otomatik güncellendi" && git push)
