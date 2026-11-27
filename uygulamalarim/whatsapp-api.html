@@ -1,0 +1,63 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WhatsApp API ve Toplu Mesaj – Hakan Erbaş</title><meta name="description" content="Kendi sunucuna kurulan WhatsApp API ve toplu mesaj paneli">
+<style id="nav-css">
+.topnav{position:sticky;top:0;z-index:10;background:#12354a;display:flex;align-items:center;gap:4px;padding:8px 12px;flex-wrap:wrap;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.topnav .brand{color:#fff;font-weight:800;margin-right:auto;font-size:16px;padding:6px 8px}
+.topnav a{color:#c9dbe6;text-decoration:none;font-size:14px;font-weight:600;padding:7px 11px;border-radius:8px}
+.topnav a.on{background:#0f6a8e;color:#fff}
+.topnav a.dl{background:#fff;color:#12354a}
+@media print{.topnav{display:none}}
+</style><link rel="manifest" href="/cv/manifest.json"><meta name="theme-color" content="#12354a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Hakan Erbaş"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="apple-touch-icon" href="/cv/icons/icon-180.png"><style>
+*{box-sizing:border-box}html,body{margin:0;max-width:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f8;color:#1b2430;line-height:1.5}
+.hero{background:linear-gradient(135deg,#128c4a,#075e54);color:#fff;padding:34px 18px 30px;text-align:center}
+.hero h1{margin:0 0 8px;font-size:28px}.hero p{margin:0 auto;max-width:640px;font-size:16px;opacity:.95}
+.tag{display:inline-block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.18);padding:4px 12px;border-radius:20px;margin-bottom:12px}
+.btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
+a.b{display:inline-block;padding:11px 18px;border-radius:10px;background:#fff;color:#12354a;text-decoration:none;font-weight:700;font-size:15px}
+a.b.alt{background:rgba(255,255,255,.18);color:#fff}
+main{max-width:920px;margin:0 auto;padding:22px 16px 50px}
+h2{font-size:20px;color:#12354a;margin:30px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+.card h3{margin:0 0 6px;font-size:16px;color:#12354a}.card p{margin:0;font-size:14px;color:#44505c}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.num{background:#fff;border-radius:14px;padding:14px;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+.num b{display:block;font-size:22px;color:#128c4a}.num span{font-size:13px;color:#56626e}
+.shots{display:flex;gap:16px;overflow-x:auto;padding:6px 2px 14px;scroll-snap-type:x mandatory}
+.shot{flex:0 0 auto;width:230px;scroll-snap-align:start;text-align:center}
+.shot img{width:230px;border-radius:22px;border:6px solid #12354a;background:#fff;display:block}
+.shot div{font-size:13px;color:#44505c;margin-top:8px}
+.note{background:#fff8e6;border-left:5px solid #e0a800;border-radius:10px;padding:12px 14px;font-size:14px}
+ul.f{padding-left:20px;margin:0}ul.f li{margin:6px 0;font-size:15px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+code{background:#e8f1f6;padding:1px 6px;border-radius:5px;font-size:13px}
+</style></head><body><nav class="topnav"><span class="brand">Hakan Erbaş</span><a href="/cv/">CV</a><a href="/uygulamalarim/" class="on">Uygulamalarım</a><a href="https://github.com/hakanerbasss">GitHub</a><a href="https://www.youtube.com/@hakanerbasss">YouTube</a><a class="dl" href="/cv/Hakan-Erbas-CV.pdf" download>PDF indir</a><a class="dl" id="installBtn" href="#" onclick="return false">Ana ekrana ekle</a></nav>
+<div class="hero"><span class="tag">Ürün</span><h1>WhatsApp API ve Toplu Mesaj</h1>
+<p>İşletmelerin WhatsApp numarasını bir API'ye ve panele bağlayan, kendi sunucusunda çalışan sistem. Müşteri yönetimi, limit, kara liste ve toplu mesaj dahil. Tek kişi geliştirdim ve yayında tutuyorum.</p>
+<div class="btns"><a class="b" href="https://wa.wizaicorp.com" target="_blank" rel="noopener">Siteye git</a></div></div>
+<main>
+<h2>Kısaca</h2>
+<div class="nums">
+<div class="num"><b>8</b><span>mesaj türü (metin, görsel, belge, ses, konum, canlı konum, kişi, tepki)</span></div>
+<div class="num"><b>50</b><span>mesaj / toplu istek</span></div>
+<div class="num"><b>20+</b><span>API ucu</span></div>
+<div class="num"><b>QR</b><span>ile canlı bağlantı</span></div>
+</div>
+<h2>Neler yapabiliyor?</h2>
+<div class="grid">
+<div class="card"><h3>REST API</h3><p>Her müşteriye özel anahtarla metin, görsel, belge, ses, konum, canlı konum, kişi kartı ve tepki gönderimi. Numaranın WhatsApp'ta kayıtlı olup olmadığını kontrol etme ve gelen mesajlar için webhook.</p></div>
+<div class="card"><h3>Toplu mesaj paneli</h3><p>Rehberden kişi seçme, CSV/JSON rehber yükleme (Google rehber CSV desteği), <code>{isim}</code> ile kişiye özel mesaj, belge/görsel ekleme ve gönderim aralığı seçme.</p></div>
+<div class="card"><h3>Müşteri yönetimi</h3><p>Yönetici panelinden müşteri ekleme, paket ve günlük limit, bitiş tarihi, askıya alma, anahtar yenileme ve bağlantıyı kesme/yeniden kurma.</p></div>
+<div class="card"><h3>Spam ve kötüye kullanım koruması</h3><p>Günlük mesaj limiti, istek hız sınırı, toplu gönderimde mesajlar arası bekleme ve kara liste. Limit aşılınca müşteriye bildirim gider.</p></div>
+<div class="card"><h3>Müşteri paneli ve demo</h3><p>Müşteri kendi bağlantısını QR ile kurar, kullanımını ve API belgesini görür. Demo kaydı ile deneme hesabı açılır.</p></div>
+<div class="card"><h3>Duyuru ve otomatik süre sonu</h3><p>Yöneticiden tüm müşterilere duyuru; süresi biten hesaplar otomatik askıya alınır; paket yükseltme tarih seçerek yapılır.</p></div>
+</div>
+<h2>Arkasındaki mühendislik</h2>
+<div class="cols">
+<div class="card"><h3>Teknik</h3><ul class="f"><li>Node.js, Baileys kütüphanesi, SQLite</li><li>Mobil uyumlu yönetim ve müşteri panelleri (PWA olarak yüklenebilir, açık/koyu tema)</li><li>pm2 ile otomatik yeniden başlatma, tek komutlu VPS kurulum betiği</li><li>GitHub Actions ile otomatik yayın</li></ul></div>
+<div class="card"><h3>Ticari yapı</h3><ul class="f"><li>Müşterinin kendi sunucusuna kurulabilen ürün; tek komutlu kurulum betiği ve kılavuz</li><li>Türkçe tanıtım sayfası ve kayıt akışı</li><li>Paket bazlı günlük limit ve abonelik süresi takibi</li></ul></div>
+</div>
+<p style="margin-top:24px" class="note">Not: Sayfadaki bilgiler sistemin kaynak kodundan derlendi. Canlı panel ekran görüntüleri eklenecek.</p>
+<p style="text-align:center;margin-top:22px"><a href="/uygulamalarim/" style="color:#0f6a8e;font-weight:600">← Tüm uygulamalarım</a></p>
+</main><script src="/cv/pwa.js"></script></body></html>

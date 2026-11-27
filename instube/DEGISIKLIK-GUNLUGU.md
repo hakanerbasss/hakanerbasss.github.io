@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — uygulamalarim/: TİS Asistanı ve WhatsApp API detay sayfaları
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `uygulamalarim/tis-asistani.html` (+ `tis-asistani/*.jpg` ekran görüntüleri, maaş/bordro tutarları kırpıldı), `uygulamalarim/whatsapp-api.html` (kaynak koddan derlenen özellikler), `uygulamalarim/index.html` kartlarına "Detaylı incele" bağlantıları.
+
 ### 27.11.2026 — cv/ ve uygulamalarim/ PWA yapıldı (ana ekrana eklenebilir)
 **Dal:** main · **Durum:** yalnızca statik dosya
 
