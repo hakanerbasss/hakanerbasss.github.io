@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — PDF: Eğitim 1. sayfanın üstüne, Yapay Zekâ bölümü 2. sayfaya eklendi
+**Dal:** main · **Durum:** PDF yine 2 sayfa (Actions otomatik üretir)
+
+- `cv/index.html`: yazdırmaya özel (.po) Eğitim ve Yapay Zekâ blokları; web görünümünde bunlar gizli (web'de üstteki kartlar var). 2. sayfadaki alttaki Eğitim bölümü yazdırmada gizlendi.
+
 ### 27.11.2026 — uygulamalarim/: TİS Asistanı ve WhatsApp API detay sayfaları
 **Dal:** main · **Durum:** yalnızca statik dosya
 
