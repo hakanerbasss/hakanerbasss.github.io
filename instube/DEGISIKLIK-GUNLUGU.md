@@ -20,6 +20,11 @@ Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 - `uygulamalarim/tis-asistani.html`: net değer cümlesi ve telefon çerçeveli büyük görselle güçlendirilmiş giriş; ekran görüntüleri artık gerçek telefon çerçevesinde, tıklayınca büyüyor (native `<dialog>`, dışarı tıklayınca kapanır); "Nasıl çalışır?" (3 adım) ve "Kimler için?" eklendi; "Arkasındaki mühendislik" bölümüne doğrulanmış teknoloji bilgisi (Flask/SQLite/Jinja/vanilla JS, PWA, Android TWA, GitHub Actions ile otomatik APK derleme) eklendi.
 - `tis-asistani/menu.jpg`: sağ kenarda donuk arka planda görünen bir bordro tutarı fark edildi, görsel menü paneliyle sınırlı kalacak şekilde yeniden kırpıldı (gizlilik).
 
+### 27.11.2026 — PDF: Eğitim 1. sayfanın üstüne, Yapay Zekâ bölümü 2. sayfaya eklendi
+**Dal:** main · **Durum:** PDF yine 2 sayfa (Actions otomatik üretir)
+
+- `cv/index.html`: yazdırmaya özel (.po) Eğitim ve Yapay Zekâ blokları; web görünümünde bunlar gizli (web'de üstteki kartlar var). 2. sayfadaki alttaki Eğitim bölümü yazdırmada gizlendi.
+
 ### 27.11.2026 — uygulamalarim/: TİS Asistanı ve WhatsApp API detay sayfaları
 **Dal:** main · **Durum:** yalnızca statik dosya
 
