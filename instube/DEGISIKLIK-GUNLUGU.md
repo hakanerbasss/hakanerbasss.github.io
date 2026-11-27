@@ -14,6 +14,12 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — TİS Asistanı vitrin sayfası: daha güçlü giriş, telefon çerçeveli galeri, "nasıl çalışır" ve teknik detaylar
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `uygulamalarim/tis-asistani.html`: net değer cümlesi ve telefon çerçeveli büyük görselle güçlendirilmiş giriş; ekran görüntüleri artık gerçek telefon çerçevesinde, tıklayınca büyüyor (native `<dialog>`, dışarı tıklayınca kapanır); "Nasıl çalışır?" (3 adım) ve "Kimler için?" eklendi; "Arkasındaki mühendislik" bölümüne doğrulanmış teknoloji bilgisi (Flask/SQLite/Jinja/vanilla JS, PWA, Android TWA, GitHub Actions ile otomatik APK derleme) eklendi.
+- `tis-asistani/menu.jpg`: sağ kenarda donuk arka planda görünen bir bordro tutarı fark edildi, görsel menü paneliyle sınırlı kalacak şekilde yeniden kırpıldı (gizlilik).
+
 ### 27.11.2026 — uygulamalarim/: TİS Asistanı ve WhatsApp API detay sayfaları
 **Dal:** main · **Durum:** yalnızca statik dosya
 

@@ -1,5 +1,5 @@
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TİS Asistanı – Hakan Erbaş</title><meta name="description" content="Sendika üyeleri için toplu iş sözleşmesi asistanı: web + Android">
+<title>TİS Asistanı – Hakan Erbaş</title><meta name="description" content="Sendika üyeleri için toplu iş sözleşmesi asistanı: sözleşmeyi sorarak okutur, maaşı hesaplar, dilekçe yazar. Web + Android">
 <style id="nav-css">
 .topnav{position:sticky;top:0;z-index:10;background:#12354a;display:flex;align-items:center;gap:4px;padding:8px 12px;flex-wrap:wrap;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .topnav .brand{color:#fff;font-weight:800;margin-right:auto;font-size:16px;padding:6px 8px}
@@ -10,51 +10,83 @@
 </style><link rel="manifest" href="/cv/manifest.json"><meta name="theme-color" content="#12354a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Hakan Erbaş"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="apple-touch-icon" href="/cv/icons/icon-180.png"><style>
 *{box-sizing:border-box}html,body{margin:0;max-width:100%;overflow-x:hidden}
 body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f8;color:#1b2430;line-height:1.5}
-.hero{background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff;padding:34px 18px 30px;text-align:center}
-.hero h1{margin:0 0 8px;font-size:28px}.hero p{margin:0 auto;max-width:640px;font-size:16px;opacity:.95}
-.tag{display:inline-block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.18);padding:4px 12px;border-radius:20px;margin-bottom:12px}
-.btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
+.hero{background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff;padding:36px 18px 0;text-align:center;overflow:hidden}
+.hero h1{margin:0 0 10px;font-size:30px}
+.hero .lead{margin:0 auto 6px;max-width:560px;font-size:18px;font-weight:600;line-height:1.4}
+.hero .sub{margin:0 auto;max-width:560px;font-size:15px;opacity:.9}
+.btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px}
 a.b{display:inline-block;padding:11px 18px;border-radius:10px;background:#fff;color:#12354a;text-decoration:none;font-weight:700;font-size:15px}
 a.b.alt{background:rgba(255,255,255,.18);color:#fff}
+.solo{margin:16px 0 0;font-size:13px;opacity:.8}
+.hero-shot{margin-top:28px;padding-bottom:0;display:flex;justify-content:center}
 main{max-width:920px;margin:0 auto;padding:22px 16px 50px}
-h2{font-size:20px;color:#12354a;margin:30px 0 12px}
+h2{font-size:20px;color:#12354a;margin:34px 0 12px}
+h2:first-child{margin-top:0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
 .card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.08)}
 .card h3{margin:0 0 6px;font-size:16px;color:#12354a}.card p{margin:0;font-size:14px;color:#44505c}
 .nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
 .num{background:#fff;border-radius:14px;padding:14px;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,.08)}
 .num b{display:block;font-size:22px;color:#1d4ed8}.num span{font-size:13px;color:#56626e}
-.shots{display:flex;gap:16px;overflow-x:auto;padding:6px 2px 14px;scroll-snap-type:x mandatory}
-.shot{flex:0 0 auto;width:230px;scroll-snap-align:start;text-align:center}
-.shot img{width:230px;border-radius:22px;border:6px solid #12354a;background:#fff;display:block}
-.shot div{font-size:13px;color:#44505c;margin-top:8px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;counter-reset:adim}
+.step{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.08);position:relative;padding-left:52px}
+.step::before{counter-increment:adim;content:counter(adim);position:absolute;left:14px;top:16px;width:28px;height:28px;border-radius:50%;background:#1d4ed8;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.step h3{margin:0 0 4px;font-size:15px;color:#12354a}.step p{margin:0;font-size:13px;color:#44505c}
+.kimler{font-size:14px;color:#44505c;background:#fff;border-radius:12px;padding:12px 14px;margin-top:14px;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+.phone{position:relative;display:inline-block;border-radius:30px;background:#111a24;padding:9px;box-shadow:0 18px 40px rgba(10,20,40,.35);line-height:0}
+.phone::before{content:'';position:absolute;top:19px;left:50%;transform:translateX(-50%);width:46px;height:5px;border-radius:3px;background:#2a3744;z-index:1}
+.phone img{display:block;border-radius:21px;background:#fff}
+.phone button{all:unset;display:block;cursor:zoom-in;line-height:0}
+.phone-hero{width:min(230px,58vw)}
+.phone-hero img{width:100%}
+.shots{display:flex;align-items:flex-start;gap:18px;overflow-x:auto;overflow-y:hidden;padding:8px 2px 16px;scroll-snap-type:x mandatory}
+.shot{flex:0 0 auto;max-width:220px;scroll-snap-align:start;text-align:center}
+.shot .phone{height:340px}
+.shot .phone button{height:100%}
+.shot .phone img{height:100%;width:auto}
+.shot figcaption{font-size:13px;color:#44505c;margin-top:9px}
+dialog#lb{border:none;border-radius:18px;padding:0;max-width:94vw;max-height:92vh;background:transparent}
+dialog#lb::backdrop{background:rgba(10,16,24,.82)}
+dialog#lb img{display:block;max-width:min(360px,88vw);max-height:84vh;border-radius:18px;margin:0 auto}
+dialog#lb button{all:unset;display:block;margin:10px auto 0;color:#fff;font-size:13px;font-weight:600;cursor:pointer;text-align:center;width:100%}
 .note{background:#fff8e6;border-left:5px solid #e0a800;border-radius:10px;padding:12px 14px;font-size:14px}
 ul.f{padding-left:20px;margin:0}ul.f li{margin:6px 0;font-size:15px}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 code{background:#e8f1f6;padding:1px 6px;border-radius:5px;font-size:13px}
 </style></head><body><nav class="topnav"><span class="brand">Hakan Erbaş</span><a href="/cv/">CV</a><a href="/uygulamalarim/" class="on">Uygulamalarım</a><a href="https://github.com/hakanerbasss">GitHub</a><a href="https://www.youtube.com/@hakanerbasss">YouTube</a><a class="dl" href="/cv/Hakan-Erbas-CV.pdf" download>PDF indir</a><a class="dl" id="installBtn" href="#" onclick="return false">Ana ekrana ekle</a></nav>
-<div class="hero"><span class="tag">En önemli projem</span><h1>TİS Asistanı</h1>
-<p>Sendika üyelerinin toplu iş sözleşmesini okumasına, anlamasına ve kullanmasına yardım eden web ve Android uygulaması. Tasarım, yazılım, sunucu ve yayın: baştan sona tek kişi.</p>
-<div class="btns"><a class="b" href="https://tis.wizaicorp.com" target="_blank" rel="noopener">Web uygulamasını aç</a><a class="b alt" href="https://play.google.com/store/apps/details?id=com.wizaicorp.tisasistani" target="_blank" rel="noopener">Google Play</a></div></div>
+<div class="hero"><h1>TİS Asistanı</h1>
+<p class="lead">Sendika üyesi sözleşmesinde ne yazdığını öğrenir, maaşını kendi hesaplar, bordrosunu kontrol eder — hepsi tek uygulamada.</p>
+<p class="sub">Toplu iş sözleşmesi için bağımsız bilgilendirme uygulaması. Web, Android ve Android TV; aynı hesapla.</p>
+<div class="btns"><a class="b" href="https://tis.wizaicorp.com" target="_blank" rel="noopener">Web uygulamasını aç</a><a class="b alt" href="https://play.google.com/store/apps/details?id=com.wizaicorp.tisasistani" target="_blank" rel="noopener">Google Play</a></div>
+<p class="solo">Tasarım, yazılım, sunucu ve yayın: baştan sona tek kişi.</p>
+<div class="hero-shot"><figure class="phone phone-hero"><button type="button" onclick="lbAc('tis-asistani/ana-sayfa.jpg','Ana sayfa')"><img src="tis-asistani/ana-sayfa.jpg" alt="TİS Asistanı ana sayfa ekranı" loading="lazy"></button></figure></div>
+</div>
 <main>
 <h2>Kısaca</h2>
 <div class="nums">
 <div class="num"><b>20+</b><span>ekran ve özellik (menüde)</span></div>
 <div class="num"><b>Web + Android + TV</b><span>aynı hesapla</span></div>
-<div class="num"><b>Yapay zekâ</b><span>madde atıflı cevap</span></div>
+<div class="num"><b>Madde atıflı</b><span>yapay zekâ ile cevap</span></div>
 <div class="num"><b>PDF / Word</b><span>dilekçe çıktısı</span></div>
 </div>
+<h2>Nasıl çalışır?</h2>
+<div class="steps">
+<div class="step"><h3>Üye ol</h3><p>Başvuru iş yeri temsilcisinin onayından geçer.</p></div>
+<div class="step"><h3>Sözleşmeniz yüklü gelir</h3><p>Hangi sendika ve iş yerine bağlısınız, uygulama bilir; size ait sözleşme otomatik tanımlanır.</p></div>
+<div class="step"><h3>Sorun, hesaplayın, yazın</h3><p>Ücret ve izin sorularına madde atıflı cevap alın, maaşınızı hesaplayın, dilekçenizi hazırlayın.</p></div>
+</div>
+<p class="kimler">Kimler için: toplu iş sözleşmesine tabi sendika üyeleri ve iş yeri temsilcileri. Herkes yalnızca kendi sendikasının ve iş yerinin sözleşmesini görür.</p>
 <h2>Uygulamadan görüntüler</h2>
 <div class="shots">
-<div class="shot"><img src="tis-asistani/ana-sayfa.jpg" alt="Ana sayfa" loading="lazy"><div>Ana sayfa: Bugün çalıştım, maaş özeti, bordro kontrolü</div></div>
-<div class="shot"><img src="tis-asistani/menu.jpg" alt="Menü" loading="lazy"><div>Menü: sözleşme, taban ücretler, takvim, bülten, topluluk, bordro analizi</div></div>
-<div class="shot"><img src="tis-asistani/bulten.jpg" alt="Bülten" loading="lazy"><div>Bülten: haftalık, aylık, yıllık çalışma özeti</div></div>
+<figure class="shot"><div class="phone"><button type="button" onclick="lbAc('tis-asistani/ana-sayfa.jpg','Ana sayfa')"><img src="tis-asistani/ana-sayfa.jpg" alt="Ana sayfa" loading="lazy"></button></div><figcaption>Ana sayfa: Bugün çalıştım, maaş özeti, bordro kontrolü</figcaption></figure>
+<figure class="shot"><div class="phone"><button type="button" onclick="lbAc('tis-asistani/menu.jpg','Menü')"><img src="tis-asistani/menu.jpg" alt="Menü" loading="lazy"></button></div><figcaption>Menü: sözleşme, taban ücretler, takvim, bülten, topluluk, bordro analizi</figcaption></figure>
+<figure class="shot"><div class="phone"><button type="button" onclick="lbAc('tis-asistani/bulten.jpg','Bülten')"><img src="tis-asistani/bulten.jpg" alt="Bülten" loading="lazy"></button></div><figcaption>Bülten: haftalık, aylık, yıllık çalışma özeti</figcaption></figure>
 </div>
 <h2>Ne işe yarıyor?</h2>
 <div class="grid">
 <div class="card"><h3>Sözleşmeyi soru sorarak okutur</h3><p>Ücret, izin, mesai, ikramiye, kıdem. Kullanıcının kendi iş yerinde geçerli sözleşmeden cevap üretir ve hangi maddeye dayandığını gösterir.</p></div>
-<div class="card"><h3>Dilekçe hazırlar</h3><p>Savunma, izin talebi, itiraz, şikâyet. Olay kendi cümleleriyle anlatılır, resmî dile çevrilir ve madde atıfları eklenir. PDF veya Word olarak indirilir.</p></div>
-<div class="card"><h3>Maaşı hesaplar</h3><p>Çalışılan günler takvimde işaretlenir; sözleşmedeki ücret, zam ve ödeme kalemlerine göre brüt ve net hakediş tahmini çıkar.</p></div>
+<div class="card"><h3>Dilekçe hazırlar</h3><p>Savunma, izin talebi, itiraz, şikâyet. Olay kendi cümleleriyle anlatılır, resmî dile çevrilir ve madde atıfları eklenir. PDF veya Word olarak indirilir, temsilciye gönderip düzelttirilebilir.</p></div>
+<div class="card"><h3>Maaşı hesaplar</h3><p>Çalışılan günler Çalışma Takvimim'de işaretlenir; sözleşmedeki ücret, zam ve ödeme kalemlerine göre brüt ve net hakediş tahmini çıkar.</p></div>
 <div class="card"><h3>Bordroyu sözleşmeyle karşılaştırır</h3><p>E-bordro satır satır sözleşmeyle kıyaslanır, fark varsa gösterilir. Bu özellik yapay zekâ kullanmaz; bordro dosyası saklanmaz.</p></div>
 <div class="card"><h3>Bülten</h3><p>Haftalık, aylık ve yıllık çalışma özeti: çalışılan gün, fazla mesai, gece çalışması, izin ve rapor.</p></div>
 <div class="card"><h3>Temsilciyle bağlantı</h3><p>Duyurular, katılım çağrıları, doğrudan mesaj; hazırlanan dilekçe temsilciye gönderilip düzeltilebilir.</p></div>
@@ -65,8 +97,14 @@ code{background:#e8f1f6;padding:1px 6px;border-radius:5px;font-size:13px}
 <h2>Arkasındaki mühendislik</h2>
 <div class="cols">
 <div class="card"><h3>Ne yaptım?</h3><ul class="f"><li>Web uygulaması, yönetim paneli ve Android uygulaması</li><li>Yapay zekâ destekli sözleşme sorgulama ve dilekçe üretimi</li><li>Üyelik, temsilci onayı, abonelik, bildirim</li><li>Sunucu kurulumu, alan adı ve otomatik yayın (GitHub Actions)</li></ul></div>
-<div class="card"><h3>Güven ve gizlilik</h3><ul class="f"><li>Herkes yalnızca kendi sendika ve iş yerinin sözleşmesini görür</li><li>Yazışmalar yalnızca kendi temsilcisine gider</li><li>Bilgilendirme amaçlıdır, hukuki tavsiye vermez; uygulama bunu açıkça belirtir</li><li>Hesap ve veri silme sayfası vardır</li></ul></div>
+<div class="card"><h3>Teknoloji</h3><ul class="f"><li><code>Flask</code> (Python), <code>SQLite</code>, <code>Jinja</code>, vanilla JavaScript</li><li>Progressive Web App (PWA): telefona kurulabilir</li><li>Android'de Trusted Web Activity (TWA) ile mağaza uygulaması, ayrı bir Android TV sürümü</li><li>Android APK, GitHub Actions ile otomatik derlenir</li></ul></div>
+<div class="card"><h3>Güven ve gizlilik</h3><ul class="f"><li>Herkes yalnızca kendi sendika ve iş yerinin sözleşmesini görür</li><li>Yazışmalar yalnızca kendi temsilcisine gider, bordro dosyası saklanmaz</li><li>Bilgilendirme amaçlıdır, hukuki tavsiye vermez; uygulama bunu açıkça belirtir</li><li>Hesap ve veri silme sayfası vardır</li></ul></div>
 </div>
 <p style="margin-top:24px" class="note">Not: Uygulama üyelik gerektirir; üye başvurusu iş yeri temsilcisinin onayına gider. Ekran görüntülerindeki kişisel maaş ve bordro tutarları kırpılmıştır.</p>
 <p style="text-align:center;margin-top:22px"><a href="/uygulamalarim/" style="color:#0f6a8e;font-weight:600">← Tüm uygulamalarım</a></p>
-</main><script src="/cv/pwa.js"></script></body></html>
+</main>
+<dialog id="lb" onclick="if(event.target===this)this.close()"><img id="lbImg" src="" alt=""><button type="button" onclick="document.getElementById('lb').close()">Kapat</button></dialog>
+<script>
+function lbAc(src,alt){var d=document.getElementById('lb'),i=document.getElementById('lbImg');i.src=src;i.alt=alt;d.showModal();}
+</script>
+<script src="/cv/pwa.js"></script></body></html>
