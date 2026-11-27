@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — menüdeki YouTube butonu kanala (@hakanerbasss) bağlandı
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `cv/index.html`, `uygulamalarim/index.html`: YouTube bağlantısı arama yerine kanal adresi.
+
 ### 27.11.2026 — cv/ ve uygulamalarim/: menü ve kartın telefonda tam genişlik olması için düzeltme
 **Dal:** main · **Durum:** yalnızca statik dosya
 
