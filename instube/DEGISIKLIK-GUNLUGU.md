@@ -14,6 +14,11 @@ her zaman en yenisidir. Kod okuyup tahmin etme — önce buraya bak.
 Kayıt şablonu — kopyala, doldur, **en üste** yapıştır:
 
 ```
+### 27.11.2026 — cv/: YouTube yazısı @hakanerbasss, "Yapay Zekâ ile Çalışma" kartı, PDF yenilendi
+**Dal:** main · **Durum:** yalnızca statik dosya
+
+- `cv/index.html`, `cv/Hakan-Erbas-CV.pdf`: kart yalnızca web sayfasında (PDF çıktısında gizli).
+
 ### 27.11.2026 — menüdeki YouTube butonu kanala (@hakanerbasss) bağlandı
 **Dal:** main · **Durum:** yalnızca statik dosya
 
